@@ -1,14 +1,15 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ],
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
+    "files": [],
+    "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }],
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["./src/*"],
+            "@/types": ["./src/types.ts"],
+            "@/components/*": ["./src/components/*"],
+            "@/utils/*": ["./src/utils/*"],
+            "@/hooks/*": ["./src/hooks/*"],
+            "@/styles/*": ["./src/styles/*"]
+        }
     }
-  }
 }
-

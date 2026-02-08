@@ -1,2 +1,1 @@
-export { MasterMix } from './MasterMix'
-
+export { MasterMix } from "./MasterMix";

@@ -1,2 +1,1 @@
-export { AIActivity } from './AIActivity'
-
+export { AIActivity } from "./AIActivity";

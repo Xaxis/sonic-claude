@@ -1,2 +1,1 @@
-export { Analytics } from './Analytics'
-
+export { Analytics } from "./Analytics";

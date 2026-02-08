@@ -12,7 +12,11 @@ from backend.routes import ai_router, osc_router
 from backend.routes.ai import set_ai_services
 from backend.routes.osc import set_osc_service, set_ai_agent
 from backend.routes.websocket import router as websocket_router, set_websocket_services
-from backend.services import AudioAnalyzer, IntelligentAgent, LLMMusicalAgent, OSCService
+from backend.routes.samples import router as samples_router, set_sample_services
+from backend.services import (
+    AudioAnalyzer, IntelligentAgent, LLMMusicalAgent, OSCService,
+    SampleRecorder, SpectralAnalyzer, SynthesisAgent
+)
 
 # Setup logging
 setup_logging("INFO")
@@ -23,6 +27,9 @@ audio_analyzer = None
 ai_agent = None
 llm_agent = None
 osc_service = None
+sample_recorder = None
+spectral_analyzer = None
+synthesis_agent = None
 ai_loop_task = None
 
 
@@ -52,21 +59,28 @@ async def ai_feedback_loop():
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     global audio_analyzer, ai_agent, llm_agent, osc_service, ai_loop_task
-    
+    global sample_recorder, spectral_analyzer, synthesis_agent
+
     logger.info("🎵 Starting Sonic Claude API Server...")
-    
+
     # Initialize services
     try:
         osc_service = OSCService()
         audio_analyzer = AudioAnalyzer()
         llm_agent = LLMMusicalAgent(osc_service.client)
         ai_agent = IntelligentAgent(osc_service.client, audio_analyzer, llm_agent)
-        
+
+        # Initialize sample services
+        sample_recorder = SampleRecorder(samples_dir="samples", sample_rate=48000)
+        spectral_analyzer = SpectralAnalyzer()
+        synthesis_agent = SynthesisAgent()
+
         # Inject services into routes
         set_ai_services(ai_agent, llm_agent)
         set_osc_service(osc_service)
         set_ai_agent(ai_agent)
         set_websocket_services(audio_analyzer, ai_agent)
+        set_sample_services(sample_recorder, spectral_analyzer, synthesis_agent)
 
         logger.info("✅ All services initialized")
 
@@ -77,7 +91,7 @@ async def lifespan(app: FastAPI):
         # Start AI feedback loop
         ai_loop_task = asyncio.create_task(ai_feedback_loop())
         logger.info("🤖 AI feedback loop started")
-        
+
     except Exception as e:
         logger.error(f"Failed to initialize services: {e}")
         raise
@@ -112,6 +126,7 @@ app.add_middleware(
 app.include_router(ai_router)
 app.include_router(osc_router)
 app.include_router(websocket_router)
+app.include_router(samples_router)
 
 
 @app.get("/")

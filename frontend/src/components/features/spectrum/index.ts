@@ -1,2 +1,1 @@
-export { SpectrumAnalyzer } from './SpectrumAnalyzer'
-
+export { SpectrumAnalyzer } from "./SpectrumAnalyzer";

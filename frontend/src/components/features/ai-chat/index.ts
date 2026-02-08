@@ -1,2 +1,1 @@
-export { AIChat } from './AIChat'
-
+export { AIChat } from "./AIChat";

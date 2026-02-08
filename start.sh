@@ -66,34 +66,61 @@ echo ""
 cleanup() {
     echo ""
     echo "🛑 Stopping servers..."
-    kill $BACKEND_PID $FRONTEND_PID 2>/dev/null
+    kill $BACKEND_PID $FRONTEND_PID $BACKEND_LOGGER_PID $FRONTEND_LOGGER_PID 2>/dev/null
+    rm -f "$BACKEND_PIPE" "$FRONTEND_PIPE" 2>/dev/null
     exit 0
 }
 
 trap cleanup SIGINT SIGTERM
 
-# Start the FastAPI backend server
-echo "Starting backend server..."
-uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload > /tmp/sonic-claude-backend.log 2>&1 &
+# Create named pipes for log streaming
+BACKEND_PIPE="/tmp/sonic-claude-backend-pipe-$$"
+FRONTEND_PIPE="/tmp/sonic-claude-frontend-pipe-$$"
+mkfifo "$BACKEND_PIPE" "$FRONTEND_PIPE"
+
+# Function to prefix and colorize logs
+stream_backend_logs() {
+    while IFS= read -r line; do
+        echo -e "\033[1;34m[BACKEND]\033[0m $line"
+    done < "$BACKEND_PIPE"
+}
+
+stream_frontend_logs() {
+    while IFS= read -r line; do
+        echo -e "\033[1;32m[FRONTEND]\033[0m $line"
+    done < "$FRONTEND_PIPE"
+}
+
+# Start log streaming in background
+stream_backend_logs &
+BACKEND_LOGGER_PID=$!
+stream_frontend_logs &
+FRONTEND_LOGGER_PID=$!
+
+# Start the FastAPI backend server with auto-reload
+echo "Starting backend server (auto-reload enabled)..."
+uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir backend > "$BACKEND_PIPE" 2>&1 &
 BACKEND_PID=$!
 
 # Wait a moment for backend to start
 sleep 2
 
-# Start the frontend dev server with proper environment
-echo "Starting frontend server..."
-cd frontend && npm run dev -- --host 0.0.0.0 > /tmp/sonic-claude-frontend.log 2>&1 &
+# Start the frontend dev server with HMR (Hot Module Replacement)
+echo "Starting frontend server (HMR enabled)..."
+cd frontend && npm run dev -- --host 0.0.0.0 > "$FRONTEND_PIPE" 2>&1 &
 FRONTEND_PID=$!
 cd ..
 
 echo ""
 echo "✅ Servers started!"
-echo "   Backend PID: $BACKEND_PID"
-echo "   Frontend PID: $FRONTEND_PID"
+echo "   Backend PID: $BACKEND_PID (auto-reload on code changes)"
+echo "   Frontend PID: $FRONTEND_PID (HMR on code changes)"
 echo ""
-echo "📊 View logs:"
-echo "   Backend:  tail -f /tmp/sonic-claude-backend.log"
-echo "   Frontend: tail -f /tmp/sonic-claude-frontend.log"
+echo "🔄 Auto-reload enabled - watching for changes..."
+echo "   - Backend: Changes to backend/ will auto-reload"
+echo "   - Frontend: Changes to frontend/src/ will hot-reload in browser"
+echo ""
+echo "========================================"
 echo ""
 
 # Wait for both processes

@@ -65,6 +65,10 @@ async def chat_with_ai(request: ChatRequest):
             "current_state": status.get("current_state", {}),
         }
 
+        # Add spectral data if provided
+        if request.spectral_data:
+            audio_context["spectral_data"] = request.spectral_data
+
         # Process message with LLM
         response, reasoning = await _llm_agent.process_user_message(
             request.message,

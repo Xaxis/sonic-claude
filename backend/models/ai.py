@@ -2,7 +2,7 @@
 AI agent models
 """
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional, Dict, Any
 from .audio import AudioAnalysis
 from .musical import MusicalState, Decision
 
@@ -20,6 +20,7 @@ class AIStatus(BaseModel):
 class ChatRequest(BaseModel):
     """User chat message to AI"""
     message: str = Field(..., min_length=1, max_length=1000, description="User message")
+    spectral_data: Optional[Dict[str, Any]] = Field(None, description="Optional spectral features from sample analysis")
 
 
 class ChatResponse(BaseModel):
