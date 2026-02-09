@@ -58,7 +58,7 @@ class Track(BaseModel):
     clips: List[Clip] = Field(default_factory=list, description="Clips on this track")
     
     # Routing
-    instrument: str = Field(default="piano", description="Sonic Pi synth/instrument")
+    instrument: str = Field(default="piano", description="Synth/instrument name")
     midi_channel: int = Field(default=0, ge=0, le=15, description="MIDI channel")
     
     # Mixing

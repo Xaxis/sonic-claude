@@ -436,14 +436,7 @@ async def transcription_websocket(websocket: WebSocket):
                                 }
                             })
 
-                            # Auto-send to Sonic Pi if enabled
-                            if auto_send and result.combined_code:
-                                await _transcription_engine.send_to_sonic_pi(result.combined_code)
-                                await websocket.send_json({
-                                    "type": "status",
-                                    "timestamp": time.time(),
-                                    "data": {"status": "sent_to_sonic_pi"}
-                                })
+                            # TODO: Send to audio engine for playback if auto_send enabled
 
                             # Clear buffer and continue
                             audio_buffer = []
@@ -500,27 +493,5 @@ async def transcription_websocket(websocket: WebSocket):
         logger.info("🧹 WebSocket cleanup complete")
 
 
-@router.post("/send-to-sonic-pi")
-async def send_code_to_sonic_pi(code: dict):
-    """Send generated code to Sonic Pi"""
-    try:
-        if not _transcription_engine:
-            raise HTTPException(status_code=503, detail="Transcription engine not initialized")
-
-        sonic_pi_code = code.get("code", "")
-        if not sonic_pi_code:
-            raise HTTPException(status_code=400, detail="No code provided")
-
-        success = await _transcription_engine.send_to_sonic_pi(sonic_pi_code)
-
-        if success:
-            return {"status": "sent", "message": "Code sent to Sonic Pi"}
-        else:
-            raise HTTPException(status_code=500, detail="Failed to send code to Sonic Pi")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error sending code to Sonic Pi: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+# Removed send-to-sonic-pi endpoint - will be replaced with audio engine playback
 

@@ -13,11 +13,7 @@ class Settings(BaseSettings):
     app_name: str = "Sonic Claude API"
     app_version: str = "2.0.0"
     debug: bool = False
-    
-    # Sonic Pi OSC Settings
-    sonic_pi_host: str = "127.0.0.1"
-    sonic_pi_port: int = 4560
-    
+
     # Audio Settings
     audio_sample_rate: int = 48000
     audio_chunk_size: int = 2048

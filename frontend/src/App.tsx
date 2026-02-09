@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAIStatus } from "@/hooks/use-ai-status";
 import { useSpectrumWebSocket } from "@/hooks/use-spectrum-websocket";
-import { Header } from "@/components/features/header";
+import { Header } from "@/components/layout/header";
 import { Controls } from "@/components/features/controls";
 import { AIChat } from "@/components/features/ai-chat";
-import { SpectrumAnalyzer } from "@/components/features/spectrum";
+import { SpectrumAnalyzer } from "@/components/features/spectrum-analyzer";
 import { Analytics } from "@/components/features/analytics";
 import { AIActivity } from "@/components/features/ai-activity";
 import { SampleStudio } from "@/components/features/sample-studio/SampleStudio";
@@ -31,22 +31,26 @@ export default function App() {
         setSpectrumConnected,
     } = useGlobalState();
 
-    // Sync local state to global state
+    // Sync global status
     useEffect(() => {
         if (status) {
             setAIStatus(status);
         }
     }, [status, setAIStatus]);
 
+    // Sync spectrum data
     useEffect(() => {
         setSpectrum(spectrum);
     }, [spectrum, setSpectrum]);
 
+    // Sync spectrum connection status
     useEffect(() => {
         setSpectrumConnected(spectrumConnected);
     }, [spectrumConnected, setSpectrumConnected]);
 
     // Handle sending transcription to timeline
+    // @TODO - This should be refactored to use the same API as the "Add to Sequencer" button in the transcription panel??
+    // @TODO - Move this out of main App.tsx
     const handleSendToTimeline = useCallback(async (result: LiveTranscriptionResult) => {
         try {
             // Create or get current sequence
@@ -195,7 +199,7 @@ export default function App() {
     ];
 
     return (
-        <div className="from-background via-background to-background/95 flex h-screen flex-col overflow-hidden bg-gradient-to-br">
+        <div className="from-background via-background to-background/95 flex min-h-screen flex-col overflow-auto bg-gradient-to-br">
             {/* Header */}
             <Header
                 isAIOnline={aiStatus?.is_running ?? false}
@@ -204,7 +208,7 @@ export default function App() {
             />
 
             {/* Main Content - Tabbed Layout */}
-            <div className="min-h-0 flex-1 overflow-hidden p-2">
+            <div className="min-h-0 flex-1 overflow-auto p-2">
                 <TabbedLayout
                     panels={panels}
                     defaultTabs={defaultTabs}

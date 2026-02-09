@@ -113,7 +113,7 @@ export function DraggableLayout({ panels, onLayoutChange, onResetLayout }: Dragg
             </div>
 
             {/* Grid Container */}
-            <div ref={containerRef} className="min-h-0 flex-1 overflow-hidden">
+            <div ref={containerRef} className="min-h-0 flex-1 overflow-auto">
                 {containerSize.width > 0 && containerSize.height > 0 && (
                     <ReactGridLayout
                         className="layout"

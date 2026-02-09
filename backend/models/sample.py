@@ -52,9 +52,9 @@ class SpectralFeatures(BaseModel):
 class SynthesisParameters(BaseModel):
     """LLM-generated synthesis parameters to replicate a sample"""
     sample_id: str = Field(..., description="Reference to original sample")
-    
-    # Sonic Pi synth selection
-    synth_type: str = Field(..., description="Recommended Sonic Pi synth (e.g., 'saw', 'prophet', 'tb303')")
+
+    # Synth selection
+    synth_type: str = Field(..., description="Recommended synth type (e.g., 'saw', 'prophet', 'tb303')")
     
     # Core parameters
     note: str = Field(..., description="MIDI note or frequency")

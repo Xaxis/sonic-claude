@@ -66,7 +66,7 @@ class SynthesisAgent:
         # Convert harmonics to readable format
         harmonics_str = ", ".join([f"{h:.1f}Hz" for h in features.harmonics[:5]])
         
-        prompt = f"""You are an expert in audio synthesis and Sonic Pi. Analyze these spectral features from an audio sample and generate optimal Sonic Pi synthesis parameters to replicate it.
+        prompt = f"""You are an expert in audio synthesis. Analyze these spectral features from an audio sample and generate optimal synthesis parameters to replicate it.
 
 SPECTRAL ANALYSIS:
 - Fundamental Frequency: {features.fundamental_frequency:.1f} Hz

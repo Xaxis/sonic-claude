@@ -37,10 +37,7 @@ export interface ChatMessage {
     timestamp: number;
 }
 
-export interface OSCParameter {
-    parameter: string;
-    value: number | string;
-}
+// Removed OSCParameter - no longer using OSC/Sonic Pi
 
 export interface AudioDevice {
     index: number;
@@ -294,4 +291,187 @@ export interface TimelineSequence {
     loop_enabled: boolean;
     loop_start: number;  // beats
     loop_end: number;  // beats
+}
+
+// ============================================================================
+// AUDIO ENGINE TYPES (SuperCollider-based)
+// ============================================================================
+
+// Engine Status
+export interface AudioEngineStatus {
+    is_running: boolean;
+    sample_rate: number;
+    block_size: number;
+    num_input_channels: number;
+    num_output_channels: number;
+    cpu_usage: number;
+}
+
+// Synthesis Service Types
+export interface SynthDefInfo {
+    name: string;
+    category: string;
+    parameters: Record<string, SynthParameter>;
+    description: string;
+}
+
+export interface SynthParameter {
+    name: string;
+    default_value: number;
+    min_value: number;
+    max_value: number;
+    description: string;
+}
+
+export interface Synth {
+    id: string;
+    synthdef: string;
+    node_id: number;
+    parameters: Record<string, number>;
+    is_playing: boolean;
+}
+
+export interface CreateSynthRequest {
+    synthdef: string;
+    parameters?: Record<string, number>;
+}
+
+export interface UpdateSynthRequest {
+    parameters: Record<string, number>;
+}
+
+// Effects Service Types
+export interface EffectDefInfo {
+    name: string;
+    category: string;
+    parameters: Record<string, EffectParameter>;
+    description: string;
+}
+
+export interface EffectParameter {
+    name: string;
+    default_value: number;
+    min_value: number;
+    max_value: number;
+    description: string;
+}
+
+export interface Effect {
+    id: string;
+    effectdef: string;
+    node_id: number;
+    parameters: Record<string, number>;
+    is_active: boolean;
+}
+
+export interface CreateEffectRequest {
+    effectdef: string;
+    parameters?: Record<string, number>;
+}
+
+export interface UpdateEffectRequest {
+    parameters: Record<string, number>;
+}
+
+// Mixer Service Types
+export interface MixerTrack {
+    id: string;
+    name: string;
+    volume: number;  // 0.0-2.0
+    pan: number;  // -1.0 to 1.0
+    is_muted: boolean;
+    is_solo: boolean;
+    send_levels: Record<string, number>;  // aux_track_id -> level
+    effect_chain: string[];  // effect_ids
+    group_id: string | null;
+    bus_index: number;
+}
+
+export interface CreateTrackRequest {
+    name: string;
+    volume?: number;
+    pan?: number;
+}
+
+export interface UpdateTrackVolumeRequest {
+    volume: number;
+}
+
+export interface UpdateTrackPanRequest {
+    pan: number;
+}
+
+export interface SetSendLevelRequest {
+    aux_track_id: string;
+    level: number;
+}
+
+export interface AddEffectToTrackRequest {
+    effect_id: string;
+    position?: number;
+}
+
+export interface SetTrackGroupRequest {
+    group_id: string | null;
+}
+
+// Sequencer Service Types
+export interface Sequence {
+    id: string;
+    name: string;
+    tempo: number;
+    time_signature: string;
+    clips: SequencerClip[];
+    is_playing: boolean;
+    current_position: number;  // beats
+}
+
+export interface SequencerClip {
+    id: string;
+    name: string;
+    type: "midi" | "audio";
+    track_id: string;
+    start_time: number;  // beats
+    duration: number;  // beats
+
+    // MIDI-specific
+    midi_events?: MIDIEvent[];
+
+    // Audio-specific
+    audio_file_path?: string;
+    audio_offset?: number;  // seconds
+
+    is_muted: boolean;
+    is_looped: boolean;
+}
+
+export interface CreateSequenceRequest {
+    name: string;
+    tempo?: number;
+    time_signature?: string;
+}
+
+export interface AddClipRequest {
+    clip_type: "midi" | "audio";
+    track_id: string;
+    start_time: number;
+    duration: number;
+    midi_events?: MIDIEvent[];
+    audio_file_path?: string;
+}
+
+export interface UpdateClipRequest {
+    start_time?: number;
+    duration?: number;
+    midi_events?: MIDIEvent[];
+    is_muted?: boolean;
+    is_looped?: boolean;
+}
+
+export interface SetTempoRequest {
+    tempo: number;
+}
+
+export interface SeekRequest {
+    position: number;  // beats
 }

@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Controls } from "@/components/features/controls";
 import { AIChat } from "@/components/features/ai-chat";
-import { SpectrumAnalyzer } from "@/components/features/spectrum";
+import { SpectrumAnalyzer } from "@/components/features/spectrum-analyzer";
 import { Analytics } from "@/components/features/analytics";
 import { AIActivity } from "@/components/features/ai-activity";
 import { SampleStudio } from "@/components/features/sample-studio/SampleStudio";

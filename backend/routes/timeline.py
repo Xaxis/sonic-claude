@@ -13,7 +13,6 @@ from backend.models.timeline import (
     CreateSequenceRequest, AddTrackRequest, AddClipRequest, UpdateClipRequest,
     TimelineUpdate
 )
-from backend.services import TimelineToSonicPiConverter, OSCService
 
 router = APIRouter(prefix="/timeline", tags=["timeline"])
 
@@ -21,15 +20,10 @@ router = APIRouter(prefix="/timeline", tags=["timeline"])
 sequences: Dict[str, TimelineSequence] = {}
 active_websockets: List[WebSocket] = []
 
-# Service instances (set via dependency injection)
-converter = TimelineToSonicPiConverter()
-osc_service: Optional[OSCService] = None
 
-
-def set_timeline_services(osc: OSCService):
-    """Set service dependencies"""
-    global osc_service
-    osc_service = osc
+def set_timeline_services():
+    """Set service dependencies (placeholder for future audio engine)"""
+    pass
 
 
 @router.post("/sequences", response_model=TimelineSequence)
@@ -238,28 +232,20 @@ async def delete_clip(sequence_id: str, clip_id: str):
 
 @router.post("/sequences/{sequence_id}/play")
 async def play_sequence(sequence_id: str):
-    """Convert timeline sequence to Sonic Pi code and send to Sonic Pi"""
+    """Play timeline sequence (will be implemented with new audio engine)"""
     if sequence_id not in sequences:
         raise HTTPException(status_code=404, detail="Sequence not found")
 
     sequence = sequences[sequence_id]
 
-    # Convert to Sonic Pi code
-    code = converter.convert_sequence(sequence)
+    # TODO: Send to new audio engine for playback
+    # For now, just update state
+    sequence.is_playing = True
 
-    # Send to Sonic Pi via OSC
-    if osc_service:
-        await osc_service.send_code(code)
+    # Broadcast update
+    await broadcast_update("sequence_playing", sequence_id, {"is_playing": True})
 
-        # Update sequence state
-        sequence.is_playing = True
-
-        # Broadcast update
-        await broadcast_update("sequence_playing", sequence_id, {"is_playing": True})
-
-        return {"status": "playing", "code": code}
-    else:
-        raise HTTPException(status_code=503, detail="OSC service not available")
+    return {"status": "playing", "message": "Audio engine playback not yet implemented"}
 
 
 @router.post("/sequences/{sequence_id}/stop")
@@ -271,9 +257,7 @@ async def stop_sequence(sequence_id: str):
     sequence = sequences[sequence_id]
     sequence.is_playing = False
 
-    # Send stop command to Sonic Pi
-    if osc_service:
-        await osc_service.send_code("stop")
+    # TODO: Send stop command to new audio engine
 
     # Broadcast update
     await broadcast_update("sequence_stopped", sequence_id, {"is_playing": False})

@@ -45,10 +45,10 @@ class StemAnalysis(BaseModel):
 
 
 class SonicPiCode(BaseModel):
-    """Generated Sonic Pi code for a stem"""
+    """Generated audio code for a stem (legacy - will be replaced with audio engine format)"""
     stem_type: StemType = Field(..., description="Type of stem")
-    code: str = Field(..., description="Generated Sonic Pi code")
-    live_loop_name: str = Field(..., description="Name of the live_loop")
+    code: str = Field(..., description="Generated audio code")
+    live_loop_name: str = Field(..., description="Name of the loop")
     synth_name: str = Field(..., description="Synth used")
     parameters: Dict[str, Any] = Field(default_factory=dict, description="Synth parameters")
 

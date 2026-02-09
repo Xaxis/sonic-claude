@@ -51,51 +51,7 @@ class APIClient {
         });
     }
 
-    // OSC Control
-    async sendOSC(parameter: string, value: number | string): Promise<void> {
-        await this.request("/osc/send", {
-            method: "POST",
-            body: JSON.stringify({ parameter, value }),
-        });
-    }
-
-    // Transport
-    async play(): Promise<void> {
-        await this.sendOSC("transport", "play");
-    }
-
-    async stop(): Promise<void> {
-        await this.sendOSC("transport", "stop");
-    }
-
-    // Parameters
-    async setBPM(bpm: number): Promise<void> {
-        await this.sendOSC("bpm", bpm);
-    }
-
-    async setIntensity(intensity: number): Promise<void> {
-        await this.sendOSC("intensity", intensity);
-    }
-
-    async setCutoff(cutoff: number): Promise<void> {
-        await this.sendOSC("cutoff", cutoff);
-    }
-
-    async setReverb(reverb: number): Promise<void> {
-        await this.sendOSC("reverb", reverb);
-    }
-
-    async setEcho(echo: number): Promise<void> {
-        await this.sendOSC("echo", echo);
-    }
-
-    async setKey(key: string): Promise<void> {
-        await this.sendOSC("key", key);
-    }
-
-    async setScale(scale: string): Promise<void> {
-        await this.sendOSC("scale", scale);
-    }
+    // Removed OSC control methods - will be replaced with audio engine API
 
     // Sample Recording
     async listAudioDevices(): Promise<AudioDevice[]> {
@@ -197,12 +153,7 @@ class APIClient {
         });
     }
 
-    async sendCodeToSonicPi(code: string): Promise<{ status: string; message: string }> {
-        return this.request("/transcribe/send-to-sonic-pi", {
-            method: "POST",
-            body: JSON.stringify({ code }),
-        });
-    }
+    // Removed sendCodeToSonicPi - will be replaced with audio engine playback
 
     // Timeline/Sequencer
     async createSequence(name: string, tempo: number = 120, timeSignature: string = "4/4"): Promise<TimelineSequence> {

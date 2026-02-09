@@ -8,27 +8,28 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.core import settings, setup_logging, get_logger
-from backend.routes import ai_router, osc_router
+from backend.routes import ai_router
 from backend.routes.ai import set_ai_services
-from backend.routes.osc import set_osc_service, set_ai_agent
 from backend.routes.websocket import router as websocket_router, set_websocket_services
 from backend.routes.samples import router as samples_router, set_sample_services
 from backend.routes.transcription import router as transcription_router, set_transcription_services
 from backend.routes.timeline import router as timeline_router, set_timeline_services
 from backend.services import (
-    AudioAnalyzer, IntelligentAgent, LLMMusicalAgent, OSCService,
+    AudioAnalyzer, UnifiedIntelligentAgent,
     SampleRecorder, SpectralAnalyzer, SynthesisAgent, LiveTranscriptionEngine
 )
+from backend.audio_engine import AudioEngineManager
+from backend.audio_engine.routes import engine_router
+from backend.audio_engine.routes.engine import set_engine
 
 # Setup logging
 setup_logging("INFO")
 logger = get_logger(__name__)
 
 # Global service instances
+audio_engine = None
 audio_analyzer = None
-ai_agent = None
-llm_agent = None
-osc_service = None
+unified_agent = None
 sample_recorder = None
 spectral_analyzer = None
 synthesis_agent = None
@@ -38,19 +39,19 @@ ai_loop_task = None
 
 async def ai_feedback_loop():
     """Background task for updating audio analysis only - NO LLM calls"""
-    global ai_agent, audio_analyzer
+    global unified_agent, audio_analyzer
 
     logger.info("Audio Analysis Loop started (LLM only runs on user chat messages)")
 
     while True:
         try:
-            if ai_agent and audio_analyzer:
+            if unified_agent and audio_analyzer:
                 # Just update the latest audio analysis for status reporting
                 # NO LLM CALLS - those only happen when user sends chat messages
                 analysis = audio_analyzer.analyze_current_audio()
                 if analysis:
-                    ai_agent.latest_audio = analysis
-                    ai_agent.current_state.energy_level = analysis.energy
+                    unified_agent.latest_audio = analysis
+                    unified_agent.current_state.energy_level = analysis.energy
 
             await asyncio.sleep(0.5)  # Update audio analysis every 500ms
         except Exception as e:
@@ -61,17 +62,32 @@ async def ai_feedback_loop():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
-    global audio_analyzer, ai_agent, llm_agent, osc_service, ai_loop_task
+    global audio_engine, audio_analyzer, unified_agent, ai_loop_task
     global sample_recorder, spectral_analyzer, synthesis_agent, transcription_engine
 
     logger.info("🎵 Starting Sonic Claude API Server...")
 
     # Initialize services
     try:
-        osc_service = OSCService()
+        # Initialize audio engine
+        audio_engine = AudioEngineManager(
+            host="127.0.0.1",
+            port=57110,
+            sample_rate=48000,
+            block_size=64
+        )
+        logger.info("🎛️  Audio engine initialized")
+
+        # Start audio engine
+        engine_started = await audio_engine.start()
+        if engine_started:
+            logger.info("✅ Audio engine started successfully")
+        else:
+            logger.warning("⚠️  Audio engine failed to start (SuperCollider may not be running)")
+
+        # Initialize AI services with audio engine
         audio_analyzer = AudioAnalyzer()
-        llm_agent = LLMMusicalAgent(osc_service.client)
-        ai_agent = IntelligentAgent(osc_service.client, audio_analyzer, llm_agent)
+        unified_agent = UnifiedIntelligentAgent(audio_engine, audio_analyzer)
 
         # Initialize sample services
         sample_recorder = SampleRecorder(samples_dir="samples", sample_rate=48000)
@@ -79,16 +95,15 @@ async def lifespan(app: FastAPI):
         synthesis_agent = SynthesisAgent()
 
         # Initialize transcription engine
-        transcription_engine = LiveTranscriptionEngine(osc_service)
+        transcription_engine = LiveTranscriptionEngine(audio_engine)
 
         # Inject services into routes
-        set_ai_services(ai_agent, llm_agent)
-        set_osc_service(osc_service)
-        set_ai_agent(ai_agent)
-        set_websocket_services(audio_analyzer, ai_agent)
+        set_ai_services(unified_agent)
+        set_websocket_services(audio_analyzer, unified_agent)
         set_sample_services(sample_recorder, spectral_analyzer, synthesis_agent)
         set_transcription_services(transcription_engine, sample_recorder)
-        set_timeline_services(osc_service)
+        set_timeline_services()
+        set_engine(audio_engine)
 
         logger.info("✅ All services initialized")
 
@@ -103,13 +118,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to initialize services: {e}")
         raise
-    
+
     yield
-    
+
     # Cleanup
     logger.info("Shutting down...")
     if ai_loop_task:
         ai_loop_task.cancel()
+    if audio_engine:
+        await audio_engine.stop()
     if audio_analyzer:
         await audio_analyzer.stop()
 
@@ -131,8 +148,8 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(engine_router)
 app.include_router(ai_router)
-app.include_router(osc_router)
 app.include_router(websocket_router)
 app.include_router(samples_router)
 app.include_router(transcription_router)
@@ -155,8 +172,8 @@ async def health_check():
     return {
         "status": "healthy",
         "services": {
-            "osc": osc_service is not None,
-            "audio": audio_analyzer is not None,
+            "audio_engine": audio_engine is not None and audio_engine.is_running,
+            "audio_analyzer": audio_analyzer is not None,
             "ai_agent": ai_agent is not None,
             "llm": llm_agent is not None,
         }
@@ -166,7 +183,6 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     print(f"🎵 Starting {settings.app_name} v{settings.app_version}")
-    print(f"📡 OSC Target: {settings.sonic_pi_host}:{settings.sonic_pi_port}")
     print("🌐 API: http://localhost:8000")
     print("📚 Docs: http://localhost:8000/docs")
     uvicorn.run(app, host="0.0.0.0", port=8000)
