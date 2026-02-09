@@ -118,6 +118,22 @@ body {
 .react-grid-item {
   transition: all 200ms ease;
   transition-property: left, top, width, height;
+  /* Visual treatment for grid items */
+  border: 1px solid transparent;
+  position: relative;
+}
+
+.react-grid-item > div {
+  /* Ensure panel fills the grid item */
+  height: 100%;
+  width: 100%;
+}
+
+/* Grid item wrapper - provides visual context for resize handle */
+.grid-item-wrapper {
+  height: 100%;
+  width: 100%;
+  position: relative;
 }
 
 .react-grid-item.cssTransforms {
@@ -128,12 +144,20 @@ body {
   transition: none;
   z-index: 100;
   will-change: width, height;
+  /* Highlight border during resize */
+  border-color: rgba(34, 211, 238, 0.4);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.2),
+              0 0 20px rgba(34, 211, 238, 0.15);
 }
 
 .react-grid-item.react-draggable-dragging {
   transition: none;
   z-index: 100;
   will-change: transform;
+  /* Highlight border during drag */
+  border-color: rgba(192, 132, 252, 0.4);
+  box-shadow: 0 0 0 1px rgba(192, 132, 252, 0.2),
+              0 0 30px rgba(192, 132, 252, 0.2);
 }
 
 .react-grid-item.dropping {
@@ -141,18 +165,22 @@ body {
 }
 
 .react-grid-item.react-grid-placeholder {
-  background: rgba(0, 245, 255, 0.15);
-  opacity: 0.5;
+  background: linear-gradient(135deg,
+    rgba(34, 211, 238, 0.08) 0%,
+    rgba(192, 132, 252, 0.08) 100%);
+  opacity: 0.8;
   transition-duration: 100ms;
   z-index: 2;
-  border: 2px dashed rgba(0, 245, 255, 0.5);
-  border-radius: 0.5rem;
+  border: 2px dashed rgba(34, 211, 238, 0.6);
+  box-shadow: inset 0 0 30px rgba(34, 211, 238, 0.1);
 }
 
+/* Resize Handle Styling */
 .react-resizable-handle {
   position: absolute;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
+  z-index: 10;
 }
 
 .react-resizable-handle-se {
@@ -161,14 +189,50 @@ body {
   cursor: se-resize;
 }
 
+/* Elegant resize handle indicator */
+.react-resizable-handle-se::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 0 16px 16px;
+  border-color: transparent transparent rgba(34, 211, 238, 0.15) transparent;
+  transition: border-color 200ms ease;
+}
+
 .react-resizable-handle-se::after {
   content: "";
   position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid rgba(34, 211, 238, 0.4);
+  border-bottom: 2px solid rgba(34, 211, 238, 0.4);
+  transition: all 200ms ease;
+}
+
+/* Hover state for resize handle */
+.react-grid-item:hover .react-resizable-handle-se::before {
+  border-color: transparent transparent rgba(34, 211, 238, 0.25) transparent;
+}
+
+.react-grid-item:hover .react-resizable-handle-se::after {
+  border-color: rgba(34, 211, 238, 0.7);
   right: 3px;
   bottom: 3px;
-  width: 8px;
-  height: 8px;
-  border-right: 2px solid rgba(0, 245, 255, 0.5);
-  border-bottom: 2px solid rgba(0, 245, 255, 0.5);
+}
+
+/* Active resize state */
+.react-grid-item.resizing .react-resizable-handle-se::before {
+  border-color: transparent transparent rgba(34, 211, 238, 0.35) transparent;
+}
+
+.react-grid-item.resizing .react-resizable-handle-se::after {
+  border-color: rgba(34, 211, 238, 1);
+  border-width: 2.5px;
 }
 

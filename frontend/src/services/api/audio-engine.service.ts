@@ -5,16 +5,20 @@
  */
 
 import { BaseAPIClient } from "./base";
+import type { AudioEngineStatus } from "@/types";
 import type {
-    AudioEngineStatus,
     SynthDefInfo,
     Synth,
     CreateSynthRequest,
     UpdateSynthRequest,
+} from "@/components/features/synthesis";
+import type {
     EffectDefInfo,
     Effect,
     CreateEffectRequest,
     UpdateEffectRequest,
+} from "@/components/features/effects";
+import type {
     MixerTrack,
     CreateTrackRequest,
     UpdateTrackVolumeRequest,
@@ -22,6 +26,8 @@ import type {
     SetSendLevelRequest,
     AddEffectToTrackRequest,
     SetTrackGroupRequest,
+} from "@/components/features/mixer";
+import type {
     Sequence,
     SequencerClip,
     CreateSequenceRequest,
@@ -29,7 +35,7 @@ import type {
     UpdateClipRequest,
     SetTempoRequest,
     SeekRequest,
-} from "@/types";
+} from "@/components/features/sequencer";
 
 export class AudioEngineService extends BaseAPIClient {
     // ========================================================================
@@ -265,6 +271,13 @@ export class AudioEngineService extends BaseAPIClient {
         return this.put("/mixer/master/volume", request);
     }
 
+    /**
+     * Set master pan
+     */
+    async setMasterPan(request: UpdateTrackPanRequest): Promise<MixerTrack> {
+        return this.put("/mixer/master/pan", request);
+    }
+
     // ========================================================================
     // SEQUENCER ROUTES (17 routes)
     // ========================================================================
@@ -392,3 +405,6 @@ export class AudioEngineService extends BaseAPIClient {
         return this.post("/sequencer/stop-all");
     }
 }
+
+// Export singleton instance
+export const audioEngineService = new AudioEngineService();

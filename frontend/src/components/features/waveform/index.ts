@@ -1,0 +1,2 @@
+export { WaveformPanel } from "./WaveformPanel";
+

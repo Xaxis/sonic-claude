@@ -1,1 +1,2 @@
-export { Transport } from "./Transport";
+export { TransportPanel } from "./TransportPanel";
+

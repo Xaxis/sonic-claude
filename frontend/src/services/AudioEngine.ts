@@ -3,8 +3,6 @@
  * Handles pan, attack/release envelopes, reverse playback, and gate mode
  */
 
-import type { PadConfig } from "@/types";
-
 interface PlaybackOptions {
     volume: number;
     pitch: number;

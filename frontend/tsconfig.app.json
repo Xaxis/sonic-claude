@@ -14,7 +14,7 @@
         "noEmit": true,
         "jsx": "react-jsx",
 
-        /* Path aliases */
+        /* Path aliases - Single source of truth */
         "baseUrl": ".",
         "paths": {
             "@/*": ["./src/*"]
@@ -27,5 +27,6 @@
         "noFallthroughCasesInSwitch": true,
         "noUncheckedSideEffectImports": true
     },
-    "include": ["src"]
+    "include": ["src"],
+    "exclude": ["**/*.old.tsx", "**/*.old.ts"]
 }

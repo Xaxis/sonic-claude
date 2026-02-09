@@ -1,3 +1,6 @@
-export { DraggableLayout } from "./DraggableLayout";
-export { TabbedLayout } from "./TabbedLayout";
-export type { PanelConfig, TabConfig } from "./TabbedLayout";
+export { Header } from "./Header";
+export { TabbedWrapper } from "./TabbedWrapper";
+export { PanelGrid } from "./PanelGrid";
+export { PopoutWindow } from "./PopoutWindow";
+export type { PanelConfig } from "./PanelGrid";
+export type { TabConfig } from "./TabbedWrapper";

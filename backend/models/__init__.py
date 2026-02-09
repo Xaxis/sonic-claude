@@ -1,59 +1,19 @@
 """
 Pydantic models for API requests and responses
 """
-from .audio import AudioAnalysis, FrequencySpectrum
-from .musical import MusicalState, Decision
-from .ai import AIStatus, ChatRequest, ChatResponse
-from .sample import (
-    Sample, SpectralFeatures, SynthesisParameters,
-    RecordingRequest, RenameRequest, AnalyzeRequest, SynthesizeRequest, AudioDevice
-)
-from .transcription import (
-    StemType, Note, Beat, StemAnalysis, SonicPiCode,
-    TranscriptionStatus, LiveTranscriptionState, LiveTranscriptionResult,
-    TranscriptionRequest, TranscriptionSettings, StreamUpdate
-)
-from .timeline import (
-    ClipType, MIDIEvent, Clip, Track, TimelineSequence, TimelineUpdate,
-    CreateSequenceRequest, AddTrackRequest, AddClipRequest, UpdateClipRequest
-)
+# Audio Engine Models
+from .engine import EngineStatus, AudioBus, ControlBus
+from .synth import Synth, SynthDef
+from .effect import Effect, EffectDef, EffectType
+from .track import Track, TrackType, Effect as TrackEffect
+from .sequence import Sequence, Clip, MIDINote, MIDIClip, AudioClip
 
 __all__ = [
-    "AudioAnalysis",
-    "FrequencySpectrum",
-    "MusicalState",
-    "Decision",
-    "AIStatus",
-    "ChatRequest",
-    "ChatResponse",
-    "Sample",
-    "SpectralFeatures",
-    "SynthesisParameters",
-    "RecordingRequest",
-    "RenameRequest",
-    "AnalyzeRequest",
-    "SynthesizeRequest",
-    "AudioDevice",
-    "StemType",
-    "Note",
-    "Beat",
-    "StemAnalysis",
-    "SonicPiCode",
-    "TranscriptionStatus",
-    "LiveTranscriptionState",
-    "LiveTranscriptionResult",
-    "TranscriptionRequest",
-    "TranscriptionSettings",
-    "StreamUpdate",
-    "ClipType",
-    "MIDIEvent",
-    "Clip",
-    "Track",
-    "TimelineSequence",
-    "TimelineUpdate",
-    "CreateSequenceRequest",
-    "AddTrackRequest",
-    "AddClipRequest",
-    "UpdateClipRequest",
+    # Audio Engine
+    "EngineStatus", "AudioBus", "ControlBus",
+    "Synth", "SynthDef",
+    "Effect", "EffectDef", "EffectType",
+    "Track", "TrackType", "TrackEffect",
+    "Sequence", "Clip", "MIDINote", "MIDIClip", "AudioClip",
 ]
 
