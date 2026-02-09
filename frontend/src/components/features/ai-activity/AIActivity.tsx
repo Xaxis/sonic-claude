@@ -78,7 +78,7 @@ export function AIActivity({ reasoning, decisions }: AIActivityProps) {
     };
 
     return (
-        <Card className="border-magenta-500/30 flex h-full flex-col bg-black/40">
+        <Card className="border-magenta-500/30 flex flex-col bg-black/40">
             <CardHeader className="border-magenta-500/20 border-b pb-3">
                 <CardTitle className="text-magenta-400 flex items-center gap-2">
                     <Brain className="h-5 w-5" />

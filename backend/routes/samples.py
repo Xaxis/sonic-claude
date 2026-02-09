@@ -10,7 +10,7 @@ import io
 from backend.core import get_logger
 from backend.models.sample import (
     Sample, SpectralFeatures, SynthesisParameters,
-    RecordingRequest, RenameRequest, AnalyzeRequest, SynthesizeRequest
+    RecordingRequest, RenameRequest, AnalyzeRequest, SynthesizeRequest, AudioDevice
 )
 
 logger = get_logger(__name__)
@@ -38,7 +38,10 @@ async def control_recording(request: RecordingRequest):
             raise HTTPException(status_code=503, detail="Sample recorder not initialized")
             
         if request.action == "start":
-            sample_id = _sample_recorder.start_recording(request.name or "Untitled")
+            sample_id = _sample_recorder.start_recording(
+                request.name or "Untitled",
+                request.device_index
+            )
             return {
                 "status": "recording",
                 "sample_id": sample_id,
@@ -71,12 +74,27 @@ async def list_samples():
     try:
         if not _sample_recorder:
             raise HTTPException(status_code=503, detail="Sample recorder not initialized")
-            
+
         samples = _sample_recorder.list_samples()
         return samples
-        
+
     except Exception as e:
         logger.error(f"Error listing samples: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/audio-devices", response_model=List[AudioDevice])
+async def list_audio_devices():
+    """List all available audio input devices"""
+    try:
+        if not _sample_recorder:
+            raise HTTPException(status_code=503, detail="Sample recorder not initialized")
+
+        devices = _sample_recorder.list_audio_devices()
+        return devices
+
+    except Exception as e:
+        logger.error(f"Error listing audio devices: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

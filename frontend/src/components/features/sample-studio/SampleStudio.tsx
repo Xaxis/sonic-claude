@@ -4,21 +4,22 @@ import {
     Square,
     Play,
     Pause,
-    Trash2,
-    Edit2,
     Sparkles,
     Activity,
     BarChart3,
     Volume2,
     Paperclip,
     X,
+    Music,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { api } from "@/lib/api";
 import { useSpectralData } from "@/contexts/SpectralDataContext";
-import type { Sample, SpectralFeatures, SynthesisParameters } from "@/types";
+import { notifySampleLibraryChanged } from "@/hooks/useSampleLibrary";
+import { SampleTable } from "./SampleTable";
+import type { Sample, SpectralFeatures, SynthesisParameters, AudioDevice } from "@/types";
 
 type DecompositionMode = "spectral" | "harmonics" | "envelope" | "perceptual";
 
@@ -40,12 +41,18 @@ export function SampleStudio() {
         perceptual: true,
         fullSpectrum: false,
     });
+    const [editingSampleId, setEditingSampleId] = useState<string | null>(null);
+    const [editingName, setEditingName] = useState("");
+    const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
+    const [selectedDeviceIndex, setSelectedDeviceIndex] = useState<number | null>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const editInputRef = useRef<HTMLInputElement | null>(null);
     const { attachSpectralData, detachSpectralData, isAttached } = useSpectralData();
 
-    // Load samples on mount
+    // Load samples and audio devices on mount
     useEffect(() => {
         loadSamples();
+        loadAudioDevices();
     }, []);
 
     const loadSamples = async () => {
@@ -57,9 +64,26 @@ export function SampleStudio() {
         }
     };
 
+    const loadAudioDevices = async () => {
+        try {
+            console.log("🎤 Loading audio devices...");
+            const devices = await api.listAudioDevices();
+            console.log("🎤 Loaded devices:", devices);
+            setAudioDevices(devices);
+            // Auto-select first device if available
+            if (devices.length > 0 && selectedDeviceIndex === null) {
+                setSelectedDeviceIndex(devices[0].index);
+                console.log("🎤 Auto-selected device:", devices[0].name);
+            }
+        } catch (error) {
+            console.error("❌ Failed to load audio devices:", error);
+        }
+    };
+
     const handleStartRecording = async () => {
         try {
-            await api.startRecording(recordingName || "Untitled");
+            const name = recordingName.trim() || "Untitled";
+            await api.startRecording(name, selectedDeviceIndex ?? undefined);
             setIsRecording(true);
         } catch (error) {
             console.error("Failed to start recording:", error);
@@ -71,6 +95,11 @@ export function SampleStudio() {
             const result = await api.stopRecording();
             setIsRecording(false);
             setRecordingName("");
+
+            // Notify all tabs/windows that sample library changed
+            notifySampleLibraryChanged();
+
+            // Refresh samples immediately
             await loadSamples();
             setSelectedSample(result.sample);
         } catch (error) {
@@ -78,10 +107,58 @@ export function SampleStudio() {
         }
     };
 
+    const handleStartRename = (sample: Sample) => {
+        setEditingSampleId(sample.id);
+        setEditingName(sample.name);
+        // Focus the input after state update
+        setTimeout(() => {
+            editInputRef.current?.focus();
+            editInputRef.current?.select();
+        }, 0);
+    };
+
+    const handleCancelRename = () => {
+        setEditingSampleId(null);
+        setEditingName("");
+    };
+
+    const handleSaveRename = async () => {
+        if (!editingSampleId || !editingName.trim()) {
+            handleCancelRename();
+            return;
+        }
+
+        try {
+            await api.renameSample(editingSampleId, editingName.trim());
+
+            // Notify all tabs/windows that sample library changed
+            notifySampleLibraryChanged();
+
+            // Refresh samples immediately
+            await loadSamples();
+
+            // Update selected sample if it was renamed
+            if (selectedSample?.id === editingSampleId) {
+                setSelectedSample({ ...selectedSample, name: editingName.trim() });
+            }
+
+            handleCancelRename();
+        } catch (error) {
+            console.error("Failed to rename sample:", error);
+            handleCancelRename();
+        }
+    };
+
     const handleDeleteSample = async (sampleId: string) => {
         try {
             await api.deleteSample(sampleId);
+
+            // Notify all tabs/windows that sample library changed
+            notifySampleLibraryChanged();
+
+            // Refresh samples immediately
             await loadSamples();
+
             if (selectedSample?.id === sampleId) {
                 setSelectedSample(null);
                 setSpectralFeatures(null);
@@ -120,15 +197,18 @@ export function SampleStudio() {
         }
     };
 
-    const handlePlaySample = async () => {
-        if (!selectedSample) {
+    const handlePlaySample = async (sample?: Sample) => {
+        const sampleToPlay = sample || selectedSample;
+
+        if (!sampleToPlay) {
             console.log("❌ No sample selected");
             return;
         }
 
-        console.log("🎵 handlePlaySample called for:", selectedSample.id, "isPlaying:", isPlaying);
+        console.log("🎵 handlePlaySample called for:", sampleToPlay.id, "isPlaying:", isPlaying);
 
-        if (isPlaying && audioRef.current) {
+        // If clicking the same sample that's playing, pause it
+        if (isPlaying && audioRef.current && selectedSample?.id === sampleToPlay.id) {
             console.log("⏸️ Pausing audio");
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
@@ -136,8 +216,13 @@ export function SampleStudio() {
             return;
         }
 
+        // Select the sample if it's not already selected
+        if (sample && selectedSample?.id !== sample.id) {
+            setSelectedSample(sample);
+        }
+
         try {
-            const audioUrl = `http://localhost:8000/samples/${selectedSample.id}/audio`;
+            const audioUrl = `http://localhost:8000/samples/${sampleToPlay.id}/audio`;
             console.log("📡 Loading audio from:", audioUrl);
 
             // Stop and cleanup existing audio
@@ -234,205 +319,141 @@ export function SampleStudio() {
     };
 
     return (
-        <div className="flex h-full flex-col gap-3 overflow-auto p-4">
-            {/* Test Audio Button */}
-            <Button onClick={handleTestTone} size="sm" variant="outline" className="h-7 gap-1.5">
-                <Volume2 className="h-3.5 w-3.5" />
-                TEST AUDIO (440Hz)
-            </Button>
-
+        <div className="flex flex-col space-y-5 overflow-y-auto p-4">
             {/* Recording Controls */}
-            <div className="space-y-2">
-                <div className="text-muted-foreground text-xs font-medium tracking-wider">
-                    RECORDING
+            <div className="space-y-3">
+                <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium tracking-[0.15em] uppercase">
+                    <Mic className="h-3.5 w-3.5" />
+                    Recording
                 </div>
-                <div className="flex gap-2">
+                <div className="bg-primary/5 border-primary/10 space-y-2 rounded-lg border p-3">
+                    {/* Audio Input Source Selector */}
+                    <div className="space-y-1.5">
+                        <label className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                            Input Source
+                        </label>
+                        <select
+                            value={selectedDeviceIndex ?? ""}
+                            onChange={(e) => setSelectedDeviceIndex(Number(e.target.value))}
+                            disabled={isRecording}
+                            className="bg-background border-border text-foreground hover:border-primary focus:border-primary h-8 w-full rounded-md border px-3 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                        >
+                            {audioDevices.length === 0 ? (
+                                <option value="">Loading devices...</option>
+                            ) : (
+                                audioDevices.map((device) => (
+                                    <option key={device.index} value={device.index}>
+                                        {device.name} ({device.channels}ch, {device.sample_rate}Hz)
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                    </div>
+
                     <Input
                         placeholder="Sample name..."
                         value={recordingName}
                         onChange={(e) => setRecordingName(e.target.value)}
                         disabled={isRecording}
-                        className="h-8 flex-1 text-sm"
+                        className="h-8 text-sm"
                     />
                     {!isRecording ? (
-                        <Button onClick={handleStartRecording} size="sm" className="gap-1.5">
+                        <Button onClick={handleStartRecording} size="sm" className="w-full gap-1.5">
                             <Mic className="h-3.5 w-3.5" />
-                            REC
+                            START RECORDING
                         </Button>
                     ) : (
                         <Button
                             onClick={handleStopRecording}
                             size="sm"
                             variant="destructive"
-                            className="animate-pulse gap-1.5"
+                            className="w-full animate-pulse gap-1.5"
                         >
                             <Square className="h-3.5 w-3.5" />
-                            STOP
+                            STOP RECORDING
                         </Button>
                     )}
                 </div>
             </div>
 
             {/* Sample Library */}
-            <div className="min-h-0 flex-1 space-y-2">
-                <div className="text-muted-foreground text-xs font-medium tracking-wider">
-                    SAMPLE LIBRARY ({samples.length})
+            <div className="space-y-3">
+                <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium tracking-[0.15em] uppercase">
+                    <Music className="h-3.5 w-3.5" />
+                    Sample Library
                 </div>
-                <div className="max-h-[200px] space-y-1 overflow-auto pr-2">
-                    {samples.map((sample) => (
-                        <div
-                            key={sample.id}
-                            className={`cursor-pointer rounded border p-2 transition-colors ${
-                                selectedSample?.id === sample.id
-                                    ? "border-primary bg-primary/10"
-                                    : "border-border/50 hover:border-primary/50"
-                            }`}
-                            onClick={() => setSelectedSample(sample)}
-                        >
-                            <div className="flex items-center justify-between gap-2">
-                                <div className="min-w-0 flex-1">
-                                    <div className="truncate text-sm font-medium">
-                                        {sample.name}
-                                    </div>
-                                    <div className="text-muted-foreground text-xs">
-                                        {sample.duration.toFixed(2)}s • {sample.sample_rate}Hz
-                                    </div>
-                                </div>
-                                <div className="flex gap-1">
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={async (e) => {
-                                            e.stopPropagation();
-
-                                            // If this sample is already selected and playing, pause it
-                                            if (selectedSample?.id === sample.id && isPlaying) {
-                                                handlePlaySample();
-                                                return;
-                                            }
-
-                                            // Select the sample first
-                                            setSelectedSample(sample);
-
-                                            // Play directly without waiting for state update
-                                            try {
-                                                const audioUrl = `http://localhost:8000/samples/${sample.id}/audio`;
-                                                console.log("🎵 Quick play:", audioUrl);
-
-                                                // Stop existing audio
-                                                if (audioRef.current) {
-                                                    audioRef.current.pause();
-                                                    audioRef.current.removeAttribute("src");
-                                                    audioRef.current.load();
-                                                }
-
-                                                const audio = new Audio();
-                                                audio.crossOrigin = "anonymous";
-                                                audio.preload = "auto";
-                                                audio.src = audioUrl;
-
-                                                audio.addEventListener("ended", () => {
-                                                    setIsPlaying(false);
-                                                });
-
-                                                audio.addEventListener("error", (e) => {
-                                                    console.error("❌ Quick play error:", e);
-                                                    setIsPlaying(false);
-                                                });
-
-                                                audioRef.current = audio;
-                                                await audio.play();
-                                                setIsPlaying(true);
-                                                console.log("✅ Quick play started");
-                                            } catch (error) {
-                                                console.error("❌ Quick play failed:", error);
-                                                setIsPlaying(false);
-                                            }
-                                        }}
-                                        className="h-6 w-6 p-0"
-                                    >
-                                        {selectedSample?.id === sample.id && isPlaying ? (
-                                            <Pause className="h-3 w-3" />
-                                        ) : (
-                                            <Play className="h-3 w-3" />
-                                        )}
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteSample(sample.id);
-                                        }}
-                                        className="h-6 w-6 p-0"
-                                    >
-                                        <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                <SampleTable
+                    samples={samples}
+                    selectedSample={selectedSample}
+                    isPlaying={isPlaying}
+                    onSelectSample={setSelectedSample}
+                    onPlaySample={handlePlaySample}
+                    onEditSample={handleStartRename}
+                    onDeleteSample={handleDeleteSample}
+                    onSamplesChanged={loadSamples}
+                />
             </div>
 
             {/* Selected Sample Analysis */}
             {selectedSample && (
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <div className="text-muted-foreground text-xs font-medium tracking-wider">
-                            SELECTED: {selectedSample.name}
-                        </div>
+                <div className="space-y-3">
+                    <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium tracking-[0.15em] uppercase">
+                        <Activity className="h-3.5 w-3.5" />
+                        Selected: {selectedSample.name}
+                    </div>
+
+                    <div className="bg-secondary/5 border-secondary/10 space-y-2 rounded-lg border p-3">
                         <Button
                             onClick={handlePlaySample}
                             size="sm"
                             variant={isPlaying ? "default" : "outline"}
-                            className="h-7 gap-1.5"
+                            className="w-full gap-1.5"
                         >
                             {isPlaying ? (
-                                <Pause className="h-3 w-3" />
+                                <Pause className="h-3.5 w-3.5" />
                             ) : (
-                                <Play className="h-3 w-3" />
+                                <Play className="h-3.5 w-3.5" />
                             )}
                             {isPlaying ? "PAUSE" : "PLAY"}
                         </Button>
-                    </div>
 
-                    <div className="flex gap-2">
-                        <Button
-                            onClick={handleAnalyzeSample}
-                            size="sm"
-                            disabled={isAnalyzing}
-                            className="flex-1 gap-1.5"
-                        >
-                            <Activity className="h-3.5 w-3.5" />
-                            {isAnalyzing ? "ANALYZING..." : "ANALYZE"}
-                        </Button>
-                        <Button
-                            onClick={handleSynthesizeSample}
-                            size="sm"
-                            disabled={isSynthesizing || !spectralFeatures}
-                            className="flex-1 gap-1.5"
-                        >
-                            <Sparkles className="h-3.5 w-3.5" />
-                            {isSynthesizing ? "SYNTHESIZING..." : "SYNTHESIZE"}
-                        </Button>
+                        <div className="grid grid-cols-2 gap-2">
+                            <Button
+                                onClick={handleAnalyzeSample}
+                                size="sm"
+                                disabled={isAnalyzing}
+                                className="gap-1.5"
+                            >
+                                <Activity className="h-3.5 w-3.5" />
+                                {isAnalyzing ? "ANALYZING..." : "ANALYZE"}
+                            </Button>
+                            <Button
+                                onClick={handleSynthesizeSample}
+                                size="sm"
+                                disabled={isSynthesizing || !spectralFeatures}
+                                className="gap-1.5"
+                            >
+                                <Sparkles className="h-3.5 w-3.5" />
+                                {isSynthesizing ? "SYNTH" : "SYNTHESIZE"}
+                            </Button>
+                        </div>
                     </div>
 
                     {/* Decomposition Mode Selector */}
                     {spectralFeatures && (
-                        <div className="space-y-2">
-                            <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium tracking-wider">
+                        <div className="space-y-3">
+                            <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium tracking-[0.15em] uppercase">
                                 <BarChart3 className="h-3.5 w-3.5" />
-                                DECOMPOSITION VIEW
+                                Decomposition View
                             </div>
-                            <div className="grid grid-cols-2 gap-1">
+                            <div className="grid grid-cols-2 gap-2">
                                 <Button
                                     size="sm"
                                     variant={
                                         decompositionMode === "spectral" ? "default" : "outline"
                                     }
                                     onClick={() => setDecompositionMode("spectral")}
-                                    className="h-7 text-xs"
+                                    className="text-xs"
                                 >
                                     SPECTRUM
                                 </Button>
@@ -442,7 +463,7 @@ export function SampleStudio() {
                                         decompositionMode === "harmonics" ? "default" : "outline"
                                     }
                                     onClick={() => setDecompositionMode("harmonics")}
-                                    className="h-7 text-xs"
+                                    className="text-xs"
                                 >
                                     HARMONICS
                                 </Button>
@@ -452,7 +473,7 @@ export function SampleStudio() {
                                         decompositionMode === "envelope" ? "default" : "outline"
                                     }
                                     onClick={() => setDecompositionMode("envelope")}
-                                    className="h-7 text-xs"
+                                    className="text-xs"
                                 >
                                     ENVELOPE
                                 </Button>
@@ -462,7 +483,7 @@ export function SampleStudio() {
                                         decompositionMode === "perceptual" ? "default" : "outline"
                                     }
                                     onClick={() => setDecompositionMode("perceptual")}
-                                    className="h-7 text-xs"
+                                    className="text-xs"
                                 >
                                     PERCEPTUAL
                                 </Button>
@@ -694,13 +715,14 @@ export function SampleStudio() {
 
                     {/* Feature Selection & Attach to Chat */}
                     {spectralFeatures && (
-                        <div className="space-y-2">
-                            <div className="text-muted-foreground text-xs font-medium tracking-wider">
-                                ATTACH TO CHAT
+                        <div className="space-y-3">
+                            <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium tracking-[0.15em] uppercase">
+                                <Paperclip className="h-3.5 w-3.5" />
+                                Attach to Chat
                             </div>
 
                             {/* Feature Selection Checkboxes */}
-                            <div className="border-muted/30 bg-muted/5 space-y-2 rounded border p-3">
+                            <div className="bg-accent/5 border-accent/10 space-y-2 rounded-lg border p-3">
                                 <div className="text-muted-foreground mb-2 text-xs">
                                     Select features to include:
                                 </div>
@@ -811,42 +833,47 @@ export function SampleStudio() {
 
                     {/* Synthesis Parameters Display */}
                     {synthesisParams && (
-                        <div className="space-y-2 rounded border border-cyan-500/30 bg-cyan-500/5 p-3">
-                            <div className="text-xs font-medium tracking-wider text-cyan-400">
-                                SYNTHESIS PARAMETERS
+                        <div className="space-y-3">
+                            <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium tracking-[0.15em] uppercase">
+                                <Sparkles className="h-3.5 w-3.5" />
+                                Synthesis Parameters
                             </div>
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div>
-                                    <div className="text-muted-foreground">Synth</div>
-                                    <div className="font-mono text-cyan-400">
-                                        {synthesisParams.synth_type}
+                            <div className="bg-primary/5 border-primary/10 space-y-2 rounded-lg border p-3">
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div>
+                                        <div className="text-muted-foreground">Synth</div>
+                                        <div className="text-primary font-mono font-bold">
+                                            {synthesisParams.synth_type}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-muted-foreground">Note</div>
+                                        <div className="text-primary font-mono font-bold">
+                                            {synthesisParams.note}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-muted-foreground">Cutoff</div>
+                                        <div className="text-primary font-mono font-bold">
+                                            {synthesisParams.cutoff.toFixed(0)}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-muted-foreground">Confidence</div>
+                                        <div className="text-primary font-mono font-bold">
+                                            {(synthesisParams.confidence * 100).toFixed(0)}%
+                                        </div>
                                     </div>
                                 </div>
-                                <div>
-                                    <div className="text-muted-foreground">Note</div>
-                                    <div className="font-mono">{synthesisParams.note}</div>
-                                </div>
-                                <div>
-                                    <div className="text-muted-foreground">Cutoff</div>
-                                    <div className="font-mono">
-                                        {synthesisParams.cutoff.toFixed(0)}
+                                {synthesisParams.reasoning && (
+                                    <div className="text-xs">
+                                        <div className="text-muted-foreground mb-1">Reasoning</div>
+                                        <div className="text-muted-foreground/80 italic">
+                                            {synthesisParams.reasoning}
+                                        </div>
                                     </div>
-                                </div>
-                                <div>
-                                    <div className="text-muted-foreground">Confidence</div>
-                                    <div className="font-mono">
-                                        {(synthesisParams.confidence * 100).toFixed(0)}%
-                                    </div>
-                                </div>
+                                )}
                             </div>
-                            {synthesisParams.reasoning && (
-                                <div className="text-xs">
-                                    <div className="text-muted-foreground">Reasoning</div>
-                                    <div className="text-cyan-300/80 italic">
-                                        {synthesisParams.reasoning}
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     )}
                 </div>

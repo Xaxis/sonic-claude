@@ -84,10 +84,19 @@ class SynthesisParameters(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in synthesis match")
 
 
+class AudioDevice(BaseModel):
+    """Audio input device information"""
+    index: int = Field(..., description="Device index")
+    name: str = Field(..., description="Device name")
+    channels: int = Field(..., description="Number of input channels")
+    sample_rate: int = Field(..., description="Default sample rate")
+
+
 class RecordingRequest(BaseModel):
     """Request to start/stop recording"""
     action: str = Field(..., description="'start' or 'stop'")
     name: Optional[str] = Field(None, description="Sample name (for start action)")
+    device_index: Optional[int] = Field(None, description="Audio input device index (for start action)")
 
 
 class RenameRequest(BaseModel):

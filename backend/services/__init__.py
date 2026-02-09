@@ -8,6 +8,8 @@ from .osc_service import OSCService
 from .sample_recorder import SampleRecorder
 from .spectral_analyzer import SpectralAnalyzer
 from .synthesis_agent import SynthesisAgent
+from .live_transcription_engine import LiveTranscriptionEngine
+from .timeline_to_sonic_pi import TimelineToSonicPiConverter
 
 __all__ = [
     "AudioAnalyzer",
@@ -16,6 +18,8 @@ __all__ = [
     "OSCService",
     "SampleRecorder",
     "SpectralAnalyzer",
-    "SynthesisAgent"
+    "SynthesisAgent",
+    "LiveTranscriptionEngine",
+    "TimelineToSonicPiConverter",
 ]
 

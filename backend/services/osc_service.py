@@ -72,3 +72,22 @@ class OSCService:
         """Set musical scale"""
         self.send_parameter("scale", scale.lower())
 
+    async def send_code(self, code: str) -> None:
+        """
+        Send Sonic Pi code to be executed
+
+        Args:
+            code: Sonic Pi code to execute
+        """
+        try:
+            # Sonic Pi OSC API expects:
+            # /run-code [gui_id, code]
+            # gui_id is typically "sonic-pi-tool" or similar identifier
+            gui_id = "sonic-claude"
+            self.client.send_message("/run-code", [gui_id, code])
+            logger.info(f"✅ Sent code to Sonic Pi ({len(code)} chars)")
+            logger.debug(f"Code preview: {code[:200]}...")
+        except Exception as e:
+            logger.error(f"❌ Failed to send code to Sonic Pi: {e}")
+            raise
+

@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { useSpectralData } from "@/contexts/SpectralDataContext";
+import { useGlobalState } from "@/contexts/GlobalStateContext";
 import type { ChatMessage } from "@/types";
 
 export function AIChat() {
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const { chatMessages, setChatMessages } = useGlobalState();
     const [input, setInput] = useState("");
     const [isThinking, setIsThinking] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -19,7 +20,7 @@ export function AIChat() {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages]);
+    }, [chatMessages]);
 
     const handleSend = async () => {
         if (!input.trim() || isThinking) return;
@@ -30,7 +31,7 @@ export function AIChat() {
             timestamp: Date.now(),
         };
 
-        setMessages((prev) => [...prev, userMessage]);
+        setChatMessages((prev) => [...prev, userMessage]);
         setInput("");
         setIsThinking(true);
 
@@ -54,7 +55,7 @@ export function AIChat() {
                 timestamp: Date.now(),
             };
 
-            setMessages((prev) => [...prev, assistantMessage]);
+            setChatMessages((prev) => [...prev, assistantMessage]);
         } catch (error) {
             console.error("Chat error:", error);
             const errorMessage: ChatMessage = {
@@ -62,7 +63,7 @@ export function AIChat() {
                 content: "Sorry, I encountered an error. Please try again.",
                 timestamp: Date.now(),
             };
-            setMessages((prev) => [...prev, errorMessage]);
+            setChatMessages((prev) => [...prev, errorMessage]);
         } finally {
             setIsThinking(false);
         }
@@ -76,7 +77,7 @@ export function AIChat() {
     };
 
     return (
-        <div className="flex h-full flex-col gap-4 overflow-hidden p-4">
+        <div className="flex flex-col gap-4 overflow-hidden p-4">
             {/* Attached Spectral Data Indicator */}
             {isAttached && attachedData && (
                 <div className="space-y-2 rounded-lg border border-green-500/30 bg-green-500/10 p-3">
@@ -108,13 +109,13 @@ export function AIChat() {
 
             {/* Messages Area */}
             <div className="flex-1 space-y-3 overflow-y-auto pr-2">
-                {messages.length === 0 && (
+                {chatMessages.length === 0 && (
                     <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
                         Start a conversation with the AI DJ...
                     </div>
                 )}
 
-                {messages.map((msg, idx) => (
+                {chatMessages.map((msg, idx) => (
                     <div
                         key={idx}
                         className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} animate-in`}

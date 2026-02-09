@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Wifi, WifiOff } from "lucide-react";
+import { Activity } from "lucide-react";
 
 interface SpectrumAnalyzerProps {
     spectrum: number[];
@@ -107,34 +106,51 @@ export function SpectrumAnalyzer({ spectrum, isConnected = false }: SpectrumAnal
     }, [spectrum]);
 
     return (
-        <div className="flex h-full w-full flex-col p-4">
-            {/* Status Bar */}
-            <div className="mb-3 flex flex-shrink-0 items-center justify-between">
-                <div className="text-primary flex items-center gap-2 text-xs font-medium tracking-wider">
-                    <Activity className="h-4 w-4" />
-                    <span>REAL-TIME ANALYSIS</span>
+        <div className="flex flex-col space-y-5 overflow-y-auto p-4">
+            {/* Status Section */}
+            <div className="space-y-3">
+                <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium tracking-[0.15em] uppercase">
+                    <Activity className="h-3.5 w-3.5" />
+                    Real-Time Analysis
                 </div>
-                <div className="flex items-center gap-2 text-xs font-medium">
-                    {isConnected ? (
-                        <>
-                            <div className="h-2 w-2 animate-pulse rounded-full bg-green-400 shadow-lg shadow-green-400/50" />
-                            <span className="tracking-wide text-green-400">STREAMING</span>
-                        </>
-                    ) : (
-                        <>
-                            <div className="h-2 w-2 rounded-full bg-red-400" />
-                            <span className="tracking-wide text-red-400">OFFLINE</span>
-                        </>
-                    )}
+                <div className="bg-primary/5 border-primary/10 flex items-center justify-between rounded-lg border p-3">
+                    <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                        Status
+                    </span>
+                    <div className="flex items-center gap-2">
+                        {isConnected ? (
+                            <>
+                                <div className="h-2 w-2 animate-pulse rounded-full bg-green-400 shadow-lg shadow-green-400/50" />
+                                <span className="font-mono text-sm font-bold tracking-wide text-green-400">
+                                    STREAMING
+                                </span>
+                            </>
+                        ) : (
+                            <>
+                                <div className="h-2 w-2 rounded-full bg-red-400" />
+                                <span className="font-mono text-sm font-bold tracking-wide text-red-400">
+                                    OFFLINE
+                                </span>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Canvas */}
-            <canvas
-                ref={canvasRef}
-                className="border-primary/10 w-full flex-1 rounded-lg border bg-black/40 shadow-inner"
-                style={{ imageRendering: "crisp-edges", minHeight: "120px" }}
-            />
+            {/* Spectrum Visualizer */}
+            <div className="space-y-3">
+                <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium tracking-[0.15em] uppercase">
+                    <Activity className="h-3.5 w-3.5" />
+                    Frequency Spectrum
+                </div>
+                <div className="bg-primary/5 border-primary/10 rounded-lg border p-3">
+                    <canvas
+                        ref={canvasRef}
+                        className="w-full rounded-md bg-black/40"
+                        style={{ imageRendering: "crisp-edges", height: "300px" }}
+                    />
+                </div>
+            </div>
         </div>
     );
 }

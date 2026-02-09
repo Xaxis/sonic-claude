@@ -13,9 +13,11 @@ from backend.routes.ai import set_ai_services
 from backend.routes.osc import set_osc_service, set_ai_agent
 from backend.routes.websocket import router as websocket_router, set_websocket_services
 from backend.routes.samples import router as samples_router, set_sample_services
+from backend.routes.transcription import router as transcription_router, set_transcription_services
+from backend.routes.timeline import router as timeline_router, set_timeline_services
 from backend.services import (
     AudioAnalyzer, IntelligentAgent, LLMMusicalAgent, OSCService,
-    SampleRecorder, SpectralAnalyzer, SynthesisAgent
+    SampleRecorder, SpectralAnalyzer, SynthesisAgent, LiveTranscriptionEngine
 )
 
 # Setup logging
@@ -30,6 +32,7 @@ osc_service = None
 sample_recorder = None
 spectral_analyzer = None
 synthesis_agent = None
+transcription_engine = None
 ai_loop_task = None
 
 
@@ -59,7 +62,7 @@ async def ai_feedback_loop():
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     global audio_analyzer, ai_agent, llm_agent, osc_service, ai_loop_task
-    global sample_recorder, spectral_analyzer, synthesis_agent
+    global sample_recorder, spectral_analyzer, synthesis_agent, transcription_engine
 
     logger.info("🎵 Starting Sonic Claude API Server...")
 
@@ -75,12 +78,17 @@ async def lifespan(app: FastAPI):
         spectral_analyzer = SpectralAnalyzer()
         synthesis_agent = SynthesisAgent()
 
+        # Initialize transcription engine
+        transcription_engine = LiveTranscriptionEngine(osc_service)
+
         # Inject services into routes
         set_ai_services(ai_agent, llm_agent)
         set_osc_service(osc_service)
         set_ai_agent(ai_agent)
         set_websocket_services(audio_analyzer, ai_agent)
         set_sample_services(sample_recorder, spectral_analyzer, synthesis_agent)
+        set_transcription_services(transcription_engine, sample_recorder)
+        set_timeline_services(osc_service)
 
         logger.info("✅ All services initialized")
 
@@ -127,6 +135,8 @@ app.include_router(ai_router)
 app.include_router(osc_router)
 app.include_router(websocket_router)
 app.include_router(samples_router)
+app.include_router(transcription_router)
+app.include_router(timeline_router)
 
 
 @app.get("/")

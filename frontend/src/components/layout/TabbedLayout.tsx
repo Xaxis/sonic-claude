@@ -1,13 +1,14 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import { Plus, X, Edit2, Check } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Plus, X, ExternalLink } from "lucide-react";
 import { DraggableLayout } from "./DraggableLayout";
-import type { Layout, LayoutItem } from "react-grid-layout";
+import { windowManager } from "@/services/WindowManager";
+import type { Layout } from "react-grid-layout";
 
 export interface PanelConfig {
     id: string;
     title: string;
     component: React.ReactNode;
-    defaultLayout: LayoutItem;
+    defaultLayout: { i: string; x: number; y: number; w: number; h: number; minW?: number; minH?: number };
     closeable?: boolean;
 }
 
@@ -20,342 +21,183 @@ export interface TabConfig {
 interface TabbedLayoutProps {
     panels: PanelConfig[];
     defaultTabs: TabConfig[];
+    activeTab?: string;  // Controlled active tab ID
+    onTabChange?: (tabId: string) => void;
 }
 
 interface TabLayouts {
-    [tabId: string]: {
-        [panelId: string]: LayoutItem;
-    };
+    [tabId: string]: Layout;
 }
 
-const STORAGE_KEY = "sonic-claude-tabs";
+export function TabbedLayout({ panels, defaultTabs, activeTab: controlledActiveTab, onTabChange }: TabbedLayoutProps) {
+    const [tabs, setTabs] = useState<TabConfig[]>(defaultTabs);
+    const [internalActiveTabId, setInternalActiveTabId] = useState(tabs[0]?.id || "");
+    const [tabLayouts, setTabLayouts] = useState<TabLayouts>({});
+    const [poppedOutTabs, setPoppedOutTabs] = useState<Set<string>>(new Set());
 
-export function TabbedLayout({ panels, defaultTabs }: TabbedLayoutProps) {
-    const [editingTabId, setEditingTabId] = useState<string | null>(null);
-    const [editingTabName, setEditingTabName] = useState("");
-    const editInputRef = useRef<HTMLInputElement>(null);
-    const [draggedPanelId, setDraggedPanelId] = useState<string | null>(null);
-    const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
-
-    // Load saved configuration or use defaults
-    const [tabs, setTabs] = useState<TabConfig[]>(() => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                return parsed.tabs || defaultTabs;
-            } catch {
-                return defaultTabs;
-            }
+    // Use controlled or uncontrolled activeTab
+    const activeTabId = controlledActiveTab || internalActiveTabId;
+    const handleTabChange = (tabId: string) => {
+        if (onTabChange) {
+            onTabChange(tabId);
+        } else {
+            setInternalActiveTabId(tabId);
         }
-        return defaultTabs;
-    });
+    };
 
-    const [activeTabId, setActiveTabId] = useState<string>(() => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                return parsed.activeTabId || defaultTabs[0]?.id;
-            } catch {
-                return defaultTabs[0]?.id;
-            }
-        }
-        return defaultTabs[0]?.id;
-    });
-
-    const [tabLayouts, setTabLayouts] = useState<TabLayouts>(() => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                return parsed.layouts || {};
-            } catch {
-                return {};
-            }
-        }
-        return {};
-    });
-
-    // Save to localStorage whenever tabs, activeTabId, or layouts change
+    // Listen for popout state changes
     useEffect(() => {
-        localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({
-                tabs,
-                activeTabId,
-                layouts: tabLayouts,
-            })
-        );
-    }, [tabs, activeTabId, tabLayouts]);
+        const unsubscribeOpen = windowManager.subscribeToState("popout-opened", (data: any) => {
+            setPoppedOutTabs((prev) => new Set(prev).add(data.tabId));
+        });
 
-    const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
+        const unsubscribeClose = windowManager.subscribeToState("popout-closed", (data: any) => {
+            setPoppedOutTabs((prev) => {
+                const next = new Set(prev);
+                next.delete(data.tabId);
+                return next;
+            });
+        });
 
-    // Get panels for active tab
+        // Initialize with current popouts
+        const currentPopouts = windowManager.getPopouts();
+        setPoppedOutTabs(new Set(currentPopouts.map((p) => p.tabId)));
+
+        return () => {
+            unsubscribeOpen();
+            unsubscribeClose();
+        };
+    }, []);
+
+    const handleLayoutChange = useCallback((tabId: string, layout: Layout) => {
+        setTabLayouts((prev) => ({
+            ...prev,
+            [tabId]: layout,
+        }));
+    }, []);
+
+    const handleResetLayout = useCallback((tabId: string) => {
+        setTabLayouts((prev) => {
+            const next = { ...prev };
+            delete next[tabId];
+            return next;
+        });
+    }, []);
+
+    const handleDeleteTab = useCallback(
+        (tabId: string) => {
+            if (tabs.length <= 1) return;
+            setTabs((prev) => prev.filter((t) => t.id !== tabId));
+            if (activeTabId === tabId) {
+                handleTabChange(tabs[0].id === tabId ? tabs[1].id : tabs[0].id);
+            }
+        },
+        [tabs, activeTabId, handleTabChange]
+    );
+
+    const handleCreateTab = useCallback(() => {
+        const newTab: TabConfig = {
+            id: `tab-${Date.now()}`,
+            name: "New Tab",
+            panelIds: [],
+        };
+        setTabs((prev) => [...prev, newTab]);
+        handleTabChange(newTab.id);
+    }, [handleTabChange]);
+
+    const handlePopoutTab = useCallback((tab: TabConfig) => {
+        windowManager.openPopout(tab.id, tab.panelIds);
+    }, []);
+
+    const activeTab = tabs.find((t) => t.id === activeTabId);
     const activePanels = panels.filter((p) => activeTab?.panelIds.includes(p.id));
 
-    // Apply saved layouts to panels
+    // Get saved layout for this tab or use defaults
+    const savedLayout = tabLayouts[activeTabId];
     const panelsWithLayouts = activePanels.map((panel) => {
-        const savedLayout = tabLayouts[activeTabId]?.[panel.id];
         if (savedLayout) {
-            return {
-                ...panel,
-                defaultLayout: savedLayout,
-            };
+            const savedItem = savedLayout.find((item) => item.i === panel.id);
+            if (savedItem) {
+                return { ...panel, defaultLayout: savedItem };
+            }
         }
         return panel;
     });
 
-    const handleLayoutChange = useCallback(
-        (layout: Layout[]) => {
-            setTabLayouts((prev) => ({
-                ...prev,
-                [activeTabId]: layout.reduce(
-                    (acc, l) => {
-                        acc[l.i] = l;
-                        return acc;
-                    },
-                    {} as { [panelId: string]: Layout }
-                ),
-            }));
-        },
-        [activeTabId]
-    );
-
-    const handleCloseTab = useCallback(
-        (tabId: string) => {
-            if (tabs.length <= 1) return; // Don't close last tab
-
-            const newTabs = tabs.filter((t) => t.id !== tabId);
-            setTabs(newTabs);
-
-            if (activeTabId === tabId) {
-                setActiveTabId(newTabs[0].id);
-            }
-        },
-        [tabs, activeTabId]
-    );
-
-    const handleResetLayout = useCallback(() => {
-        localStorage.removeItem(STORAGE_KEY);
-        setTabs(defaultTabs);
-        setActiveTabId(defaultTabs[0]?.id);
-        setTabLayouts({});
-        console.log("🔄 Tabs and layouts reset to defaults");
-    }, [defaultTabs]);
-
-    const handleMovePanelToTab = useCallback((panelId: string, targetTabId: string) => {
-        setTabs((prevTabs) => {
-            const newTabs = prevTabs.map((tab) => {
-                // Remove panel from all tabs
-                const filteredPanelIds = tab.panelIds.filter((id) => id !== panelId);
-
-                // Add panel to target tab
-                if (tab.id === targetTabId) {
-                    return {
-                        ...tab,
-                        panelIds: [...filteredPanelIds, panelId],
-                    };
-                }
-
-                return {
-                    ...tab,
-                    panelIds: filteredPanelIds,
-                };
-            });
-            return newTabs;
-        });
-    }, []);
-
-    const handleCreateTab = useCallback(() => {
-        const newTabId = `tab-${Date.now()}`;
-        const newTab: TabConfig = {
-            id: newTabId,
-            name: `Tab ${tabs.length + 1}`,
-            panelIds: [],
-        };
-        setTabs((prev) => [...prev, newTab]);
-        setActiveTabId(newTabId);
-    }, [tabs.length]);
-
-    const handleDeleteTab = useCallback(
-        (tabId: string) => {
-            if (tabs.length <= 1) return; // Don't delete last tab
-
-            const tabToDelete = tabs.find((t) => t.id === tabId);
-            if (!tabToDelete) return;
-
-            // Move panels from deleted tab to first remaining tab
-            const remainingTabs = tabs.filter((t) => t.id !== tabId);
-            const firstTab = remainingTabs[0];
-
-            setTabs(
-                remainingTabs.map((tab) => {
-                    if (tab.id === firstTab.id) {
-                        return {
-                            ...tab,
-                            panelIds: [...tab.panelIds, ...tabToDelete.panelIds],
-                        };
-                    }
-                    return tab;
-                })
-            );
-
-            if (activeTabId === tabId) {
-                setActiveTabId(firstTab.id);
-            }
-        },
-        [tabs, activeTabId]
-    );
-
-    const handleStartRename = useCallback((tabId: string, currentName: string) => {
-        setEditingTabId(tabId);
-        setEditingTabName(currentName);
-        setTimeout(() => editInputRef.current?.focus(), 0);
-    }, []);
-
-    const handleFinishRename = useCallback(() => {
-        if (editingTabId && editingTabName.trim()) {
-            setTabs((prev) =>
-                prev.map((tab) =>
-                    tab.id === editingTabId ? { ...tab, name: editingTabName.trim() } : tab
-                )
-            );
-        }
-        setEditingTabId(null);
-        setEditingTabName("");
-    }, [editingTabId, editingTabName]);
-
-    const handlePanelDragStart = useCallback((panelId: string) => {
-        setDraggedPanelId(panelId);
-    }, []);
-
-    const handlePanelDragEnd = useCallback(() => {
-        if (draggedPanelId && dragOverTabId && dragOverTabId !== activeTabId) {
-            handleMovePanelToTab(draggedPanelId, dragOverTabId);
-        }
-        setDraggedPanelId(null);
-        setDragOverTabId(null);
-    }, [draggedPanelId, dragOverTabId, activeTabId, handleMovePanelToTab]);
-
     return (
-        <div className="flex h-full flex-col overflow-hidden">
+        <div className="flex h-full flex-col">
             {/* Tab Bar */}
-            <div className="panel-glass border-primary/10 flex flex-shrink-0 items-center gap-2 border-b px-3 py-2 backdrop-blur-xl">
-                {/* Drag Indicator */}
-                {draggedPanelId && (
-                    <div className="from-primary/0 via-primary/50 to-primary/0 absolute top-0 right-0 left-0 h-1 animate-pulse bg-gradient-to-r" />
-                )}
-
-                {/* Tabs */}
+            <div className="panel-glass border-primary/10 flex flex-shrink-0 items-center gap-2 border-b px-3 py-2">
                 <div className="flex flex-1 gap-1 overflow-x-auto">
-                    {tabs.map((tab) => (
-                        <div
-                            key={tab.id}
-                            className={`group relative flex items-center gap-2 rounded-t-lg px-4 py-2 transition-all duration-200 ${
-                                activeTabId === tab.id
-                                    ? "bg-primary/15 text-primary border-primary border-b-2"
-                                    : "bg-primary/5 text-primary/60 hover:bg-primary/10 hover:text-primary/80"
-                            } ${dragOverTabId === tab.id && draggedPanelId ? "ring-primary/50 ring-2" : ""} `}
-                            onDragOver={(e) => {
-                                if (draggedPanelId) {
-                                    e.preventDefault();
-                                    setDragOverTabId(tab.id);
-                                }
-                            }}
-                            onDragLeave={() => {
-                                if (draggedPanelId) {
-                                    setDragOverTabId(null);
-                                }
-                            }}
-                            onDrop={(e) => {
-                                e.preventDefault();
-                                handlePanelDragEnd();
-                            }}
-                        >
-                            {editingTabId === tab.id ? (
-                                <input
-                                    ref={editInputRef}
-                                    type="text"
-                                    value={editingTabName}
-                                    onChange={(e) => setEditingTabName(e.target.value)}
-                                    onBlur={handleFinishRename}
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter") handleFinishRename();
-                                        if (e.key === "Escape") {
-                                            setEditingTabId(null);
-                                            setEditingTabName("");
-                                        }
-                                    }}
-                                    className="bg-background/50 border-primary/30 focus:border-primary w-32 rounded border px-2 py-0.5 text-sm font-medium tracking-wide outline-none"
-                                />
-                            ) : (
-                                <button
-                                    onClick={() => setActiveTabId(tab.id)}
-                                    className="flex items-center gap-2 text-sm font-medium tracking-wide"
-                                >
-                                    {tab.name}
-                                    <span className="text-xs opacity-60">
-                                        ({tab.panelIds.length})
+                    {tabs.map((tab) => {
+                        const isPoppedOut = poppedOutTabs.has(tab.id);
+                        return (
+                            <div
+                                key={tab.id}
+                                className={`relative flex cursor-pointer items-center gap-2 rounded-t-lg px-4 py-2 transition-all ${
+                                    isPoppedOut
+                                        ? "bg-accent/15 text-accent border-accent/50 border-b-2 opacity-60"
+                                        : activeTabId === tab.id
+                                          ? "bg-primary/15 text-primary border-primary border-b-2"
+                                          : "bg-primary/5 text-primary/60 hover:bg-primary/10 hover:text-primary/80"
+                                } `}
+                                onClick={() => !isPoppedOut && handleTabChange(tab.id)}
+                            >
+                                <span className="text-sm font-medium">{tab.name}</span>
+                                {isPoppedOut && (
+                                    <span className="text-accent/80 flex items-center gap-1 text-xs">
+                                        <ExternalLink className="h-2.5 w-2.5" />
+                                        <span>Popped Out</span>
                                     </span>
-                                </button>
-                            )}
-
-                            {/* Tab Actions */}
-                            <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                                {editingTabId !== tab.id && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleStartRename(tab.id, tab.name);
-                                        }}
-                                        className="hover:bg-primary/20 rounded p-1 transition-colors"
-                                        title="Rename tab"
-                                    >
-                                        <Edit2 className="h-3 w-3" />
-                                    </button>
                                 )}
-
-                                {tabs.length > 1 && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteTab(tab.id);
-                                        }}
-                                        className="hover:bg-destructive/20 rounded p-1 transition-colors"
-                                        title="Delete tab"
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </button>
-                                )}
+                                <div className="flex items-center gap-1">
+                                    {!isPoppedOut && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handlePopoutTab(tab);
+                                            }}
+                                            className="hover:bg-primary/20 rounded p-1.5 touch-manipulation transition-colors"
+                                            title="Pop out to new window"
+                                            aria-label="Pop out to new window"
+                                        >
+                                            <ExternalLink className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
+                                    {tabs.length > 1 && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteTab(tab.id);
+                                            }}
+                                            className="hover:bg-destructive/20 rounded p-1.5 touch-manipulation transition-colors"
+                                            aria-label="Close tab"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ))}
-
-                    {/* New Tab Button */}
-                    <button
-                        onClick={handleCreateTab}
-                        className="bg-primary/5 hover:bg-primary/10 text-primary/60 hover:text-primary flex items-center gap-1.5 rounded-t-lg px-3 py-2 transition-all duration-200"
-                        title="Create new tab"
-                    >
-                        <Plus className="h-4 w-4" />
-                        <span className="text-sm font-medium">New Tab</span>
-                    </button>
+                        );
+                    })}
                 </div>
+                <button
+                    onClick={handleCreateTab}
+                    className="bg-primary/5 hover:bg-primary/10 text-primary/60 hover:text-primary flex items-center gap-1.5 rounded-t-lg px-4 py-2.5 touch-manipulation transition-all"
+                    aria-label="Create new tab"
+                >
+                    <Plus className="h-4 w-4" />
+                    <span className="text-sm font-medium">New Tab</span>
+                </button>
             </div>
 
             {/* Active Tab Content */}
-            <div className="min-h-0 flex-1 overflow-hidden">
+            <div className="min-h-0 flex-1">
                 <DraggableLayout
                     key={activeTabId}
                     panels={panelsWithLayouts}
-                    onLayoutChange={handleLayoutChange}
-                    onResetLayout={handleResetLayout}
-                    tabs={tabs}
-                    activeTabId={activeTabId}
-                    onMovePanelToTab={handleMovePanelToTab}
-                    onPanelDragStart={handlePanelDragStart}
-                    onPanelDragEnd={handlePanelDragEnd}
+                    onLayoutChange={(layout) => handleLayoutChange(activeTabId, layout)}
+                    onResetLayout={() => handleResetLayout(activeTabId)}
                 />
             </div>
         </div>

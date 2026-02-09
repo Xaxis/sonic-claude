@@ -126,7 +126,7 @@ export function Controls() {
     };
 
     return (
-        <div className="flex h-full flex-col space-y-5 overflow-y-auto p-4">
+        <div className="flex flex-col space-y-5 overflow-y-auto p-4">
             {/* Transport Controls */}
             <div className="space-y-3">
                 <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium tracking-[0.15em] uppercase">
