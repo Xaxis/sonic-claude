@@ -4,14 +4,29 @@
  * Syncs across windows using BroadcastChannel
  */
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from "react";
 import { windowManager } from "@/services/WindowManager";
 import { audioEngineService } from "@/services/api/audio-engine.service";
+import { toast } from "sonner";
 import type { AudioEngineStatus } from "@/types";
 import type { Synth } from "@/components/features/synthesis";
 import type { Effect } from "@/components/features/effects";
 import type { MixerTrack } from "@/components/features/mixer";
 import type { Sequence } from "@/components/features/sequencer";
+
+// WebSocket message types
+interface TransportWebSocketData {
+    type: "transport";
+    is_playing: boolean;
+    position_beats: number;
+    position_seconds: number;
+    tempo: number;
+    time_signature_num: number;
+    time_signature_den: number;
+    loop_enabled?: boolean;
+    loop_start?: number;
+    loop_end?: number;
+}
 
 interface AudioEngineState {
     // Engine
@@ -86,6 +101,8 @@ interface AudioEngineContextValue extends AudioEngineState {
     deleteSequence: (sequenceId: string) => Promise<void>;
     playSequence: (sequenceId: string) => Promise<void>;
     stopPlayback: () => Promise<void>;
+    pausePlayback: () => Promise<void>;
+    resumePlayback: () => Promise<void>;
     setTempo: (tempo: number) => Promise<void>;
     setSequences: (sequences: Sequence[]) => void;
     setActiveSequenceId: (sequenceId: string | null) => void;
@@ -146,6 +163,122 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         return unsubscribe;
     }, []);
 
+    // WebSocket integration for real-time transport updates
+    const wsRef = useRef<WebSocket | null>(null);
+    const reconnectTimeoutRef = useRef<number | undefined>(undefined);
+    const isCleaningUpRef = useRef(false);
+
+    useEffect(() => {
+        isCleaningUpRef.current = false;
+
+        const connect = () => {
+            if (isCleaningUpRef.current) return;
+
+            try {
+                const ws = new WebSocket("ws://localhost:8000/ws/transport");
+                wsRef.current = ws;
+
+                ws.onopen = () => {
+                    if (!isCleaningUpRef.current) {
+                        console.log("🔌 Transport WebSocket connected");
+                    }
+                };
+
+                ws.onmessage = (event) => {
+                    if (isCleaningUpRef.current) return;
+
+                    try {
+                        const message: TransportWebSocketData = JSON.parse(event.data);
+                        if (message.type === "transport") {
+                            // Update local state (don't broadcast - too frequent)
+                            setState((prev) => ({
+                                ...prev,
+                                isPlaying: message.is_playing,
+                                currentPosition: message.position_beats,
+                                tempo: message.tempo,
+                            }));
+                        }
+                    } catch (error) {
+                        console.error("Failed to parse transport message:", error);
+                    }
+                };
+
+                ws.onerror = () => {
+                    if (!isCleaningUpRef.current && ws.readyState !== WebSocket.CLOSED) {
+                        console.warn("⚠️ Transport WebSocket error, will retry...");
+                    }
+                };
+
+                ws.onclose = () => {
+                    if (isCleaningUpRef.current) return;
+
+                    reconnectTimeoutRef.current = window.setTimeout(() => {
+                        if (!isCleaningUpRef.current) {
+                            connect();
+                        }
+                    }, 2000);
+                };
+            } catch (error) {
+                if (!isCleaningUpRef.current) {
+                    console.error("Failed to create Transport WebSocket:", error);
+                }
+            }
+        };
+
+        connect();
+
+        return () => {
+            isCleaningUpRef.current = true;
+
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+            }
+            if (wsRef.current) {
+                wsRef.current.close();
+            }
+        };
+    }, []);
+
+    // Initialize with a default test sequence
+    const hasInitializedRef = useRef(false);
+    useEffect(() => {
+        const initializeDefaultSequence = async () => {
+            if (hasInitializedRef.current) return;
+            hasInitializedRef.current = true;
+
+            try {
+                // Wait a bit for backend to be ready
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Check if sequences already exist
+                const sequences = await audioEngineService.getSequences();
+                if (sequences.length > 0) {
+                    setState((prev) => ({ ...prev, sequences: sequences as any[], activeSequenceId: sequences[0].id }));
+                    return;
+                }
+
+                // Create a default test sequence
+                const sequence = await audioEngineService.createSequence({
+                    name: "Test Sequence",
+                    tempo: 120,
+                    time_signature: [4, 4],
+                });
+
+                setState((prev) => ({
+                    ...prev,
+                    sequences: [sequence as any],
+                    activeSequenceId: sequence.id,
+                }));
+
+                toast.success("Created default test sequence");
+            } catch (error) {
+                console.error("Failed to initialize default sequence:", error);
+            }
+        };
+
+        initializeDefaultSequence();
+    }, []);
+
     // Engine actions
     const setEngineStatus = useCallback((status: AudioEngineStatus) => {
         setState((prev) => ({ ...prev, engineStatus: status }));
@@ -163,8 +296,10 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
             const defs = await audioEngineService.getSynthDefs();
             setState((prev) => ({ ...prev, synthDefs: defs as any[] }));
             broadcastUpdate("audioEngine.synthDefs", defs);
+            toast.success(`Loaded ${defs.length} synth definitions`);
         } catch (error) {
             console.error("Failed to load synth definitions:", error);
+            toast.error("Failed to load synth definitions");
         }
     }, [broadcastUpdate]);
 
@@ -179,8 +314,10 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 activeSynths: [...prev.activeSynths, synth as any],
             }));
             broadcastUpdate("audioEngine.activeSynths", [...state.activeSynths, synth]);
+            toast.success(`Created ${synthdef} synth`);
         } catch (error) {
             console.error("Failed to create synth:", error);
+            toast.error(`Failed to create synth: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }, [broadcastUpdate, state.activeSynths]);
 
@@ -199,6 +336,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
             }));
         } catch (error) {
             console.error("Failed to update synth parameter:", error);
+            toast.error("Failed to update synth parameter");
         }
     }, []);
 
@@ -415,7 +553,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
             const sequence = await audioEngineService.createSequence({
                 name,
                 tempo: tempo || 120,
-                time_signature: "4/4",
+                time_signature: [4, 4],
             });
             setState((prev) => ({
                 ...prev,
@@ -456,7 +594,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
 
     const stopPlayback = useCallback(async () => {
         try {
-            await audioEngineService.stopAll();
+            await audioEngineService.stopPlayback();
             setState((prev) => ({
                 ...prev,
                 isPlaying: false,
@@ -469,18 +607,41 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         }
     }, [broadcastUpdate]);
 
+    const pausePlayback = useCallback(async () => {
+        try {
+            await audioEngineService.pausePlayback();
+            setState((prev) => ({
+                ...prev,
+                isPlaying: false,
+            }));
+            broadcastUpdate("audioEngine.isPlaying", false);
+        } catch (error) {
+            console.error("Failed to pause playback:", error);
+        }
+    }, [broadcastUpdate]);
+
+    const resumePlayback = useCallback(async () => {
+        try {
+            await audioEngineService.resumePlayback();
+            setState((prev) => ({
+                ...prev,
+                isPlaying: true,
+            }));
+            broadcastUpdate("audioEngine.isPlaying", true);
+        } catch (error) {
+            console.error("Failed to resume playback:", error);
+        }
+    }, [broadcastUpdate]);
+
     const setTempo = useCallback(async (tempo: number) => {
         try {
-            // Set tempo on active sequence if one exists
-            if (state.activeSequenceId) {
-                await audioEngineService.setTempo(state.activeSequenceId, { tempo });
-            }
+            await audioEngineService.setTempo({ tempo });
             setState((prev) => ({ ...prev, tempo }));
             broadcastUpdate("audioEngine.tempo", tempo);
         } catch (error) {
             console.error("Failed to set tempo:", error);
         }
-    }, [broadcastUpdate, state.activeSequenceId]);
+    }, [broadcastUpdate]);
 
     const setSequences = useCallback((sequences: Sequence[]) => {
         setState((prev) => ({ ...prev, sequences }));
@@ -561,6 +722,8 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         deleteSequence,
         playSequence,
         stopPlayback,
+        pausePlayback,
+        resumePlayback,
         setTempo,
         setSequences,
         setActiveSequenceId,

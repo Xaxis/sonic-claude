@@ -83,119 +83,113 @@ import { createElement } from "react";
 
 export const DEFAULT_PANELS: PanelConfig[] = [
     // ===== LOOP TAB =====
-    // The feedback loop workspace - where everything happens
 
-    // INPUT SECTION (Left - 3 cols)
+    // Main workspace (fits in 600px height = 10 rows × 60px)
     {
         id: "input",
         title: "INPUT",
         component: createElement(InputPanel),
         closeable: false,
-        getSubtitle: () => "Library • 4 samples loaded", // TODO: Make dynamic
-        defaultLayout: { x: 0, y: 0, w: 3, h: 12 },
+        getSubtitle: () => "Library • 4 samples loaded",
+        defaultLayout: { x: 0, y: 0, w: 3, h: 10 },
     },
-
-    // LOOP CORE (Center - 6 cols)
-    {
-        id: "loop-visualizer",
-        title: "LOOP",
-        component: createElement(LoopVisualizerPanel),
-        closeable: false,
-        getSubtitle: () => "Active • 120 BPM • 4/4 • Position: 8.2 beats", // TODO: Make dynamic
-        defaultLayout: { x: 3, y: 0, w: 6, h: 6 },
-    },
-    {
-        id: "sequencer",
-        title: "SEQUENCER",
-        component: createElement(SequencerPanel),
-        closeable: false,
-        getSubtitle: () => "Timeline-based arrangement",
-        defaultLayout: { x: 3, y: 6, w: 6, h: 4 },
-    },
-    {
-        id: "transport",
-        title: "TRANSPORT",
-        component: createElement(TransportPanel),
-        closeable: false,
-        getSubtitle: () => "Master playback controls",
-        defaultLayout: { x: 3, y: 10, w: 6, h: 2 },
-    },
-
-    // PROCESSING SECTION (Right - 3 cols)
-    {
-        id: "synthesis",
-        title: "SYNTHESIS",
-        component: createElement(SynthesisPanel),
-        closeable: true,
-        getSubtitle: () => "Synth voice management",
-        defaultLayout: { x: 9, y: 0, w: 3, h: 4 },
-    },
-    {
-        id: "effects",
-        title: "EFFECTS",
-        component: createElement(EffectsPanel),
-        closeable: true,
-        getSubtitle: () => "5 effects in chain • 4 active",
-        defaultLayout: { x: 9, y: 4, w: 3, h: 4 },
-    },
-    {
-        id: "mixer",
-        title: "MIXER",
-        component: createElement(MixerPanel),
-        closeable: false,
-        getSubtitle: () => "8 tracks • Master: -6.2 dB",
-        defaultLayout: { x: 9, y: 8, w: 3, h: 4 },
-    },
-
-    // OPTIONAL PANELS
-    {
-        id: "metering",
-        title: "METERING",
-        component: createElement(MeteringPanel),
-        closeable: true,
-        getSubtitle: () => "Peak: -3.2 dB • RMS: -12.4 dB",
-        defaultLayout: { x: 0, y: 12, w: 3, h: 3 },
-    },
-    {
-        id: "piano-roll",
-        title: "PIANO ROLL",
-        component: createElement(PianoRollPanel),
-        closeable: true,
-        getSubtitle: () => "Clip: Bass Line • 7 notes • C3-C6",
-        defaultLayout: { x: 4, y: 12, w: 8, h: 6 },
-    },
-    {
-        id: "ai-agent",
-        title: "AI AGENT",
-        component: createElement(AIChatPanel),
-        closeable: true,
-        getSubtitle: () => "Ready • 3 suggestions pending",
-        defaultLayout: { x: 0, y: 15, w: 12, h: 4 },
-    },
-
-    // ===== ANALYZE TAB =====
-    // Deep analysis and transcription
-    {
-        id: "transcription",
-        title: "TRANSCRIPTION",
-        component: createElement(TranscriptionPanel),
-        closeable: false,
-        defaultLayout: { x: 0, y: 0, w: 6, h: 8 },
-    },
-    {
-        id: "spectral",
-        title: "SPECTRAL",
-        component: createElement(SpectralPanel),
-        closeable: true,
-        defaultLayout: { x: 6, y: 0, w: 6, h: 8 },
-    },
-    {
-        id: "timeline",
-        title: "TIMELINE",
-        component: createElement(TimelinePanel),
-        closeable: true,
-        defaultLayout: { x: 0, y: 8, w: 12, h: 4 },
-    },
+    // {
+    //     id: "loop-visualizer",
+    //     title: "LOOP",
+    //     component: createElement(LoopVisualizerPanel),
+    //     closeable: false,
+    //     getSubtitle: () => "Active • 120 BPM • 4/4 • Position: 8.2 beats",
+    //     defaultLayout: { x: 2, y: 0, w: 6, h: 5 },
+    // },
+    // {
+    //     id: "mixer",
+    //     title: "MIXER",
+    //     component: createElement(MixerPanel),
+    //     closeable: false,
+    //     getSubtitle: () => "8 tracks • Master: -6.2 dB",
+    //     defaultLayout: { x: 8, y: 0, w: 4, h: 8 },
+    // },
+    // {
+    //     id: "sequencer",
+    //     title: "SEQUENCER",
+    //     component: createElement(SequencerPanel),
+    //     closeable: false,
+    //     getSubtitle: () => "Timeline-based arrangement",
+    //     defaultLayout: { x: 2, y: 5, w: 6, h: 3 },
+    // },
+    // {
+    //     id: "transport",
+    //     title: "TRANSPORT",
+    //     component: createElement(TransportPanel),
+    //     closeable: false,
+    //     getSubtitle: () => "Master playback controls",
+    //     defaultLayout: { x: 0, y: 8, w: 2, h: 2 },
+    // },
+    // {
+    //     id: "synthesis",
+    //     title: "SYNTHESIS",
+    //     component: createElement(SynthesisPanel),
+    //     closeable: true,
+    //     getSubtitle: () => "Synth voice management",
+    //     defaultLayout: { x: 2, y: 8, w: 3, h: 2 },
+    // },
+    // {
+    //     id: "effects",
+    //     title: "EFFECTS",
+    //     component: createElement(EffectsPanel),
+    //     closeable: true,
+    //     getSubtitle: () => "5 effects in chain • 4 active",
+    //     defaultLayout: { x: 5, y: 8, w: 3, h: 2 },
+    // },
+    // {
+    //     id: "metering",
+    //     title: "METERING",
+    //     component: createElement(MeteringPanel),
+    //     closeable: true,
+    //     getSubtitle: () => "Peak: -3.2 dB • RMS: -12.4 dB",
+    //     defaultLayout: { x: 8, y: 8, w: 4, h: 2 },
+    // },
+    //
+    // {
+    //     id: "piano-roll",
+    //     title: "PIANO ROLL",
+    //     component: createElement(PianoRollPanel),
+    //     closeable: true,
+    //     getSubtitle: () => "Clip: Bass Line • 7 notes • C3-C6",
+    //     defaultLayout: { x: 0, y: 10, w: 8, h: 6 },
+    // },
+    // {
+    //     id: "ai-agent",
+    //     title: "AI AGENT",
+    //     component: createElement(AIChatPanel),
+    //     closeable: true,
+    //     getSubtitle: () => "Ready • 3 suggestions pending",
+    //     defaultLayout: { x: 8, y: 10, w: 4, h: 6 },
+    // },
+    //
+    // // ===== ANALYZE TAB =====
+    // // Deep analysis and transcription
+    // {
+    //     id: "transcription",
+    //     title: "TRANSCRIPTION",
+    //     component: createElement(TranscriptionPanel),
+    //     closeable: false,
+    //     defaultLayout: { x: 0, y: 0, w: 6, h: 8 },
+    // },
+    // {
+    //     id: "spectral",
+    //     title: "SPECTRAL",
+    //     component: createElement(SpectralPanel),
+    //     closeable: true,
+    //     defaultLayout: { x: 6, y: 0, w: 6, h: 8 },
+    // },
+    // {
+    //     id: "timeline",
+    //     title: "TIMELINE",
+    //     component: createElement(TimelinePanel),
+    //     closeable: true,
+    //     defaultLayout: { x: 0, y: 8, w: 12, h: 4 },
+    // },
 ];
 
 /**
@@ -212,21 +206,10 @@ export const DEFAULT_TABS = [
         name: "LOOP",
         panelIds: [
             "input",
-            "loop-visualizer",
-            "sequencer",
-            "transport",
-            "synthesis",
-            "effects",
-            "mixer",
-            "metering",
-            "piano-roll",
-            "ai-agent",
+            // "loop-visualizer", // Center top - spectrum/waveform visualization
+            // "synthesis",       // Center bottom - synth controls
+            // "transport",       // Bottom - playback controls
         ],
-    },
-    {
-        id: "analyze",
-        name: "ANALYZE",
-        panelIds: ["transcription", "spectral", "timeline"],
     },
 ];
 

@@ -98,8 +98,18 @@ class MixerService:
         track = self.tracks[track_id]
         track.volume = max(0.0, min(2.0, volume))
 
-        # TODO: Send OSC message to update volume
-        logger.debug(f"Set track {track_id} volume = {track.volume}")
+        # Send OSC message to update volume on track's mixer synth
+        if self.engine.server and self.engine.is_running and track.bus:
+            try:
+                # Assuming each track has a mixer synth node
+                # We'll use the bus ID as the node ID for simplicity
+                mixer_node_id = 3000 + track.bus.id  # Offset to avoid conflicts
+                self.engine.server.send_message("/n_set", [mixer_node_id, "volume", track.volume])
+                logger.debug(f"Set track {track_id} volume = {track.volume} on SuperCollider")
+            except Exception as e:
+                logger.error(f"Failed to send OSC message for volume update: {e}")
+        else:
+            logger.debug(f"Set track {track_id} volume = {track.volume} (SuperCollider not running)")
 
     async def set_pan(self, track_id: str, pan: float):
         """Set track pan (-1.0 to 1.0)"""
@@ -109,8 +119,16 @@ class MixerService:
         track = self.tracks[track_id]
         track.pan = max(-1.0, min(1.0, pan))
 
-        # TODO: Send OSC message to update pan
-        logger.debug(f"Set track {track_id} pan = {track.pan}")
+        # Send OSC message to update pan on track's mixer synth
+        if self.engine.server and self.engine.is_running and track.bus:
+            try:
+                mixer_node_id = 3000 + track.bus.id
+                self.engine.server.send_message("/n_set", [mixer_node_id, "pan", track.pan])
+                logger.debug(f"Set track {track_id} pan = {track.pan} on SuperCollider")
+            except Exception as e:
+                logger.error(f"Failed to send OSC message for pan update: {e}")
+        else:
+            logger.debug(f"Set track {track_id} pan = {track.pan} (SuperCollider not running)")
 
     async def mute(self, track_id: str, muted: bool):
         """Mute/unmute track"""
@@ -120,8 +138,18 @@ class MixerService:
         track = self.tracks[track_id]
         track.muted = muted
 
-        # TODO: Send OSC message to mute/unmute
-        logger.info(f"Track {track_id} muted = {muted}")
+        # Send OSC message to mute/unmute (set volume to 0 or restore)
+        if self.engine.server and self.engine.is_running and track.bus:
+            try:
+                mixer_node_id = 3000 + track.bus.id
+                # When muted, set amp to 0, otherwise use track volume
+                amp_value = 0.0 if muted else track.volume
+                self.engine.server.send_message("/n_set", [mixer_node_id, "amp", amp_value])
+                logger.info(f"Track {track_id} muted = {muted} on SuperCollider")
+            except Exception as e:
+                logger.error(f"Failed to send OSC message for mute: {e}")
+        else:
+            logger.info(f"Track {track_id} muted = {muted} (SuperCollider not running)")
 
     async def solo(self, track_id: str, soloed: bool):
         """Solo/unsolo track"""

@@ -4,14 +4,17 @@
  * Synth voice management - create, edit, and control synth instances.
  * Shows active synths with their parameters.
  * Integrates with AudioEngineContext for real synth management.
+ *
+ * Uses professional Knob components in grid layout for parameters.
  */
 
 import { useState, useEffect } from "react";
 import { SubPanel } from "@/components/ui/sub-panel";
-import { Slider } from "@/components/ui/slider";
-import { Plus, Waves, Trash2 } from "lucide-react";
+import { Knob } from "@/components/ui/knob";
+import { Plus, Waves, Trash2, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAudioEngine } from "@/contexts/AudioEngineContext";
+import { api } from "@/services/api";
 
 export function SynthesisPanel() {
     const {
@@ -64,6 +67,35 @@ export function SynthesisPanel() {
             if (selectedSynthId === synthId) {
                 setSelectedSynthId(null);
             }
+        }
+    };
+
+    // Handle play note - trigger a test note
+    const handlePlayNote = async (synthId: string, note: number = 60) => {
+        const synth = activeSynths.find(s => s.id === synthId);
+        if (!synth) return;
+
+        try {
+            // Convert MIDI note to frequency (A4 = 440Hz = MIDI note 69)
+            const freq = 440.0 * Math.pow(2, (note - 69) / 12);
+
+            // Set frequency and trigger gate
+            await api.audioEngine.updateSynth(synth.node_id.toString(), {
+                parameters: { freq, gate: 1.0 },
+            });
+
+            // Release note after 500ms
+            setTimeout(async () => {
+                try {
+                    await api.audioEngine.updateSynth(synth.node_id.toString(), {
+                        parameters: { gate: 0.0 },
+                    });
+                } catch (error) {
+                    console.error("Failed to release note:", error);
+                }
+            }, 500);
+        } catch (error) {
+            console.error("Failed to play note:", error);
         }
     };
 
@@ -127,33 +159,60 @@ export function SynthesisPanel() {
             {selectedSynth ? (
                 <div className="flex-1 flex flex-col gap-2">
                     <SubPanel title={`${selectedSynth.synthdef} Parameters`} className="flex-1 overflow-auto">
-                        <div className="p-4 space-y-4">
+                        <div className="p-4">
+                            {/* Play Note Button */}
+                            <div className="mb-4 flex gap-2">
+                                <button
+                                    onClick={() => handlePlayNote(selectedSynth.id, 60)}
+                                    className="px-4 py-2 rounded-lg bg-primary/20 hover:bg-primary/30 border border-primary text-primary transition-all flex items-center gap-2"
+                                >
+                                    <Play size={16} />
+                                    <span className="text-sm font-semibold">Play C4</span>
+                                </button>
+                                <button
+                                    onClick={() => handlePlayNote(selectedSynth.id, 64)}
+                                    className="px-4 py-2 rounded-lg bg-primary/20 hover:bg-primary/30 border border-primary text-primary transition-all flex items-center gap-2"
+                                >
+                                    <Play size={16} />
+                                    <span className="text-sm font-semibold">Play E4</span>
+                                </button>
+                                <button
+                                    onClick={() => handlePlayNote(selectedSynth.id, 67)}
+                                    className="px-4 py-2 rounded-lg bg-primary/20 hover:bg-primary/30 border border-primary text-primary transition-all flex items-center gap-2"
+                                >
+                                    <Play size={16} />
+                                    <span className="text-sm font-semibold">Play G4</span>
+                                </button>
+                            </div>
+
                             {Object.keys(selectedSynth.parameters).length === 0 ? (
                                 <div className="text-center text-sm text-muted-foreground py-8">
                                     No parameters available
                                 </div>
                             ) : (
-                                Object.entries(selectedSynth.parameters).map(([param, value]) => (
-                                    <div key={param}>
-                                        <div className="flex justify-between mb-1">
-                                            <label className="text-xs text-muted-foreground capitalize">
-                                                {param.replace(/_/g, " ")}
-                                            </label>
-                                            <span className="text-xs font-mono text-foreground">
-                                                {typeof value === "number" ? value.toFixed(3) : value}
-                                            </span>
-                                        </div>
-                                        {typeof value === "number" && (
-                                            <Slider
-                                                value={value}
-                                                onChange={(v) => handleParameterChange(selectedSynth.id, param, v)}
-                                                min={0}
-                                                max={1}
-                                                step={0.01}
-                                            />
-                                        )}
-                                    </div>
-                                ))
+                                <div className="grid grid-cols-3 gap-4">
+                                    {Object.entries(selectedSynth.parameters).map(([param, value]) => {
+                                        if (typeof value !== "number") return null;
+
+                                        // Determine format based on parameter name
+                                        const format = param.toLowerCase().includes("pan") ? "pan" : "default";
+                                        const min = param.toLowerCase().includes("pan") ? -1 : 0;
+                                        const max = 1;
+
+                                        return (
+                                            <div key={param} className="flex justify-center">
+                                                <Knob
+                                                    value={value}
+                                                    onChange={(v) => handleParameterChange(selectedSynth.id, param, v)}
+                                                    label={param.replace(/_/g, " ")}
+                                                    format={format}
+                                                    min={min}
+                                                    max={max}
+                                                />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             )}
                         </div>
                     </SubPanel>

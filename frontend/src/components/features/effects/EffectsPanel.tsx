@@ -4,11 +4,13 @@
  * Audio effects chain management.
  * Shows active effects with their parameters and routing.
  * Integrates with AudioEngineContext for real effect management.
+ *
+ * Uses professional Knob components in grid layout for parameters.
  */
 
 import { useState, useEffect } from "react";
 import { SubPanel } from "@/components/ui/sub-panel";
-import { Slider } from "@/components/ui/slider";
+import { Knob } from "@/components/ui/knob";
 import { Plus, Power, Zap, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAudioEngine } from "@/contexts/AudioEngineContext";
@@ -149,33 +151,38 @@ export function EffectsPanel() {
             {/* Effect Parameters */}
             {selectedEffect ? (
                 <SubPanel title={`${selectedEffect.effectdef} Parameters`} className="flex-1 overflow-auto">
-                    <div className="p-4 space-y-4">
+                    <div className="p-4">
                         {Object.keys(selectedEffect.parameters).length === 0 ? (
                             <div className="text-center text-sm text-muted-foreground py-8">
                                 No parameters available
                             </div>
                         ) : (
-                            Object.entries(selectedEffect.parameters).map(([param, value]) => (
-                                <div key={param}>
-                                    <div className="flex justify-between mb-1">
-                                        <label className="text-xs text-muted-foreground capitalize">
-                                            {param.replace(/_/g, " ")}
-                                        </label>
-                                        <span className="text-xs font-mono text-foreground">
-                                            {typeof value === "number" ? value.toFixed(3) : value}
-                                        </span>
-                                    </div>
-                                    {typeof value === "number" && (
-                                        <Slider
-                                            value={value}
-                                            onChange={(v) => handleParameterChange(selectedEffect.id, param, v)}
-                                            min={0}
-                                            max={1}
-                                            step={0.01}
-                                        />
-                                    )}
-                                </div>
-                            ))
+                            <div className="grid grid-cols-3 gap-4">
+                                {Object.entries(selectedEffect.parameters).map(([param, value]) => {
+                                    if (typeof value !== "number") return null;
+
+                                    // Determine format based on parameter name
+                                    const paramLower = param.toLowerCase();
+                                    const format = paramLower.includes("pan") ? "pan"
+                                                 : paramLower.includes("mix") || paramLower.includes("wet") ? "percent"
+                                                 : "default";
+                                    const min = paramLower.includes("pan") ? -1 : 0;
+                                    const max = 1;
+
+                                    return (
+                                        <div key={param} className="flex justify-center">
+                                            <Knob
+                                                value={value}
+                                                onChange={(v) => handleParameterChange(selectedEffect.id, param, v)}
+                                                label={param.replace(/_/g, " ")}
+                                                format={format}
+                                                min={min}
+                                                max={max}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         )}
                     </div>
                 </SubPanel>

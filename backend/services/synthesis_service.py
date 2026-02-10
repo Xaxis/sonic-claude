@@ -535,7 +535,13 @@ class SynthesisService:
         synth_id = self.next_synth_id
         self.next_synth_id += 1
 
-        params = parameters or {}
+        # Merge default parameters with provided ones
+        synthdef_obj = self.synthdefs[synthdef]
+        params = {**synthdef_obj.parameters, **(parameters or {})}
+
+        # Add bus if specified
+        if bus is not None:
+            params["out"] = bus
 
         synth = Synth(
             id=synth_id,
@@ -547,15 +553,38 @@ class SynthesisService:
 
         self.synths[synth_id] = synth
 
-        # TODO: Send OSC message to create synth on server
-        logger.info(f"Created synth {synth_id} ({synthdef})")
+        # Send OSC message to create synth on SuperCollider
+        if self.engine.server and self.engine.is_running:
+            try:
+                # Build parameter list for OSC message
+                # Format: [param1_name, param1_value, param2_name, param2_value, ...]
+                osc_params = []
+                for key, value in params.items():
+                    osc_params.extend([key, value])
+
+                # Send /s_new message: [synthdef_name, node_id, add_action, target_id, ...params]
+                # add_action: 0=addToHead, 1=addToTail
+                self.engine.server.send_message("/s_new", [synthdef, synth_id, 1, group] + osc_params)
+                logger.info(f"Created synth {synth_id} ({synthdef}) on SuperCollider")
+            except Exception as e:
+                logger.error(f"Failed to send OSC message for synth creation: {e}")
+        else:
+            logger.warning(f"Created synth {synth_id} ({synthdef}) but SuperCollider not running")
 
         return synth
 
     async def free_synth(self, synth_id: int):
         """Free a synth"""
         if synth_id in self.synths:
-            # TODO: Send OSC message to free synth
+            # Send OSC message to free synth on SuperCollider
+            if self.engine.server and self.engine.is_running:
+                try:
+                    # Send /n_free message: [node_id]
+                    self.engine.server.send_message("/n_free", [synth_id])
+                    logger.info(f"Freed synth {synth_id} on SuperCollider")
+                except Exception as e:
+                    logger.error(f"Failed to send OSC message for synth free: {e}")
+
             del self.synths[synth_id]
             logger.info(f"Freed synth {synth_id}")
 
@@ -567,8 +596,16 @@ class SynthesisService:
         synth = self.synths[synth_id]
         synth.set(param, value)
 
-        # TODO: Send OSC message to update parameter
-        logger.debug(f"Set synth {synth_id} {param} = {value}")
+        # Send OSC message to update parameter on SuperCollider
+        if self.engine.server and self.engine.is_running:
+            try:
+                # Send /n_set message: [node_id, param_name, param_value]
+                self.engine.server.send_message("/n_set", [synth_id, param, value])
+                logger.debug(f"Set synth {synth_id} {param} = {value} on SuperCollider")
+            except Exception as e:
+                logger.error(f"Failed to send OSC message for parameter update: {e}")
+        else:
+            logger.debug(f"Set synth {synth_id} {param} = {value} (SuperCollider not running)")
 
     def get_synth(self, synth_id: int) -> Optional[Synth]:
         """Get synth by ID"""

@@ -4,10 +4,14 @@
  * Multi-track mixer with volume, pan, mute, solo controls.
  * Shows level meters and master fader.
  * Integrates with AudioEngineContext for real mixer state and real-time metering.
+ *
+ * Uses professional Fader (volume) and Knob (pan) components.
  */
 
 import { useEffect } from "react";
-import { Slider } from "@/components/ui/slider";
+import { Fader } from "@/components/ui/fader";
+import { Knob } from "@/components/ui/knob";
+import { Meter } from "@/components/ui/meter";
 import { cn } from "@/lib/utils";
 import { useAudioEngine } from "@/contexts/AudioEngineContext";
 import { Plus, Trash2 } from "lucide-react";
@@ -31,12 +35,25 @@ export function MixerPanel() {
         loadTracks();
     }, [loadTracks]);
 
-    // Handle volume change
-    const handleVolumeChange = async (trackId: string, volume: number) => {
-        await updateTrackVolume(trackId, volume);
+    // Convert dB to linear volume (0-2 range)
+    const dbToLinear = (db: number): number => {
+        if (db <= -96) return 0;
+        return Math.pow(10, db / 20);
     };
 
-    // Handle pan change
+    // Convert linear volume to dB
+    const linearToDb = (linear: number): number => {
+        if (linear === 0) return -96;
+        return 20 * Math.log10(linear);
+    };
+
+    // Handle volume change (receives dB from Fader, converts to linear for API)
+    const handleVolumeChange = async (trackId: string, db: number) => {
+        const linear = dbToLinear(db);
+        await updateTrackVolume(trackId, linear);
+    };
+
+    // Handle pan change (receives -1 to 1 from Knob)
     const handlePanChange = async (trackId: string, pan: number) => {
         await updateTrackPan(trackId, pan);
     };
@@ -61,12 +78,18 @@ export function MixerPanel() {
         await deleteTrack(trackId);
     };
 
-    // Get meter level for a track (0-1 range)
-    const getMeterLevel = (trackId: string): number => {
+    // Get meter levels for a track (in dB)
+    const getMeterLevels = (trackId: string) => {
         const meter = meters[trackId];
-        if (!meter) return 0;
-        // Use peak level (average of L/R)
-        return (meter.peakL + meter.peakR) / 2;
+        if (!meter) {
+            return { peakL: -96, peakR: -96, rmsL: -96, rmsR: -96 };
+        }
+        return {
+            peakL: meter.peakL || -96,
+            peakR: meter.peakR || -96,
+            rmsL: meter.rmsL || -96,
+            rmsR: meter.rmsR || -96,
+        };
     };
 
     return (
@@ -89,9 +112,11 @@ export function MixerPanel() {
                 ) : (
                     <>
                         {tracks.map((track) => {
-                            const meterLevel = getMeterLevel(track.id);
+                            const meterLevels = getMeterLevels(track.id);
+                            const volumeDb = linearToDb(track.volume);
+
                             return (
-                                <div key={track.id} className="flex flex-col gap-1.5 w-20 flex-shrink-0 bg-muted/20 rounded-lg p-2 group relative">
+                                <div key={track.id} className="flex flex-col gap-2 w-24 flex-shrink-0 bg-muted/20 rounded-lg p-3 group relative">
                                     {/* Delete button (appears on hover) */}
                                     <button
                                         onClick={() => handleDeleteTrack(track.id)}
@@ -102,50 +127,41 @@ export function MixerPanel() {
                                     </button>
 
                                     {/* Track Name */}
-                                    <div className="text-xs font-semibold text-center truncate px-1 text-foreground">
+                                    <div className="text-xs font-semibold text-center truncate text-foreground">
                                         {track.name}
                                     </div>
 
-                                    {/* Level Meter */}
-                                    <div className="flex-1 bg-gray-900/50 rounded relative overflow-hidden min-h-[100px]">
-                                        <div
-                                            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-green-500 via-yellow-500 to-red-500 transition-all duration-75"
-                                            style={{ height: `${Math.min(meterLevel * 100, 100)}%` }}
-                                        />
-                                        {/* Peak indicator line */}
-                                        {meterLevel > 0.9 && (
-                                            <div className="absolute top-0 left-0 right-0 h-0.5 bg-red-500 animate-pulse" />
-                                        )}
-                                    </div>
-
-                                    {/* Volume Fader */}
-                                    <div className="px-1">
-                                        <Slider
-                                            value={track.volume}
-                                            onChange={(value: number) => handleVolumeChange(track.id, value)}
-                                            min={0}
-                                            max={2}
-                                            step={0.01}
+                                    {/* Professional Meter Component */}
+                                    <div className="flex justify-center">
+                                        <Meter
+                                            peak={meterLevels.peakL}
+                                            rms={meterLevels.rmsL}
+                                            stereo={true}
+                                            peakRight={meterLevels.peakR}
+                                            rmsRight={meterLevels.rmsR}
                                         />
                                     </div>
 
-                                    {/* Volume Label (in dB) */}
-                                    <div className="text-xs text-center text-muted-foreground font-mono">
-                                        {track.volume === 0 ? "-∞" : (20 * Math.log10(track.volume)).toFixed(1)} dB
+                                    {/* Professional Fader Component */}
+                                    <div className="flex justify-center">
+                                        <Fader
+                                            value={volumeDb}
+                                            onChange={(db) => handleVolumeChange(track.id, db)}
+                                            min={-96}
+                                            max={6}
+                                        />
                                     </div>
 
-                                    {/* Pan Control */}
-                                    <div className="px-1">
-                                        <Slider
-                                            value={(track.pan + 1) / 2}
-                                            onChange={(value: number) => handlePanChange(track.id, value * 2 - 1)}
-                                            min={0}
+                                    {/* Professional Knob Component for Pan */}
+                                    <div className="flex justify-center">
+                                        <Knob
+                                            value={track.pan}
+                                            onChange={(pan) => handlePanChange(track.id, pan)}
+                                            label="Pan"
+                                            format="pan"
+                                            min={-1}
                                             max={1}
-                                            step={0.01}
                                         />
-                                        <div className="text-xs text-center text-muted-foreground mt-0.5 font-mono">
-                                            {track.pan === 0 ? "C" : track.pan > 0 ? `R${Math.round(track.pan * 100)}` : `L${Math.round(Math.abs(track.pan) * 100)}`}
-                                        </div>
                                     </div>
 
                                     {/* Mute/Solo Buttons */}
@@ -190,36 +206,30 @@ export function MixerPanel() {
 
             {/* Master Channel */}
             {masterTrack && (
-                <div className="w-24 flex flex-col gap-1.5 border-l-2 border-primary/30 pl-2 bg-primary/5 rounded-r-lg p-2">
+                <div className="w-28 flex flex-col gap-2 border-l-2 border-primary/30 pl-3 bg-primary/5 rounded-r-lg p-3">
                     <div className="text-xs font-bold text-center text-primary">
                         MASTER
                     </div>
 
-                    {/* Master Level Meter */}
-                    <div className="flex-1 bg-gray-900/50 rounded relative overflow-hidden min-h-[100px]">
-                        <div
-                            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-green-500 via-yellow-500 to-red-500 transition-all duration-75"
-                            style={{ height: `${Math.min(getMeterLevel("master") * 100, 100)}%` }}
-                        />
-                        {getMeterLevel("master") > 0.9 && (
-                            <div className="absolute top-0 left-0 right-0 h-0.5 bg-red-500 animate-pulse" />
-                        )}
-                    </div>
-
-                    {/* Master Fader */}
-                    <div className="px-2">
-                        <Slider
-                            value={masterTrack.volume}
-                            onChange={(value: number) => handleVolumeChange("master", value)}
-                            min={0}
-                            max={2}
-                            step={0.01}
+                    {/* Professional Master Meter */}
+                    <div className="flex justify-center">
+                        <Meter
+                            peak={getMeterLevels("master").peakL}
+                            rms={getMeterLevels("master").rmsL}
+                            stereo={true}
+                            peakRight={getMeterLevels("master").peakR}
+                            rmsRight={getMeterLevels("master").rmsR}
                         />
                     </div>
 
-                    {/* Master Volume Label */}
-                    <div className="text-xs text-center text-primary font-mono font-bold">
-                        {masterTrack.volume === 0 ? "-∞" : (20 * Math.log10(masterTrack.volume)).toFixed(1)} dB
+                    {/* Professional Master Fader */}
+                    <div className="flex justify-center">
+                        <Fader
+                            value={linearToDb(masterTrack.volume)}
+                            onChange={(db) => handleVolumeChange("master", db)}
+                            min={-96}
+                            max={6}
+                        />
                     </div>
                 </div>
             )}

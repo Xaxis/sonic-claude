@@ -14,6 +14,7 @@ from backend.services import (
     SequencerService
 )
 from backend.services.websocket_service import WebSocketService
+from backend.services.websocket_service import WebSocketService
 
 logger = get_logger(__name__)
 
@@ -66,11 +67,11 @@ class ServiceContainer:
         self.synthesis_service = SynthesisService(self.audio_engine)
         self.effects_service = EffectsService(self.audio_engine)
         self.mixer_service = MixerService(self.audio_engine)
-        self.sequencer_service = SequencerService(self.audio_engine)
+        self.sequencer_service = SequencerService(self.audio_engine, self.synthesis_service)
         logger.info("🎹 Audio engine services initialized")
 
-        # Initialize WebSocket service
-        self.websocket_service = WebSocketService()
+        # Initialize WebSocket service with sequencer dependency
+        self.websocket_service = WebSocketService(sequencer_service=self.sequencer_service)
         await self.websocket_service.start()
         logger.info("🔌 WebSocket service initialized")
 

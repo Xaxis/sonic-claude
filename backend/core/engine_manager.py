@@ -61,22 +61,23 @@ class AudioEngineManager:
         """
         try:
             logger.info(f"Starting SuperCollider server on {self.host}:{self.port}")
-            
+
             # Connect to SuperCollider server
             # Note: Assumes scsynth is already running
-            self.server = SCServer(host=self.host, port=self.port)
-            
+            # The parameter is 'hostname', not 'host'
+            self.server = SCServer(hostname=self.host, port=self.port)
+
             # Wait for server to be ready
             await asyncio.sleep(0.5)
-            
+
             self.is_running = True
-            
+
             # Start health monitoring
             self._health_check_task = asyncio.create_task(self._health_check_loop())
-            
+
             logger.info("SuperCollider server started successfully")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to start SuperCollider server: {e}")
             self.is_running = False

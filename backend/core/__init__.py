@@ -27,5 +27,6 @@ __all__ = [
     "get_effects_service",
     "get_mixer_service",
     "get_sequencer_service",
+    "get_websocket_service",
 ]
 

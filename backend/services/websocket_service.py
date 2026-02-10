@@ -4,7 +4,7 @@ Manages real-time data streaming to connected clients
 """
 import asyncio
 import numpy as np
-from typing import Set, Dict, Optional
+from typing import Set, Dict, Optional, TYPE_CHECKING
 from fastapi import WebSocket
 import logging
 
@@ -16,13 +16,16 @@ from backend.models.websocket import (
     AnalyticsData
 )
 
+if TYPE_CHECKING:
+    from backend.services.sequencer_service import SequencerService
+
 logger = logging.getLogger(__name__)
 
 
 class WebSocketService:
     """Manages WebSocket connections and real-time data streaming"""
 
-    def __init__(self):
+    def __init__(self, sequencer_service: Optional["SequencerService"] = None):
         # Connection pools for each channel
         self.spectrum_connections: Set[WebSocket] = set()
         self.meter_connections: Set[WebSocket] = set()
@@ -37,6 +40,9 @@ class WebSocketService:
         # Audio buffer for analysis (placeholder)
         self._audio_buffer: Optional[np.ndarray] = None
         self._sample_rate = 48000
+
+        # Service dependencies
+        self._sequencer_service = sequencer_service
 
     async def start(self):
         """Start WebSocket streaming tasks"""
@@ -236,16 +242,31 @@ class WebSocketService:
         )
 
     def _generate_transport_data(self) -> TransportData:
-        """Generate transport position data"""
-        # Placeholder: Incrementing position
+        """Generate transport position data from SequencerService"""
+        if self._sequencer_service is None:
+            # Fallback to placeholder if sequencer not available
+            return TransportData(
+                is_playing=False,
+                position_beats=0.0,
+                position_seconds=0.0,
+                tempo=120.0,
+                time_signature_num=4,
+                time_signature_den=4,
+                loop_enabled=False
+            )
+
+        # Get real data from sequencer
+        state = self._sequencer_service.get_playback_state()
+        position_seconds = (state["playhead_position"] / state["tempo"]) * 60.0
+
         return TransportData(
-            is_playing=False,
-            position_beats=0.0,
-            position_seconds=0.0,
-            tempo=120.0,
-            time_signature_num=4,
-            time_signature_den=4,
-            loop_enabled=False
+            is_playing=state["is_playing"],
+            position_beats=state["playhead_position"],
+            position_seconds=position_seconds,
+            tempo=state["tempo"],
+            time_signature_num=4,  # TODO: Get from sequence
+            time_signature_den=4,  # TODO: Get from sequence
+            loop_enabled=False  # TODO: Get from sequence
         )
 
     def _generate_analytics_data(self) -> AnalyticsData:
