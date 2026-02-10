@@ -8,10 +8,10 @@
 import { useEffect, useRef } from "react";
 import { Panel } from "@/components/ui/panel";
 import { SubPanel } from "@/components/ui/sub-panel";
-import { useWaveformWebSocket } from "@/hooks/useWaveformWebsocket";
+import { useAudioEngine } from "@/contexts/AudioEngineContext";
 
 export function WaveformPanel() {
-    const { waveform, isConnected } = useWaveformWebSocket();
+    const { waveform } = useAudioEngine();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Draw waveform on canvas
@@ -48,11 +48,7 @@ export function WaveformPanel() {
         ctx.stroke();
 
         // Draw waveforms
-        const drawWaveform = (
-            samples: number[],
-            yOffset: number,
-            color: string
-        ) => {
+        const drawWaveform = (samples: number[], yOffset: number, color: string) => {
             if (samples.length === 0) return;
 
             const sliceWidth = rect.width / samples.length;
@@ -85,59 +81,53 @@ export function WaveformPanel() {
         };
 
         // Draw left channel (top half)
-        drawWaveform(waveform.samples_left, rect.height / 4, "rgba(6, 182, 212, 0.8)"); // cyan
+        drawWaveform(waveform.left, rect.height / 4, "rgba(6, 182, 212, 0.8)"); // cyan
 
         // Draw right channel (bottom half)
-        drawWaveform(waveform.samples_right, (rect.height * 3) / 4, "rgba(236, 72, 153, 0.8)"); // pink
+        drawWaveform(waveform.right, (rect.height * 3) / 4, "rgba(236, 72, 153, 0.8)"); // pink
     }, [waveform]);
 
     return (
         <Panel title="WAVEFORM" className="flex flex-col">
-            <div className="flex-1 p-4 flex flex-col gap-4">
+            <div className="flex flex-1 flex-col gap-4 p-4">
                 {/* Connection status */}
                 <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-muted-foreground">
-                        STEREO WAVEFORM
-                    </h3>
+                    <h3 className="text-muted-foreground text-sm font-semibold">STEREO WAVEFORM</h3>
                     <div className="flex items-center gap-2 text-xs">
                         <div
                             className={`h-2 w-2 rounded-full ${
-                                isConnected ? "bg-green-500" : "bg-red-500"
+                                waveform.left.length > 0 ? "bg-green-500" : "bg-red-500"
                             }`}
                         />
                         <span className="text-muted-foreground">
-                            {isConnected ? "Connected" : "Disconnected"}
+                            {waveform.left.length > 0 ? "Connected" : "Disconnected"}
                         </span>
                     </div>
                 </div>
 
                 {/* Waveform display */}
                 <SubPanel title="LIVE WAVEFORM" className="flex-1">
-                    <div className="relative w-full h-full min-h-[300px]">
-                        <canvas
-                            ref={canvasRef}
-                            className="absolute inset-0 w-full h-full"
-                        />
+                    <div className="relative h-full min-h-[300px] w-full">
+                        <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
                         {/* Channel labels */}
-                        <div className="absolute left-2 top-2 text-xs font-mono text-cyan-400 opacity-50">
+                        <div className="absolute top-2 left-2 font-mono text-xs text-cyan-400 opacity-50">
                             L
                         </div>
-                        <div className="absolute left-2 bottom-2 text-xs font-mono text-pink-400 opacity-50">
+                        <div className="absolute bottom-2 left-2 font-mono text-xs text-pink-400 opacity-50">
                             R
                         </div>
                     </div>
                 </SubPanel>
 
                 {/* Info */}
-                {waveform && (
-                    <div className="flex justify-between text-xs text-muted-foreground font-mono">
-                        <span>Sample Rate: {waveform.sample_rate} Hz</span>
-                        <span>Samples: {waveform.samples_left.length}</span>
+                {waveform.left.length > 0 && (
+                    <div className="text-muted-foreground flex justify-between font-mono text-xs">
+                        <span>Sample Rate: 48000 Hz</span>
+                        <span>Samples: {waveform.left.length}</span>
                     </div>
                 )}
             </div>
         </Panel>
     );
 }
-

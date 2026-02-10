@@ -5,7 +5,8 @@ Real-time data streaming endpoints
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 import logging
 
-from backend.core import get_websocket_service
+from backend.core import get_logger
+from backend.core.dependencies import get_websocket_service
 from backend.services.websocket_service import WebSocketService
 
 logger = logging.getLogger(__name__)

@@ -33,4 +33,3 @@ export interface CreateEffectRequest {
 export interface UpdateEffectRequest {
     parameters: Record<string, number>;
 }
-

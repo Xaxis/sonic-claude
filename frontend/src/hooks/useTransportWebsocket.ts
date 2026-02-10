@@ -1,6 +1,6 @@
 /**
  * Transport WebSocket Hook
- * 
+ *
  * Connects to backend WebSocket for real-time transport data.
  * Provides playback position, tempo, time signature, and loop info.
  */
@@ -107,4 +107,3 @@ export function useTransportWebSocket() {
 
     return { transport, isConnected };
 }
-

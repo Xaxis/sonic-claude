@@ -53,7 +53,7 @@ export function SynthesisPanel() {
 
     // Handle parameter change
     const handleParameterChange = async (synthId: string, param: string, value: number) => {
-        const synth = activeSynths.find(s => s.id === synthId);
+        const synth = activeSynths.find((s) => s.id === synthId);
         if (synth) {
             await updateSynthParameter(synth.node_id, param, value);
         }
@@ -61,7 +61,7 @@ export function SynthesisPanel() {
 
     // Handle delete synth
     const handleDeleteSynth = async (synthId: string) => {
-        const synth = activeSynths.find(s => s.id === synthId);
+        const synth = activeSynths.find((s) => s.id === synthId);
         if (synth) {
             await deleteSynth(synth.node_id);
             if (selectedSynthId === synthId) {
@@ -72,7 +72,7 @@ export function SynthesisPanel() {
 
     // Handle play note - trigger a test note
     const handlePlayNote = async (synthId: string, note: number = 60) => {
-        const synth = activeSynths.find(s => s.id === synthId);
+        const synth = activeSynths.find((s) => s.id === synthId);
         if (!synth) return;
 
         try {
@@ -99,16 +99,16 @@ export function SynthesisPanel() {
         }
     };
 
-    const selectedSynth = activeSynths.find(s => s.id === selectedSynthId);
+    const selectedSynth = activeSynths.find((s) => s.id === selectedSynthId);
 
     return (
-        <div className="flex-1 flex gap-2 overflow-hidden h-full p-2">
+        <div className="flex h-full flex-1 gap-2 overflow-hidden p-2">
             {/* Synth List */}
-            <div className="w-64 flex flex-col gap-2">
+            <div className="flex w-64 flex-col gap-2">
                 <SubPanel title="Active Synths" className="flex-1 overflow-auto">
                     <div className="flex flex-col gap-1 p-2">
                         {activeSynths.length === 0 ? (
-                            <div className="p-4 text-center text-sm text-muted-foreground">
+                            <div className="text-muted-foreground p-4 text-center text-sm">
                                 No active synths
                             </div>
                         ) : (
@@ -116,7 +116,7 @@ export function SynthesisPanel() {
                                 <div
                                     key={synth.id}
                                     className={cn(
-                                        "p-3 rounded-lg transition-all border group",
+                                        "group rounded-lg border p-3 transition-all",
                                         selectedSynthId === synth.id
                                             ? "bg-primary/20 border-primary text-primary"
                                             : "bg-muted/30 border-border hover:bg-muted/50"
@@ -126,17 +126,18 @@ export function SynthesisPanel() {
                                         onClick={() => setSelectedSynthId(synth.id)}
                                         className="w-full text-left"
                                     >
-                                        <div className="flex items-center justify-between mb-1">
+                                        <div className="mb-1 flex items-center justify-between">
                                             <span className="font-semibold">{synth.synthdef}</span>
                                             <Waves size={16} className="text-muted-foreground" />
                                         </div>
-                                        <div className="text-xs text-muted-foreground">
-                                            Node: {synth.node_id} • {synth.is_playing ? "Playing" : "Stopped"}
+                                        <div className="text-muted-foreground text-xs">
+                                            Node: {synth.node_id} •{" "}
+                                            {synth.is_playing ? "Playing" : "Stopped"}
                                         </div>
                                     </button>
                                     <button
                                         onClick={() => handleDeleteSynth(synth.id)}
-                                        className="mt-2 w-full p-1 rounded bg-destructive/20 hover:bg-destructive/30 text-destructive text-xs flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="bg-destructive/20 hover:bg-destructive/30 text-destructive mt-2 flex w-full items-center justify-center gap-1 rounded p-1 text-xs opacity-0 transition-opacity group-hover:opacity-100"
                                     >
                                         <Trash2 size={12} />
                                         Delete
@@ -146,7 +147,7 @@ export function SynthesisPanel() {
                         )}
                         <button
                             onClick={handleAddSynth}
-                            className="p-3 rounded-lg border border-dashed border-border hover:border-primary hover:bg-primary/10 transition-all flex items-center justify-center gap-2 text-muted-foreground hover:text-primary"
+                            className="border-border hover:border-primary hover:bg-primary/10 text-muted-foreground hover:text-primary flex items-center justify-center gap-2 rounded-lg border border-dashed p-3 transition-all"
                         >
                             <Plus size={16} />
                             <span className="text-sm">Add Synth</span>
@@ -157,28 +158,31 @@ export function SynthesisPanel() {
 
             {/* Synth Parameters */}
             {selectedSynth ? (
-                <div className="flex-1 flex flex-col gap-2">
-                    <SubPanel title={`${selectedSynth.synthdef} Parameters`} className="flex-1 overflow-auto">
+                <div className="flex flex-1 flex-col gap-2">
+                    <SubPanel
+                        title={`${selectedSynth.synthdef} Parameters`}
+                        className="flex-1 overflow-auto"
+                    >
                         <div className="p-4">
                             {/* Play Note Button */}
                             <div className="mb-4 flex gap-2">
                                 <button
                                     onClick={() => handlePlayNote(selectedSynth.id, 60)}
-                                    className="px-4 py-2 rounded-lg bg-primary/20 hover:bg-primary/30 border border-primary text-primary transition-all flex items-center gap-2"
+                                    className="bg-primary/20 hover:bg-primary/30 border-primary text-primary flex items-center gap-2 rounded-lg border px-4 py-2 transition-all"
                                 >
                                     <Play size={16} />
                                     <span className="text-sm font-semibold">Play C4</span>
                                 </button>
                                 <button
                                     onClick={() => handlePlayNote(selectedSynth.id, 64)}
-                                    className="px-4 py-2 rounded-lg bg-primary/20 hover:bg-primary/30 border border-primary text-primary transition-all flex items-center gap-2"
+                                    className="bg-primary/20 hover:bg-primary/30 border-primary text-primary flex items-center gap-2 rounded-lg border px-4 py-2 transition-all"
                                 >
                                     <Play size={16} />
                                     <span className="text-sm font-semibold">Play E4</span>
                                 </button>
                                 <button
                                     onClick={() => handlePlayNote(selectedSynth.id, 67)}
-                                    className="px-4 py-2 rounded-lg bg-primary/20 hover:bg-primary/30 border border-primary text-primary transition-all flex items-center gap-2"
+                                    className="bg-primary/20 hover:bg-primary/30 border-primary text-primary flex items-center gap-2 rounded-lg border px-4 py-2 transition-all"
                                 >
                                     <Play size={16} />
                                     <span className="text-sm font-semibold">Play G4</span>
@@ -186,40 +190,52 @@ export function SynthesisPanel() {
                             </div>
 
                             {Object.keys(selectedSynth.parameters).length === 0 ? (
-                                <div className="text-center text-sm text-muted-foreground py-8">
+                                <div className="text-muted-foreground py-8 text-center text-sm">
                                     No parameters available
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-3 gap-4">
-                                    {Object.entries(selectedSynth.parameters).map(([param, value]) => {
-                                        if (typeof value !== "number") return null;
+                                    {Object.entries(selectedSynth.parameters).map(
+                                        ([param, value]) => {
+                                            if (typeof value !== "number") return null;
 
-                                        // Determine format based on parameter name
-                                        const format = param.toLowerCase().includes("pan") ? "pan" : "default";
-                                        const min = param.toLowerCase().includes("pan") ? -1 : 0;
-                                        const max = 1;
+                                            // Determine format based on parameter name
+                                            const format = param.toLowerCase().includes("pan")
+                                                ? "pan"
+                                                : "default";
+                                            const min = param.toLowerCase().includes("pan")
+                                                ? -1
+                                                : 0;
+                                            const max = 1;
 
-                                        return (
-                                            <div key={param} className="flex justify-center">
-                                                <Knob
-                                                    value={value}
-                                                    onChange={(v) => handleParameterChange(selectedSynth.id, param, v)}
-                                                    label={param.replace(/_/g, " ")}
-                                                    format={format}
-                                                    min={min}
-                                                    max={max}
-                                                />
-                                            </div>
-                                        );
-                                    })}
+                                            return (
+                                                <div key={param} className="flex justify-center">
+                                                    <Knob
+                                                        value={value}
+                                                        onChange={(v) =>
+                                                            handleParameterChange(
+                                                                selectedSynth.id,
+                                                                param,
+                                                                v
+                                                            )
+                                                        }
+                                                        label={param.replace(/_/g, " ")}
+                                                        format={format}
+                                                        min={min}
+                                                        max={max}
+                                                    />
+                                                </div>
+                                            );
+                                        }
+                                    )}
                                 </div>
                             )}
                         </div>
                     </SubPanel>
                 </div>
             ) : (
-                <div className="flex-1 flex items-center justify-center">
-                    <div className="text-center text-muted-foreground">
+                <div className="flex flex-1 items-center justify-center">
+                    <div className="text-muted-foreground text-center">
                         <Waves size={48} className="mx-auto mb-2 opacity-50" />
                         <p className="text-sm">Select a synth to edit parameters</p>
                     </div>
@@ -228,4 +244,3 @@ export function SynthesisPanel() {
         </div>
     );
 }
-

@@ -51,11 +51,11 @@ export function PianoRollPanel() {
     };
 
     return (
-        <div className="flex-1 flex flex-col gap-2 overflow-hidden h-full p-2">
+        <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
             <SubPanel title="MIDI Editor">
-                <div className="flex overflow-hidden h-full">
+                <div className="flex h-full overflow-hidden">
                     {/* Piano Keyboard */}
-                    <div className="w-16 flex-shrink-0 border-r border-border overflow-y-auto">
+                    <div className="border-border w-16 flex-shrink-0 overflow-y-auto border-r">
                         {Array.from({ length: maxPitch - minPitch + 1 }, (_, i) => {
                             const pitch = maxPitch - i;
                             const isBlack = isBlackKey(pitch);
@@ -63,7 +63,7 @@ export function PianoRollPanel() {
                                 <div
                                     key={pitch}
                                     className={cn(
-                                        "flex items-center justify-center text-xs font-mono border-b border-border",
+                                        "border-border flex items-center justify-center border-b font-mono text-xs",
                                         isBlack
                                             ? "bg-gray-800 text-gray-400"
                                             : "bg-gray-900 text-gray-300"
@@ -77,7 +77,7 @@ export function PianoRollPanel() {
                     </div>
 
                     {/* Note Grid */}
-                    <div className="flex-1 overflow-auto relative">
+                    <div className="relative flex-1 overflow-auto">
                         {/* Grid Background */}
                         <div
                             className="relative"
@@ -94,7 +94,7 @@ export function PianoRollPanel() {
                                     <div
                                         key={`h-${pitch}`}
                                         className={cn(
-                                            "absolute left-0 right-0 border-b border-border",
+                                            "border-border absolute right-0 left-0 border-b",
                                             isBlack ? "bg-gray-800/30" : "bg-gray-900/30"
                                         )}
                                         style={{
@@ -128,10 +128,10 @@ export function PianoRollPanel() {
                                     <div
                                         key={note.id}
                                         className={cn(
-                                            "absolute rounded cursor-pointer transition-colors",
+                                            "absolute cursor-pointer rounded transition-colors",
                                             isSelected
-                                                ? "bg-cyan-500 border-2 border-cyan-300"
-                                                : "bg-cyan-600/80 border border-cyan-500 hover:bg-cyan-500"
+                                                ? "border-2 border-cyan-300 bg-cyan-500"
+                                                : "border border-cyan-500 bg-cyan-600/80 hover:bg-cyan-500"
                                         )}
                                         style={{
                                             left: `${x}px`,
@@ -150,4 +150,3 @@ export function PianoRollPanel() {
         </div>
     );
 }
-

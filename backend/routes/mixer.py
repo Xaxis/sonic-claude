@@ -6,7 +6,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Optional
 from pydantic import BaseModel, Field
 
-from backend.core import get_logger, get_mixer_service
+from backend.core import get_logger
+from backend.core.dependencies import get_mixer_service
 from ..services.mixer_service import MixerService
 
 logger = get_logger(__name__)

@@ -4,7 +4,15 @@
  * Syncs across windows using BroadcastChannel
  */
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from "react";
+import {
+    createContext,
+    useContext,
+    useState,
+    useEffect,
+    useCallback,
+    ReactNode,
+    useRef,
+} from "react";
 import { windowManager } from "@/services/WindowManager";
 import { audioEngineService } from "@/services/api/audio-engine.service";
 import { toast } from "sonner";
@@ -35,11 +43,11 @@ interface AudioEngineState {
 
     // Synthesis
     activeSynths: Synth[];
-    synthDefs: any[];  // Available synth definitions
+    synthDefs: any[];
 
     // Effects
     activeEffects: Effect[];
-    effectDefs: any[];  // Available effect definitions
+    effectDefs: any[];
 
     // Mixer
     tracks: MixerTrack[];
@@ -49,10 +57,10 @@ interface AudioEngineState {
     sequences: Sequence[];
     activeSequenceId: string | null;
     isPlaying: boolean;
-    currentPosition: number;  // beats
-    tempo: number;  // BPM
+    currentPosition: number; // beats
+    tempo: number; // BPM
 
-    // Real-time data (from WebSockets)
+    // Real-time data (from WebSockets - SuperCollider output monitoring)
     spectrum: number[];
     meters: Record<string, { peakL: number; peakR: number; rmsL: number; rmsR: number }>;
     waveform: { left: number[]; right: number[] };
@@ -62,6 +70,11 @@ interface AudioEngineState {
         activeVoices: number;
         bufferLoad: number;
     };
+
+    // Real-time data (from browser audio input - system audio capture)
+    inputSpectrum: number[];
+    inputWaveform: { left: number[]; right: number[] };
+    inputLevel: number; // dB
 }
 
 interface AudioEngineContextValue extends AudioEngineState {
@@ -112,9 +125,21 @@ interface AudioEngineContextValue extends AudioEngineState {
 
     // Real-time data setters (called by WebSocket hooks)
     setSpectrum: (spectrum: number[]) => void;
-    setMeters: (meters: Record<string, { peakL: number; peakR: number; rmsL: number; rmsR: number }>) => void;
+    setMeters: (
+        meters: Record<string, { peakL: number; peakR: number; rmsL: number; rmsR: number }>
+    ) => void;
+
+    // Input audio data setters (called by InputPanel)
+    setInputSpectrum: (spectrum: number[]) => void;
+    setInputWaveform: (waveform: { left: number[]; right: number[] }) => void;
+    setInputLevel: (level: number) => void;
     setWaveform: (waveform: { left: number[]; right: number[] }) => void;
-    setAnalytics: (analytics: { cpu: number; memory: number; activeVoices: number; bufferLoad: number }) => void;
+    setAnalytics: (analytics: {
+        cpu: number;
+        memory: number;
+        activeVoices: number;
+        bufferLoad: number;
+    }) => void;
 }
 
 const AudioEngineContext = createContext<AudioEngineContextValue | undefined>(undefined);
@@ -141,6 +166,9 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         meters: {},
         waveform: { left: [], right: [] },
         analytics: { cpu: 0, memory: 0, activeVoices: 0, bufferLoad: 0 },
+        inputSpectrum: [],
+        inputWaveform: { left: [], right: [] },
+        inputLevel: -60,
     });
 
     // Broadcast state changes to other windows
@@ -163,8 +191,11 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         return unsubscribe;
     }, []);
 
-    // WebSocket integration for real-time transport updates
-    const wsRef = useRef<WebSocket | null>(null);
+    // WebSocket integration for real-time data
+    const transportWsRef = useRef<WebSocket | null>(null);
+    const spectrumWsRef = useRef<WebSocket | null>(null);
+    const waveformWsRef = useRef<WebSocket | null>(null);
+    const metersWsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<number | undefined>(undefined);
     const isCleaningUpRef = useRef(false);
 
@@ -175,22 +206,21 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
             if (isCleaningUpRef.current) return;
 
             try {
-                const ws = new WebSocket("ws://localhost:8000/ws/transport");
-                wsRef.current = ws;
+                // Transport WebSocket
+                const transportWs = new WebSocket("ws://localhost:8000/ws/transport");
+                transportWsRef.current = transportWs;
 
-                ws.onopen = () => {
+                transportWs.onopen = () => {
                     if (!isCleaningUpRef.current) {
                         console.log("🔌 Transport WebSocket connected");
                     }
                 };
 
-                ws.onmessage = (event) => {
+                transportWs.onmessage = (event) => {
                     if (isCleaningUpRef.current) return;
-
                     try {
                         const message: TransportWebSocketData = JSON.parse(event.data);
                         if (message.type === "transport") {
-                            // Update local state (don't broadcast - too frequent)
                             setState((prev) => ({
                                 ...prev,
                                 isPlaying: message.is_playing,
@@ -203,24 +233,144 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                     }
                 };
 
-                ws.onerror = () => {
-                    if (!isCleaningUpRef.current && ws.readyState !== WebSocket.CLOSED) {
+                transportWs.onerror = () => {
+                    if (!isCleaningUpRef.current && transportWs.readyState !== WebSocket.CLOSED) {
                         console.warn("⚠️ Transport WebSocket error, will retry...");
                     }
                 };
 
-                ws.onclose = () => {
+                transportWs.onclose = () => {
                     if (isCleaningUpRef.current) return;
-
                     reconnectTimeoutRef.current = window.setTimeout(() => {
                         if (!isCleaningUpRef.current) {
                             connect();
                         }
                     }, 2000);
                 };
+
+                // Spectrum WebSocket
+                const spectrumWs = new WebSocket("ws://localhost:8000/ws/spectrum");
+                spectrumWsRef.current = spectrumWs;
+
+                spectrumWs.onopen = () => {
+                    if (!isCleaningUpRef.current) {
+                        console.log("🔌 Spectrum WebSocket connected");
+                    }
+                };
+
+                let spectrumMessageCount = 0;
+                spectrumWs.onmessage = (event) => {
+                    if (isCleaningUpRef.current) return;
+                    try {
+                        const message = JSON.parse(event.data);
+                        if (message.type === "spectrum" && Array.isArray(message.magnitudes)) {
+                            // Debug: Log first few messages
+                            if (spectrumMessageCount < 3) {
+                                console.log(`🔊 Spectrum message ${spectrumMessageCount + 1}:`, {
+                                    bins: message.magnitudes.length,
+                                    range: [Math.min(...message.magnitudes), Math.max(...message.magnitudes)],
+                                    sample: message.magnitudes.slice(0, 5)
+                                });
+                                spectrumMessageCount++;
+                            }
+                            setState((prev) => ({ ...prev, spectrum: message.magnitudes }));
+                        }
+                    } catch (error) {
+                        console.error("Failed to parse spectrum message:", error);
+                    }
+                };
+
+                spectrumWs.onerror = () => {
+                    if (!isCleaningUpRef.current && spectrumWs.readyState !== WebSocket.CLOSED) {
+                        console.warn("⚠️ Spectrum WebSocket error");
+                    }
+                };
+
+                // Waveform WebSocket
+                const waveformWs = new WebSocket("ws://localhost:8000/ws/waveform");
+                waveformWsRef.current = waveformWs;
+
+                waveformWs.onopen = () => {
+                    if (!isCleaningUpRef.current) {
+                        console.log("🔌 Waveform WebSocket connected");
+                    }
+                };
+
+                let waveformMessageCount = 0;
+                waveformWs.onmessage = (event) => {
+                    if (isCleaningUpRef.current) return;
+                    try {
+                        const message = JSON.parse(event.data);
+                        if (message.type === "waveform") {
+                            // Debug: Log first few messages
+                            if (waveformMessageCount < 3) {
+                                console.log(`📊 Waveform message ${waveformMessageCount + 1}:`, {
+                                    leftSamples: message.samples_left?.length || 0,
+                                    rightSamples: message.samples_right?.length || 0
+                                });
+                                waveformMessageCount++;
+                            }
+                            setState((prev) => ({
+                                ...prev,
+                                waveform: {
+                                    left: message.samples_left || [],
+                                    right: message.samples_right || []
+                                }
+                            }));
+                        }
+                    } catch (error) {
+                        console.error("Failed to parse waveform message:", error);
+                    }
+                };
+
+                waveformWs.onerror = () => {
+                    if (!isCleaningUpRef.current && waveformWs.readyState !== WebSocket.CLOSED) {
+                        console.warn("⚠️ Waveform WebSocket error");
+                    }
+                };
+
+                // Meters WebSocket
+                const metersWs = new WebSocket("ws://localhost:8000/ws/meters");
+                metersWsRef.current = metersWs;
+
+                metersWs.onopen = () => {
+                    if (!isCleaningUpRef.current) {
+                        console.log("🔌 Meters WebSocket connected");
+                    }
+                };
+
+                metersWs.onmessage = (event) => {
+                    if (isCleaningUpRef.current) return;
+                    try {
+                        const message = JSON.parse(event.data);
+                        if (message.type === "meters") {
+                            setState((prev) => ({
+                                ...prev,
+                                meters: {
+                                    ...prev.meters,
+                                    [message.track_id]: {
+                                        peakL: message.peak_left,
+                                        peakR: message.peak_right,
+                                        rmsL: message.rms_left,
+                                        rmsR: message.rms_right,
+                                    }
+                                }
+                            }));
+                        }
+                    } catch (error) {
+                        console.error("Failed to parse meters message:", error);
+                    }
+                };
+
+                metersWs.onerror = () => {
+                    if (!isCleaningUpRef.current && metersWs.readyState !== WebSocket.CLOSED) {
+                        console.warn("⚠️ Meters WebSocket error");
+                    }
+                };
+
             } catch (error) {
                 if (!isCleaningUpRef.current) {
-                    console.error("Failed to create Transport WebSocket:", error);
+                    console.error("Failed to create WebSocket connections:", error);
                 }
             }
         };
@@ -233,8 +383,19 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
             if (reconnectTimeoutRef.current) {
                 clearTimeout(reconnectTimeoutRef.current);
             }
-            if (wsRef.current) {
-                wsRef.current.close();
+
+            // Close all WebSocket connections
+            if (transportWsRef.current) {
+                transportWsRef.current.close();
+            }
+            if (spectrumWsRef.current) {
+                spectrumWsRef.current.close();
+            }
+            if (waveformWsRef.current) {
+                waveformWsRef.current.close();
+            }
+            if (metersWsRef.current) {
+                metersWsRef.current.close();
             }
         };
     }, []);
@@ -248,12 +409,16 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
 
             try {
                 // Wait a bit for backend to be ready
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise((resolve) => setTimeout(resolve, 1000));
 
                 // Check if sequences already exist
                 const sequences = await audioEngineService.getSequences();
                 if (sequences.length > 0) {
-                    setState((prev) => ({ ...prev, sequences: sequences as any[], activeSequenceId: sequences[0].id }));
+                    setState((prev) => ({
+                        ...prev,
+                        sequences: sequences as any[],
+                        activeSequenceId: sequences[0].id,
+                    }));
                     return;
                 }
 
@@ -280,15 +445,21 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
     }, []);
 
     // Engine actions
-    const setEngineStatus = useCallback((status: AudioEngineStatus) => {
-        setState((prev) => ({ ...prev, engineStatus: status }));
-        broadcastUpdate("audioEngine.engineStatus", status);
-    }, [broadcastUpdate]);
+    const setEngineStatus = useCallback(
+        (status: AudioEngineStatus) => {
+            setState((prev) => ({ ...prev, engineStatus: status }));
+            broadcastUpdate("audioEngine.engineStatus", status);
+        },
+        [broadcastUpdate]
+    );
 
-    const setIsEngineRunning = useCallback((isRunning: boolean) => {
-        setState((prev) => ({ ...prev, isEngineRunning: isRunning }));
-        broadcastUpdate("audioEngine.isEngineRunning", isRunning);
-    }, [broadcastUpdate]);
+    const setIsEngineRunning = useCallback(
+        (isRunning: boolean) => {
+            setState((prev) => ({ ...prev, isEngineRunning: isRunning }));
+            broadcastUpdate("audioEngine.isEngineRunning", isRunning);
+        },
+        [broadcastUpdate]
+    );
 
     // Synthesis actions (API-integrated)
     const loadSynthDefs = useCallback(async () => {
@@ -303,42 +474,50 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         }
     }, [broadcastUpdate]);
 
-    const createSynth = useCallback(async (synthdef: string, parameters?: Record<string, number>) => {
-        try {
-            const synth = await audioEngineService.createSynth({
-                synthdef,
-                parameters: parameters || {},
-            });
-            setState((prev) => ({
-                ...prev,
-                activeSynths: [...prev.activeSynths, synth as any],
-            }));
-            broadcastUpdate("audioEngine.activeSynths", [...state.activeSynths, synth]);
-            toast.success(`Created ${synthdef} synth`);
-        } catch (error) {
-            console.error("Failed to create synth:", error);
-            toast.error(`Failed to create synth: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }, [broadcastUpdate, state.activeSynths]);
+    const createSynth = useCallback(
+        async (synthdef: string, parameters?: Record<string, number>) => {
+            try {
+                const synth = await audioEngineService.createSynth({
+                    synthdef,
+                    parameters: parameters || {},
+                });
+                setState((prev) => ({
+                    ...prev,
+                    activeSynths: [...prev.activeSynths, synth as any],
+                }));
+                broadcastUpdate("audioEngine.activeSynths", [...state.activeSynths, synth]);
+                toast.success(`Created ${synthdef} synth`);
+            } catch (error) {
+                console.error("Failed to create synth:", error);
+                toast.error(
+                    `Failed to create synth: ${error instanceof Error ? error.message : "Unknown error"}`
+                );
+            }
+        },
+        [broadcastUpdate, state.activeSynths]
+    );
 
-    const updateSynthParameter = useCallback(async (synthId: number, parameter: string, value: number) => {
-        try {
-            await audioEngineService.updateSynth(synthId.toString(), {
-                parameters: { [parameter]: value },
-            });
-            setState((prev) => ({
-                ...prev,
-                activeSynths: prev.activeSynths.map((s) =>
-                    (s as any).id === synthId
-                        ? { ...s, parameters: { ...(s as any).parameters, [parameter]: value } }
-                        : s
-                ),
-            }));
-        } catch (error) {
-            console.error("Failed to update synth parameter:", error);
-            toast.error("Failed to update synth parameter");
-        }
-    }, []);
+    const updateSynthParameter = useCallback(
+        async (synthId: number, parameter: string, value: number) => {
+            try {
+                await audioEngineService.updateSynth(synthId.toString(), {
+                    parameters: { [parameter]: value },
+                });
+                setState((prev) => ({
+                    ...prev,
+                    activeSynths: prev.activeSynths.map((s) =>
+                        (s as any).id === synthId
+                            ? { ...s, parameters: { ...(s as any).parameters, [parameter]: value } }
+                            : s
+                    ),
+                }));
+            } catch (error) {
+                console.error("Failed to update synth parameter:", error);
+                toast.error("Failed to update synth parameter");
+            }
+        },
+        []
+    );
 
     const deleteSynth = useCallback(async (synthId: number) => {
         try {
@@ -352,12 +531,13 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    const setActiveSynths = useCallback((synths: Synth[]) => {
-        setState((prev) => ({ ...prev, activeSynths: synths }));
-        broadcastUpdate("audioEngine.activeSynths", synths);
-    }, [broadcastUpdate]);
-
-
+    const setActiveSynths = useCallback(
+        (synths: Synth[]) => {
+            setState((prev) => ({ ...prev, activeSynths: synths }));
+            broadcastUpdate("audioEngine.activeSynths", synths);
+        },
+        [broadcastUpdate]
+    );
 
     // Effects actions (API-integrated)
     const loadEffectDefs = useCallback(async () => {
@@ -370,39 +550,45 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         }
     }, [broadcastUpdate]);
 
-    const createEffect = useCallback(async (effectdef: string, parameters?: Record<string, number>) => {
-        try {
-            const effect = await audioEngineService.createEffect({
-                effectdef,
-                parameters: parameters || {},
-            });
-            setState((prev) => ({
-                ...prev,
-                activeEffects: [...prev.activeEffects, effect as any],
-            }));
-            broadcastUpdate("audioEngine.activeEffects", [...state.activeEffects, effect]);
-        } catch (error) {
-            console.error("Failed to create effect:", error);
-        }
-    }, [broadcastUpdate, state.activeEffects]);
+    const createEffect = useCallback(
+        async (effectdef: string, parameters?: Record<string, number>) => {
+            try {
+                const effect = await audioEngineService.createEffect({
+                    effectdef,
+                    parameters: parameters || {},
+                });
+                setState((prev) => ({
+                    ...prev,
+                    activeEffects: [...prev.activeEffects, effect as any],
+                }));
+                broadcastUpdate("audioEngine.activeEffects", [...state.activeEffects, effect]);
+            } catch (error) {
+                console.error("Failed to create effect:", error);
+            }
+        },
+        [broadcastUpdate, state.activeEffects]
+    );
 
-    const updateEffectParameter = useCallback(async (effectId: number, parameter: string, value: number) => {
-        try {
-            await audioEngineService.updateEffect(effectId.toString(), {
-                parameters: { [parameter]: value },
-            });
-            setState((prev) => ({
-                ...prev,
-                activeEffects: prev.activeEffects.map((e) =>
-                    (e as any).id === effectId
-                        ? { ...e, parameters: { ...(e as any).parameters, [parameter]: value } }
-                        : e
-                ),
-            }));
-        } catch (error) {
-            console.error("Failed to update effect parameter:", error);
-        }
-    }, []);
+    const updateEffectParameter = useCallback(
+        async (effectId: number, parameter: string, value: number) => {
+            try {
+                await audioEngineService.updateEffect(effectId.toString(), {
+                    parameters: { [parameter]: value },
+                });
+                setState((prev) => ({
+                    ...prev,
+                    activeEffects: prev.activeEffects.map((e) =>
+                        (e as any).id === effectId
+                            ? { ...e, parameters: { ...(e as any).parameters, [parameter]: value } }
+                            : e
+                    ),
+                }));
+            } catch (error) {
+                console.error("Failed to update effect parameter:", error);
+            }
+        },
+        []
+    );
 
     const deleteEffect = useCallback(async (effectId: number) => {
         try {
@@ -430,10 +616,13 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    const setActiveEffects = useCallback((effects: Effect[]) => {
-        setState((prev) => ({ ...prev, activeEffects: effects }));
-        broadcastUpdate("audioEngine.activeEffects", effects);
-    }, [broadcastUpdate]);
+    const setActiveEffects = useCallback(
+        (effects: Effect[]) => {
+            setState((prev) => ({ ...prev, activeEffects: effects }));
+            broadcastUpdate("audioEngine.activeEffects", effects);
+        },
+        [broadcastUpdate]
+    );
 
     // Mixer actions (API-integrated)
     const loadTracks = useCallback(async () => {
@@ -446,18 +635,21 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         }
     }, [broadcastUpdate]);
 
-    const createTrack = useCallback(async (name: string, _type: string) => {
-        try {
-            const track = await audioEngineService.createTrack({ name });
-            setState((prev) => ({
-                ...prev,
-                tracks: [...prev.tracks, track as any],
-            }));
-            broadcastUpdate("audioEngine.tracks", [...state.tracks, track]);
-        } catch (error) {
-            console.error("Failed to create track:", error);
-        }
-    }, [broadcastUpdate, state.tracks]);
+    const createTrack = useCallback(
+        async (name: string, _type: string) => {
+            try {
+                const track = await audioEngineService.createTrack({ name });
+                setState((prev) => ({
+                    ...prev,
+                    tracks: [...prev.tracks, track as any],
+                }));
+                broadcastUpdate("audioEngine.tracks", [...state.tracks, track]);
+            } catch (error) {
+                console.error("Failed to create track:", error);
+            }
+        },
+        [broadcastUpdate, state.tracks]
+    );
 
     const updateTrackVolume = useCallback(async (trackId: string, volume: number) => {
         try {
@@ -527,15 +719,21 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    const setTracks = useCallback((tracks: MixerTrack[]) => {
-        setState((prev) => ({ ...prev, tracks }));
-        broadcastUpdate("audioEngine.tracks", tracks);
-    }, [broadcastUpdate]);
+    const setTracks = useCallback(
+        (tracks: MixerTrack[]) => {
+            setState((prev) => ({ ...prev, tracks }));
+            broadcastUpdate("audioEngine.tracks", tracks);
+        },
+        [broadcastUpdate]
+    );
 
-    const setMasterTrack = useCallback((track: MixerTrack) => {
-        setState((prev) => ({ ...prev, masterTrack: track }));
-        broadcastUpdate("audioEngine.masterTrack", track);
-    }, [broadcastUpdate]);
+    const setMasterTrack = useCallback(
+        (track: MixerTrack) => {
+            setState((prev) => ({ ...prev, masterTrack: track }));
+            broadcastUpdate("audioEngine.masterTrack", track);
+        },
+        [broadcastUpdate]
+    );
 
     // Sequencer actions (API-integrated)
     const loadSequences = useCallback(async () => {
@@ -548,22 +746,25 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         }
     }, [broadcastUpdate]);
 
-    const createSequence = useCallback(async (name: string, tempo?: number) => {
-        try {
-            const sequence = await audioEngineService.createSequence({
-                name,
-                tempo: tempo || 120,
-                time_signature: [4, 4],
-            });
-            setState((prev) => ({
-                ...prev,
-                sequences: [...prev.sequences, sequence as any],
-            }));
-            broadcastUpdate("audioEngine.sequences", [...state.sequences, sequence]);
-        } catch (error) {
-            console.error("Failed to create sequence:", error);
-        }
-    }, [broadcastUpdate, state.sequences]);
+    const createSequence = useCallback(
+        async (name: string, tempo?: number) => {
+            try {
+                const sequence = await audioEngineService.createSequence({
+                    name,
+                    tempo: tempo || 120,
+                    time_signature: [4, 4],
+                });
+                setState((prev) => ({
+                    ...prev,
+                    sequences: [...prev.sequences, sequence as any],
+                }));
+                broadcastUpdate("audioEngine.sequences", [...state.sequences, sequence]);
+            } catch (error) {
+                console.error("Failed to create sequence:", error);
+            }
+        },
+        [broadcastUpdate, state.sequences]
+    );
 
     const deleteSequence = useCallback(async (sequenceId: string) => {
         try {
@@ -577,20 +778,23 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    const playSequence = useCallback(async (sequenceId: string) => {
-        try {
-            await audioEngineService.playSequence(sequenceId);
-            setState((prev) => ({
-                ...prev,
-                activeSequenceId: sequenceId,
-                isPlaying: true,
-            }));
-            broadcastUpdate("audioEngine.isPlaying", true);
-            broadcastUpdate("audioEngine.activeSequenceId", sequenceId);
-        } catch (error) {
-            console.error("Failed to play sequence:", error);
-        }
-    }, [broadcastUpdate]);
+    const playSequence = useCallback(
+        async (sequenceId: string) => {
+            try {
+                await audioEngineService.playSequence(sequenceId);
+                setState((prev) => ({
+                    ...prev,
+                    activeSequenceId: sequenceId,
+                    isPlaying: true,
+                }));
+                broadcastUpdate("audioEngine.isPlaying", true);
+                broadcastUpdate("audioEngine.activeSequenceId", sequenceId);
+            } catch (error) {
+                console.error("Failed to play sequence:", error);
+            }
+        },
+        [broadcastUpdate]
+    );
 
     const stopPlayback = useCallback(async () => {
         try {
@@ -633,40 +837,58 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         }
     }, [broadcastUpdate]);
 
-    const setTempo = useCallback(async (tempo: number) => {
-        try {
-            await audioEngineService.setTempo({ tempo });
+    const setTempo = useCallback(
+        async (tempo: number) => {
+            try {
+                await audioEngineService.setTempo({ tempo });
+                setState((prev) => ({ ...prev, tempo }));
+                broadcastUpdate("audioEngine.tempo", tempo);
+            } catch (error) {
+                console.error("Failed to set tempo:", error);
+            }
+        },
+        [broadcastUpdate]
+    );
+
+    const setSequences = useCallback(
+        (sequences: Sequence[]) => {
+            setState((prev) => ({ ...prev, sequences }));
+            broadcastUpdate("audioEngine.sequences", sequences);
+        },
+        [broadcastUpdate]
+    );
+
+    const setActiveSequenceId = useCallback(
+        (sequenceId: string | null) => {
+            setState((prev) => ({ ...prev, activeSequenceId: sequenceId }));
+            broadcastUpdate("audioEngine.activeSequenceId", sequenceId);
+        },
+        [broadcastUpdate]
+    );
+
+    const setIsPlaying = useCallback(
+        (isPlaying: boolean) => {
+            setState((prev) => ({ ...prev, isPlaying }));
+            broadcastUpdate("audioEngine.isPlaying", isPlaying);
+        },
+        [broadcastUpdate]
+    );
+
+    const setCurrentPosition = useCallback(
+        (position: number) => {
+            setState((prev) => ({ ...prev, currentPosition: position }));
+            broadcastUpdate("audioEngine.currentPosition", position);
+        },
+        [broadcastUpdate]
+    );
+
+    const setTempoValue = useCallback(
+        (tempo: number) => {
             setState((prev) => ({ ...prev, tempo }));
             broadcastUpdate("audioEngine.tempo", tempo);
-        } catch (error) {
-            console.error("Failed to set tempo:", error);
-        }
-    }, [broadcastUpdate]);
-
-    const setSequences = useCallback((sequences: Sequence[]) => {
-        setState((prev) => ({ ...prev, sequences }));
-        broadcastUpdate("audioEngine.sequences", sequences);
-    }, [broadcastUpdate]);
-
-    const setActiveSequenceId = useCallback((sequenceId: string | null) => {
-        setState((prev) => ({ ...prev, activeSequenceId: sequenceId }));
-        broadcastUpdate("audioEngine.activeSequenceId", sequenceId);
-    }, [broadcastUpdate]);
-
-    const setIsPlaying = useCallback((isPlaying: boolean) => {
-        setState((prev) => ({ ...prev, isPlaying }));
-        broadcastUpdate("audioEngine.isPlaying", isPlaying);
-    }, [broadcastUpdate]);
-
-    const setCurrentPosition = useCallback((position: number) => {
-        setState((prev) => ({ ...prev, currentPosition: position }));
-        broadcastUpdate("audioEngine.currentPosition", position);
-    }, [broadcastUpdate]);
-
-    const setTempoValue = useCallback((tempo: number) => {
-        setState((prev) => ({ ...prev, tempo }));
-        broadcastUpdate("audioEngine.tempo", tempo);
-    }, [broadcastUpdate]);
+        },
+        [broadcastUpdate]
+    );
 
     // Real-time data setters (called by WebSocket hooks)
     const setSpectrum = useCallback((spectrum: number[]) => {
@@ -674,18 +896,40 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         // Don't broadcast real-time data (too frequent)
     }, []);
 
-    const setMeters = useCallback((meters: Record<string, { peakL: number; peakR: number; rmsL: number; rmsR: number }>) => {
-        setState((prev) => ({ ...prev, meters }));
-        // Don't broadcast real-time data (too frequent)
-    }, []);
+    const setMeters = useCallback(
+        (meters: Record<string, { peakL: number; peakR: number; rmsL: number; rmsR: number }>) => {
+            setState((prev) => ({ ...prev, meters }));
+            // Don't broadcast real-time data (too frequent)
+        },
+        []
+    );
 
     const setWaveform = useCallback((waveform: { left: number[]; right: number[] }) => {
         setState((prev) => ({ ...prev, waveform }));
         // Don't broadcast real-time data (too frequent)
     }, []);
 
-    const setAnalytics = useCallback((analytics: { cpu: number; memory: number; activeVoices: number; bufferLoad: number }) => {
-        setState((prev) => ({ ...prev, analytics }));
+    const setAnalytics = useCallback(
+        (analytics: { cpu: number; memory: number; activeVoices: number; bufferLoad: number }) => {
+            setState((prev) => ({ ...prev, analytics }));
+            // Don't broadcast real-time data (too frequent)
+        },
+        []
+    );
+
+    // Input audio data setters (called by InputPanel)
+    const setInputSpectrum = useCallback((inputSpectrum: number[]) => {
+        setState((prev) => ({ ...prev, inputSpectrum }));
+        // Don't broadcast real-time data (too frequent)
+    }, []);
+
+    const setInputWaveform = useCallback((inputWaveform: { left: number[]; right: number[] }) => {
+        setState((prev) => ({ ...prev, inputWaveform }));
+        // Don't broadcast real-time data (too frequent)
+    }, []);
+
+    const setInputLevel = useCallback((inputLevel: number) => {
+        setState((prev) => ({ ...prev, inputLevel }));
         // Don't broadcast real-time data (too frequent)
     }, []);
 
@@ -735,13 +979,13 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         setMeters,
         setWaveform,
         setAnalytics,
+        // Input audio data
+        setInputSpectrum,
+        setInputWaveform,
+        setInputLevel,
     };
 
-    return (
-        <AudioEngineContext.Provider value={value}>
-            {children}
-        </AudioEngineContext.Provider>
-    );
+    return <AudioEngineContext.Provider value={value}>{children}</AudioEngineContext.Provider>;
 }
 
 /**

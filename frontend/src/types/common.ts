@@ -1,6 +1,6 @@
 /**
  * Common/Shared Types
- * 
+ *
  * Types used across multiple features.
  * Feature-specific types should live in their respective feature folders.
  */
@@ -63,4 +63,3 @@ export interface AudioEngineStatus {
     num_output_channels: number;
     cpu_usage: number;
 }
-

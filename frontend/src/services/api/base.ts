@@ -26,10 +26,7 @@ export class BaseAPIClient {
     /**
      * Make an HTTP request
      */
-    protected async request<T>(
-        endpoint: string,
-        options?: RequestInit
-    ): Promise<T> {
+    protected async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
         const url = `${this.baseURL}${endpoint}`;
 
         try {
@@ -80,10 +77,7 @@ export class BaseAPIClient {
     /**
      * POST request
      */
-    protected async post<T>(
-        endpoint: string,
-        data?: any
-    ): Promise<T> {
+    protected async post<T>(endpoint: string, data?: any): Promise<T> {
         return this.request<T>(endpoint, {
             method: "POST",
             body: data ? JSON.stringify(data) : undefined,
@@ -93,10 +87,7 @@ export class BaseAPIClient {
     /**
      * PUT request
      */
-    protected async put<T>(
-        endpoint: string,
-        data?: any
-    ): Promise<T> {
+    protected async put<T>(endpoint: string, data?: any): Promise<T> {
         return this.request<T>(endpoint, {
             method: "PUT",
             body: data ? JSON.stringify(data) : undefined,
@@ -110,4 +101,3 @@ export class BaseAPIClient {
         return this.request<T>(endpoint, { method: "DELETE" });
     }
 }
-

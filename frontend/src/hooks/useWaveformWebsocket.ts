@@ -1,6 +1,6 @@
 /**
  * Waveform WebSocket Hook
- * 
+ *
  * Connects to backend WebSocket for real-time waveform data.
  * Provides stereo waveform samples for visualization.
  */
@@ -93,4 +93,3 @@ export function useWaveformWebSocket() {
 
     return { waveform, isConnected };
 }
-

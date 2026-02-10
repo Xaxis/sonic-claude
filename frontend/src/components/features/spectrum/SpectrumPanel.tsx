@@ -7,10 +7,10 @@
 
 import { useEffect, useRef } from "react";
 import { Panel } from "@/components/ui/panel";
-import { useSpectrumWebSocket } from "@/hooks/useSpectrumWebsocket";
+import { useAudioEngine } from "@/contexts/AudioEngineContext";
 
 export function SpectrumPanel() {
-    const { spectrum, isConnected } = useSpectrumWebSocket();
+    const { spectrum } = useAudioEngine();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -61,20 +61,18 @@ export function SpectrumPanel() {
 
     return (
         <Panel title="SPECTRUM" className="flex flex-col">
-            <div className="flex-1 p-4 flex flex-col gap-2">
+            <div className="flex flex-1 flex-col gap-2 p-4">
                 {/* Connection status */}
                 <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">
-                        {spectrum.length} bins
-                    </span>
+                    <span className="text-muted-foreground">{spectrum.length} bins</span>
                     <div className="flex items-center gap-2">
                         <div
                             className={`h-2 w-2 rounded-full ${
-                                isConnected ? "bg-green-500" : "bg-red-500"
+                                spectrum.length > 0 ? "bg-green-500" : "bg-red-500"
                             }`}
                         />
                         <span className="text-muted-foreground">
-                            {isConnected ? "Connected" : "Disconnected"}
+                            {spectrum.length > 0 ? "Connected" : "Disconnected"}
                         </span>
                     </div>
                 </div>
@@ -82,12 +80,12 @@ export function SpectrumPanel() {
                 {/* Spectrum canvas */}
                 <canvas
                     ref={canvasRef}
-                    className="flex-1 w-full rounded border border-white/10"
+                    className="w-full flex-1 rounded border border-white/10"
                     style={{ minHeight: "200px" }}
                 />
 
                 {/* Frequency labels */}
-                <div className="flex justify-between text-xs text-muted-foreground">
+                <div className="text-muted-foreground flex justify-between text-xs">
                     <span>20 Hz</span>
                     <span>1 kHz</span>
                     <span>10 kHz</span>
@@ -97,4 +95,3 @@ export function SpectrumPanel() {
         </Panel>
     );
 }
-

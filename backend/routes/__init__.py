@@ -8,6 +8,7 @@ from .effects import router as effects_router
 from .mixer import router as mixer_router
 from .sequencer import router as sequencer_router
 from .websocket import router as websocket_router
+from .samples import router as samples_router
 
 __all__ = [
     # Audio Engine
@@ -18,5 +19,7 @@ __all__ = [
     "sequencer_router",
     # WebSocket
     "websocket_router",
+    # Sample Library
+    "samples_router",
 ]
 

@@ -1,6 +1,6 @@
 /**
  * Knob Component
- * 
+ *
  * Rotary knob control for pan, send amounts, and other parameters.
  * Professional DAW-style knob with arc visualization.
  */
@@ -56,7 +56,7 @@ export function Knob({
         const sensitivity = 0.005;
         const delta = deltaY * sensitivity * (max - min);
         const newValue = Math.max(min, Math.min(max, startValueRef.current + delta));
-        
+
         onChange(Math.round(newValue * 100) / 100);
     };
 
@@ -74,7 +74,9 @@ export function Knob({
     const formatValue = () => {
         if (format === "pan") {
             if (Math.abs(value) < 0.01) return "C";
-            return value < 0 ? `L${Math.abs(value * 100).toFixed(0)}` : `R${(value * 100).toFixed(0)}`;
+            return value < 0
+                ? `L${Math.abs(value * 100).toFixed(0)}`
+                : `R${(value * 100).toFixed(0)}`;
         }
         if (format === "percent") {
             return `${(value * 100).toFixed(0)}%`;
@@ -85,9 +87,9 @@ export function Knob({
     return (
         <div className={cn("flex flex-col items-center gap-2", className)}>
             {/* Knob */}
-            <div className="relative w-12 h-12">
+            <div className="relative h-12 w-12">
                 {/* Background circle */}
-                <svg className="w-full h-full" viewBox="0 0 48 48">
+                <svg className="h-full w-full" viewBox="0 0 48 48">
                     {/* Track arc */}
                     <circle
                         cx="24"
@@ -124,7 +126,7 @@ export function Knob({
                 {/* Knob body */}
                 <div
                     className={cn(
-                        "absolute inset-2 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 border-2 cursor-pointer select-none",
+                        "absolute inset-2 cursor-pointer rounded-full border-2 bg-gradient-to-br from-gray-700 to-gray-900 select-none",
                         isDragging ? "border-cyan-400" : "border-gray-600 hover:border-gray-500"
                     )}
                     onPointerDown={handlePointerDown}
@@ -134,18 +136,20 @@ export function Knob({
                 >
                     {/* Indicator line */}
                     <div
-                        className="absolute top-1 left-1/2 w-0.5 h-3 bg-cyan-400 rounded-full"
-                        style={{ transform: `translateX(-50%) rotate(${angle}deg)`, transformOrigin: "50% 16px" }}
+                        className="absolute top-1 left-1/2 h-3 w-0.5 rounded-full bg-cyan-400"
+                        style={{
+                            transform: `translateX(-50%) rotate(${angle}deg)`,
+                            transformOrigin: "50% 16px",
+                        }}
                     />
                 </div>
             </div>
 
             {/* Value display */}
-            <div className="text-xs font-mono text-center min-w-[3rem]">
-                <div className="text-cyan-400 font-semibold">{formatValue()}</div>
+            <div className="min-w-[3rem] text-center font-mono text-xs">
+                <div className="font-semibold text-cyan-400">{formatValue()}</div>
                 {label && <div className="text-muted-foreground mt-1">{label}</div>}
             </div>
         </div>
     );
 }
-

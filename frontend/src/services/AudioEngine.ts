@@ -15,12 +15,15 @@ interface PlaybackOptions {
 
 export class AudioEngine {
     private audioContext: AudioContext;
-    private activeSources: Map<string, {
-        source: AudioBufferSourceNode;
-        gainNode: GainNode;
-        panNode: StereoPannerNode;
-        startTime: number;
-    }> = new Map();
+    private activeSources: Map<
+        string,
+        {
+            source: AudioBufferSourceNode;
+            gainNode: GainNode;
+            panNode: StereoPannerNode;
+            startTime: number;
+        }
+    > = new Map();
     private audioBuffers: Map<string, AudioBuffer> = new Map();
 
     constructor() {
@@ -230,4 +233,3 @@ export class AudioEngine {
 
 // Singleton instance
 export const audioEngine = new AudioEngine();
-

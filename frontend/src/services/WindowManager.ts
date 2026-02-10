@@ -1,6 +1,6 @@
 /**
  * WindowManager - Simple multi-window state synchronization
- * 
+ *
  * Uses BroadcastChannel API to sync state across all windows/tabs.
  * Handles popout window creation and tracking.
  */
@@ -24,11 +24,11 @@ class WindowManagerService {
     private setupMessageHandler() {
         this.channel.onmessage = (event: MessageEvent<StateUpdate>) => {
             const { key, value } = event.data;
-            
+
             // Notify all listeners for this key
             const keyListeners = this.listeners.get(key);
             if (keyListeners) {
-                keyListeners.forEach(listener => listener(value));
+                keyListeners.forEach((listener) => listener(value));
             }
         };
     }
@@ -42,7 +42,7 @@ class WindowManagerService {
             value,
             timestamp: Date.now(),
         };
-        
+
         this.channel.postMessage(update);
     }
 
@@ -84,7 +84,7 @@ class WindowManagerService {
 
         if (popout) {
             console.log(`🪟 Opened popout for tab: ${tabId}`);
-            
+
             // Broadcast that this tab is now popped out
             this.broadcastState("popout-opened", { tabId, panelIds });
         }
@@ -108,4 +108,3 @@ export const windowManager = new WindowManagerService();
 window.addEventListener("beforeunload", () => {
     windowManager.cleanup();
 });
-

@@ -1,2 +1,1 @@
 export { SpectrumPanel } from "./SpectrumPanel";
-

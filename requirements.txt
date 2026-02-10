@@ -9,5 +9,5 @@ librosa>=0.10.1
 soundfile>=0.12.1
 demucs>=4.0.1
 # aubio==0.4.9  # Optional - may fail to build on some systems, using librosa instead
-supercollider==0.0.6  # SuperCollider Python client
+python-osc==1.8.3  # OSC protocol for SuperCollider communication
 

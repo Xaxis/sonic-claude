@@ -18,36 +18,14 @@ import { TabbedWrapper } from "@/components/layout/TabbedWrapper";
 import { useLayout } from "@/contexts/LayoutContext";
 import { useAudioEngine } from "@/contexts/AudioEngineContext";
 import { DEFAULT_PANELS } from "@/config/layout.config";
-import { Toaster } from "sonner";
 
 export default function App() {
-    const {
-        tabs,
-        activeTab,
-        setActiveTab,
-        createTab,
-        deleteTab,
-        popoutTab,
-    } = useLayout();
+    const { tabs, activeTab, setActiveTab, createTab, deleteTab, popoutTab } = useLayout();
 
     const { isEngineRunning, engineStatus, activeSynths } = useAudioEngine();
 
     return (
-        <div className="flex h-screen w-screen flex-col overflow-hidden bg-background">
-            {/* Toast Notifications */}
-            <Toaster
-                position="top-right"
-                theme="dark"
-                toastOptions={{
-                    style: {
-                        background: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))',
-                        color: 'hsl(var(--foreground))',
-                    },
-                    className: 'font-mono',
-                }}
-            />
-
+        <div className="bg-background flex h-screen w-screen flex-col overflow-hidden">
             {/* Header - Always visible */}
             <Header
                 isEngineRunning={isEngineRunning}

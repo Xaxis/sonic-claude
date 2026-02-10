@@ -51,7 +51,8 @@ export function TransportPanel() {
         } else {
             // Start playback from beginning
             // Use first sequence if no active sequence
-            const sequenceToPlay = activeSequenceId || (sequences.length > 0 ? sequences[0].id : null);
+            const sequenceToPlay =
+                activeSequenceId || (sequences.length > 0 ? sequences[0].id : null);
             if (!sequenceToPlay) {
                 console.warn("No sequences available to play");
                 return;
@@ -135,12 +136,12 @@ export function TransportPanel() {
     };
 
     return (
-        <div className="flex items-center justify-between px-4 py-2 h-full bg-gradient-to-r from-muted/20 to-muted/10">
+        <div className="from-muted/20 to-muted/10 flex h-full items-center justify-between bg-gradient-to-r px-4 py-2">
             {/* Transport Controls */}
             <div className="flex items-center gap-2">
                 <button
                     onClick={handleRewind}
-                    className="p-2 hover:bg-muted rounded transition-colors"
+                    className="hover:bg-muted rounded p-2 transition-colors"
                     title="Rewind to start"
                 >
                     <SkipBack size={18} className="text-muted-foreground" />
@@ -148,7 +149,7 @@ export function TransportPanel() {
                 <button
                     onClick={handlePlayPause}
                     className={cn(
-                        "p-3 rounded-lg transition-all",
+                        "rounded-lg p-3 transition-all",
                         isPlaying
                             ? "bg-primary/20 text-primary hover:bg-primary/30"
                             : "bg-muted hover:bg-muted/80 text-foreground"
@@ -159,7 +160,7 @@ export function TransportPanel() {
                 </button>
                 <button
                     onClick={handleStop}
-                    className="p-2 hover:bg-destructive/20 text-destructive rounded transition-colors"
+                    className="hover:bg-destructive/20 text-destructive rounded p-2 transition-colors"
                     title="Stop"
                 >
                     <Square size={18} />
@@ -167,7 +168,7 @@ export function TransportPanel() {
                 <button
                     onClick={handleRecord}
                     className={cn(
-                        "p-2 rounded transition-colors",
+                        "rounded p-2 transition-colors",
                         isRecording
                             ? "bg-destructive/30 text-destructive animate-pulse"
                             : "hover:bg-muted text-muted-foreground"
@@ -179,7 +180,7 @@ export function TransportPanel() {
                 <button
                     onClick={handleToggleLoop}
                     className={cn(
-                        "p-2 rounded transition-colors",
+                        "rounded p-2 transition-colors",
                         isLooping
                             ? "bg-secondary/30 text-secondary"
                             : "hover:bg-muted text-muted-foreground"
@@ -194,23 +195,23 @@ export function TransportPanel() {
             <div className="flex items-center gap-6">
                 {/* Time */}
                 <div className="text-center">
-                    <div className="text-xs text-muted-foreground mb-0.5">TIME</div>
-                    <div className="text-xl font-mono text-primary font-bold">
+                    <div className="text-muted-foreground mb-0.5 text-xs">TIME</div>
+                    <div className="text-primary font-mono text-xl font-bold">
                         {formatTime(positionSeconds)}
                     </div>
                 </div>
 
                 {/* Position (Bars.Beats.Ticks) */}
                 <div className="text-center">
-                    <div className="text-xs text-muted-foreground mb-0.5">POSITION</div>
-                    <div className="text-xl font-mono text-secondary font-bold">
+                    <div className="text-muted-foreground mb-0.5 text-xs">POSITION</div>
+                    <div className="text-secondary font-mono text-xl font-bold">
                         {formatPosition(currentPosition)}
                     </div>
                 </div>
 
                 {/* Tempo (Editable) */}
                 <div className="text-center">
-                    <div className="text-xs text-muted-foreground mb-0.5">TEMPO</div>
+                    <div className="text-muted-foreground mb-0.5 text-xs">TEMPO</div>
                     <div className="flex items-center gap-1">
                         <input
                             type="number"
@@ -221,32 +222,35 @@ export function TransportPanel() {
                             min="20"
                             max="300"
                             step="1"
-                            className="w-16 text-xl font-mono text-primary font-bold bg-transparent border-b border-transparent hover:border-primary/30 focus:border-primary focus:outline-none text-center transition-colors"
+                            className="text-primary hover:border-primary/30 focus:border-primary w-16 border-b border-transparent bg-transparent text-center font-mono text-xl font-bold transition-colors focus:outline-none"
                         />
-                        <span className="text-sm text-muted-foreground">BPM</span>
+                        <span className="text-muted-foreground text-sm">BPM</span>
                     </div>
                 </div>
 
                 {/* Time Signature */}
                 <div className="text-center">
-                    <div className="text-xs text-muted-foreground mb-0.5">TIME SIG</div>
-                    <div className="text-xl font-mono text-secondary font-bold">
-                        4/4
-                    </div>
+                    <div className="text-muted-foreground mb-0.5 text-xs">TIME SIG</div>
+                    <div className="text-secondary font-mono text-xl font-bold">4/4</div>
                 </div>
             </div>
 
             {/* Status Indicator */}
             <div className="flex items-center gap-2">
-                <div className={cn(
-                    "h-2 w-2 rounded-full",
-                    isPlaying ? "bg-primary animate-pulse" : isPaused ? "bg-secondary" : "bg-muted-foreground"
-                )} />
-                <span className="text-xs text-muted-foreground font-mono">
+                <div
+                    className={cn(
+                        "h-2 w-2 rounded-full",
+                        isPlaying
+                            ? "bg-primary animate-pulse"
+                            : isPaused
+                              ? "bg-secondary"
+                              : "bg-muted-foreground"
+                    )}
+                />
+                <span className="text-muted-foreground font-mono text-xs">
                     {isPlaying ? "PLAYING" : isPaused ? "PAUSED" : "STOPPED"}
                 </span>
             </div>
         </div>
     );
 }
-

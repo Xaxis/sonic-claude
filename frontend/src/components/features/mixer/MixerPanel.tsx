@@ -93,16 +93,16 @@ export function MixerPanel() {
     };
 
     return (
-        <div className="flex-1 flex gap-2 overflow-hidden h-full p-2">
+        <div className="flex h-full flex-1 gap-2 overflow-hidden p-2">
             {/* Track Channels */}
-            <div className="flex-1 flex gap-2 overflow-x-auto pb-2">
+            <div className="flex flex-1 gap-2 overflow-x-auto pb-2">
                 {tracks.length === 0 ? (
-                    <div className="flex-1 flex items-center justify-center">
-                        <div className="text-center text-muted-foreground">
-                            <p className="text-sm mb-2">No tracks</p>
+                    <div className="flex flex-1 items-center justify-center">
+                        <div className="text-muted-foreground text-center">
+                            <p className="mb-2 text-sm">No tracks</p>
                             <button
                                 onClick={handleAddTrack}
-                                className="px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary rounded text-xs flex items-center gap-1 mx-auto"
+                                className="bg-primary/20 hover:bg-primary/30 text-primary mx-auto flex items-center gap-1 rounded px-3 py-1.5 text-xs"
                             >
                                 <Plus size={14} />
                                 Add Track
@@ -116,18 +116,21 @@ export function MixerPanel() {
                             const volumeDb = linearToDb(track.volume);
 
                             return (
-                                <div key={track.id} className="flex flex-col gap-2 w-24 flex-shrink-0 bg-muted/20 rounded-lg p-3 group relative">
+                                <div
+                                    key={track.id}
+                                    className="bg-muted/20 group relative flex w-24 flex-shrink-0 flex-col gap-2 rounded-lg p-3"
+                                >
                                     {/* Delete button (appears on hover) */}
                                     <button
                                         onClick={() => handleDeleteTrack(track.id)}
-                                        className="absolute -top-1 -right-1 p-1 bg-destructive/80 hover:bg-destructive rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                        className="bg-destructive/80 hover:bg-destructive absolute -top-1 -right-1 z-10 rounded-full p-1 opacity-0 transition-opacity group-hover:opacity-100"
                                         title="Delete track"
                                     >
                                         <Trash2 size={10} className="text-white" />
                                     </button>
 
                                     {/* Track Name */}
-                                    <div className="text-xs font-semibold text-center truncate text-foreground">
+                                    <div className="text-foreground truncate text-center text-xs font-semibold">
                                         {track.name}
                                     </div>
 
@@ -167,9 +170,11 @@ export function MixerPanel() {
                                     {/* Mute/Solo Buttons */}
                                     <div className="flex gap-1">
                                         <button
-                                            onClick={() => handleMuteToggle(track.id, track.is_muted)}
+                                            onClick={() =>
+                                                handleMuteToggle(track.id, track.is_muted)
+                                            }
                                             className={cn(
-                                                "flex-1 px-2 py-1 text-xs font-bold rounded transition-colors",
+                                                "flex-1 rounded px-2 py-1 text-xs font-bold transition-colors",
                                                 track.is_muted
                                                     ? "bg-red-500 text-white"
                                                     : "bg-gray-700/50 text-gray-300 hover:bg-gray-600/50"
@@ -178,9 +183,11 @@ export function MixerPanel() {
                                             M
                                         </button>
                                         <button
-                                            onClick={() => handleSoloToggle(track.id, track.is_solo)}
+                                            onClick={() =>
+                                                handleSoloToggle(track.id, track.is_solo)
+                                            }
                                             className={cn(
-                                                "flex-1 px-2 py-1 text-xs font-bold rounded transition-colors",
+                                                "flex-1 rounded px-2 py-1 text-xs font-bold transition-colors",
                                                 track.is_solo
                                                     ? "bg-yellow-500 text-black"
                                                     : "bg-gray-700/50 text-gray-300 hover:bg-gray-600/50"
@@ -195,7 +202,7 @@ export function MixerPanel() {
                         {/* Add Track Button */}
                         <button
                             onClick={handleAddTrack}
-                            className="w-20 flex-shrink-0 border-2 border-dashed border-border hover:border-primary hover:bg-primary/10 rounded-lg transition-all flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary"
+                            className="border-border hover:border-primary hover:bg-primary/10 text-muted-foreground hover:text-primary flex w-20 flex-shrink-0 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed transition-all"
                         >
                             <Plus size={20} />
                             <span className="text-xs">Add</span>
@@ -206,10 +213,8 @@ export function MixerPanel() {
 
             {/* Master Channel */}
             {masterTrack && (
-                <div className="w-28 flex flex-col gap-2 border-l-2 border-primary/30 pl-3 bg-primary/5 rounded-r-lg p-3">
-                    <div className="text-xs font-bold text-center text-primary">
-                        MASTER
-                    </div>
+                <div className="border-primary/30 bg-primary/5 flex w-28 flex-col gap-2 rounded-r-lg border-l-2 p-3 pl-3">
+                    <div className="text-primary text-center text-xs font-bold">MASTER</div>
 
                     {/* Professional Master Meter */}
                     <div className="flex justify-center">
@@ -236,4 +241,3 @@ export function MixerPanel() {
         </div>
     );
 }
-

@@ -1,6 +1,6 @@
 /**
  * PopoutWindow Component
- * 
+ *
  * Renders a single tab in a separate window.
  * Syncs state with main window via BroadcastChannel.
  */
@@ -26,10 +26,10 @@ export function PopoutWindow() {
     const panelIds = panelIdsParam ? panelIdsParam.split(",") : [];
 
     // Find the tab configuration
-    const tab = tabs.find(t => t.id === tabId);
+    const tab = tabs.find((t) => t.id === tabId);
 
     // Get panels for this tab
-    const panels = DEFAULT_PANELS.filter(p => panelIds.includes(p.id));
+    const panels = DEFAULT_PANELS.filter((p) => panelIds.includes(p.id));
 
     // Register this popout on mount
     useEffect(() => {
@@ -79,9 +79,9 @@ export function PopoutWindow() {
 
     if (!tabId || !tab) {
         return (
-            <div className="flex h-screen w-screen items-center justify-center bg-background">
+            <div className="bg-background flex h-screen w-screen items-center justify-center">
                 <div className="text-center">
-                    <h1 className="text-2xl font-bold text-primary mb-2">Invalid Popout</h1>
+                    <h1 className="text-primary mb-2 text-2xl font-bold">Invalid Popout</h1>
                     <p className="text-muted-foreground">Tab not found</p>
                 </div>
             </div>
@@ -89,7 +89,7 @@ export function PopoutWindow() {
     }
 
     return (
-        <div className="flex h-screen w-screen flex-col overflow-hidden bg-background">
+        <div className="bg-background flex h-screen w-screen flex-col overflow-hidden">
             {/* Header - Same as main window */}
             <Header
                 isEngineRunning={isEngineRunning}
@@ -114,4 +114,3 @@ export function PopoutWindow() {
         </div>
     );
 }
-

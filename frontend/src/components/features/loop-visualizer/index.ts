@@ -1,2 +1,1 @@
-export { LoopVisualizerPanel } from "./LoopVisualizerPanel";
-
+export { LoopVisualizerPanel } from "./LoopVisualizerPanel.tsx";

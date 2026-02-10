@@ -26,7 +26,10 @@ class SynthesisService:
 
         # Track active synths
         self.synths: Dict[int, Synth] = {}
-        self.next_synth_id = 1000
+        # Start at 3000 to avoid conflicts with reserved IDs:
+        # - 1000: audioMonitor synth (audio analyzer)
+        # - 2000: audioInput synth (audio input service)
+        self.next_synth_id = 3000
 
         # SynthDef library
         self.synthdefs: Dict[str, SynthDef] = {}
@@ -514,7 +517,7 @@ class SynthesisService:
         self,
         synthdef: str,
         parameters: Optional[Dict[str, float]] = None,
-        group: int = 1,
+        group: int = 0,
         bus: Optional[int] = None
     ) -> Synth:
         """
@@ -554,22 +557,16 @@ class SynthesisService:
         self.synths[synth_id] = synth
 
         # Send OSC message to create synth on SuperCollider
-        if self.engine.server and self.engine.is_running:
+        if self.engine.is_running:
             try:
-                # Build parameter list for OSC message
-                # Format: [param1_name, param1_value, param2_name, param2_value, ...]
-                osc_params = []
-                for key, value in params.items():
-                    osc_params.extend([key, value])
-
-                # Send /s_new message: [synthdef_name, node_id, add_action, target_id, ...params]
-                # add_action: 0=addToHead, 1=addToTail
-                self.engine.server.send_message("/s_new", [synthdef, synth_id, 1, group] + osc_params)
-                logger.info(f"Created synth {synth_id} ({synthdef}) on SuperCollider")
+                # Use EngineManager's create_synth helper
+                # add_action: 1=addToTail (add at end of group)
+                self.engine.create_synth(synthdef, synth_id, add_action=1, target=group, **params)
+                logger.info(f"✅ Created synth {synth_id} ({synthdef}) on SuperCollider")
             except Exception as e:
-                logger.error(f"Failed to send OSC message for synth creation: {e}")
+                logger.error(f"❌ Failed to create synth on SuperCollider: {e}")
         else:
-            logger.warning(f"Created synth {synth_id} ({synthdef}) but SuperCollider not running")
+            logger.warning(f"⚠️  Created synth {synth_id} ({synthdef}) but SuperCollider not connected")
 
         return synth
 
@@ -577,13 +574,13 @@ class SynthesisService:
         """Free a synth"""
         if synth_id in self.synths:
             # Send OSC message to free synth on SuperCollider
-            if self.engine.server and self.engine.is_running:
+            if self.engine.is_running:
                 try:
-                    # Send /n_free message: [node_id]
-                    self.engine.server.send_message("/n_free", [synth_id])
-                    logger.info(f"Freed synth {synth_id} on SuperCollider")
+                    # Use EngineManager's free_node helper
+                    self.engine.free_node(synth_id)
+                    logger.info(f"✅ Freed synth {synth_id} on SuperCollider")
                 except Exception as e:
-                    logger.error(f"Failed to send OSC message for synth free: {e}")
+                    logger.error(f"❌ Failed to free synth on SuperCollider: {e}")
 
             del self.synths[synth_id]
             logger.info(f"Freed synth {synth_id}")
@@ -597,15 +594,15 @@ class SynthesisService:
         synth.set(param, value)
 
         # Send OSC message to update parameter on SuperCollider
-        if self.engine.server and self.engine.is_running:
+        if self.engine.is_running:
             try:
-                # Send /n_set message: [node_id, param_name, param_value]
-                self.engine.server.send_message("/n_set", [synth_id, param, value])
+                # Use EngineManager's set_node_param helper
+                self.engine.set_node_param(synth_id, **{param: value})
                 logger.debug(f"Set synth {synth_id} {param} = {value} on SuperCollider")
             except Exception as e:
-                logger.error(f"Failed to send OSC message for parameter update: {e}")
+                logger.error(f"Failed to update parameter on SuperCollider: {e}")
         else:
-            logger.debug(f"Set synth {synth_id} {param} = {value} (SuperCollider not running)")
+            logger.debug(f"Set synth {synth_id} {param} = {value} (SuperCollider not connected)")
 
     def get_synth(self, synth_id: int) -> Optional[Synth]:
         """Get synth by ID"""

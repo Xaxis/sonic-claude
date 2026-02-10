@@ -6,10 +6,8 @@ export function TimelinePanel() {
             <div className="flex-1 p-4">
                 <div className="flex h-full items-center justify-center">
                     <div className="text-center">
-                        <h3 className="text-lg font-bold text-primary mb-2">
-                            Timeline Panel
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
+                        <h3 className="text-primary mb-2 text-lg font-bold">Timeline Panel</h3>
+                        <p className="text-muted-foreground text-sm">
                             Analyzed Audio Timeline • Markers • Regions
                         </p>
                     </div>
@@ -18,4 +16,3 @@ export function TimelinePanel() {
         </Panel>
     );
 }
-

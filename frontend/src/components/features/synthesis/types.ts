@@ -53,4 +53,3 @@ export interface SynthesisParameters {
     reasoning: string;
     confidence: number;
 }
-

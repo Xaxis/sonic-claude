@@ -1,8 +1,8 @@
 /**
  * TabbedWrapper Component
- * 
+ *
  * Core tab management system.
- * 
+ *
  * Responsibilities:
  * - Render tab bar with tab switching
  * - Manage which panels belong to which tabs
@@ -67,10 +67,10 @@ export function TabbedWrapper({
         return (
             <div className="flex h-full w-full items-center justify-center">
                 <div className="text-center">
-                    <p className="text-muted-foreground text-sm mb-4">No tabs available</p>
+                    <p className="text-muted-foreground mb-4 text-sm">No tabs available</p>
                     <button
                         onClick={() => onTabCreate?.()}
-                        className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
+                        className="bg-primary/10 hover:bg-primary/20 text-primary rounded px-4 py-2 transition-colors"
                     >
                         Create First Tab
                     </button>
@@ -91,19 +91,19 @@ export function TabbedWrapper({
     return (
         <div className="flex h-full w-full flex-col overflow-hidden">
             {/* Tab Bar */}
-            <div className="flex items-center gap-1 border-b border-primary/10 bg-card/20 px-2">
+            <div className="border-primary/10 bg-card/20 flex items-center gap-1 border-b px-2">
                 {tabs.map((tab) => {
                     const isPoppedOut = poppedOutTabs.has(tab.id);
 
                     return (
                         <div
                             key={tab.id}
-                            className={`group relative flex items-center gap-2 px-4 py-2.5 cursor-pointer transition-colors ${
+                            className={`group relative flex cursor-pointer items-center gap-2 px-4 py-2.5 transition-colors ${
                                 isPoppedOut
-                                    ? "bg-purple-500/20 text-purple-400 border-b-2 border-purple-500"
+                                    ? "border-b-2 border-purple-500 bg-purple-500/20 text-purple-400"
                                     : tab.id === activeTab
-                                    ? "bg-primary/10 text-primary border-b-2 border-primary"
-                                    : "text-muted-foreground hover:bg-card/30 hover:text-foreground"
+                                      ? "bg-primary/10 text-primary border-primary border-b-2"
+                                      : "text-muted-foreground hover:bg-card/30 hover:text-foreground"
                             }`}
                             onClick={() => !isPoppedOut && handleTabClick(tab.id)}
                             title={isPoppedOut ? "Tab is popped out to separate window" : undefined}
@@ -115,10 +115,10 @@ export function TabbedWrapper({
 
                             {/* Tab Actions (show on hover) */}
                             {!isPoppedOut && (
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                                     <button
                                         onClick={(e) => handleTabPopout(tab.id, e)}
-                                        className="p-1 hover:bg-primary/20 rounded transition-colors"
+                                        className="hover:bg-primary/20 rounded p-1 transition-colors"
                                         title="Pop out to window"
                                     >
                                         <ExternalLink className="h-3 w-3" />
@@ -126,7 +126,7 @@ export function TabbedWrapper({
                                     {tabs.length > 1 && (
                                         <button
                                             onClick={(e) => handleTabDelete(tab.id, e)}
-                                            className="p-1 hover:bg-destructive/20 rounded transition-colors"
+                                            className="hover:bg-destructive/20 rounded p-1 transition-colors"
                                             title="Close tab"
                                         >
                                             <X className="h-3 w-3" />
@@ -137,14 +137,14 @@ export function TabbedWrapper({
                         </div>
                     );
                 })}
-                
+
                 {/* New Tab Button */}
                 <button
                     onClick={onTabCreate}
-                    className="p-2 hover:bg-card/30 rounded transition-colors"
+                    className="hover:bg-card/30 rounded p-2 transition-colors"
                     title="New tab"
                 >
-                    <Plus className="h-4 w-4 text-muted-foreground" />
+                    <Plus className="text-muted-foreground h-4 w-4" />
                 </button>
             </div>
 
@@ -153,8 +153,8 @@ export function TabbedWrapper({
                 {isActiveTabPoppedOut ? (
                     <div className="flex h-full w-full items-center justify-center">
                         <div className="text-center">
-                            <ExternalLink className="h-12 w-12 text-secondary mx-auto mb-4" />
-                            <h2 className="text-xl font-bold text-secondary mb-2">
+                            <ExternalLink className="text-secondary mx-auto mb-4 h-12 w-12" />
+                            <h2 className="text-secondary mb-2 text-xl font-bold">
                                 Tab Popped Out
                             </h2>
                             <p className="text-muted-foreground">
@@ -179,4 +179,3 @@ export function TabbedWrapper({
         </div>
     );
 }
-

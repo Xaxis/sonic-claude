@@ -1,6 +1,6 @@
 /**
  * Meter Component
- * 
+ *
  * Vertical VU meter for displaying audio levels.
  * Shows peak and RMS levels with color-coded zones.
  */
@@ -22,14 +22,7 @@ export interface MeterProps {
     className?: string;
 }
 
-export function Meter({
-    peak,
-    rms,
-    stereo = false,
-    peakRight,
-    rmsRight,
-    className,
-}: MeterProps) {
+export function Meter({ peak, rms, stereo = false, peakRight, rmsRight, className }: MeterProps) {
     // Convert dB to percentage (0-1)
     const dbToPercent = (db: number) => {
         return Math.max(0, Math.min(1, (db + 96) / 96));
@@ -47,29 +40,35 @@ export function Meter({
         const rmsPercent = rmsDb !== undefined ? dbToPercent(rmsDb) : peakPercent;
 
         return (
-            <div className="relative h-full w-2 rounded bg-black/40 border border-white/10">
+            <div className="relative h-full w-2 rounded border border-white/10 bg-black/40">
                 {/* RMS level (background) */}
                 {rmsDb !== undefined && (
                     <div
-                        className={cn("absolute bottom-0 left-0 right-0 rounded-b opacity-60", getColor(rmsDb))}
+                        className={cn(
+                            "absolute right-0 bottom-0 left-0 rounded-b opacity-60",
+                            getColor(rmsDb)
+                        )}
                         style={{ height: `${rmsPercent * 100}%` }}
                     />
                 )}
 
                 {/* Peak level */}
                 <div
-                    className={cn("absolute bottom-0 left-0 right-0 rounded-b transition-all duration-75", getColor(peakDb))}
+                    className={cn(
+                        "absolute right-0 bottom-0 left-0 rounded-b transition-all duration-75",
+                        getColor(peakDb)
+                    )}
                     style={{ height: `${peakPercent * 100}%` }}
                 />
 
                 {/* Clip indicator (red zone at top) */}
-                <div className="absolute top-0 left-0 right-0 h-1 bg-red-500/20 rounded-t" />
+                <div className="absolute top-0 right-0 left-0 h-1 rounded-t bg-red-500/20" />
             </div>
         );
     };
 
     return (
-        <div className={cn("flex gap-1 h-32", className)}>
+        <div className={cn("flex h-32 gap-1", className)}>
             {/* Left/Mono channel */}
             {renderChannel(peak, rms)}
 
@@ -78,4 +77,3 @@ export function Meter({
         </div>
     );
 }
-

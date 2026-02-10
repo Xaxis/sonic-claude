@@ -30,4 +30,3 @@ export const api = new APIClient();
 // Export individual services for direct import if needed
 export { AudioEngineService } from "./audio-engine.service";
 export { BaseAPIClient, APIError } from "./base";
-

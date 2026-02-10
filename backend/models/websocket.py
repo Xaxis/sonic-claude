@@ -19,10 +19,10 @@ class MeterData(BaseModel):
     """Audio metering data"""
     type: str = "meters"
     track_id: str = Field(..., description="Track identifier")
-    peak_left: float = Field(..., ge=-96.0, le=6.0, description="Peak level L (dB)")
-    peak_right: float = Field(..., ge=-96.0, le=6.0, description="Peak level R (dB)")
-    rms_left: float = Field(..., ge=-96.0, le=6.0, description="RMS level L (dB)")
-    rms_right: float = Field(..., ge=-96.0, le=6.0, description="RMS level R (dB)")
+    peak_left: float = Field(..., ge=-200.0, le=6.0, description="Peak level L (dB), -200 = silence")
+    peak_right: float = Field(..., ge=-200.0, le=6.0, description="Peak level R (dB), -200 = silence")
+    rms_left: float = Field(..., ge=-200.0, le=6.0, description="RMS level L (dB), -200 = silence")
+    rms_right: float = Field(..., ge=-200.0, le=6.0, description="RMS level R (dB), -200 = silence")
 
 
 class WaveformData(BaseModel):

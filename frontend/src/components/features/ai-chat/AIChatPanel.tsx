@@ -20,7 +20,8 @@ const MOCK_MESSAGES: Message[] = [
     {
         id: "1",
         role: "assistant",
-        content: "Hello! I'm your AI music assistant. I can help you with composition, mixing, sound design, and more. What would you like to work on?",
+        content:
+            "Hello! I'm your AI music assistant. I can help you with composition, mixing, sound design, and more. What would you like to work on?",
         timestamp: new Date(Date.now() - 300000),
     },
     {
@@ -32,7 +33,8 @@ const MOCK_MESSAGES: Message[] = [
     {
         id: "3",
         role: "assistant",
-        content: "Great choice! For a chill lo-fi vibe, try this progression:\n\nCmaj7 → Am7 → Fmaj7 → G7\n\nThis gives you that warm, jazzy feel. You can also add some voice leading by moving individual notes smoothly between chords. Want me to create this in the sequencer?",
+        content:
+            "Great choice! For a chill lo-fi vibe, try this progression:\n\nCmaj7 → Am7 → Fmaj7 → G7\n\nThis gives you that warm, jazzy feel. You can also add some voice leading by moving individual notes smoothly between chords. Want me to create this in the sequencer?",
         timestamp: new Date(Date.now() - 180000),
     },
 ];
@@ -58,10 +60,10 @@ export function AIChatPanel() {
     };
 
     return (
-        <div className="flex-1 flex flex-col gap-2 overflow-hidden h-full p-2">
+        <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
             {/* Chat Messages */}
-            <SubPanel title="Conversation" className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            <SubPanel title="Conversation" className="flex flex-1 flex-col overflow-hidden">
+                <div className="flex-1 space-y-3 overflow-y-auto p-3">
                     {messages.map((message) => (
                         <div
                             key={message.id}
@@ -75,7 +77,7 @@ export function AIChatPanel() {
                                 }`}
                             >
                                 <div className="text-sm whitespace-pre-wrap">{message.content}</div>
-                                <div className="text-xs text-muted-foreground mt-1">
+                                <div className="text-muted-foreground mt-1 text-xs">
                                     {message.timestamp.toLocaleTimeString()}
                                 </div>
                             </div>
@@ -84,7 +86,7 @@ export function AIChatPanel() {
                 </div>
 
                 {/* Input Area */}
-                <div className="border-t border-border p-3">
+                <div className="border-border border-t p-3">
                     <div className="flex gap-2">
                         <input
                             type="text"
@@ -92,13 +94,13 @@ export function AIChatPanel() {
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && handleSend()}
                             placeholder="Ask the AI for help..."
-                            className="flex-1 bg-gray-800/50 border border-border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                            className="border-border flex-1 rounded border bg-gray-800/50 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-500 focus:outline-none"
                         />
                         <button
                             onClick={handleSend}
-                            className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded transition-colors flex items-center gap-2"
+                            className="flex items-center gap-2 rounded bg-cyan-500 px-4 py-2 text-black transition-colors hover:bg-cyan-400"
                         >
-                            <Send className="w-4 h-4" />
+                            <Send className="h-4 w-4" />
                         </button>
                     </div>
                 </div>
@@ -106,14 +108,14 @@ export function AIChatPanel() {
 
             {/* Quick Actions */}
             <SubPanel title="Quick Actions">
-                <div className="p-3 grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 p-3">
                     {QUICK_ACTIONS.map((action) => (
                         <button
                             key={action}
                             onClick={() => handleQuickAction(action)}
-                            className="px-3 py-2 bg-gray-800/50 hover:bg-gray-700/50 border border-border rounded text-xs transition-colors flex items-center gap-2"
+                            className="border-border flex items-center gap-2 rounded border bg-gray-800/50 px-3 py-2 text-xs transition-colors hover:bg-gray-700/50"
                         >
-                            <Sparkles className="w-3 h-3 text-cyan-400" />
+                            <Sparkles className="h-3 w-3 text-cyan-400" />
                             {action}
                         </button>
                     ))}
@@ -122,4 +124,3 @@ export function AIChatPanel() {
         </div>
     );
 }
-

@@ -12,9 +12,24 @@
 
 import { SubPanel } from "@/components/ui/sub-panel";
 import { Toggle } from "@/components/ui/toggle";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 import { useState, useEffect, useRef } from "react";
 import { Upload, Search, Folder, Music, Mic, Piano, Edit2, Trash2, Play } from "lucide-react";
-import { useToast, ToastContainer } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/toast";
+import * as sampleApi from "@/services/sampleApi";
+import type { SampleMetadata } from "@/services/sampleApi";
+import { useAudioEngine } from "@/contexts/AudioEngineContext";
+import * as audioInputApi from "@/services/audioInputApi";
 
 interface AudioDeviceInfo {
     deviceId: string;
@@ -22,35 +37,38 @@ interface AudioDeviceInfo {
     kind: string;
 }
 
-interface Sample {
-    id: string;
-    name: string;
-    category: string;
-    duration: number; // seconds
-    size: number; // bytes
-    file: File;
-    audioBuffer?: AudioBuffer;
+// Use SampleMetadata from API, but extend with cached audio URL
+interface Sample extends SampleMetadata {
+    audioUrl?: string;
 }
 
-const SAMPLE_CATEGORIES = ["All", "Drums", "Bass", "Synth", "Vocals", "FX", "Loops", "Uncategorized"];
+const SAMPLE_CATEGORIES = [
+    "All",
+    "Drums",
+    "Bass",
+    "Synth",
+    "Vocals",
+    "FX",
+    "Loops",
+    "Uncategorized",
+];
 
 export function InputPanel() {
-    const { toasts, toast, removeToast } = useToast();
+    const { toast } = useToast();
     const [activeTab, setActiveTab] = useState<"audio" | "midi" | "library">("audio");
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [searchQuery, setSearchQuery] = useState("");
 
     // Sample library state
     const [samples, setSamples] = useState<Sample[]>([]);
+    const [isLoadingSamples, setIsLoadingSamples] = useState(false);
     const [editingSampleId, setEditingSampleId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState("");
     const [editingCategory, setEditingCategory] = useState("");
 
     // Audio input state
     const [audioInputDevices, setAudioInputDevices] = useState<AudioDeviceInfo[]>([]);
-    const [audioOutputDevices, setAudioOutputDevices] = useState<AudioDeviceInfo[]>([]);
     const [selectedInputDevice, setSelectedInputDevice] = useState<string>("");
-    const [selectedOutputDevice, setSelectedOutputDevice] = useState<string>("");
     const [isRecording, setIsRecording] = useState(false);
     const [inputLevel, setInputLevel] = useState(0);
     const [gain, setGain] = useState(0); // dB
@@ -64,10 +82,17 @@ export function InputPanel() {
     const gainNodeRef = useRef<GainNode | null>(null);
     const animationFrameRef = useRef<number | null>(null);
 
+    // Recording refs
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const recordedChunksRef = useRef<Blob[]>([]);
+    const recordingStartTimeRef = useRef<number>(0);
+
     // MIDI state
     const [midiDevice, setMidiDevice] = useState("No MIDI Devices");
+    const [midiThruEnabled, setMidiThruEnabled] = useState(true);
+    const [quantizeEnabled, setQuantizeEnabled] = useState(false);
 
-    // Enumerate audio devices - both inputs and outputs
+    // Enumerate audio input devices
     useEffect(() => {
         const enumerateDevices = async () => {
             try {
@@ -78,35 +103,23 @@ export function InputPanel() {
                 const devices = await navigator.mediaDevices.enumerateDevices();
 
                 const audioInputs = devices
-                    .filter(device => device.kind === "audioinput")
-                    .map(device => ({
+                    .filter((device) => device.kind === "audioinput")
+                    .map((device) => ({
                         deviceId: device.deviceId,
                         label: device.label || `Audio Input ${device.deviceId.slice(0, 5)}`,
                         kind: device.kind,
                     }));
 
-                const audioOutputs = devices
-                    .filter(device => device.kind === "audiooutput")
-                    .map(device => ({
-                        deviceId: device.deviceId,
-                        label: device.label || `Audio Output ${device.deviceId.slice(0, 5)}`,
-                        kind: device.kind,
-                    }));
-
                 // Stop temp stream
-                tempStream.getTracks().forEach(track => track.stop());
+                tempStream.getTracks().forEach((track) => track.stop());
 
                 setAudioInputDevices(audioInputs);
-                setAudioOutputDevices(audioOutputs);
 
                 if (audioInputs.length > 0 && !selectedInputDevice) {
                     setSelectedInputDevice(audioInputs[0].deviceId);
                 }
-                if (audioOutputs.length > 0 && !selectedOutputDevice) {
-                    setSelectedOutputDevice(audioOutputs[0].deviceId);
-                }
 
-                console.log("Audio devices detected:", { inputs: audioInputs, outputs: audioOutputs });
+                console.log("Audio input devices detected:", audioInputs);
             } catch (error) {
                 console.error("Failed to enumerate audio devices:", error);
                 toast.error("Failed to access audio devices. Grant microphone permission.");
@@ -122,27 +135,69 @@ export function InputPanel() {
         };
     }, []);
 
+    // Load samples from backend on mount
+    useEffect(() => {
+        const loadSamples = async () => {
+            setIsLoadingSamples(true);
+            try {
+                const samplesData = await sampleApi.getAllSamples();
+                setSamples(samplesData.map(s => ({ ...s, audioUrl: undefined })));
+                console.log(`Loaded ${samplesData.length} samples from backend`);
+            } catch (error) {
+                console.error("Failed to load samples:", error);
+                toast.error("Failed to load sample library");
+            } finally {
+                setIsLoadingSamples(false);
+            }
+        };
+
+        loadSamples();
+    }, []);
+
+    // Map device label to SuperCollider device index
+    const getSupercolliderDeviceIndex = (deviceLabel: string): number => {
+        // Map known devices to SuperCollider indices
+        // SuperCollider device indices are based on the order shown in scsynth log
+        if (deviceLabel.includes("BlackHole")) return 0;
+        if (deviceLabel.includes("Microphone")) return 1;
+        if (deviceLabel.includes("Speakers")) return 2;
+        if (deviceLabel.includes("Multi-Output")) return 3;
+        return 0; // Default to first device
+    };
+
     // Start/stop audio input monitoring
     useEffect(() => {
         console.log("Audio monitoring effect triggered:", { isMonitoring, selectedInputDevice });
 
         if (!isMonitoring || !selectedInputDevice) {
-            console.log("Stopping audio input - monitoring:", isMonitoring, "device:", selectedInputDevice);
+            console.log(
+                "Stopping audio input - monitoring:",
+                isMonitoring,
+                "device:",
+                selectedInputDevice
+            );
             stopAudioInput();
+            stopSupercolliderInput();
             return;
         }
 
         console.log("Starting audio input...");
         startAudioInput();
+        startSupercolliderInput();
 
         return () => {
+            // Stop recording if active
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+                mediaRecorderRef.current.stop();
+            }
             stopAudioInput();
+            stopSupercolliderInput();
         };
-    }, [isMonitoring, selectedInputDevice, selectedOutputDevice]);
+    }, [isMonitoring, selectedInputDevice]);
 
     const startAudioInput = async () => {
         try {
-            console.log("startAudioInput called with input:", selectedInputDevice, "output:", selectedOutputDevice);
+            console.log("startAudioInput called with input:", selectedInputDevice);
 
             // Create audio context
             if (!audioContextRef.current) {
@@ -150,15 +205,10 @@ export function InputPanel() {
                 console.log("Created new AudioContext");
             }
 
-            // Determine which device to capture from
-            // If output device is selected, try to capture from it (system audio)
-            // Otherwise use input device (microphone)
-            const deviceId = selectedOutputDevice || selectedInputDevice;
-
             console.log("Requesting getUserMedia...");
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
-                    deviceId: deviceId ? { exact: deviceId } : undefined,
+                    deviceId: selectedInputDevice ? { exact: selectedInputDevice } : undefined,
                     echoCancellation: false,
                     noiseSuppression: false,
                     autoGainControl: false,
@@ -191,14 +241,37 @@ export function InputPanel() {
             // Start level monitoring and spectrum analysis
             updateInputLevel();
 
-            const deviceLabel = audioInputDevices.find(d => d.deviceId === selectedInputDevice)?.label ||
-                              audioOutputDevices.find(d => d.deviceId === selectedOutputDevice)?.label ||
-                              "Unknown";
+            const deviceLabel =
+                audioInputDevices.find((d) => d.deviceId === selectedInputDevice)?.label || "Unknown";
             console.log("Audio input started successfully:", deviceLabel);
             toast.success(`Audio input started: ${deviceLabel}`);
         } catch (error) {
             console.error("Failed to start audio input:", error);
             toast.error("Failed to start audio input. Check permissions.");
+        }
+    };
+
+    const startSupercolliderInput = async () => {
+        try {
+            const deviceLabel =
+                audioInputDevices.find((d) => d.deviceId === selectedInputDevice)?.label || "";
+            const scDeviceIndex = getSupercolliderDeviceIndex(deviceLabel);
+            const ampLinear = Math.pow(10, gain / 20); // Convert dB to linear
+
+            await audioInputApi.setInputDevice(scDeviceIndex, ampLinear);
+            console.log(`✅ SuperCollider input set to device ${scDeviceIndex} (${deviceLabel})`);
+        } catch (error) {
+            console.error("Failed to set SuperCollider input:", error);
+            toast.error("Failed to set SuperCollider input device");
+        }
+    };
+
+    const stopSupercolliderInput = async () => {
+        try {
+            await audioInputApi.stopInput();
+            console.log("✅ SuperCollider input stopped");
+        } catch (error) {
+            console.error("Failed to stop SuperCollider input:", error);
         }
     };
 
@@ -209,7 +282,7 @@ export function InputPanel() {
         }
 
         if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach(track => track.stop());
+            mediaStreamRef.current.getTracks().forEach((track) => track.stop());
             mediaStreamRef.current = null;
         }
 
@@ -263,27 +336,95 @@ export function InputPanel() {
         animationFrameRef.current = requestAnimationFrame(updateInputLevel);
     };
 
-    const handleGainChange = (value: number) => {
+    const handleGainChange = async (value: number) => {
         setGain(value);
         if (gainNodeRef.current) {
             gainNodeRef.current.gain.value = Math.pow(10, value / 20);
         }
+        // Also update SuperCollider gain
+        if (isMonitoring && selectedInputDevice) {
+            try {
+                const ampLinear = Math.pow(10, value / 20);
+                await audioInputApi.setInputGain(ampLinear);
+            } catch (error) {
+                console.error("Failed to update SuperCollider gain:", error);
+            }
+        }
     };
 
-    const handleStartRecording = () => {
+    const handleStartRecording = async () => {
         if (!mediaStreamRef.current) {
             toast.error("No audio input active");
             return;
         }
 
-        setIsRecording(!isRecording);
-
         if (!isRecording) {
-            toast.success("Recording started");
-            // TODO: Implement actual recording to backend
+            // Start recording
+            try {
+                recordedChunksRef.current = [];
+                recordingStartTimeRef.current = Date.now();
+
+                const mediaRecorder = new MediaRecorder(mediaStreamRef.current, {
+                    mimeType: MediaRecorder.isTypeSupported("audio/webm")
+                        ? "audio/webm"
+                        : "audio/ogg",
+                });
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunksRef.current.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const blob = new Blob(recordedChunksRef.current, {
+                        type: mediaRecorder.mimeType,
+                    });
+                    const duration = (Date.now() - recordingStartTimeRef.current) / 1000;
+
+                    // Create a File from the Blob
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+                    const fileName = `recording-${timestamp}.webm`;
+                    const file = new File([blob], fileName, { type: blob.type });
+
+                    const name = `Recording ${new Date().toLocaleTimeString()}`;
+
+                    try {
+                        // Upload to backend
+                        toast.info("Saving recording...");
+                        const metadata = await sampleApi.uploadSample(file, name, "Uncategorized");
+
+                        // Update duration on backend
+                        await sampleApi.updateSampleDuration(metadata.id, duration);
+
+                        // Add to local state
+                        setSamples((prev) => [{ ...metadata, duration, audioUrl: undefined }, ...prev]);
+                        toast.success(`Recording saved: ${name}`);
+
+                        // Switch to library tab to show the new recording
+                        setActiveTab("library");
+                    } catch (error) {
+                        console.error("Failed to save recording:", error);
+                        toast.error("Failed to save recording to server");
+                    }
+                };
+
+                mediaRecorder.start(100); // Collect data every 100ms
+                mediaRecorderRef.current = mediaRecorder;
+                setIsRecording(true);
+                toast.success("Recording started");
+            } catch (error) {
+                console.error("Failed to start recording:", error);
+                toast.error("Failed to start recording");
+            }
         } else {
-            toast.success("Recording stopped");
-            // TODO: Stop recording and save
+            // Stop recording
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+                mediaRecorderRef.current.stop();
+                mediaRecorderRef.current = null;
+                setIsRecording(false);
+                toast.info("Recording stopped, processing...");
+            }
         }
     };
 
@@ -299,17 +440,35 @@ export function InputPanel() {
                 continue;
             }
 
-            const sample: Sample = {
-                id: `${Date.now()}-${i}`,
-                name: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
-                category: "Uncategorized",
-                duration: 0, // Will be calculated when loaded
-                size: file.size,
-                file: file,
-            };
+            const name = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
 
-            setSamples(prev => [...prev, sample]);
-            toast.success(`Added ${file.name}`);
+            try {
+                // Upload to backend
+                toast.info(`Uploading ${file.name}...`);
+                const metadata = await sampleApi.uploadSample(file, name, "Uncategorized");
+
+                // Try to get duration
+                let duration = 0;
+                try {
+                    const tempContext = new AudioContext();
+                    const arrayBuffer = await file.arrayBuffer();
+                    const audioBuffer = await tempContext.decodeAudioData(arrayBuffer);
+                    duration = audioBuffer.duration;
+                    await tempContext.close();
+
+                    // Update duration on backend
+                    await sampleApi.updateSampleDuration(metadata.id, duration);
+                } catch (error) {
+                    console.warn("Could not decode audio duration:", error);
+                }
+
+                // Add to local state
+                setSamples((prev) => [...prev, { ...metadata, duration, audioUrl: undefined }]);
+                toast.success(`Added ${file.name}`);
+            } catch (error) {
+                console.error("Failed to upload sample:", error);
+                toast.error(`Failed to upload ${file.name}`);
+            }
         }
 
         // Reset input
@@ -322,8 +481,35 @@ export function InputPanel() {
     };
 
     const handlePlaySample = async (sample: Sample) => {
-        // TODO: Play sample preview
-        toast.info(`Playing ${sample.name}`);
+        try {
+            // Create a temporary audio context for playback
+            const playbackContext = new AudioContext();
+
+            // Fetch audio from backend
+            const audioUrl = sampleApi.getSampleDownloadUrl(sample.id);
+            const response = await fetch(audioUrl);
+            const arrayBuffer = await response.arrayBuffer();
+
+            // Decode the audio data
+            const audioBuffer = await playbackContext.decodeAudioData(arrayBuffer);
+
+            // Create a buffer source
+            const source = playbackContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(playbackContext.destination);
+
+            // Play the sample
+            source.start(0);
+            toast.success(`Playing ${sample.name}`);
+
+            // Clean up when done
+            source.onended = () => {
+                playbackContext.close();
+            };
+        } catch (error) {
+            console.error("Failed to play sample:", error);
+            toast.error("Failed to play sample");
+        }
     };
 
     const handleEditSample = (sample: Sample) => {
@@ -332,404 +518,485 @@ export function InputPanel() {
         setEditingCategory(sample.category);
     };
 
-    const handleSaveEdit = () => {
+    const handleSaveEdit = async () => {
         if (!editingSampleId) return;
 
-        setSamples(prev => prev.map(s =>
-            s.id === editingSampleId
-                ? { ...s, name: editingName, category: editingCategory }
-                : s
-        ));
+        try {
+            // Update on backend
+            await sampleApi.updateSample(editingSampleId, {
+                name: editingName,
+                category: editingCategory,
+            });
 
-        setEditingSampleId(null);
-        toast.success("Sample updated");
+            // Update local state
+            setSamples((prev) =>
+                prev.map((s) =>
+                    s.id === editingSampleId
+                        ? { ...s, name: editingName, category: editingCategory }
+                        : s
+                )
+            );
+
+            setEditingSampleId(null);
+            toast.success("Sample updated");
+        } catch (error) {
+            console.error("Failed to update sample:", error);
+            toast.error("Failed to update sample");
+        }
     };
 
     const handleCancelEdit = () => {
         setEditingSampleId(null);
     };
 
-    const handleDeleteSample = (sampleId: string) => {
-        setSamples(prev => prev.filter(s => s.id !== sampleId));
-        toast.success("Sample deleted");
+    const handleDeleteSample = async (sampleId: string) => {
+        try {
+            // Delete from backend
+            await sampleApi.deleteSample(sampleId);
+
+            // Remove from local state
+            setSamples((prev) => prev.filter((s) => s.id !== sampleId));
+            toast.success("Sample deleted");
+        } catch (error) {
+            console.error("Failed to delete sample:", error);
+            toast.error("Failed to delete sample");
+        }
     };
 
     // Filter samples
-    const filteredSamples = samples.filter(sample => {
+    const filteredSamples = samples.filter((sample) => {
         const matchesCategory = selectedCategory === "All" || sample.category === selectedCategory;
         const matchesSearch = sample.name.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesCategory && matchesSearch;
     });
 
     return (
-        <div className="flex-1 flex flex-col overflow-hidden h-full">
-                {/* Tab Buttons */}
-                <div className="flex gap-1 p-2 border-b border-border">
-                    <button
-                        onClick={() => setActiveTab("audio")}
-                        className={`flex items-center gap-1 px-3 py-1 text-xs font-mono rounded transition-colors ${
-                            activeTab === "audio"
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted text-muted-foreground hover:bg-muted/80"
-                        }`}
-                    >
-                        <Mic size={12} />
-                        AUDIO IN
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("midi")}
-                        className={`flex items-center gap-1 px-3 py-1 text-xs font-mono rounded transition-colors ${
-                            activeTab === "midi"
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted text-muted-foreground hover:bg-muted/80"
-                        }`}
-                    >
-                        <Piano size={12} />
-                        MIDI IN
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("library")}
-                        className={`flex items-center gap-1 px-3 py-1 text-xs font-mono rounded transition-colors ${
-                            activeTab === "library"
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted text-muted-foreground hover:bg-muted/80"
-                        }`}
-                    >
-                        <Folder size={12} />
-                        LIBRARY
-                    </button>
-                </div>
+        <div className="flex h-full flex-1 flex-col overflow-hidden">
+            {/* Tab Buttons */}
+            <div className="border-border flex gap-1 border-b p-2">
+                <Button
+                    onClick={() => setActiveTab("audio")}
+                    variant={activeTab === "audio" ? "default" : "ghost"}
+                    size="xs"
+                >
+                    <Mic size={12} />
+                    AUDIO IN
+                </Button>
+                <Button
+                    onClick={() => setActiveTab("midi")}
+                    variant={activeTab === "midi" ? "default" : "ghost"}
+                    size="xs"
+                >
+                    <Piano size={12} />
+                    MIDI IN
+                </Button>
+                <Button
+                    onClick={() => setActiveTab("library")}
+                    variant={activeTab === "library" ? "default" : "ghost"}
+                    size="xs"
+                >
+                    <Folder size={12} />
+                    LIBRARY
+                </Button>
+            </div>
 
-                {/* Content Area */}
-                <div className="flex-1 overflow-auto p-2 space-y-2">
-                    {activeTab === "library" && (
-                        <>
-                            {/* Search and Upload */}
-                            <SubPanel title="Search">
-                                <div className="p-2 space-y-2">
-                                    <div className="relative">
-                                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
-                                        <input
-                                            type="text"
-                                            placeholder="Search samples..."
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full bg-background border border-border rounded pl-8 pr-2 py-1 text-xs"
-                                        />
+            {/* Content Area */}
+            <div className="flex-1 space-y-2 overflow-auto p-2">
+                {activeTab === "library" && (
+                    <>
+                        {/* Search and Upload */}
+                        <SubPanel title="Search">
+                            <div className="space-y-2 p-2">
+                                <div className="relative">
+                                    <Search
+                                        className="text-muted-foreground absolute top-1/2 left-2 z-10 -translate-y-1/2"
+                                        size={14}
+                                    />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search samples..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="h-8 w-full pl-8 text-xs"
+                                    />
+                                </div>
+                                <Button
+                                    onClick={() => document.getElementById('file-upload-input')?.click()}
+                                    variant="default"
+                                    size="sm"
+                                    className="w-full"
+                                >
+                                    <Upload size={12} />
+                                    UPLOAD FILES
+                                </Button>
+                                <input
+                                    id="file-upload-input"
+                                    type="file"
+                                    multiple
+                                    accept="audio/*"
+                                    onChange={handleFileUpload}
+                                    className="hidden"
+                                />
+                            </div>
+                        </SubPanel>
+
+                        {/* Categories */}
+                        <SubPanel title="Categories">
+                            <div className="flex flex-wrap gap-1 p-2">
+                                {SAMPLE_CATEGORIES.map((cat) => (
+                                    <Button
+                                        key={cat}
+                                        onClick={() => setSelectedCategory(cat)}
+                                        variant={selectedCategory === cat ? "default" : "ghost"}
+                                        size="xs"
+                                    >
+                                        {cat}
+                                    </Button>
+                                ))}
+                            </div>
+                        </SubPanel>
+
+                        {/* Sample List */}
+                        <SubPanel title={`Samples (${filteredSamples.length})`}>
+                            <div className="divide-border divide-y">
+                                {filteredSamples.length === 0 && (
+                                    <div className="text-muted-foreground p-4 text-center text-xs">
+                                        No samples. Upload audio files to get started.
                                     </div>
-                                    <label className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground px-3 py-1 rounded text-xs font-mono hover:bg-primary/90 cursor-pointer">
-                                        <Upload size={12} />
-                                        UPLOAD FILES
-                                        <input
-                                            type="file"
-                                            multiple
-                                            accept="audio/*"
-                                            onChange={handleFileUpload}
-                                            className="hidden"
-                                        />
-                                    </label>
-                                </div>
-                            </SubPanel>
-
-                            {/* Categories */}
-                            <SubPanel title="Categories">
-                                <div className="p-2 flex flex-wrap gap-1">
-                                    {SAMPLE_CATEGORIES.map(cat => (
-                                        <button
-                                            key={cat}
-                                            onClick={() => setSelectedCategory(cat)}
-                                            className={`px-2 py-1 text-xs rounded transition-colors ${
-                                                selectedCategory === cat
-                                                    ? "bg-primary text-primary-foreground"
-                                                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                                            }`}
-                                        >
-                                            {cat}
-                                        </button>
-                                    ))}
-                                </div>
-                            </SubPanel>
-
-                            {/* Sample List */}
-                            <SubPanel title={`Samples (${filteredSamples.length})`}>
-                                <div className="divide-y divide-border">
-                                    {filteredSamples.length === 0 && (
-                                        <div className="p-4 text-center text-xs text-muted-foreground">
-                                            No samples. Upload audio files to get started.
-                                        </div>
-                                    )}
-                                    {filteredSamples.map(sample => (
-                                        <div
-                                            key={sample.id}
-                                            className="p-2 hover:bg-muted/50 transition-colors group"
-                                        >
-                                            {editingSampleId === sample.id ? (
-                                                // Edit mode
-                                                <div className="space-y-2">
-                                                    <input
-                                                        type="text"
-                                                        value={editingName}
-                                                        onChange={(e) => setEditingName(e.target.value)}
-                                                        className="w-full bg-background border border-border rounded px-2 py-1 text-xs font-mono"
-                                                        placeholder="Sample name"
-                                                    />
-                                                    <select
-                                                        value={editingCategory}
-                                                        onChange={(e) => setEditingCategory(e.target.value)}
-                                                        className="w-full bg-background border border-border rounded px-2 py-1 text-xs"
-                                                    >
-                                                        {SAMPLE_CATEGORIES.filter(c => c !== "All").map(cat => (
-                                                            <option key={cat} value={cat}>{cat}</option>
+                                )}
+                                {filteredSamples.map((sample) => (
+                                    <div
+                                        key={sample.id}
+                                        className="hover:bg-muted/50 group p-2 transition-colors"
+                                    >
+                                        {editingSampleId === sample.id ? (
+                                            // Edit mode
+                                            <div className="space-y-2">
+                                                <Input
+                                                    type="text"
+                                                    value={editingName}
+                                                    onChange={(e) => setEditingName(e.target.value)}
+                                                    className="w-full"
+                                                    placeholder="Sample name"
+                                                />
+                                                <Select
+                                                    value={editingCategory}
+                                                    onValueChange={setEditingCategory}
+                                                >
+                                                    <SelectTrigger className="h-8 w-full text-xs">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {SAMPLE_CATEGORIES.filter(
+                                                            (c) => c !== "All"
+                                                        ).map((cat) => (
+                                                            <SelectItem key={cat} value={cat}>
+                                                                {cat}
+                                                            </SelectItem>
                                                         ))}
-                                                    </select>
-                                                    <div className="flex gap-1">
-                                                        <button
-                                                            onClick={handleSaveEdit}
-                                                            className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded text-xs hover:bg-primary/90"
-                                                        >
-                                                            Save
-                                                        </button>
-                                                        <button
-                                                            onClick={handleCancelEdit}
-                                                            className="flex-1 bg-muted text-muted-foreground px-2 py-1 rounded text-xs hover:bg-muted/80"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                // View mode
-                                                <div className="flex items-center gap-2">
-                                                    <Music size={14} className="text-muted-foreground flex-shrink-0" />
-                                                    <div
-                                                        className="flex-1 min-w-0 cursor-move"
-                                                        draggable
-                                                        onDragStart={() => handleSampleDragStart(sample.id)}
+                                                    </SelectContent>
+                                                </Select>
+                                                <div className="flex gap-1">
+                                                    <Button
+                                                        onClick={handleSaveEdit}
+                                                        variant="default"
+                                                        size="xs"
+                                                        className="flex-1"
                                                     >
-                                                        <div className="text-xs font-mono truncate">{sample.name}</div>
-                                                        <div className="text-[10px] text-muted-foreground">
-                                                            {sample.category} • {(sample.size / 1024 / 1024).toFixed(2)} MB
-                                                        </div>
+                                                        Save
+                                                    </Button>
+                                                    <Button
+                                                        onClick={handleCancelEdit}
+                                                        variant="ghost"
+                                                        size="xs"
+                                                        className="flex-1"
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            // View mode
+                                            <div className="flex items-center gap-2">
+                                                <Music
+                                                    size={14}
+                                                    className="text-muted-foreground flex-shrink-0"
+                                                />
+                                                <div
+                                                    className="min-w-0 flex-1 cursor-move"
+                                                    draggable
+                                                    onDragStart={() =>
+                                                        handleSampleDragStart(sample.id)
+                                                    }
+                                                >
+                                                    <div className="truncate text-xs">
+                                                        {sample.name}
                                                     </div>
-                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button
-                                                            onClick={() => handlePlaySample(sample)}
-                                                            className="p-1 hover:bg-background rounded"
-                                                            title="Play"
-                                                        >
-                                                            <Play size={12} className="text-muted-foreground" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleEditSample(sample)}
-                                                            className="p-1 hover:bg-background rounded"
-                                                            title="Edit"
-                                                        >
-                                                            <Edit2 size={12} className="text-muted-foreground" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteSample(sample.id)}
-                                                            className="p-1 hover:bg-background rounded"
-                                                            title="Delete"
-                                                        >
-                                                            <Trash2 size={12} className="text-red-500" />
-                                                        </button>
+                                                    <div className="text-muted-foreground text-[10px]">
+                                                        {sample.category} •{" "}
+                                                        {sample.duration > 0
+                                                            ? `${sample.duration.toFixed(1)}s`
+                                                            : ""}
+                                                        {sample.duration > 0 ? " • " : ""}
+                                                        {(sample.size / 1024 / 1024).toFixed(2)} MB
                                                     </div>
                                                 </div>
-                                            )}
-                                        </div>
+                                                <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                                    <Button
+                                                        onClick={() => handlePlaySample(sample)}
+                                                        variant="ghost"
+                                                        size="icon-xs"
+                                                        title="Play"
+                                                    >
+                                                        <Play
+                                                            size={12}
+                                                            className="text-muted-foreground"
+                                                        />
+                                                    </Button>
+                                                    <Button
+                                                        onClick={() => handleEditSample(sample)}
+                                                        variant="ghost"
+                                                        size="icon-xs"
+                                                        title="Edit"
+                                                    >
+                                                        <Edit2
+                                                            size={12}
+                                                            className="text-muted-foreground"
+                                                        />
+                                                    </Button>
+                                                    <Button
+                                                        onClick={() =>
+                                                            handleDeleteSample(sample.id)
+                                                        }
+                                                        variant="ghost"
+                                                        size="icon-xs"
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2
+                                                            size={12}
+                                                            className="text-red-500"
+                                                        />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </SubPanel>
+                    </>
+                )}
+
+                {activeTab === "audio" && (
+                    <>
+                        {/* Input Device Selection */}
+                        <SubPanel title="Input Device">
+                            <div className="p-2">
+                                <Select
+                                    value={selectedInputDevice}
+                                    onValueChange={setSelectedInputDevice}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue
+                                            placeholder={
+                                                audioInputDevices.length === 0
+                                                    ? "No input devices"
+                                                    : "Select input device..."
+                                            }
+                                        />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {audioInputDevices.map((device) => (
+                                            <SelectItem
+                                                key={device.deviceId}
+                                                value={device.deviceId}
+                                            >
+                                                {device.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </SubPanel>
+
+                        {/* Mini Spectrum Analyzer */}
+                        <SubPanel title="Spectrum">
+                            <div className="p-2">
+                                <div className="flex h-16 items-end gap-0.5">
+                                    {spectrumData.map((value, i) => (
+                                        <div
+                                            key={i}
+                                            className="flex-1 rounded-t transition-all duration-75"
+                                            style={{
+                                                height: `${value * 100}%`,
+                                                backgroundColor:
+                                                    value > 0.8
+                                                        ? "hsl(0 85% 60%)"
+                                                        : value > 0.5
+                                                          ? "hsl(45 95% 60%)"
+                                                          : "hsl(187 85% 55%)",
+                                                boxShadow:
+                                                    value > 0.5
+                                                        ? `0 0 8px ${value > 0.8 ? "rgba(239, 68, 68, 0.5)" : "rgba(250, 204, 21, 0.5)"}`
+                                                        : "0 0 6px rgba(0, 245, 255, 0.3)",
+                                                minHeight: "2px",
+                                            }}
+                                        />
                                     ))}
                                 </div>
-                            </SubPanel>
-                        </>
-                    )}
+                            </div>
+                        </SubPanel>
 
-                    {activeTab === "audio" && (
-                        <>
-                            {/* Input Device Selection */}
-                            <SubPanel title="Input Device">
-                                <div className="p-2">
-                                    <select
-                                        value={selectedInputDevice}
-                                        onChange={(e) => setSelectedInputDevice(e.target.value)}
-                                        className="w-full bg-background border border-border rounded px-2 py-1 text-xs font-mono"
-                                    >
-                                        {audioInputDevices.length === 0 && (
-                                            <option value="">No input devices</option>
-                                        )}
-                                        {audioInputDevices.map(device => (
-                                            <option key={device.deviceId} value={device.deviceId}>
-                                                {device.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </SubPanel>
-
-                            {/* Output Device Selection (for system audio capture) */}
-                            <SubPanel title="Output Device">
-                                <div className="p-2">
-                                    <select
-                                        value={selectedOutputDevice}
-                                        onChange={(e) => setSelectedOutputDevice(e.target.value)}
-                                        className="w-full bg-background border border-border rounded px-2 py-1 text-xs font-mono"
-                                    >
-                                        <option value="">None</option>
-                                        {audioOutputDevices.map(device => (
-                                            <option key={device.deviceId} value={device.deviceId}>
-                                                {device.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </SubPanel>
-
-                            {/* Mini Spectrum Analyzer */}
-                            <SubPanel title="Spectrum">
-                                <div className="p-2">
-                                    <div className="h-16 flex items-end gap-0.5">
-                                        {spectrumData.map((value, i) => (
-                                            <div
-                                                key={i}
-                                                className="flex-1 rounded-t transition-all duration-75"
-                                                style={{
-                                                    height: `${value * 100}%`,
-                                                    backgroundColor: value > 0.8 ? "#ef4444" : value > 0.5 ? "#eab308" : "#22c55e",
-                                                    minHeight: "2px"
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            </SubPanel>
-
-                            {/* Input Level */}
-                            <SubPanel title="Input Level">
-                                <div className="p-2 space-y-2">
-                                    <div className="flex gap-2 items-center">
-                                        <div className="flex-1 h-4 bg-background border border-border rounded overflow-hidden">
-                                            {/* Level meter - green to yellow to red */}
-                                            <div
-                                                className="h-full transition-all duration-75"
-                                                style={{
-                                                    width: `${Math.max(0, Math.min(100, ((inputLevel + 60) / 60) * 100))}%`,
-                                                    backgroundColor: inputLevel > -6 ? "#ef4444" : inputLevel > -12 ? "#eab308" : "#22c55e"
-                                                }}
-                                            />
-                                        </div>
-                                        <span className="text-xs font-mono text-muted-foreground w-14 text-right">
-                                            {inputLevel.toFixed(1)} dB
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs text-muted-foreground w-10">Gain:</span>
-                                        <input
-                                            type="range"
-                                            min="-20"
-                                            max="20"
-                                            step="0.5"
-                                            value={gain}
-                                            onChange={(e) => handleGainChange(parseFloat(e.target.value))}
-                                            className="flex-1"
-                                        />
-                                        <span className="text-xs font-mono w-14 text-right">
-                                            {gain > 0 ? "+" : ""}{gain.toFixed(1)} dB
-                                        </span>
-                                    </div>
-                                </div>
-                            </SubPanel>
-
-                            {/* Controls */}
-                            <SubPanel title="Controls">
-                                <div className="p-2 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-mono text-muted-foreground">MONITOR</span>
-                                        <Toggle
-                                            checked={isMonitoring}
-                                            onCheckedChange={setIsMonitoring}
+                        {/* Input Level */}
+                        <SubPanel title="Input Level">
+                            <div className="space-y-2 p-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="bg-background border-border h-4 flex-1 overflow-hidden rounded border">
+                                        {/* Level meter - cyan to yellow to red */}
+                                        <div
+                                            className="h-full transition-all duration-75"
+                                            style={{
+                                                width: `${Math.max(0, Math.min(100, ((inputLevel + 60) / 60) * 100))}%`,
+                                                backgroundColor:
+                                                    inputLevel > -6
+                                                        ? "hsl(0 85% 60%)"
+                                                        : inputLevel > -12
+                                                          ? "hsl(45 95% 60%)"
+                                                          : "hsl(187 85% 55%)",
+                                                boxShadow:
+                                                    inputLevel > -12
+                                                        ? `0 0 10px ${inputLevel > -6 ? "rgba(239, 68, 68, 0.5)" : "rgba(250, 204, 21, 0.5)"}`
+                                                        : "0 0 8px rgba(0, 245, 255, 0.3)",
+                                            }}
                                         />
                                     </div>
-                                    <button
-                                        onClick={handleStartRecording}
-                                        className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-mono transition-colors ${
-                                            isRecording
-                                                ? "bg-red-500 text-white hover:bg-red-600"
-                                                : "bg-primary text-primary-foreground hover:bg-primary/90"
-                                        }`}
-                                    >
-                                        <div className={`w-2 h-2 rounded-full ${isRecording ? "bg-white animate-pulse" : "bg-red-500"}`} />
-                                        {isRecording ? "STOP" : "REC"}
-                                    </button>
+                                    <Label className="w-14 text-right text-xs">
+                                        {inputLevel.toFixed(1)} dB
+                                    </Label>
                                 </div>
-                            </SubPanel>
-                        </>
-                    )}
-
-                    {activeTab === "midi" && (
-                        <>
-                            {/* Device Selection */}
-                            <SubPanel title="MIDI Device">
-                                <div className="p-2 space-y-2">
-                                    <select
-                                        value={midiDevice}
-                                        onChange={(e) => setMidiDevice(e.target.value)}
-                                        className="w-full bg-background border border-border rounded px-2 py-1 text-xs"
-                                    >
-                                        <option>No MIDI Devices</option>
-                                        <option>USB MIDI Keyboard</option>
-                                        <option>Virtual MIDI Bus</option>
-                                    </select>
+                                <div className="flex items-center gap-2">
+                                    <Label className="w-10 text-xs">
+                                        Gain:
+                                    </Label>
+                                    <Slider
+                                        min={-20}
+                                        max={20}
+                                        step={0.5}
+                                        value={[gain]}
+                                        onValueChange={(values) => handleGainChange(values[0])}
+                                        className="flex-1"
+                                    />
+                                    <Label className="w-14 text-right text-xs">
+                                        {gain > 0 ? "+" : ""}
+                                        {gain.toFixed(1)} dB
+                                    </Label>
                                 </div>
-                            </SubPanel>
+                            </div>
+                        </SubPanel>
 
-                            {/* MIDI Activity */}
-                            <SubPanel title="MIDI Activity">
-                                <div className="p-2 space-y-2">
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className="text-muted-foreground">Last Note:</span>
-                                        <span className="font-mono">C4 (60)</span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className="text-muted-foreground">Velocity:</span>
-                                        <span className="font-mono">87</span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className="text-muted-foreground">Channel:</span>
-                                        <span className="font-mono">1</span>
-                                    </div>
-                                    <div className="h-8 bg-background border border-border rounded flex items-center justify-center">
-                                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                    </div>
+                        {/* Controls */}
+                        <SubPanel title="Controls">
+                            <div className="space-y-2 p-2">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-xs">MONITOR</Label>
+                                    <Toggle
+                                        checked={isMonitoring}
+                                        onCheckedChange={setIsMonitoring}
+                                    />
                                 </div>
-                            </SubPanel>
+                                <Button
+                                    onClick={handleStartRecording}
+                                    variant={isRecording ? "destructive" : "default"}
+                                    size="sm"
+                                    className="w-full"
+                                >
+                                    <div
+                                        className={`h-2 w-2 rounded-full ${isRecording ? "animate-pulse bg-white" : "bg-red-500"}`}
+                                    />
+                                    {isRecording ? "STOP" : "REC"}
+                                </Button>
+                            </div>
+                        </SubPanel>
+                    </>
+                )}
 
-                            {/* MIDI Settings */}
-                            <SubPanel title="Settings">
-                                <div className="p-2 space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs text-muted-foreground">Channel:</span>
-                                        <select className="flex-1 bg-background border border-border rounded px-2 py-1 text-xs">
-                                            <option>All Channels</option>
+                {activeTab === "midi" && (
+                    <>
+                        {/* Device Selection */}
+                        <SubPanel title="MIDI Device">
+                            <div className="space-y-2 p-2">
+                                <Select value={midiDevice} onValueChange={setMidiDevice}>
+                                    <SelectTrigger className="h-8 w-full text-xs">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">No MIDI Devices</SelectItem>
+                                        <SelectItem value="usb">USB MIDI Keyboard</SelectItem>
+                                        <SelectItem value="virtual">Virtual MIDI Bus</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </SubPanel>
+
+                        {/* MIDI Activity */}
+                        <SubPanel title="MIDI Activity">
+                            <div className="space-y-2 p-2">
+                                <div className="flex items-center justify-between text-xs">
+                                    <Label className="text-xs">Last Note:</Label>
+                                    <Label className="text-xs">C4 (60)</Label>
+                                </div>
+                                <div className="flex items-center justify-between text-xs">
+                                    <Label className="text-xs">Velocity:</Label>
+                                    <Label className="text-xs">87</Label>
+                                </div>
+                                <div className="flex items-center justify-between text-xs">
+                                    <Label className="text-xs">Channel:</Label>
+                                    <Label className="text-xs">1</Label>
+                                </div>
+                                <div className="bg-background border-border flex h-8 items-center justify-center rounded border">
+                                    <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+                                </div>
+                            </div>
+                        </SubPanel>
+
+                        {/* MIDI Settings */}
+                        <SubPanel title="Settings">
+                            <div className="space-y-2 p-2">
+                                <div className="flex items-center gap-2">
+                                    <Label className="text-xs">Channel:</Label>
+                                    <Select defaultValue="all">
+                                        <SelectTrigger className="flex-1">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Channels</SelectItem>
                                             {Array.from({ length: 16 }, (_, i) => (
-                                                <option key={i + 1} value={i + 1}>
+                                                <SelectItem key={i + 1} value={String(i + 1)}>
                                                     Channel {i + 1}
-                                                </option>
+                                                </SelectItem>
                                             ))}
-                                        </select>
-                                    </div>
-                                    <label className="flex items-center gap-2 text-xs">
-                                        <input type="checkbox" defaultChecked />
-                                        <span>Enable MIDI thru</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 text-xs">
-                                        <input type="checkbox" />
-                                        <span>Quantize input</span>
-                                    </label>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
-                            </SubPanel>
-                        </>
-                    )}
-                </div>
-            <ToastContainer toasts={toasts} onRemove={removeToast} />
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-xs">Enable MIDI thru</Label>
+                                    <Toggle
+                                        checked={midiThruEnabled}
+                                        onCheckedChange={setMidiThruEnabled}
+                                    />
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-xs">Quantize input</Label>
+                                    <Toggle
+                                        checked={quantizeEnabled}
+                                        onCheckedChange={setQuantizeEnabled}
+                                    />
+                                </div>
+                            </div>
+                        </SubPanel>
+                    </>
+                )}
+            </div>
         </div>
     );
 }

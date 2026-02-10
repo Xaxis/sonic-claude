@@ -367,20 +367,16 @@ class EffectsService:
         self.effects[effect_id] = effect
 
         # Send OSC message to create effect on SuperCollider
-        if self.engine.server and self.engine.is_running:
+        if self.engine.is_running:
             try:
-                # Build parameter list for OSC message
-                osc_params = []
-                for key, value in params.items():
-                    osc_params.extend([key, value])
-
-                # Send /s_new message for effect (effects are synths too)
-                self.engine.server.send_message("/s_new", [effectdef, effect_id, 1, group] + osc_params)
-                logger.info(f"Created effect {effect_id} ({effectdef}) on SuperCollider")
+                # Use EngineManager's create_synth helper (effects are synths in SC)
+                # add_action: 1=addToTail (add at end of effects group)
+                self.engine.create_synth(effectdef, effect_id, add_action=1, target=group, **params)
+                logger.info(f"✅ Created effect {effect_id} ({effectdef}) on SuperCollider")
             except Exception as e:
-                logger.error(f"Failed to send OSC message for effect creation: {e}")
+                logger.error(f"❌ Failed to create effect on SuperCollider: {e}")
         else:
-            logger.warning(f"Created effect {effect_id} ({effectdef}) but SuperCollider not running")
+            logger.warning(f"⚠️  Created effect {effect_id} ({effectdef}) but SuperCollider not connected")
 
         return effect
 
@@ -388,12 +384,13 @@ class EffectsService:
         """Free an effect"""
         if effect_id in self.effects:
             # Send OSC message to free effect on SuperCollider
-            if self.engine.server and self.engine.is_running:
+            if self.engine.is_running:
                 try:
-                    self.engine.server.send_message("/n_free", [effect_id])
-                    logger.info(f"Freed effect {effect_id} on SuperCollider")
+                    # Use EngineManager's free_node helper
+                    self.engine.free_node(effect_id)
+                    logger.info(f"✅ Freed effect {effect_id} on SuperCollider")
                 except Exception as e:
-                    logger.error(f"Failed to send OSC message for effect free: {e}")
+                    logger.error(f"❌ Failed to free effect on SuperCollider: {e}")
 
             del self.effects[effect_id]
             logger.info(f"Freed effect {effect_id}")
@@ -407,14 +404,15 @@ class EffectsService:
         effect.set(param, value)
 
         # Send OSC message to update parameter on SuperCollider
-        if self.engine.server and self.engine.is_running:
+        if self.engine.is_running:
             try:
-                self.engine.server.send_message("/n_set", [effect_id, param, value])
+                # Use EngineManager's set_node_param helper
+                self.engine.set_node_param(effect_id, **{param: value})
                 logger.debug(f"Set effect {effect_id} {param} = {value} on SuperCollider")
             except Exception as e:
-                logger.error(f"Failed to send OSC message for effect parameter update: {e}")
+                logger.error(f"Failed to update effect parameter on SuperCollider: {e}")
         else:
-            logger.debug(f"Set effect {effect_id} {param} = {value} (SuperCollider not running)")
+            logger.debug(f"Set effect {effect_id} {param} = {value} (SuperCollider not connected)")
 
     async def bypass_effect(self, effect_id: int, bypass: bool):
         """Bypass/enable an effect"""
@@ -425,16 +423,17 @@ class EffectsService:
         effect.bypass = bypass
 
         # Send OSC message to bypass effect (set wet/dry mix)
-        if self.engine.server and self.engine.is_running:
+        if self.engine.is_running:
             try:
                 # When bypassed, set mix to 0 (all dry), otherwise 1 (all wet)
                 mix_value = 0.0 if bypass else 1.0
-                self.engine.server.send_message("/n_set", [effect_id, "mix", mix_value])
+                # Use EngineManager's set_node_param helper
+                self.engine.set_node_param(effect_id, mix=mix_value)
                 logger.info(f"Effect {effect_id} bypass = {bypass} on SuperCollider")
             except Exception as e:
-                logger.error(f"Failed to send OSC message for effect bypass: {e}")
+                logger.error(f"Failed to update effect bypass on SuperCollider: {e}")
         else:
-            logger.info(f"Effect {effect_id} bypass = {bypass} (SuperCollider not running)")
+            logger.info(f"Effect {effect_id} bypass = {bypass} (SuperCollider not connected)")
 
     def get_effect(self, effect_id: int) -> Optional[Effect]:
         """Get effect by ID"""

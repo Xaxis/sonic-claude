@@ -1,98 +1,59 @@
+"use client";
+
 import * as React from "react";
+import { Slider as SliderPrimitive } from "radix-ui";
+
 import { cn } from "@/lib/utils";
 
-export interface SliderProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
-    value?: number;
-    min?: number;
-    max?: number;
-    step?: number;
-    onChange?: (value: number) => void;
-}
+function Slider({
+    className,
+    defaultValue,
+    value,
+    min = 0,
+    max = 100,
+    ...props
+}: React.ComponentProps<typeof SliderPrimitive.Root>) {
+    const _values = React.useMemo(
+        () =>
+            Array.isArray(value) ? value : Array.isArray(defaultValue) ? defaultValue : [min, max],
+        [value, defaultValue, min, max]
+    );
 
-const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
-    ({ className, value, min = 0, max = 100, step = 1, onChange, ...props }, ref) => {
-        const internalRef = React.useRef<HTMLInputElement>(null);
-        const sliderRef = (ref as React.RefObject<HTMLInputElement>) || internalRef;
-        const isDraggingRef = React.useRef(false);
-
-        const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-            onChange?.(Number(e.target.value));
-        };
-
-        // Calculate value from touch/mouse position
-        const calculateValueFromPosition = React.useCallback(
-            (clientX: number) => {
-                if (!sliderRef.current) return;
-
-                const rect = sliderRef.current.getBoundingClientRect();
-                const percentage = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-                const range = max - min;
-                const rawValue = min + percentage * range;
-
-                // Round to nearest step
-                const steppedValue = Math.round(rawValue / step) * step;
-                const clampedValue = Math.max(min, Math.min(max, steppedValue));
-
-                onChange?.(clampedValue);
-            },
-            [min, max, step, onChange, sliderRef]
-        );
-
-        // Touch event handlers
-        const handleTouchStart = React.useCallback(
-            (e: React.TouchEvent<HTMLInputElement>) => {
-                e.preventDefault(); // Prevent scrolling while dragging
-                isDraggingRef.current = true;
-                const touch = e.touches[0];
-                calculateValueFromPosition(touch.clientX);
-            },
-            [calculateValueFromPosition]
-        );
-
-        const handleTouchMove = React.useCallback(
-            (e: React.TouchEvent<HTMLInputElement>) => {
-                if (!isDraggingRef.current) return;
-                e.preventDefault(); // Prevent scrolling while dragging
-                const touch = e.touches[0];
-                calculateValueFromPosition(touch.clientX);
-            },
-            [calculateValueFromPosition]
-        );
-
-        const handleTouchEnd = React.useCallback(
-            (e: React.TouchEvent<HTMLInputElement>) => {
-                e.preventDefault();
-                isDraggingRef.current = false;
-            },
-            []
-        );
-
-        return (
-            <input
-                type="range"
-                ref={sliderRef}
-                value={value}
-                min={min}
-                max={max}
-                step={step}
-                onChange={handleChange}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
+    return (
+        <SliderPrimitive.Root
+            data-slot="slider"
+            defaultValue={defaultValue}
+            value={value}
+            min={min}
+            max={max}
+            className={cn(
+                "relative flex w-full touch-none items-center select-none data-[disabled]:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-44 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col",
+                className
+            )}
+            {...props}
+        >
+            <SliderPrimitive.Track
+                data-slot="slider-track"
                 className={cn(
-                    "bg-border h-1 w-full cursor-pointer appearance-none rounded-lg touch-none",
-                    // Larger touch target for better mobile UX (44px minimum)
-                    "[&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(0,245,255,0.5)]",
-                    "[&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0",
-                    // Add padding to increase touch target area
-                    "py-2",
-                    className
+                    "bg-border relative grow overflow-hidden rounded-full data-[orientation=horizontal]:h-1 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1"
                 )}
-                {...props}
-            />
-        );
-    }
-);
-Slider.displayName = "Slider";
+            >
+                <SliderPrimitive.Range
+                    data-slot="slider-range"
+                    className={cn(
+                        "bg-primary absolute shadow-[0_0_8px_rgba(0,245,255,0.4)] data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full"
+                    )}
+                />
+            </SliderPrimitive.Track>
+            {Array.from({ length: _values.length }, (_, index) => (
+                <SliderPrimitive.Thumb
+                    data-slot="slider-thumb"
+                    key={index}
+                    className="border-primary bg-background block size-3 shrink-0 rounded-full border shadow-md transition-all hover:shadow-[0_0_12px_rgba(0,245,255,0.6)] focus-visible:shadow-[0_0_12px_rgba(0,245,255,0.6)] focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
+                />
+            ))}
+        </SliderPrimitive.Root>
+    );
+}
 
 export { Slider };

@@ -1,6 +1,6 @@
 /**
  * MixerChannel Component
- * 
+ *
  * Single channel strip for the mixer.
  * Contains fader, pan, meter, mute/solo buttons.
  */
@@ -52,7 +52,7 @@ export function MixerChannel({
         <SubPanel className="w-24 flex-shrink-0">
             <div className="flex flex-col items-center gap-3 p-3">
                 {/* Track name */}
-                <div className="text-xs font-semibold text-center text-muted-foreground truncate w-full">
+                <div className="text-muted-foreground w-full truncate text-center text-xs font-semibold">
                     {name}
                 </div>
 
@@ -60,12 +60,7 @@ export function MixerChannel({
                 <Meter peak={peak} rms={rms} />
 
                 {/* Fader */}
-                <Fader
-                    value={volume}
-                    onChange={onVolumeChange}
-                    min={-96}
-                    max={6}
-                />
+                <Fader value={volume} onChange={onVolumeChange} min={-96} max={6} />
 
                 {/* Pan knob */}
                 <Knob
@@ -78,11 +73,11 @@ export function MixerChannel({
                 />
 
                 {/* Mute/Solo buttons */}
-                <div className="flex gap-1 w-full">
+                <div className="flex w-full gap-1">
                     <button
                         onClick={onMuteToggle}
                         className={cn(
-                            "flex-1 px-2 py-1 text-xs font-bold rounded transition-colors",
+                            "flex-1 rounded px-2 py-1 text-xs font-bold transition-colors",
                             muted
                                 ? "bg-red-500 text-white"
                                 : "bg-gray-700 text-gray-300 hover:bg-gray-600"
@@ -93,7 +88,7 @@ export function MixerChannel({
                     <button
                         onClick={onSoloToggle}
                         className={cn(
-                            "flex-1 px-2 py-1 text-xs font-bold rounded transition-colors",
+                            "flex-1 rounded px-2 py-1 text-xs font-bold transition-colors",
                             soloed
                                 ? "bg-yellow-500 text-black"
                                 : "bg-gray-700 text-gray-300 hover:bg-gray-600"
@@ -106,4 +101,3 @@ export function MixerChannel({
         </SubPanel>
     );
 }
-

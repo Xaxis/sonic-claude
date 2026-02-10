@@ -82,10 +82,7 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
         return (
             <div
                 ref={ref}
-                className={cn(
-                    "panel-glass flex flex-col overflow-hidden",
-                    className
-                )}
+                className={cn("panel-glass flex flex-col overflow-hidden", className)}
                 {...props}
             >
                 {/* Panel Header */}
@@ -112,7 +109,7 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
                                                     e.stopPropagation();
                                                     onClose?.();
                                                 }}
-                                                className="hover:bg-destructive/20 cursor-pointer rounded p-2 touch-manipulation transition-colors"
+                                                className="hover:bg-destructive/20 cursor-pointer touch-manipulation rounded p-2 transition-colors"
                                                 aria-label="Close panel"
                                             >
                                                 <X className="h-4 w-4" />
@@ -125,8 +122,8 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
 
                         {/* Subtitle/Context Bar */}
                         {subtitle && (
-                            <div className="border-b border-border bg-muted/30 px-4 py-2">
-                                <span className="text-xs text-muted-foreground font-mono">
+                            <div className="border-border bg-muted/30 border-b px-4 py-2">
+                                <span className="text-muted-foreground font-mono text-xs">
                                     {subtitle}
                                 </span>
                             </div>
@@ -148,4 +145,3 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
 );
 
 Panel.displayName = "Panel";
-

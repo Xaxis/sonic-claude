@@ -1,6 +1,6 @@
 /**
  * TransportButton Component
- * 
+ *
  * Specialized button for transport controls (play, pause, stop, record).
  * Supports active state and different visual styles.
  */
@@ -36,8 +36,8 @@ export const TransportButton = React.forwardRef<HTMLButtonElement, TransportButt
             <button
                 ref={ref}
                 className={cn(
-                    "flex items-center justify-center gap-2 px-4 py-2 rounded font-semibold transition-all",
-                    "disabled:opacity-50 disabled:cursor-not-allowed",
+                    "flex items-center justify-center gap-2 rounded px-4 py-2 font-semibold transition-all",
+                    "disabled:cursor-not-allowed disabled:opacity-50",
                     variantStyles[variant],
                     className
                 )}
@@ -51,4 +51,3 @@ export const TransportButton = React.forwardRef<HTMLButtonElement, TransportButt
 );
 
 TransportButton.displayName = "TransportButton";
-

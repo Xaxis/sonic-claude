@@ -6,7 +6,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Optional
 from pydantic import BaseModel, Field
 
-from backend.core import get_logger, get_sequencer_service
+from backend.core import get_logger
+from backend.core.dependencies import get_sequencer_service
 from ..services.sequencer_service import SequencerService
 from ..models.sequence import MIDINote, MIDIClip, AudioClip
 

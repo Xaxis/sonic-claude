@@ -18,6 +18,7 @@ from backend.models.websocket import (
 
 if TYPE_CHECKING:
     from backend.services.sequencer_service import SequencerService
+    from backend.services.audio_analyzer import AudioAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,11 @@ logger = logging.getLogger(__name__)
 class WebSocketService:
     """Manages WebSocket connections and real-time data streaming"""
 
-    def __init__(self, sequencer_service: Optional["SequencerService"] = None):
+    def __init__(
+        self,
+        sequencer_service: Optional["SequencerService"] = None,
+        audio_analyzer: Optional["AudioAnalyzer"] = None
+    ):
         # Connection pools for each channel
         self.spectrum_connections: Set[WebSocket] = set()
         self.meter_connections: Set[WebSocket] = set()
@@ -37,12 +42,12 @@ class WebSocketService:
         self._streaming_tasks: Dict[str, asyncio.Task] = {}
         self._is_running = False
 
-        # Audio buffer for analysis (placeholder)
-        self._audio_buffer: Optional[np.ndarray] = None
-        self._sample_rate = 48000
-
         # Service dependencies
         self._sequencer_service = sequencer_service
+        self._audio_analyzer = audio_analyzer
+
+        # Sample rate
+        self._sample_rate = 48000
 
     async def start(self):
         """Start WebSocket streaming tasks"""
@@ -131,11 +136,19 @@ class WebSocketService:
     # Streaming tasks
     async def _stream_spectrum(self):
         """Stream frequency spectrum data at 60 FPS"""
+        first_broadcast = True
         while self._is_running:
             try:
                 if self.spectrum_connections:
                     # Generate spectrum data (placeholder - will integrate with audio engine)
                     data = self._generate_spectrum_data()
+
+                    # Debug: Log first broadcast
+                    if first_broadcast:
+                        logger.info(f"🔊 First spectrum broadcast: {len(self.spectrum_connections)} connections")
+                        logger.info(f"   Spectrum data: {len(data.magnitudes)} bins, range: [{min(data.magnitudes):.2f}, {max(data.magnitudes):.2f}] dB")
+                        first_broadcast = False
+
                     await self._broadcast(self.spectrum_connections, data)
 
                 await asyncio.sleep(1/60)  # 60 FPS
@@ -161,11 +174,19 @@ class WebSocketService:
 
     async def _stream_waveform(self):
         """Stream waveform data at 30 FPS"""
+        first_broadcast = True
         while self._is_running:
             try:
                 if self.waveform_connections:
                     # Generate waveform data (placeholder)
                     data = self._generate_waveform_data()
+
+                    # Debug: Log first broadcast
+                    if first_broadcast:
+                        logger.info(f"📊 First waveform broadcast: {len(self.waveform_connections)} connections")
+                        logger.info(f"   Waveform data: {len(data.samples_left)} samples")
+                        first_broadcast = False
+
                     await self._broadcast(self.waveform_connections, data)
 
                 await asyncio.sleep(1/30)  # 30 FPS
@@ -201,45 +222,92 @@ class WebSocketService:
                 logger.error(f"Error streaming analytics: {e}")
                 await asyncio.sleep(0.1)
 
-    # Data generation (placeholders - will integrate with audio engine)
+    # Data generation (using real audio analyzer)
     def _generate_spectrum_data(self) -> SpectrumData:
-        """Generate spectrum data from audio buffer"""
-        # Placeholder: Generate dummy spectrum
-        num_bins = 512
-        frequencies = np.linspace(20, 20000, num_bins).tolist()
-        magnitudes = (np.random.randn(num_bins) * 10 - 60).tolist()  # Random spectrum
+        """
+        Generate spectrum data from audio analyzer
 
-        return SpectrumData(
-            frequencies=frequencies,
-            magnitudes=magnitudes,
-            sample_rate=self._sample_rate,
-            fft_size=1024
-        )
+        Returns raw dB values - frontend handles visualization normalization
+        """
+        # Debug: Log analyzer status once
+        if not hasattr(self, '_analyzer_status_logged'):
+            logger.info(f"🔍 Audio analyzer status: exists={self._audio_analyzer is not None}, running={self._audio_analyzer.is_running if self._audio_analyzer else False}")
+            self._analyzer_status_logged = True
+
+        if self._audio_analyzer and self._audio_analyzer.is_running:
+            # Get real FFT data from audio analyzer
+            frequencies, magnitudes_db = self._audio_analyzer.get_frequency_spectrum(num_bins=512)
+
+            return SpectrumData(
+                frequencies=frequencies.tolist(),
+                magnitudes=magnitudes_db.tolist(),  # Send raw dB values
+                sample_rate=self._sample_rate,
+                fft_size=2048
+            )
+        else:
+            # Fallback: Return silence spectrum when no audio analyzer
+            if not hasattr(self, '_fallback_logged'):
+                logger.warning("⚠️  Using fallback silence spectrum (audio analyzer not running)")
+                self._fallback_logged = True
+
+            num_bins = 512
+            frequencies = np.linspace(20, 20000, num_bins).tolist()
+            magnitudes = [-96.0] * num_bins  # Silence = -96 dB
+
+            return SpectrumData(
+                frequencies=frequencies,
+                magnitudes=magnitudes,
+                sample_rate=self._sample_rate,
+                fft_size=1024
+            )
 
     def _generate_meter_data(self) -> MeterData:
         """Generate metering data"""
-        # Placeholder: Random meter values
-        return MeterData(
-            track_id="master",
-            peak_left=float(np.random.randn() * 6 - 12),
-            peak_right=float(np.random.randn() * 6 - 12),
-            rms_left=float(np.random.randn() * 6 - 18),
-            rms_right=float(np.random.randn() * 6 - 18)
-        )
+        if self._audio_analyzer and self._audio_analyzer.is_running:
+            # Get real peak/RMS levels from audio analyzer
+            peak_left, peak_right, rms_left, rms_right = self._audio_analyzer.get_peak_levels()
+
+            return MeterData(
+                track_id="master",
+                peak_left=float(peak_left),
+                peak_right=float(peak_right),
+                rms_left=float(rms_left),
+                rms_right=float(rms_right)
+            )
+        else:
+            # Fallback: Return silence when no audio analyzer
+            return MeterData(
+                track_id="master",
+                peak_left=-200.0,
+                peak_right=-200.0,
+                rms_left=-200.0,
+                rms_right=-200.0
+            )
 
     def _generate_waveform_data(self) -> WaveformData:
         """Generate waveform data"""
-        # Placeholder: Random waveform
-        num_samples = 1024
-        samples_left = (np.random.randn(num_samples) * 0.5).tolist()
-        samples_right = (np.random.randn(num_samples) * 0.5).tolist()
+        if self._audio_analyzer and self._audio_analyzer.is_running:
+            # Get real waveform from audio analyzer
+            left, right = self._audio_analyzer.get_waveform(num_samples=1024)
 
-        return WaveformData(
-            samples_left=samples_left,
-            samples_right=samples_right,
-            sample_rate=self._sample_rate,
-            duration=num_samples / self._sample_rate
-        )
+            return WaveformData(
+                samples_left=left.tolist(),
+                samples_right=right.tolist(),
+                sample_rate=self._sample_rate,
+                duration=len(left) / self._sample_rate
+            )
+        else:
+            # Fallback: Random waveform if analyzer not available
+            num_samples = 1024
+            samples_left = (np.random.randn(num_samples) * 0.5).tolist()
+            samples_right = (np.random.randn(num_samples) * 0.5).tolist()
+
+            return WaveformData(
+                samples_left=samples_left,
+                samples_right=samples_right,
+                sample_rate=self._sample_rate,
+                duration=num_samples / self._sample_rate
+            )
 
     def _generate_transport_data(self) -> TransportData:
         """Generate transport position data from SequencerService"""

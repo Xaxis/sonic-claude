@@ -1,2 +1,1 @@
 export { TranscriptionPanel } from "./TranscriptionPanel";
-

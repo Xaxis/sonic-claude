@@ -5,12 +5,12 @@
 export interface MixerTrack {
     id: string;
     name: string;
-    volume: number;  // 0.0-2.0
-    pan: number;  // -1.0 to 1.0
+    volume: number; // 0.0-2.0
+    pan: number; // -1.0 to 1.0
     is_muted: boolean;
     is_solo: boolean;
-    send_levels: Record<string, number>;  // aux_track_id -> level
-    effect_chain: string[];  // effect_ids
+    send_levels: Record<string, number>; // aux_track_id -> level
+    effect_chain: string[]; // effect_ids
     group_id: string | null;
     bus_index: number;
 }
@@ -42,4 +42,3 @@ export interface AddEffectToTrackRequest {
 export interface SetTrackGroupRequest {
     group_id: string | null;
 }
-

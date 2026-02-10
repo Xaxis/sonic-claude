@@ -1,6 +1,6 @@
 /**
  * Analytics WebSocket Hook
- * 
+ *
  * Connects to backend WebSocket for real-time analytics data.
  * Provides system performance metrics and audio engine stats.
  */
@@ -98,4 +98,3 @@ export function useAnalyticsWebSocket() {
 
     return { analytics, isConnected };
 }
-

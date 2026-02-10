@@ -1,9 +1,9 @@
 /**
  * PanelGrid Component
- * 
+ *
  * Manages the draggable/resizable grid layout of panels within a tab.
  * Uses react-grid-layout for drag-and-drop functionality.
- * 
+ *
  * Responsibilities:
  * - Render panels in a grid layout
  * - Handle panel dragging and resizing
@@ -122,4 +122,3 @@ export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridPro
         </div>
     );
 }
-

@@ -74,7 +74,7 @@ export const GRID_CONFIG = {
 
 /**
  * Default Panel Definitions
- * 
+ *
  * All available panels in the application.
  * Components consume these via LayoutContext.
  */
@@ -83,8 +83,8 @@ import { createElement } from "react";
 
 export const DEFAULT_PANELS: PanelConfig[] = [
     // ===== LOOP TAB =====
+    // Main workspace
 
-    // Main workspace (fits in 600px height = 10 rows × 60px)
     {
         id: "input",
         title: "INPUT",
@@ -93,14 +93,14 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         getSubtitle: () => "Library • 4 samples loaded",
         defaultLayout: { x: 0, y: 0, w: 3, h: 10 },
     },
-    // {
-    //     id: "loop-visualizer",
-    //     title: "LOOP",
-    //     component: createElement(LoopVisualizerPanel),
-    //     closeable: false,
-    //     getSubtitle: () => "Active • 120 BPM • 4/4 • Position: 8.2 beats",
-    //     defaultLayout: { x: 2, y: 0, w: 6, h: 5 },
-    // },
+    {
+        id: "loop-visualizer",
+        title: "LOOP",
+        component: createElement(LoopVisualizerPanel),
+        closeable: false,
+        getSubtitle: () => "Active • 120 BPM • 4/4 • Position: 8.2 beats",
+        defaultLayout: { x: 3, y: 0, w: 6, h: 10 },
+    },
     // {
     //     id: "mixer",
     //     title: "MIXER",
@@ -206,9 +206,9 @@ export const DEFAULT_TABS = [
         name: "LOOP",
         panelIds: [
             "input",
-            // "loop-visualizer", // Center top - spectrum/waveform visualization
-            // "synthesis",       // Center bottom - synth controls
-            // "transport",       // Bottom - playback controls
+            "loop-visualizer",
+            // "synthesis",
+            // "transport",
         ],
     },
 ];
@@ -239,4 +239,3 @@ export const DEFAULT_LAYOUT_STATE = {
     poppedOutTabs: [] as string[],
     layouts: {} as Record<string, Record<string, { x: number; y: number; w: number; h: number }>>,
 };
-

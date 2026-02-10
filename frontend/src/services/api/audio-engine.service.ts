@@ -247,7 +247,9 @@ export class AudioEngineService extends BaseAPIClient {
      * Reorder effects in track
      */
     async reorderTrackEffects(trackId: string, effectIds: string[]): Promise<MixerTrack> {
-        return this.put(`/audio-engine/audio/mixer/tracks/${trackId}/effects/order`, { effect_ids: effectIds });
+        return this.put(`/audio-engine/audio/mixer/tracks/${trackId}/effects/order`, {
+            effect_ids: effectIds,
+        });
     }
 
     /**
@@ -327,22 +329,37 @@ export class AudioEngineService extends BaseAPIClient {
     /**
      * Update clip
      */
-    async updateClip(sequenceId: string, clipId: string, request: UpdateClipRequest): Promise<SequencerClip> {
-        return this.put(`/audio-engine/audio/sequencer/sequences/${sequenceId}/clips/${clipId}`, request);
+    async updateClip(
+        sequenceId: string,
+        clipId: string,
+        request: UpdateClipRequest
+    ): Promise<SequencerClip> {
+        return this.put(
+            `/audio-engine/audio/sequencer/sequences/${sequenceId}/clips/${clipId}`,
+            request
+        );
     }
 
     /**
      * Remove clip
      */
-    async removeClip(sequenceId: string, clipId: string): Promise<{ status: string; message?: string }> {
+    async removeClip(
+        sequenceId: string,
+        clipId: string
+    ): Promise<{ status: string; message?: string }> {
         return this.delete(`/audio-engine/audio/sequencer/sequences/${sequenceId}/clips/${clipId}`);
     }
 
     /**
      * Play sequence
      */
-    async playSequence(sequenceId: string, position: number = 0): Promise<{ status: string; sequence_id: string; position: number }> {
-        return this.post(`/audio-engine/audio/sequencer/sequences/${sequenceId}/play`, { position });
+    async playSequence(
+        sequenceId: string,
+        position: number = 0
+    ): Promise<{ status: string; sequence_id: string; position: number }> {
+        return this.post(`/audio-engine/audio/sequencer/sequences/${sequenceId}/play`, {
+            position,
+        });
     }
 
     /**

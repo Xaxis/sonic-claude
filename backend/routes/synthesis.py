@@ -6,7 +6,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Optional
 from pydantic import BaseModel, Field
 
-from backend.core import get_logger, get_synthesis_service
+from backend.core import get_logger
+from backend.core.dependencies import get_synthesis_service
 from ..services.synthesis_service import SynthesisService
 from ..models.synth import SynthDef
 

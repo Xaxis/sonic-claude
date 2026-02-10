@@ -6,7 +6,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Optional
 from pydantic import BaseModel, Field
 
-from backend.core import get_logger, get_effects_service
+from backend.core import get_logger
+from backend.core.dependencies import get_effects_service
 from ..services.effects_service import EffectsService
 from ..models.effect import EffectType
 

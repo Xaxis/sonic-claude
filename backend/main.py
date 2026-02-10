@@ -7,8 +7,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.core import (
-    settings, setup_logging, get_logger,
+from backend.core import settings, setup_logging, get_logger
+from backend.core.dependencies import (
     ServiceContainer, set_container, get_container
 )
 from backend.routes import (
@@ -17,8 +17,10 @@ from backend.routes import (
     effects_router,
     mixer_router,
     sequencer_router,
-    websocket_router
+    websocket_router,
+    samples_router
 )
+from backend.routes.audio_input import router as audio_input_router
 
 # Setup logging
 setup_logging("INFO")
@@ -70,6 +72,8 @@ app.include_router(effects_router)
 app.include_router(mixer_router)
 app.include_router(sequencer_router)
 app.include_router(websocket_router)
+app.include_router(samples_router)
+app.include_router(audio_input_router)
 
 
 @app.get("/")

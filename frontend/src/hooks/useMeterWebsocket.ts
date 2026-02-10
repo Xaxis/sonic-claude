@@ -1,6 +1,6 @@
 /**
  * Meter WebSocket Hook
- * 
+ *
  * Connects to backend WebSocket for real-time audio metering data.
  * Provides peak and RMS levels for all tracks.
  */
@@ -112,4 +112,3 @@ export function useMeterWebSocket() {
 
     return { meters, isConnected };
 }
-

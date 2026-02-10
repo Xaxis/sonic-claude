@@ -4,7 +4,8 @@ Audio engine control API routes
 from fastapi import APIRouter, HTTPException, Depends
 from ..core.engine_manager import AudioEngineManager
 from ..models.engine import EngineStatus
-from backend.core import get_audio_engine
+from backend.core import get_logger
+from backend.core.dependencies import get_audio_engine
 from .synthesis import router as synthesis_router
 from .effects import router as effects_router
 from .mixer import router as mixer_router

@@ -1,6 +1,6 @@
 /**
  * Fader Component
- * 
+ *
  * Vertical fader control for volume, send levels, etc.
  * Professional DAW-style fader with dB scale and precise control.
  */
@@ -72,19 +72,19 @@ export function Fader({
         const y = e.clientY - rect.top;
         const percent = 1 - Math.max(0, Math.min(1, y / rect.height));
         const newValue = percentToValue(percent);
-        
+
         onChange(Math.round(newValue * 10) / 10); // Round to 0.1 dB
     };
 
     const percent = valueToPercent(value);
-    const displayValue = value > -96 ? `${value > 0 ? '+' : ''}${value.toFixed(1)}` : '-∞';
+    const displayValue = value > -96 ? `${value > 0 ? "+" : ""}${value.toFixed(1)}` : "-∞";
 
     return (
         <div className={cn("flex flex-col items-center gap-2", className)}>
             {/* Fader track */}
             <div
                 ref={trackRef}
-                className="relative h-32 w-8 rounded bg-black/40 border border-white/10 cursor-pointer select-none"
+                className="relative h-32 w-8 cursor-pointer rounded border border-white/10 bg-black/40 select-none"
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
@@ -92,17 +92,17 @@ export function Fader({
             >
                 {/* Fill */}
                 <div
-                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-cyan-500/60 to-purple-500/60 rounded-b transition-all"
+                    className="absolute right-0 bottom-0 left-0 rounded-b bg-gradient-to-t from-cyan-500/60 to-purple-500/60 transition-all"
                     style={{ height: `${percent * 100}%` }}
                 />
 
                 {/* Thumb */}
                 <div
                     className={cn(
-                        "absolute left-1/2 -translate-x-1/2 w-10 h-3 rounded border-2 transition-colors",
+                        "absolute left-1/2 h-3 w-10 -translate-x-1/2 rounded border-2 transition-colors",
                         isDragging
-                            ? "bg-cyan-400 border-cyan-300"
-                            : "bg-gray-700 border-gray-500 hover:bg-gray-600"
+                            ? "border-cyan-300 bg-cyan-400"
+                            : "border-gray-500 bg-gray-700 hover:bg-gray-600"
                     )}
                     style={{ bottom: `calc(${percent * 100}% - 6px)` }}
                 />
@@ -110,18 +110,17 @@ export function Fader({
                 {/* 0dB marker */}
                 {min < 0 && max > 0 && (
                     <div
-                        className="absolute left-0 right-0 h-px bg-yellow-500/50"
+                        className="absolute right-0 left-0 h-px bg-yellow-500/50"
                         style={{ bottom: `${valueToPercent(0) * 100}%` }}
                     />
                 )}
             </div>
 
             {/* Value display */}
-            <div className="text-xs font-mono text-center min-w-[3rem]">
-                <div className="text-cyan-400 font-semibold">{displayValue}</div>
+            <div className="min-w-[3rem] text-center font-mono text-xs">
+                <div className="font-semibold text-cyan-400">{displayValue}</div>
                 {label && <div className="text-muted-foreground mt-1">{label}</div>}
             </div>
         </div>
     );
 }
-

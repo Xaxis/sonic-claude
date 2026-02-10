@@ -106,22 +106,28 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
 
     // Sync state across windows via WindowManager
     useEffect(() => {
-        const unsubscribeLayout = windowManager.subscribeToState(BROADCAST_KEYS.LAYOUT, (newState: LayoutState) => {
-            setState({
-                ...newState,
-                poppedOutTabs: new Set(newState.poppedOutTabs),
-            });
-        });
+        const unsubscribeLayout = windowManager.subscribeToState(
+            BROADCAST_KEYS.LAYOUT,
+            (newState: LayoutState) => {
+                setState({
+                    ...newState,
+                    poppedOutTabs: new Set(newState.poppedOutTabs),
+                });
+            }
+        );
 
         // Listen for popout close events
-        const unsubscribePopoutClosed = windowManager.subscribeToState(BROADCAST_KEYS.POPOUT_CLOSED, (data: { tabId: string }) => {
-            console.log(`📡 Received popout close event for tab: ${data.tabId}`);
-            setState(prev => {
-                const newPoppedOut = new Set(prev.poppedOutTabs);
-                newPoppedOut.delete(data.tabId);
-                return { ...prev, poppedOutTabs: newPoppedOut };
-            });
-        });
+        const unsubscribePopoutClosed = windowManager.subscribeToState(
+            BROADCAST_KEYS.POPOUT_CLOSED,
+            (data: { tabId: string }) => {
+                console.log(`📡 Received popout close event for tab: ${data.tabId}`);
+                setState((prev) => {
+                    const newPoppedOut = new Set(prev.poppedOutTabs);
+                    newPoppedOut.delete(data.tabId);
+                    return { ...prev, poppedOutTabs: newPoppedOut };
+                });
+            }
+        );
 
         return () => {
             unsubscribeLayout();
@@ -136,136 +142,163 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
-    const setActiveTab = useCallback((tabId: string) => {
-        setState(prev => {
-            const newState = { ...prev, activeTab: tabId };
-            broadcastState(newState);
-            return newState;
-        });
-    }, [broadcastState]);
-
-    const createTab = useCallback((name: string, panelIds: string[]) => {
-        setState(prev => {
-            const newTab: TabConfig = {
-                id: `tab-${Date.now()}`,
-                name,
-                panelIds,
-            };
-            const newState = {
-                ...prev,
-                tabs: [...prev.tabs, newTab],
-                activeTab: newTab.id,
-            };
-            broadcastState(newState);
-            return newState;
-        });
-    }, [broadcastState]);
-
-    const deleteTab = useCallback((tabId: string) => {
-        setState(prev => {
-            const newTabs = prev.tabs.filter(t => t.id !== tabId);
-            const newState = {
-                ...prev,
-                tabs: newTabs,
-                activeTab: prev.activeTab === tabId ? (newTabs[0]?.id || "") : prev.activeTab,
-            };
-            broadcastState(newState);
-            return newState;
-        });
-    }, [broadcastState]);
-
-    const renameTab = useCallback((tabId: string, newName: string) => {
-        setState(prev => {
-            const newState = {
-                ...prev,
-                tabs: prev.tabs.map(t => t.id === tabId ? { ...t, name: newName } : t),
-            };
-            broadcastState(newState);
-            return newState;
-        });
-    }, [broadcastState]);
-
-    const movePanelToTab = useCallback((panelId: string, fromTabId: string, toTabId: string) => {
-        setState(prev => {
-            const newTabs = prev.tabs.map(tab => {
-                if (tab.id === fromTabId) {
-                    return { ...tab, panelIds: tab.panelIds.filter(id => id !== panelId) };
-                }
-                if (tab.id === toTabId) {
-                    return { ...tab, panelIds: [...tab.panelIds, panelId] };
-                }
-                return tab;
+    const setActiveTab = useCallback(
+        (tabId: string) => {
+            setState((prev) => {
+                const newState = { ...prev, activeTab: tabId };
+                broadcastState(newState);
+                return newState;
             });
-            const newState = { ...prev, tabs: newTabs };
-            broadcastState(newState);
-            return newState;
-        });
-    }, [broadcastState]);
+        },
+        [broadcastState]
+    );
 
-    const updatePanelLayout = useCallback((tabId: string, panelId: string, layout: LayoutItem) => {
-        setState(prev => {
-            const newState = {
-                ...prev,
-                layouts: {
-                    ...prev.layouts,
-                    [tabId]: {
-                        ...prev.layouts[tabId],
-                        [panelId]: layout,
+    const createTab = useCallback(
+        (name: string, panelIds: string[]) => {
+            setState((prev) => {
+                const newTab: TabConfig = {
+                    id: `tab-${Date.now()}`,
+                    name,
+                    panelIds,
+                };
+                const newState = {
+                    ...prev,
+                    tabs: [...prev.tabs, newTab],
+                    activeTab: newTab.id,
+                };
+                broadcastState(newState);
+                return newState;
+            });
+        },
+        [broadcastState]
+    );
+
+    const deleteTab = useCallback(
+        (tabId: string) => {
+            setState((prev) => {
+                const newTabs = prev.tabs.filter((t) => t.id !== tabId);
+                const newState = {
+                    ...prev,
+                    tabs: newTabs,
+                    activeTab: prev.activeTab === tabId ? newTabs[0]?.id || "" : prev.activeTab,
+                };
+                broadcastState(newState);
+                return newState;
+            });
+        },
+        [broadcastState]
+    );
+
+    const renameTab = useCallback(
+        (tabId: string, newName: string) => {
+            setState((prev) => {
+                const newState = {
+                    ...prev,
+                    tabs: prev.tabs.map((t) => (t.id === tabId ? { ...t, name: newName } : t)),
+                };
+                broadcastState(newState);
+                return newState;
+            });
+        },
+        [broadcastState]
+    );
+
+    const movePanelToTab = useCallback(
+        (panelId: string, fromTabId: string, toTabId: string) => {
+            setState((prev) => {
+                const newTabs = prev.tabs.map((tab) => {
+                    if (tab.id === fromTabId) {
+                        return { ...tab, panelIds: tab.panelIds.filter((id) => id !== panelId) };
+                    }
+                    if (tab.id === toTabId) {
+                        return { ...tab, panelIds: [...tab.panelIds, panelId] };
+                    }
+                    return tab;
+                });
+                const newState = { ...prev, tabs: newTabs };
+                broadcastState(newState);
+                return newState;
+            });
+        },
+        [broadcastState]
+    );
+
+    const updatePanelLayout = useCallback(
+        (tabId: string, panelId: string, layout: LayoutItem) => {
+            setState((prev) => {
+                const newState = {
+                    ...prev,
+                    layouts: {
+                        ...prev.layouts,
+                        [tabId]: {
+                            ...prev.layouts[tabId],
+                            [panelId]: layout,
+                        },
                     },
-                },
-            };
-            broadcastState(newState);
-            return newState;
-        });
-    }, [broadcastState]);
-
-    const updateTabLayout = useCallback((tabId: string, layouts: GridLayoutItem[]) => {
-        setState(prev => {
-            const panelLayout: PanelLayout = {};
-            layouts.forEach(layout => {
-                const { i, ...layoutItem } = layout;
-                panelLayout[i] = layoutItem;
+                };
+                broadcastState(newState);
+                return newState;
             });
-            const newState = {
-                ...prev,
-                layouts: {
-                    ...prev.layouts,
-                    [tabId]: panelLayout,
-                },
-            };
-            broadcastState(newState);
-            return newState;
-        });
-    }, [broadcastState]);
+        },
+        [broadcastState]
+    );
 
-    const popoutTab = useCallback((tabId: string, openWindow: boolean = true) => {
-        const tab = state.tabs.find(t => t.id === tabId);
-        if (!tab) return;
+    const updateTabLayout = useCallback(
+        (tabId: string, layouts: GridLayoutItem[]) => {
+            setState((prev) => {
+                const panelLayout: PanelLayout = {};
+                layouts.forEach((layout) => {
+                    const { i, ...layoutItem } = layout;
+                    panelLayout[i] = layoutItem;
+                });
+                const newState = {
+                    ...prev,
+                    layouts: {
+                        ...prev.layouts,
+                        [tabId]: panelLayout,
+                    },
+                };
+                broadcastState(newState);
+                return newState;
+            });
+        },
+        [broadcastState]
+    );
 
-        // Open popout window (only if called from main window)
-        if (openWindow) {
-            windowManager.openPopout(tabId, tab.panelIds);
-        }
+    const popoutTab = useCallback(
+        (tabId: string, openWindow: boolean = true) => {
+            const tab = state.tabs.find((t) => t.id === tabId);
+            if (!tab) return;
 
-        // Mark as popped out
-        setState(prev => {
-            const newPoppedOut = new Set(prev.poppedOutTabs);
-            newPoppedOut.add(tabId);
-            const newState = { ...prev, poppedOutTabs: newPoppedOut };
-            broadcastState(newState);
-            return newState;
-        });
-    }, [state.tabs, broadcastState]);
+            // Open popout window (only if called from main window)
+            if (openWindow) {
+                windowManager.openPopout(tabId, tab.panelIds);
+            }
 
-    const closePopout = useCallback((tabId: string) => {
-        setState(prev => {
-            const newPoppedOut = new Set(prev.poppedOutTabs);
-            newPoppedOut.delete(tabId);
-            const newState = { ...prev, poppedOutTabs: newPoppedOut };
-            broadcastState(newState);
-            return newState;
-        });
-    }, [broadcastState]);
+            // Mark as popped out
+            setState((prev) => {
+                const newPoppedOut = new Set(prev.poppedOutTabs);
+                newPoppedOut.add(tabId);
+                const newState = { ...prev, poppedOutTabs: newPoppedOut };
+                broadcastState(newState);
+                return newState;
+            });
+        },
+        [state.tabs, broadcastState]
+    );
+
+    const closePopout = useCallback(
+        (tabId: string) => {
+            setState((prev) => {
+                const newPoppedOut = new Set(prev.poppedOutTabs);
+                newPoppedOut.delete(tabId);
+                const newState = { ...prev, poppedOutTabs: newPoppedOut };
+                broadcastState(newState);
+                return newState;
+            });
+        },
+        [broadcastState]
+    );
 
     const value: LayoutContextValue = {
         ...state,
@@ -280,11 +313,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         closePopout,
     };
 
-    return (
-        <LayoutContext.Provider value={value}>
-            {children}
-        </LayoutContext.Provider>
-    );
+    return <LayoutContext.Provider value={value}>{children}</LayoutContext.Provider>;
 }
 
 export function useLayout() {

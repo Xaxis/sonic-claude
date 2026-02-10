@@ -7,12 +7,12 @@
 // ============================================================================
 
 export interface MIDIEvent {
-    note: number;  // MIDI note number (0-127)
-    note_name: string;  // e.g., 'C4', 'F#3'
-    start_time: number;  // Start time in beats
-    duration: number;  // Duration in beats
-    velocity: number;  // MIDI velocity (0-127)
-    channel: number;  // MIDI channel (0-15)
+    note: number; // MIDI note number (0-127)
+    note_name: string; // e.g., 'C4', 'F#3'
+    start_time: number; // Start time in beats
+    duration: number; // Duration in beats
+    velocity: number; // MIDI velocity (0-127)
+    channel: number; // MIDI channel (0-15)
 }
 
 export interface Sequence {
@@ -22,7 +22,7 @@ export interface Sequence {
     time_signature: string;
     clips: SequencerClip[];
     is_playing: boolean;
-    current_position: number;  // beats
+    current_position: number; // beats
 }
 
 export interface SequencerClip {
@@ -30,15 +30,15 @@ export interface SequencerClip {
     name: string;
     type: "midi" | "audio";
     track_id: string;
-    start_time: number;  // beats
-    duration: number;  // beats
+    start_time: number; // beats
+    duration: number; // beats
 
     // MIDI-specific
     midi_events?: MIDIEvent[];
 
     // Audio-specific
     audio_file_path?: string;
-    audio_offset?: number;  // seconds
+    audio_offset?: number; // seconds
 
     is_muted: boolean;
     is_looped: boolean;
@@ -72,7 +72,7 @@ export interface SetTempoRequest {
 }
 
 export interface SeekRequest {
-    position: number;  // beats
+    position: number; // beats
 }
 
 // ============================================================================
@@ -86,16 +86,16 @@ export interface Clip {
     name: string;
     type: ClipType;
     track_id: string;
-    start_time: number;  // beats
-    duration: number;  // beats
-    color: string;  // hex color
+    start_time: number; // beats
+    duration: number; // beats
+    color: string; // hex color
 
     // MIDI-specific
     midi_events: MIDIEvent[];
 
     // Audio-specific
     audio_file_path?: string;
-    audio_offset: number;  // seconds
+    audio_offset: number; // seconds
 
     // Playback
     is_muted: boolean;
@@ -107,21 +107,21 @@ export interface Track {
     id: string;
     name: string;
     color: string;
-    height: number;  // pixels
+    height: number; // pixels
 
     // Clips
     clips: Clip[];
 
     // Routing
-    instrument: string;  // Synth name
+    instrument: string; // Synth name
     midi_channel: number;
 
     // Mixing
-    volume: number;  // 0.0-2.0
-    pan: number;  // -1.0 to 1.0
+    volume: number; // 0.0-2.0
+    pan: number; // -1.0 to 1.0
     is_muted: boolean;
     is_solo: boolean;
-    is_armed: boolean;  // recording armed
+    is_armed: boolean; // recording armed
 }
 
 export interface TimelineSequence {
@@ -134,22 +134,21 @@ export interface TimelineSequence {
     tracks: Track[];
 
     // Playback settings
-    tempo: number;  // BPM
+    tempo: number; // BPM
     time_signature_numerator: number;
     time_signature_denominator: number;
     key: string;
     scale: string;
 
     // Timeline view
-    zoom_level: number;  // 0.1-10.0
-    scroll_position: number;  // beats
+    zoom_level: number; // 0.1-10.0
+    scroll_position: number; // beats
 
     // Playback state
     is_playing: boolean;
     is_recording: boolean;
-    playhead_position: number;  // beats
+    playhead_position: number; // beats
     loop_enabled: boolean;
-    loop_start: number;  // beats
-    loop_end: number;  // beats
+    loop_start: number; // beats
+    loop_end: number; // beats
 }
-
