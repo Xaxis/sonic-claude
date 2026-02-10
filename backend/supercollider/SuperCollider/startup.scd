@@ -1,3 +1,3 @@
-// Empty startup file - prevents user's startup.scd from loading
-// This is intentionally blank to avoid SuperDirt and other user configs
+// Empty startup.scd to prevent SuperDirt and other user configs from loading
+// This file is intentionally empty
 

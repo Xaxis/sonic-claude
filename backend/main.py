@@ -1,111 +1,182 @@
 """
-Sonic Claude - AI DJ Backend
-Main application entry point
+Sonic Claude Backend - FastAPI Application
+
+COMPLETE PIPELINE:
+SuperCollider → Python OSC → Audio Analyzer → WebSocket → Frontend
+Frontend → REST API → Synthesis Service → SuperCollider OSC
 """
+import logging
 import asyncio
+import subprocess
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.core import settings, setup_logging, get_logger
-from backend.core.dependencies import (
-    ServiceContainer, set_container, get_container
-)
-from backend.routes import (
-    engine_router,
-    synthesis_router,
-    effects_router,
-    mixer_router,
-    sequencer_router,
-    websocket_router,
-    samples_router
-)
-from backend.routes.audio_input import router as audio_input_router
+from backend.core.engine_manager import AudioEngineManager
+from backend.services.audio_analyzer import AudioAnalyzerService
+from backend.services.audio_input_service import AudioInputService
+from backend.services.synthesis_service import SynthesisService
+from backend.services.websocket_manager import WebSocketManager
+from backend.api import audio_routes, websocket_routes
 
-# Setup logging
-setup_logging("INFO")
-logger = get_logger(__name__)
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Global service instances
+engine_manager: AudioEngineManager = None
+audio_analyzer: AudioAnalyzerService = None
+audio_input_service: AudioInputService = None
+synthesis_service: SynthesisService = None
+ws_manager: WebSocketManager = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager"""
-    logger.info("🎵 Starting Sonic Claude API Server...")
-
-    # Initialize service container
-    container = ServiceContainer()
-    set_container(container)
-
+    """Application lifespan manager - sets up the complete pipeline"""
+    global engine_manager, audio_analyzer, audio_input_service, synthesis_service, ws_manager
+    
+    logger.info("🚀 Starting Sonic Claude Backend...")
+    logger.info("=" * 60)
+    
     try:
-        # Initialize all services
-        await container.initialize()
+        # Step 1: Initialize WebSocket manager
+        logger.info("📡 Initializing WebSocket manager...")
+        ws_manager = WebSocketManager()
+        websocket_routes.set_ws_manager(ws_manager)
+        
+        # Step 2: Initialize engine manager (OSC communication)
+        logger.info("🔗 Connecting to SuperCollider...")
+        engine_manager = AudioEngineManager()
+        await engine_manager.connect()
+        
+        # Step 3: Initialize services
+        logger.info("🎵 Initializing audio services...")
+        audio_analyzer = AudioAnalyzerService(engine_manager)
+        audio_input_service = AudioInputService(engine_manager)
+        synthesis_service = SynthesisService(engine_manager)
+
+        # Step 4: Wire up the pipeline (Audio Analyzer → WebSocket Manager)
+        logger.info("🔌 Wiring up audio pipeline...")
+        audio_analyzer.on_waveform_update = ws_manager.broadcast_waveform
+        audio_analyzer.on_spectrum_update = ws_manager.broadcast_spectrum
+        audio_analyzer.on_meter_update = ws_manager.broadcast_meters
+
+        # Wire up input audio pipeline
+        audio_input_service.on_waveform_update = ws_manager.broadcast_waveform
+        audio_input_service.on_spectrum_update = ws_manager.broadcast_spectrum
+        audio_input_service.on_meter_update = ws_manager.broadcast_meters
+        
+        # Step 5: Inject services into API routes
+        audio_routes.set_services(synthesis_service, audio_analyzer)
+        
+        # Step 6: Wait for SynthDefs to load (they're loaded in osc_relay.scd)
+        logger.info("⏳ Waiting for SynthDefs to load in OSC relay...")
+        await asyncio.sleep(5)  # Give sclang time to boot and load SynthDefs
+
+        # Buffer IDs are allocated by sclang in osc_relay.scd
+        # They will be 0 and 1 (first two buffers allocated)
+        waveform_buffer_id = 0
+        spectrum_buffer_id = 1
+        logger.info(f"   Using buffer IDs: waveform={waveform_buffer_id}, spectrum={spectrum_buffer_id}")
+        
+        # Step 7: Create default node groups
+        logger.info("🗂️  Creating node groups...")
+        engine_manager.send_message("/g_new", 1, 1, 0)  # synths, addToTail, root
+        engine_manager.send_message("/g_new", 2, 1, 1)  # effects, addToTail, synths
+        engine_manager.send_message("/g_new", 3, 1, 2)  # master, addToTail, effects
+        logger.info("✅ Created groups: 1=synths, 2=effects, 3=master")
+        
+        # Step 8: Start audio monitoring (output)
+        logger.info("🎤 Starting output audio monitoring...")
+        await audio_analyzer.start_monitoring(
+            waveform_buffer_id=waveform_buffer_id,
+            spectrum_buffer_id=spectrum_buffer_id
+        )
+
+        # Step 9: Start audio input monitoring
+        logger.info("🎤 Starting input audio monitoring...")
+        await audio_input_service.start_monitoring(
+            waveform_buffer_id=waveform_buffer_id,  # Reuse same buffers
+            spectrum_buffer_id=spectrum_buffer_id,
+            input_channel=0  # First input channel
+        )
+
+        logger.info("=" * 60)
+        logger.info("✅ Sonic Claude Backend READY")
+        logger.info("   Pipeline: SC → OSC → Analyzer → WebSocket → Frontend")
+        logger.info("   Control: Frontend → REST → Synthesis → OSC → SC")
+        logger.info("   Input: Mic/Line-in → SC → OSC → Input Service → WebSocket → Frontend")
+        logger.info("=" * 60)
+        
+        yield
+        
     except Exception as e:
-        logger.error(f"Failed to initialize services: {e}")
+        logger.error(f"❌ Failed to start backend: {e}")
         raise
+    
+    finally:
+        # Cleanup
+        logger.info("🛑 Shutting down Sonic Claude Backend...")
 
-    yield
+        if audio_analyzer:
+            await audio_analyzer.stop_monitoring()
 
-    # Cleanup
-    logger.info("Shutting down...")
-    await container.shutdown()
+        if audio_input_service:
+            await audio_input_service.stop_monitoring()
+
+        if synthesis_service:
+            await synthesis_service.free_all_synths()
+
+        if engine_manager:
+            await engine_manager.disconnect()
+
+        logger.info("✅ Sonic Claude Backend shut down")
 
 
 # Create FastAPI app
 app = FastAPI(
-    title=settings.app_name,
-    version=settings.app_version,
+    title="Sonic Claude Backend",
+    description="AI-powered live production performance system",
+    version="1.0.0",
     lifespan=lifespan
 )
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Include routers
-app.include_router(engine_router)
-app.include_router(synthesis_router)
-app.include_router(effects_router)
-app.include_router(mixer_router)
-app.include_router(sequencer_router)
-app.include_router(websocket_router)
-app.include_router(samples_router)
-app.include_router(audio_input_router)
+app.include_router(audio_routes.router, prefix="/audio-engine/audio", tags=["audio"])
+app.include_router(websocket_routes.router, prefix="/audio-engine/ws", tags=["websocket"])
 
 
 @app.get("/")
 async def root():
     """Root endpoint"""
     return {
-        "name": settings.app_name,
-        "version": settings.app_version,
-        "status": "running"
+        "name": "Sonic Claude Backend",
+        "version": "1.0.0",
+        "status": "running",
+        "engine_connected": engine_manager.is_connected if engine_manager else False
     }
 
 
 @app.get("/health")
-async def health_check(container: ServiceContainer = Depends(get_container)):
+async def health():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "services": {
-            "audio_engine": container.audio_engine is not None and container.audio_engine.is_running,
-            "synthesis_service": container.synthesis_service is not None,
-            "effects_service": container.effects_service is not None,
-            "mixer_service": container.mixer_service is not None,
-            "sequencer_service": container.sequencer_service is not None,
-            "websocket_service": container.websocket_service is not None,
-        }
+        "engine_connected": engine_manager.is_connected if engine_manager else False,
+        "monitoring": audio_analyzer.is_monitoring if audio_analyzer else False,
+        "active_synths": len(synthesis_service.active_synths) if synthesis_service else 0
     }
-
-
-if __name__ == "__main__":
-    import uvicorn
-    print(f"🎵 Starting {settings.app_name} v{settings.app_version}")
-    print("🌐 API: http://localhost:8000")
-    print("📚 Docs: http://localhost:8000/docs")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 

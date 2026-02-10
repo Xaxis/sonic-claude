@@ -207,7 +207,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
 
             try {
                 // Transport WebSocket
-                const transportWs = new WebSocket("ws://localhost:8000/ws/transport");
+                const transportWs = new WebSocket("ws://localhost:8000/audio-engine/ws/transport");
                 transportWsRef.current = transportWs;
 
                 transportWs.onopen = () => {
@@ -249,7 +249,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 };
 
                 // Spectrum WebSocket
-                const spectrumWs = new WebSocket("ws://localhost:8000/ws/spectrum");
+                const spectrumWs = new WebSocket("ws://localhost:8000/audio-engine/ws/spectrum");
                 spectrumWsRef.current = spectrumWs;
 
                 spectrumWs.onopen = () => {
@@ -287,7 +287,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 };
 
                 // Waveform WebSocket
-                const waveformWs = new WebSocket("ws://localhost:8000/ws/waveform");
+                const waveformWs = new WebSocket("ws://localhost:8000/audio-engine/ws/waveform");
                 waveformWsRef.current = waveformWs;
 
                 waveformWs.onopen = () => {
@@ -330,7 +330,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 };
 
                 // Meters WebSocket
-                const metersWs = new WebSocket("ws://localhost:8000/ws/meters");
+                const metersWs = new WebSocket("ws://localhost:8000/audio-engine/ws/meters");
                 metersWsRef.current = metersWs;
 
                 metersWs.onopen = () => {

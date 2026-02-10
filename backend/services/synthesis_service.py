@@ -1,619 +1,164 @@
 """
-Synthesis service - Synth management and playback
+Synthesis Service - Manages synth creation and control
+
+Clean, organized service layer for synth management
 """
 import logging
-from typing import Dict, List, Optional
-from ..core.engine_manager import AudioEngineManager
-from ..models.synth import Synth, SynthDef
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class SynthesisService:
     """
-    Synthesis service
-    Manages SynthDefs, voice allocation, and synth playback
+    Manages synth creation, control, and lifecycle
+    
+    Node ID allocation:
+    - 1000-2999: System synths (audioMonitor, etc.)
+    - 3000+: User synths
     """
-
-    def __init__(self, engine: AudioEngineManager):
-        """
-        Initialize synthesis service
-
-        Args:
-            engine: Audio engine manager instance
-        """
-        self.engine = engine
-
-        # Track active synths
-        self.synths: Dict[int, Synth] = {}
-        # Start at 3000 to avoid conflicts with reserved IDs:
-        # - 1000: audioMonitor synth (audio analyzer)
-        # - 2000: audioInput synth (audio input service)
-        self.next_synth_id = 3000
-
-        # SynthDef library
-        self.synthdefs: Dict[str, SynthDef] = {}
-
-        # Load default SynthDefs
-        self._load_default_synthdefs()
-
-    def _load_default_synthdefs(self):
-        """Load comprehensive SynthDef library with LLM-friendly metadata"""
-
-        # ===== BASIC OSCILLATORS =====
-        self._register_basic_synthdefs()
-
-        # ===== DRUMS =====
-        self._register_drum_synthdefs()
-
-        # ===== BASS =====
-        self._register_bass_synthdefs()
-
-        # ===== LEADS =====
-        self._register_lead_synthdefs()
-
-        # ===== PADS =====
-        self._register_pad_synthdefs()
-
-        logger.info(f"Loaded {len(self.synthdefs)} SynthDefs across all categories")
-
-    def _register_basic_synthdefs(self):
-        """Register basic oscillator SynthDefs"""
-        self.synthdefs["sine"] = SynthDef(
-            name="sine",
-            parameters={"freq": 440.0, "amp": 0.5, "gate": 1, "attack": 0.01, "release": 0.3, "out": 0},
-            description="Pure sine wave - smooth, fundamental tone",
-            category="basic",
-            parameter_ranges={
-                "freq": (20.0, 20000.0),
-                "amp": (0.0, 1.0),
-                "gate": (0, 1),
-                "attack": (0.001, 5.0),
-                "release": (0.01, 10.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "freq": "Frequency in Hz (pitch)",
-                "amp": "Amplitude/volume (0-1)",
-                "gate": "Note on/off (1=on, 0=off)",
-                "attack": "Attack time in seconds",
-                "release": "Release time in seconds",
-                "out": "Output bus number"
-            }
-        )
-
-        self.synthdefs["saw"] = SynthDef(
-            name="saw",
-            parameters={"freq": 440.0, "amp": 0.5, "gate": 1, "attack": 0.01, "release": 0.3,
-                       "cutoff": 2000.0, "resonance": 0.3, "out": 0},
-            description="Sawtooth wave - bright, rich harmonics with filter",
-            category="basic",
-            parameter_ranges={
-                "freq": (20.0, 20000.0),
-                "amp": (0.0, 1.0),
-                "gate": (0, 1),
-                "attack": (0.001, 5.0),
-                "release": (0.01, 10.0),
-                "cutoff": (20.0, 20000.0),
-                "resonance": (0.1, 1.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "freq": "Frequency in Hz (pitch)",
-                "amp": "Amplitude/volume (0-1)",
-                "gate": "Note on/off (1=on, 0=off)",
-                "attack": "Attack time in seconds",
-                "release": "Release time in seconds",
-                "cutoff": "Filter cutoff frequency in Hz",
-                "resonance": "Filter resonance (0-1)",
-                "out": "Output bus number"
-            }
-        )
-
-        self.synthdefs["square"] = SynthDef(
-            name="square",
-            parameters={"freq": 440.0, "amp": 0.5, "gate": 1, "attack": 0.01, "release": 0.3,
-                       "width": 0.5, "out": 0},
-            description="Square/pulse wave - hollow, retro sound",
-            category="basic",
-            parameter_ranges={
-                "freq": (20.0, 20000.0),
-                "amp": (0.0, 1.0),
-                "gate": (0, 1),
-                "attack": (0.001, 5.0),
-                "release": (0.01, 10.0),
-                "width": (0.01, 0.99),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "freq": "Frequency in Hz (pitch)",
-                "amp": "Amplitude/volume (0-1)",
-                "gate": "Note on/off (1=on, 0=off)",
-                "attack": "Attack time in seconds",
-                "release": "Release time in seconds",
-                "width": "Pulse width (0.5 = square wave)",
-                "out": "Output bus number"
-            }
-        )
-
-        self.synthdefs["triangle"] = SynthDef(
-            name="triangle",
-            parameters={"freq": 440.0, "amp": 0.5, "gate": 1, "attack": 0.01, "release": 0.3, "out": 0},
-            description="Triangle wave - soft, mellow tone",
-            category="basic",
-            parameter_ranges={
-                "freq": (20.0, 20000.0),
-                "amp": (0.0, 1.0),
-                "gate": (0, 1),
-                "attack": (0.001, 5.0),
-                "release": (0.01, 10.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "freq": "Frequency in Hz (pitch)",
-                "amp": "Amplitude/volume (0-1)",
-                "gate": "Note on/off (1=on, 0=off)",
-                "attack": "Attack time in seconds",
-                "release": "Release time in seconds",
-                "out": "Output bus number"
-            }
-        )
-
-        self.synthdefs["noise"] = SynthDef(
-            name="noise",
-            parameters={"amp": 0.5, "gate": 1, "attack": 0.01, "release": 0.3,
-                       "cutoff": 5000.0, "out": 0},
-            description="White noise generator with filter",
-            category="basic",
-            parameter_ranges={
-                "amp": (0.0, 1.0),
-                "gate": (0, 1),
-                "attack": (0.001, 5.0),
-                "release": (0.01, 10.0),
-                "cutoff": (20.0, 20000.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "amp": "Amplitude/volume (0-1)",
-                "gate": "Note on/off (1=on, 0=off)",
-                "attack": "Attack time in seconds",
-                "release": "Release time in seconds",
-                "cutoff": "Filter cutoff frequency in Hz",
-                "out": "Output bus number"
-            }
-        )
-
-    def _register_drum_synthdefs(self):
-        """Register drum SynthDefs"""
-        self.synthdefs["kick"] = SynthDef(
-            name="kick",
-            parameters={"amp": 0.8, "freq": 60.0, "decay": 0.3, "click": 0.5, "out": 0},
-            description="Kick drum - deep bass drum",
-            category="drums",
-            parameter_ranges={
-                "amp": (0.0, 1.0),
-                "freq": (30.0, 150.0),
-                "decay": (0.05, 2.0),
-                "click": (0.0, 1.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "amp": "Amplitude/volume (0-1)",
-                "freq": "Base frequency in Hz",
-                "decay": "Decay time in seconds",
-                "click": "Click amount (0-1)",
-                "out": "Output bus number"
-            }
-        )
-
-        self.synthdefs["snare"] = SynthDef(
-            name="snare",
-            parameters={"amp": 0.6, "freq": 200.0, "decay": 0.15, "noise": 0.7, "out": 0},
-            description="Snare drum - crisp snare",
-            category="drums",
-            parameter_ranges={
-                "amp": (0.0, 1.0),
-                "freq": (100.0, 400.0),
-                "decay": (0.05, 1.0),
-                "noise": (0.0, 1.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "amp": "Amplitude/volume (0-1)",
-                "freq": "Tone frequency in Hz",
-                "decay": "Decay time in seconds",
-                "noise": "Noise amount (0-1)",
-                "out": "Output bus number"
-            }
-        )
-
-        self.synthdefs["hihat"] = SynthDef(
-            name="hihat",
-            parameters={"amp": 0.4, "decay": 0.1, "cutoff": 8000.0, "out": 0},
-            description="Hi-hat - metallic hi-hat",
-            category="drums",
-            parameter_ranges={
-                "amp": (0.0, 1.0),
-                "decay": (0.01, 0.5),
-                "cutoff": (3000.0, 15000.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "amp": "Amplitude/volume (0-1)",
-                "decay": "Decay time in seconds",
-                "cutoff": "High-pass filter cutoff in Hz",
-                "out": "Output bus number"
-            }
-        )
-
-        self.synthdefs["clap"] = SynthDef(
-            name="clap",
-            parameters={"amp": 0.5, "decay": 0.2, "out": 0},
-            description="Clap - hand clap",
-            category="drums",
-            parameter_ranges={
-                "amp": (0.0, 1.0),
-                "decay": (0.05, 1.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "amp": "Amplitude/volume (0-1)",
-                "decay": "Decay time in seconds",
-                "out": "Output bus number"
-            }
-        )
-
-        self.synthdefs["tom"] = SynthDef(
-            name="tom",
-            parameters={"amp": 0.6, "freq": 120.0, "decay": 0.25, "out": 0},
-            description="Tom - tom drum",
-            category="drums",
-            parameter_ranges={
-                "amp": (0.0, 1.0),
-                "freq": (60.0, 300.0),
-                "decay": (0.1, 2.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "amp": "Amplitude/volume (0-1)",
-                "freq": "Frequency in Hz",
-                "decay": "Decay time in seconds",
-                "out": "Output bus number"
-            }
-        )
-
-        self.synthdefs["cymbal"] = SynthDef(
-            name="cymbal",
-            parameters={"amp": 0.5, "decay": 1.0, "out": 0},
-            description="Cymbal - crash cymbal",
-            category="drums",
-            parameter_ranges={
-                "amp": (0.0, 1.0),
-                "decay": (0.2, 5.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "amp": "Amplitude/volume (0-1)",
-                "decay": "Decay time in seconds",
-                "out": "Output bus number"
-            }
-        )
-
-    def _register_bass_synthdefs(self):
-        """Register bass SynthDefs"""
-        self.synthdefs["subbass"] = SynthDef(
-            name="subbass",
-            parameters={"freq": 55.0, "amp": 0.7, "gate": 1, "attack": 0.01, "release": 0.5,
-                       "cutoff": 200.0, "out": 0},
-            description="Sub bass - deep sub-bass",
-            category="bass",
-            parameter_ranges={
-                "freq": (20.0, 200.0),
-                "amp": (0.0, 1.0),
-                "gate": (0, 1),
-                "attack": (0.001, 1.0),
-                "release": (0.01, 5.0),
-                "cutoff": (50.0, 500.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "freq": "Frequency in Hz (pitch)",
-                "amp": "Amplitude/volume (0-1)",
-                "gate": "Note on/off (1=on, 0=off)",
-                "attack": "Attack time in seconds",
-                "release": "Release time in seconds",
-                "cutoff": "Low-pass filter cutoff in Hz",
-                "out": "Output bus number"
-            }
-        )
-
-        self.synthdefs["acidbass"] = SynthDef(
-            name="acidbass",
-            parameters={"freq": 110.0, "amp": 0.6, "gate": 1, "attack": 0.01, "release": 0.3,
-                       "cutoff": 800.0, "resonance": 0.7, "envAmount": 4000.0, "out": 0},
-            description="Acid bass - TB-303 style acid bass",
-            category="bass",
-            parameter_ranges={
-                "freq": (30.0, 300.0),
-                "amp": (0.0, 1.0),
-                "gate": (0, 1),
-                "attack": (0.001, 0.5),
-                "release": (0.01, 2.0),
-                "cutoff": (100.0, 5000.0),
-                "resonance": (0.1, 1.0),
-                "envAmount": (0.0, 10000.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "freq": "Frequency in Hz (pitch)",
-                "amp": "Amplitude/volume (0-1)",
-                "gate": "Note on/off (1=on, 0=off)",
-                "attack": "Attack time in seconds",
-                "release": "Release time in seconds",
-                "cutoff": "Filter cutoff frequency in Hz",
-                "resonance": "Filter resonance (0-1)",
-                "envAmount": "Envelope modulation amount in Hz",
-                "out": "Output bus number"
-            }
-        )
-
-        self.synthdefs["reesebass"] = SynthDef(
-            name="reesebass",
-            parameters={"freq": 55.0, "amp": 0.6, "gate": 1, "attack": 0.01, "release": 0.5,
-                       "detune": 2.0, "cutoff": 1500.0, "out": 0},
-            description="Reese bass - detuned saw bass",
-            category="bass",
-            parameter_ranges={
-                "freq": (20.0, 200.0),
-                "amp": (0.0, 1.0),
-                "gate": (0, 1),
-                "attack": (0.001, 1.0),
-                "release": (0.01, 5.0),
-                "detune": (0.0, 10.0),
-                "cutoff": (100.0, 5000.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "freq": "Frequency in Hz (pitch)",
-                "amp": "Amplitude/volume (0-1)",
-                "gate": "Note on/off (1=on, 0=off)",
-                "attack": "Attack time in seconds",
-                "release": "Release time in seconds",
-                "detune": "Detune amount in Hz",
-                "cutoff": "Low-pass filter cutoff in Hz",
-                "out": "Output bus number"
-            }
-        )
-
-    def _register_lead_synthdefs(self):
-        """Register lead SynthDefs"""
-        self.synthdefs["pluck"] = SynthDef(
-            name="pluck",
-            parameters={"freq": 440.0, "amp": 0.5, "decay": 2.0, "coef": 0.1, "out": 0},
-            description="Pluck - plucked string sound",
-            category="lead",
-            parameter_ranges={
-                "freq": (100.0, 2000.0),
-                "amp": (0.0, 1.0),
-                "decay": (0.1, 10.0),
-                "coef": (0.01, 0.99),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "freq": "Frequency in Hz (pitch)",
-                "amp": "Amplitude/volume (0-1)",
-                "decay": "Decay time in seconds",
-                "coef": "Damping coefficient (0-1)",
-                "out": "Output bus number"
-            }
-        )
-
-        self.synthdefs["supersaw"] = SynthDef(
-            name="supersaw",
-            parameters={"freq": 440.0, "amp": 0.5, "gate": 1, "attack": 0.1, "release": 0.3,
-                       "detune": 5.0, "cutoff": 5000.0, "out": 0},
-            description="Supersaw - detuned saw lead",
-            category="lead",
-            parameter_ranges={
-                "freq": (100.0, 2000.0),
-                "amp": (0.0, 1.0),
-                "gate": (0, 1),
-                "attack": (0.001, 2.0),
-                "release": (0.01, 5.0),
-                "detune": (0.0, 20.0),
-                "cutoff": (500.0, 15000.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "freq": "Frequency in Hz (pitch)",
-                "amp": "Amplitude/volume (0-1)",
-                "gate": "Note on/off (1=on, 0=off)",
-                "attack": "Attack time in seconds",
-                "release": "Release time in seconds",
-                "detune": "Detune amount (cents)",
-                "cutoff": "Low-pass filter cutoff in Hz",
-                "out": "Output bus number"
-            }
-        )
-
-    def _register_pad_synthdefs(self):
-        """Register pad SynthDefs"""
-        self.synthdefs["warmpad"] = SynthDef(
-            name="warmpad",
-            parameters={"freq": 220.0, "amp": 0.4, "gate": 1, "attack": 2.0, "release": 3.0,
-                       "cutoff": 2000.0, "out": 0},
-            description="Warm pad - soft, warm pad",
-            category="pad",
-            parameter_ranges={
-                "freq": (50.0, 1000.0),
-                "amp": (0.0, 1.0),
-                "gate": (0, 1),
-                "attack": (0.5, 10.0),
-                "release": (0.5, 15.0),
-                "cutoff": (200.0, 8000.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "freq": "Frequency in Hz (pitch)",
-                "amp": "Amplitude/volume (0-1)",
-                "gate": "Note on/off (1=on, 0=off)",
-                "attack": "Attack time in seconds",
-                "release": "Release time in seconds",
-                "cutoff": "Low-pass filter cutoff in Hz",
-                "out": "Output bus number"
-            }
-        )
-
-        self.synthdefs["strings"] = SynthDef(
-            name="strings",
-            parameters={"freq": 220.0, "amp": 0.4, "gate": 1, "attack": 1.5, "release": 2.5,
-                       "vibrato": 5.0, "out": 0},
-            description="Strings - string ensemble",
-            category="pad",
-            parameter_ranges={
-                "freq": (50.0, 1000.0),
-                "amp": (0.0, 1.0),
-                "gate": (0, 1),
-                "attack": (0.5, 10.0),
-                "release": (0.5, 15.0),
-                "vibrato": (0.0, 10.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "freq": "Frequency in Hz (pitch)",
-                "amp": "Amplitude/volume (0-1)",
-                "gate": "Note on/off (1=on, 0=off)",
-                "attack": "Attack time in seconds",
-                "release": "Release time in seconds",
-                "vibrato": "Vibrato rate in Hz",
-                "out": "Output bus number"
-            }
-        )
-
-        self.synthdefs["ambient"] = SynthDef(
-            name="ambient",
-            parameters={"freq": 220.0, "amp": 0.3, "gate": 1, "attack": 3.0, "release": 4.0, "out": 0},
-            description="Ambient - ethereal atmosphere",
-            category="pad",
-            parameter_ranges={
-                "freq": (50.0, 1000.0),
-                "amp": (0.0, 1.0),
-                "gate": (0, 1),
-                "attack": (1.0, 15.0),
-                "release": (1.0, 20.0),
-                "out": (0, 127)
-            },
-            parameter_descriptions={
-                "freq": "Frequency in Hz (pitch)",
-                "amp": "Amplitude/volume (0-1)",
-                "gate": "Note on/off (1=on, 0=off)",
-                "attack": "Attack time in seconds",
-                "release": "Release time in seconds",
-                "out": "Output bus number"
-            }
-        )
-
+    
+    def __init__(self, engine_manager):
+        self.engine_manager = engine_manager
+        self.active_synths: Dict[int, dict] = {}
+    
     async def create_synth(
         self,
         synthdef: str,
-        parameters: Optional[Dict[str, float]] = None,
-        group: int = 0,
+        params: Optional[Dict] = None,
+        group: int = 1,
         bus: Optional[int] = None
-    ) -> Synth:
+    ) -> dict:
         """
-        Create a new synth instance
-
+        Create a new synth
+        
         Args:
-            synthdef: SynthDef name
-            parameters: Initial parameter values
-            group: Target group ID
-            bus: Output bus ID
-
+            synthdef: SynthDef name (e.g., "sine", "saw", "square")
+            params: Synth parameters (e.g., {"freq": 440, "amp": 0.5})
+            group: Target group (1=synths, 2=effects, 3=master)
+            bus: Output bus (None = master output)
+        
         Returns:
-            Synth instance
+            Synth info dict with id, synthdef, parameters, group, bus
         """
-        if synthdef not in self.synthdefs:
-            raise ValueError(f"SynthDef '{synthdef}' not found")
-
-        synth_id = self.next_synth_id
-        self.next_synth_id += 1
-
-        # Merge default parameters with provided ones
-        synthdef_obj = self.synthdefs[synthdef]
-        params = {**synthdef_obj.parameters, **(parameters or {})}
-
-        # Add bus if specified
-        if bus is not None:
-            params["out"] = bus
-
-        synth = Synth(
-            id=synth_id,
-            synthdef=synthdef,
-            group=group,
-            parameters=params,
-            bus=bus
-        )
-
-        self.synths[synth_id] = synth
-
-        # Send OSC message to create synth on SuperCollider
-        if self.engine.is_running:
-            try:
-                # Use EngineManager's create_synth helper
-                # add_action: 1=addToTail (add at end of group)
-                self.engine.create_synth(synthdef, synth_id, add_action=1, target=group, **params)
-                logger.info(f"✅ Created synth {synth_id} ({synthdef}) on SuperCollider")
-            except Exception as e:
-                logger.error(f"❌ Failed to create synth on SuperCollider: {e}")
-        else:
-            logger.warning(f"⚠️  Created synth {synth_id} ({synthdef}) but SuperCollider not connected")
-
-        return synth
-
+        try:
+            # Allocate node ID
+            synth_id = self.engine_manager.allocate_node_id()
+            
+            # Default parameters
+            if params is None:
+                params = {}
+            
+            # Build OSC message arguments
+            args = [
+                synthdef,  # SynthDef name
+                synth_id,  # Node ID
+                1,  # Add action: addToTail
+                group,  # Target group
+            ]
+            
+            # Add parameters
+            for key, value in params.items():
+                args.append(key)
+                args.append(value)
+            
+            # Add output bus if specified
+            if bus is not None:
+                args.append("out")
+                args.append(bus)
+            
+            # Send /s_new message to scsynth
+            self.engine_manager.send_message("/s_new", *args)
+            
+            # Store synth info
+            synth_info = {
+                "id": synth_id,
+                "synthdef": synthdef,
+                "parameters": params,
+                "group": group,
+                "bus": bus
+            }
+            self.active_synths[synth_id] = synth_info
+            
+            logger.info(f"✅ Created synth {synth_id} ({synthdef}) in group {group}")
+            return synth_info
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to create synth: {e}")
+            raise
+    
+    async def set_synth_param(self, synth_id: int, param: str, value: float):
+        """Set a synth parameter"""
+        try:
+            if synth_id not in self.active_synths:
+                raise ValueError(f"Synth {synth_id} not found")
+            
+            # Send /n_set message to scsynth
+            self.engine_manager.send_message("/n_set", synth_id, param, value)
+            
+            # Update stored parameters
+            self.active_synths[synth_id]["parameters"][param] = value
+            
+            logger.debug(f"Set synth {synth_id} {param} = {value}")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to set synth parameter: {e}")
+            raise
+    
+    async def release_synth(self, synth_id: int):
+        """Release a synth (trigger gate=0, synth will free itself)"""
+        try:
+            if synth_id not in self.active_synths:
+                raise ValueError(f"Synth {synth_id} not found")
+            
+            # Send gate=0 to trigger release envelope
+            self.engine_manager.send_message("/n_set", synth_id, "gate", 0)
+            
+            # Remove from active synths
+            del self.active_synths[synth_id]
+            
+            logger.info(f"🔇 Released synth {synth_id}")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to release synth: {e}")
+            raise
+    
     async def free_synth(self, synth_id: int):
-        """Free a synth"""
-        if synth_id in self.synths:
-            # Send OSC message to free synth on SuperCollider
-            if self.engine.is_running:
-                try:
-                    # Use EngineManager's free_node helper
-                    self.engine.free_node(synth_id)
-                    logger.info(f"✅ Freed synth {synth_id} on SuperCollider")
-                except Exception as e:
-                    logger.error(f"❌ Failed to free synth on SuperCollider: {e}")
-
-            del self.synths[synth_id]
-            logger.info(f"Freed synth {synth_id}")
-
-    async def set_parameter(self, synth_id: int, param: str, value: float):
-        """Set synth parameter"""
-        if synth_id not in self.synths:
-            raise ValueError(f"Synth {synth_id} not found")
-
-        synth = self.synths[synth_id]
-        synth.set(param, value)
-
-        # Send OSC message to update parameter on SuperCollider
-        if self.engine.is_running:
-            try:
-                # Use EngineManager's set_node_param helper
-                self.engine.set_node_param(synth_id, **{param: value})
-                logger.debug(f"Set synth {synth_id} {param} = {value} on SuperCollider")
-            except Exception as e:
-                logger.error(f"Failed to update parameter on SuperCollider: {e}")
-        else:
-            logger.debug(f"Set synth {synth_id} {param} = {value} (SuperCollider not connected)")
-
-    def get_synth(self, synth_id: int) -> Optional[Synth]:
-        """Get synth by ID"""
-        return self.synths.get(synth_id)
-
-    def get_synthdefs(self) -> List[SynthDef]:
-        """Get all available SynthDefs"""
-        return list(self.synthdefs.values())
-
-    def register_synthdef(self, synthdef: SynthDef):
-        """Register a new SynthDef"""
-        self.synthdefs[synthdef.name] = synthdef
-        logger.info(f"Registered SynthDef: {synthdef.name}")
+        """Free a synth immediately (no release envelope)"""
+        try:
+            if synth_id not in self.active_synths:
+                raise ValueError(f"Synth {synth_id} not found")
+            
+            # Send /n_free message to scsynth
+            self.engine_manager.send_message("/n_free", synth_id)
+            
+            # Remove from active synths
+            del self.active_synths[synth_id]
+            
+            logger.info(f"🗑️  Freed synth {synth_id}")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to free synth: {e}")
+            raise
+    
+    async def free_all_synths(self):
+        """Free all active synths"""
+        try:
+            synth_ids = list(self.active_synths.keys())
+            for synth_id in synth_ids:
+                await self.free_synth(synth_id)
+            
+            logger.info("🗑️  Freed all synths")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to free all synths: {e}")
+            raise
+    
+    def get_active_synths(self) -> Dict[int, dict]:
+        """Get all active synths"""
+        return self.active_synths.copy()
+    
+    def get_synth_info(self, synth_id: int) -> Optional[dict]:
+        """Get info for a specific synth"""
+        return self.active_synths.get(synth_id)
 
