@@ -1,213 +1,189 @@
 /**
  * Transport Panel
  *
- * Playback controls and timeline navigation.
- * Play, pause, stop, record, and position display.
+ * Master playback controls - play, pause, stop, record.
+ * Shows position, tempo, time signature, and loop controls.
+ * Integrates with AudioEngineContext for real-time playback state.
  */
 
-import { useState, useEffect } from "react";
-import { Panel } from "@/components/ui/panel";
-import { SubPanel } from "@/components/ui/sub-panel";
-import { TransportButton } from "@/components/ui/transport-button";
-import { Knob } from "@/components/ui/knob";
-import { useTransportWebSocket } from "@/hooks/useTransportWebsocket";
-import { audioEngineService } from "@/services/api/audio-engine.service";
-import { Play, Pause, Square, SkipBack } from "lucide-react";
+import { useState } from "react";
+import { Play, Pause, Square, SkipBack, Circle, Repeat } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAudioEngine } from "@/contexts/AudioEngineContext";
 
 export function TransportPanel() {
-    const { transport, isConnected } = useTransportWebSocket();
-    const [currentSequenceId, setCurrentSequenceId] = useState<string | null>(null);
+    const {
+        isPlaying,
+        currentPosition,
+        tempo,
+        activeSequenceId,
+        playSequence,
+        stopPlayback,
+        setCurrentPosition,
+    } = useAudioEngine();
 
-    // Load active sequence on mount
-    useEffect(() => {
-        loadActiveSequence();
-    }, []);
+    const [isRecording, setIsRecording] = useState(false);
+    const [isLooping, setIsLooping] = useState(true);
 
-    const loadActiveSequence = async () => {
-        try {
-            const sequences = await audioEngineService.getSequences();
-            if (sequences.length > 0) {
-                setCurrentSequenceId(sequences[0].id);
-            }
-        } catch (error) {
-            console.error("Failed to load sequences:", error);
-        }
-    };
-
+    // Handle play/pause
     const handlePlay = async () => {
-        if (!currentSequenceId) return;
-        try {
-            await audioEngineService.playSequence(currentSequenceId);
-        } catch (error) {
-            console.error("Failed to play:", error);
+        if (isPlaying) {
+            await stopPlayback();
+        } else {
+            // If no sequence is active, we can't play
+            if (!activeSequenceId) {
+                console.warn("No active sequence to play");
+                return;
+            }
+            await playSequence(activeSequenceId);
         }
     };
 
-    const handlePause = async () => {
-        if (!currentSequenceId) return;
-        try {
-            await audioEngineService.pauseSequence(currentSequenceId);
-        } catch (error) {
-            console.error("Failed to pause:", error);
-        }
-    };
-
+    // Handle stop
     const handleStop = async () => {
-        try {
-            await audioEngineService.stopAll();
-        } catch (error) {
-            console.error("Failed to stop:", error);
-        }
+        await stopPlayback();
+        setCurrentPosition(0);
     };
 
-    const handleTempoChange = async (newTempo: number) => {
-        if (!currentSequenceId) return;
-        try {
-            await audioEngineService.setTempo(currentSequenceId, { tempo: newTempo });
-        } catch (error) {
-            console.error("Failed to set tempo:", error);
-        }
+    // Handle record
+    const handleRecord = () => {
+        setIsRecording(!isRecording);
+        // TODO: Implement recording functionality
     };
 
-    const handleSeek = async (position: number) => {
-        if (!currentSequenceId) return;
-        try {
-            await audioEngineService.seek(currentSequenceId, { position });
-        } catch (error) {
-            console.error("Failed to seek:", error);
-        }
+    // Handle rewind
+    const handleRewind = () => {
+        setCurrentPosition(0);
     };
 
-    // Format time display (beats or seconds)
-    const formatPosition = (beats: number) => {
-        const bars = Math.floor(beats / transport.time_signature_num) + 1;
-        const beat = Math.floor(beats % transport.time_signature_num) + 1;
-        const tick = Math.floor((beats % 1) * 960);
-        return `${bars}.${beat}.${tick.toString().padStart(3, "0")}`;
+    // Handle loop toggle
+    const handleToggleLoop = () => {
+        setIsLooping(!isLooping);
+        // TODO: Update sequence loop setting via API
     };
 
+    // Calculate position in seconds from beats and tempo
+    // Formula: seconds = (beats / tempo) * 60
+    const positionSeconds = (currentPosition / tempo) * 60;
+
+    // Format time as MM:SS.ms
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
-        const ms = Math.floor((seconds % 1) * 100);
-        return `${mins}:${secs.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
+        const ms = Math.floor((seconds % 1) * 10);
+        return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}.${ms}`;
+    };
+
+    // Format position as bars.beats.ticks
+    const formatPosition = (beats: number) => {
+        const bars = Math.floor(beats / 4) + 1;
+        const beat = Math.floor(beats % 4) + 1;
+        const ticks = Math.floor((beats % 1) * 960);
+        return `${bars}.${beat}.${ticks.toString().padStart(3, "0")}`;
     };
 
     return (
-        <Panel title="TRANSPORT" className="flex flex-col">
-            <div className="flex-1 p-4">
-                <div className="flex gap-4 h-full">
-                    {/* Transport Controls */}
-                    <SubPanel title="CONTROLS" className="flex-shrink-0">
-                        <div className="flex flex-col gap-3 p-4">
-                            {/* Main transport buttons */}
-                            <div className="flex gap-2 justify-center">
-                                <TransportButton
-                                    variant="default"
-                                    icon={<SkipBack className="h-4 w-4" />}
-                                    onClick={() => handleSeek(0)}
-                                    title="Return to Start"
-                                />
-                                <TransportButton
-                                    variant="play"
-                                    active={transport.is_playing}
-                                    icon={<Play className="h-5 w-5" />}
-                                    onClick={handlePlay}
-                                    disabled={!currentSequenceId}
-                                >
-                                    PLAY
-                                </TransportButton>
-                                <TransportButton
-                                    variant="default"
-                                    icon={<Pause className="h-4 w-4" />}
-                                    onClick={handlePause}
-                                    disabled={!currentSequenceId}
-                                >
-                                    PAUSE
-                                </TransportButton>
-                                <TransportButton
-                                    variant="stop"
-                                    icon={<Square className="h-4 w-4" />}
-                                    onClick={handleStop}
-                                >
-                                    STOP
-                                </TransportButton>
-                            </div>
+        <div className="flex items-center justify-between px-4 py-2 h-full bg-gradient-to-r from-muted/20 to-muted/10">
+            {/* Transport Controls */}
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={handleRewind}
+                    className="p-2 hover:bg-muted rounded transition-colors"
+                    title="Rewind to start"
+                >
+                    <SkipBack size={18} className="text-muted-foreground" />
+                </button>
+                <button
+                    onClick={handlePlay}
+                    className={cn(
+                        "p-3 rounded-lg transition-all",
+                        isPlaying
+                            ? "bg-primary/20 text-primary hover:bg-primary/30"
+                            : "bg-muted hover:bg-muted/80 text-foreground"
+                    )}
+                    title={isPlaying ? "Pause" : "Play"}
+                >
+                    {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+                </button>
+                <button
+                    onClick={handleStop}
+                    className="p-2 hover:bg-destructive/20 text-destructive rounded transition-colors"
+                    title="Stop"
+                >
+                    <Square size={18} />
+                </button>
+                <button
+                    onClick={handleRecord}
+                    className={cn(
+                        "p-2 rounded transition-colors",
+                        isRecording
+                            ? "bg-destructive/30 text-destructive animate-pulse"
+                            : "hover:bg-muted text-muted-foreground"
+                    )}
+                    title={isRecording ? "Stop recording" : "Record"}
+                >
+                    <Circle size={18} fill={isRecording ? "currentColor" : "none"} />
+                </button>
+                <button
+                    onClick={handleToggleLoop}
+                    className={cn(
+                        "p-2 rounded transition-colors",
+                        isLooping
+                            ? "bg-secondary/30 text-secondary"
+                            : "hover:bg-muted text-muted-foreground"
+                    )}
+                    title={isLooping ? "Loop enabled" : "Loop disabled"}
+                >
+                    <Repeat size={18} />
+                </button>
+            </div>
 
-                            {/* Connection status */}
-                            <div className="flex items-center justify-center gap-2 text-xs">
-                                <div
-                                    className={`h-2 w-2 rounded-full ${
-                                        isConnected ? "bg-green-500" : "bg-red-500"
-                                    }`}
-                                />
-                                <span className="text-muted-foreground">
-                                    {isConnected ? "Connected" : "Disconnected"}
-                                </span>
-                            </div>
-                        </div>
-                    </SubPanel>
+            {/* Position Display */}
+            <div className="flex items-center gap-6">
+                {/* Time */}
+                <div className="text-center">
+                    <div className="text-xs text-muted-foreground mb-0.5">TIME</div>
+                    <div className="text-xl font-mono text-primary font-bold">
+                        {formatTime(positionSeconds)}
+                    </div>
+                </div>
 
-                    {/* Position Display */}
-                    <SubPanel title="POSITION" className="flex-1">
-                        <div className="flex flex-col gap-4 p-4">
-                            {/* Bar.Beat.Tick */}
-                            <div className="text-center">
-                                <div className="text-xs text-muted-foreground mb-1">
-                                    BAR.BEAT.TICK
-                                </div>
-                                <div className="text-2xl font-mono font-bold text-cyan-400">
-                                    {formatPosition(transport.position_beats)}
-                                </div>
-                            </div>
+                {/* Position (Bars.Beats.Ticks) */}
+                <div className="text-center">
+                    <div className="text-xs text-muted-foreground mb-0.5">POSITION</div>
+                    <div className="text-xl font-mono text-secondary font-bold">
+                        {formatPosition(currentPosition)}
+                    </div>
+                </div>
 
-                            {/* Time */}
-                            <div className="text-center">
-                                <div className="text-xs text-muted-foreground mb-1">
-                                    TIME
-                                </div>
-                                <div className="text-xl font-mono text-purple-400">
-                                    {formatTime(transport.position_seconds)}
-                                </div>
-                            </div>
-                        </div>
-                    </SubPanel>
+                {/* Tempo */}
+                <div className="text-center">
+                    <div className="text-xs text-muted-foreground mb-0.5">TEMPO</div>
+                    <div className="text-xl font-mono text-primary font-bold">
+                        {tempo} <span className="text-sm text-muted-foreground">BPM</span>
+                    </div>
+                </div>
 
-                    {/* Tempo & Time Signature */}
-                    <SubPanel title="TEMPO" className="flex-shrink-0">
-                        <div className="flex flex-col items-center gap-4 p-4">
-                            {/* Tempo knob */}
-                            <Knob
-                                value={transport.tempo}
-                                onChange={handleTempoChange}
-                                label="BPM"
-                                min={20}
-                                max={300}
-                                format="default"
-                            />
-
-                            {/* Tempo display */}
-                            <div className="text-center">
-                                <div className="text-2xl font-mono font-bold text-cyan-400">
-                                    {transport.tempo.toFixed(1)}
-                                </div>
-                                <div className="text-xs text-muted-foreground">BPM</div>
-                            </div>
-
-                            {/* Time signature */}
-                            <div className="text-center">
-                                <div className="text-lg font-mono text-purple-400">
-                                    {transport.time_signature_num}/{transport.time_signature_den}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                    TIME SIG
-                                </div>
-                            </div>
-                        </div>
-                    </SubPanel>
+                {/* Time Signature */}
+                <div className="text-center">
+                    <div className="text-xs text-muted-foreground mb-0.5">TIME SIG</div>
+                    <div className="text-xl font-mono text-secondary font-bold">
+                        4/4
+                    </div>
                 </div>
             </div>
-        </Panel>
+
+            {/* Status Indicator */}
+            <div className="flex items-center gap-2">
+                <div className={cn(
+                    "h-2 w-2 rounded-full",
+                    isPlaying ? "bg-primary animate-pulse" : "bg-muted-foreground"
+                )} />
+                <span className="text-xs text-muted-foreground font-mono">
+                    {isPlaying ? "PLAYING" : "STOPPED"}
+                </span>
+            </div>
+        </div>
     );
 }
 

@@ -1,139 +1,125 @@
 /**
  * Metering Panel
  *
- * Real-time audio level metering for all tracks and master.
- * Displays VU meters with peak and RMS levels.
+ * Real-time audio level metering with peak and RMS displays.
+ * Integrates with AudioEngineContext for real-time WebSocket meter data.
  */
 
-import { useEffect, useState } from "react";
-import { Panel } from "@/components/ui/panel";
 import { SubPanel } from "@/components/ui/sub-panel";
-import { Meter } from "@/components/ui/meter";
-import { useMeterWebSocket } from "@/hooks/useMeterWebsocket";
-import { audioEngineService } from "@/services/api/audio-engine.service";
-
-interface Track {
-    id: string;
-    name: string;
-}
+import { useAudioEngine } from "@/contexts/AudioEngineContext";
+import { Activity } from "lucide-react";
 
 export function MeteringPanel() {
-    const { meters, isConnected } = useMeterWebSocket();
-    const [tracks, setTracks] = useState<Track[]>([]);
+    const { meters, tracks, masterTrack } = useAudioEngine();
 
-    // Load tracks
-    useEffect(() => {
-        loadTracks();
-    }, []);
-
-    const loadTracks = async () => {
-        try {
-            const response = await audioEngineService.getTracks();
-            setTracks(
-                response.map((t: any) => ({
-                    id: t.id,
-                    name: t.name,
-                }))
-            );
-        } catch (error) {
-            console.error("Failed to load tracks:", error);
-        }
+    // Convert linear amplitude (0-1) to dB
+    const linearToDb = (linear: number): number => {
+        if (linear === 0) return -Infinity;
+        return 20 * Math.log10(linear);
     };
 
+    // Convert dB to 0-1 range for display (-60dB to 0dB)
+    const dbToLevel = (db: number): number => {
+        if (!isFinite(db)) return 0;
+        return Math.max(0, Math.min(1, (db + 60) / 60));
+    };
+
+    // Get all track IDs including master
+    const allTrackIds = [...tracks.map(t => t.id), ...(masterTrack ? ["master"] : [])];
+
     return (
-        <Panel title="METERING" className="flex flex-col">
-            <div className="flex-1 p-4 overflow-auto">
-                {/* Connection status */}
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-muted-foreground">
-                        TRACK METERS
-                    </h3>
-                    <div className="flex items-center gap-2 text-xs">
-                        <div
-                            className={`h-2 w-2 rounded-full ${
-                                isConnected ? "bg-green-500" : "bg-red-500"
-                            }`}
-                        />
-                        <span className="text-muted-foreground">
-                            {isConnected ? "Connected" : "Disconnected"}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Track meters */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                    {tracks.map((track) => {
-                        const meterData = meters[track.id] || {
-                            peakLeft: -96,
-                            peakRight: -96,
-                            rmsLeft: -96,
-                            rmsRight: -96,
-                        };
-
-                        return (
-                            <SubPanel key={track.id} title={track.name}>
-                                <div className="flex flex-col items-center gap-2 p-3">
-                                    <Meter
-                                        peak={meterData.peakLeft}
-                                        rms={meterData.rmsLeft}
-                                        peakRight={meterData.peakRight}
-                                        rmsRight={meterData.rmsRight}
-                                        stereo
-                                    />
-                                    <div className="text-xs font-mono text-center">
-                                        <div className="text-cyan-400">
-                                            L: {meterData.peakLeft > -96 ? meterData.peakLeft.toFixed(1) : "-∞"}
-                                        </div>
-                                        <div className="text-purple-400">
-                                            R: {meterData.peakRight > -96 ? meterData.peakRight.toFixed(1) : "-∞"}
-                                        </div>
-                                    </div>
-                                </div>
-                            </SubPanel>
-                        );
-                    })}
-                </div>
-
-                {/* Master meter */}
-                {meters.master && (
-                    <div className="mt-6">
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-4">
-                            MASTER
-                        </h3>
-                        <SubPanel title="MASTER OUTPUT" className="max-w-xs mx-auto">
-                            <div className="flex flex-col items-center gap-2 p-4">
-                                <Meter
-                                    peak={meters.master.peakLeft}
-                                    rms={meters.master.rmsLeft}
-                                    peakRight={meters.master.peakRight}
-                                    rmsRight={meters.master.rmsRight}
-                                    stereo
-                                    className="h-48"
-                                />
-                                <div className="text-sm font-mono text-center">
-                                    <div className="text-cyan-400 font-bold">
-                                        L: {meters.master.peakLeft > -96 ? meters.master.peakLeft.toFixed(1) : "-∞"} dB
-                                    </div>
-                                    <div className="text-purple-400 font-bold">
-                                        R: {meters.master.peakRight > -96 ? meters.master.peakRight.toFixed(1) : "-∞"} dB
-                                    </div>
-                                </div>
-                            </div>
-                        </SubPanel>
-                    </div>
-                )}
-
-                {/* Empty state */}
-                {tracks.length === 0 && (
-                    <div className="flex h-full items-center justify-center">
+        <div className="flex-1 flex flex-col gap-2 overflow-hidden h-full p-2">
+            <SubPanel title="Level Meters" className="flex-1 overflow-auto">
+                {allTrackIds.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center p-8">
                         <div className="text-center text-muted-foreground">
+                            <Activity size={48} className="mx-auto mb-2 opacity-50" />
                             <p className="text-sm">No tracks to meter</p>
-                            <p className="text-xs mt-1">Create tracks in the Mixer panel</p>
                         </div>
                     </div>
+                ) : (
+                    <div className="p-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {allTrackIds.map((trackId) => {
+                            const meter = meters[trackId];
+                            const track = trackId === "master" ? masterTrack : tracks.find(t => t.id === trackId);
+                            const trackName = track?.name || trackId;
+
+                            // Calculate peak and RMS in dB
+                            const peakL = meter ? linearToDb(meter.peakL) : -Infinity;
+                            const peakR = meter ? linearToDb(meter.peakR) : -Infinity;
+                            const rmsL = meter ? linearToDb(meter.rmsL) : -Infinity;
+                            const rmsR = meter ? linearToDb(meter.rmsR) : -Infinity;
+                            const peakMax = Math.max(peakL, peakR);
+                            const rmsAvg = (rmsL + rmsR) / 2;
+
+                            return (
+                                <div key={trackId} className="flex flex-col gap-2 bg-muted/20 rounded-lg p-2">
+                                    {/* Meter Name */}
+                                    <div className={`text-xs font-semibold uppercase text-center truncate ${trackId === "master" ? "text-primary" : "text-foreground"}`}>
+                                        {trackName}
+                                    </div>
+
+                                    {/* Stereo Meter Bars */}
+                                    <div className="flex gap-1 h-32">
+                                        {/* Left Channel */}
+                                        <div className="flex-1 bg-gray-900/50 rounded relative overflow-hidden">
+                                            {/* RMS Level (background) */}
+                                            <div
+                                                className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-green-600 via-yellow-600 to-red-600 opacity-40 transition-all duration-75"
+                                                style={{ height: `${dbToLevel(rmsL) * 100}%` }}
+                                            />
+                                            {/* Peak Level (foreground) */}
+                                            <div
+                                                className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-green-500 via-yellow-500 to-red-500 transition-all duration-75"
+                                                style={{ height: `${dbToLevel(peakL) * 100}%` }}
+                                            />
+                                            {/* Clip indicator */}
+                                            {peakL > -0.5 && (
+                                                <div className="absolute top-0 left-0 right-0 h-1 bg-red-500 animate-pulse" />
+                                            )}
+                                            <div className="absolute bottom-0 left-0 right-0 text-center text-[8px] text-white/50 font-bold">
+                                                L
+                                            </div>
+                                        </div>
+
+                                        {/* Right Channel */}
+                                        <div className="flex-1 bg-gray-900/50 rounded relative overflow-hidden">
+                                            {/* RMS Level (background) */}
+                                            <div
+                                                className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-green-600 via-yellow-600 to-red-600 opacity-40 transition-all duration-75"
+                                                style={{ height: `${dbToLevel(rmsR) * 100}%` }}
+                                            />
+                                            {/* Peak Level (foreground) */}
+                                            <div
+                                                className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-green-500 via-yellow-500 to-red-500 transition-all duration-75"
+                                                style={{ height: `${dbToLevel(peakR) * 100}%` }}
+                                            />
+                                            {/* Clip indicator */}
+                                            {peakR > -0.5 && (
+                                                <div className="absolute top-0 left-0 right-0 h-1 bg-red-500 animate-pulse" />
+                                            )}
+                                            <div className="absolute bottom-0 left-0 right-0 text-center text-[8px] text-white/50 font-bold">
+                                                R
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Peak/RMS Values */}
+                                    <div className="text-[10px] font-mono text-center space-y-0.5">
+                                        <div className={`${peakMax > -0.5 ? "text-red-400 font-bold" : "text-cyan-400"}`}>
+                                            Peak: {isFinite(peakMax) ? peakMax.toFixed(1) : "-∞"} dB
+                                        </div>
+                                        <div className="text-muted-foreground">
+                                            RMS: {isFinite(rmsAvg) ? rmsAvg.toFixed(1) : "-∞"} dB
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 )}
-            </div>
-        </Panel>
+            </SubPanel>
+        </div>
     );
 }
 

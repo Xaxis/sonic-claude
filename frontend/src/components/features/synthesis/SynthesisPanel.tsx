@@ -1,244 +1,172 @@
 /**
  * Synthesis Panel
  *
- * Synth management and parameter control.
- * Create, edit, and control SuperCollider synths.
+ * Synth voice management - create, edit, and control synth instances.
+ * Shows active synths with their parameters.
+ * Integrates with AudioEngineContext for real synth management.
  */
 
-import { useEffect, useState } from "react";
-import { Panel } from "@/components/ui/panel";
+import { useState, useEffect } from "react";
 import { SubPanel } from "@/components/ui/sub-panel";
-import { Knob } from "@/components/ui/knob";
-import { audioEngineService } from "@/services/api/audio-engine.service";
-import { Plus, X } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Plus, Waves, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// Backend API types (matching backend/routes/synthesis.py)
-interface SynthDefResponse {
-    name: string;
-    category: string;
-    parameters: Record<string, number>;
-    description: string;
-    parameter_ranges: Record<string, [number, number]>;
-    parameter_descriptions: Record<string, string>;
-}
-
-interface SynthResponse {
-    id: number;
-    synthdef: string;
-    parameters: Record<string, number>;
-    group: number;
-    bus: number | null;
-}
+import { useAudioEngine } from "@/contexts/AudioEngineContext";
 
 export function SynthesisPanel() {
-    const [synthDefs, setSynthDefs] = useState<SynthDefResponse[]>([]);
-    const [activeSynths, setActiveSynths] = useState<SynthResponse[]>([]);
-    const [selectedCategory, setSelectedCategory] = useState<string>("all");
+    const {
+        activeSynths,
+        synthDefs,
+        loadSynthDefs,
+        createSynth,
+        updateSynthParameter,
+        deleteSynth,
+    } = useAudioEngine();
 
-    // Load synth definitions
+    const [selectedSynthId, setSelectedSynthId] = useState<string | null>(null);
+
+    // Load synth definitions on mount
     useEffect(() => {
         loadSynthDefs();
-    }, []);
+    }, [loadSynthDefs]);
 
-    const loadSynthDefs = async () => {
-        try {
-            const defs = await audioEngineService.getSynthDefs();
-            // Cast to SynthDefResponse[] since the API returns the correct type
-            setSynthDefs(defs as unknown as SynthDefResponse[]);
-        } catch (error) {
-            console.error("Failed to load synth definitions:", error);
+    // Auto-select first synth if none selected
+    useEffect(() => {
+        if (!selectedSynthId && activeSynths.length > 0) {
+            setSelectedSynthId(activeSynths[0].id);
+        }
+    }, [activeSynths, selectedSynthId]);
+
+    // Handle adding a new synth
+    const handleAddSynth = async () => {
+        // For now, create a default synth
+        // TODO: Show dialog to select synth type
+        if (synthDefs.length > 0) {
+            await createSynth(synthDefs[0].name);
+        } else {
+            console.warn("No synth definitions available");
         }
     };
 
-    // Get unique categories
-    const categories = ["all", ...Array.from(new Set(synthDefs.map((def) => def.category)))];
-
-    // Filter synths by category
-    const filteredSynths =
-        selectedCategory === "all"
-            ? synthDefs
-            : synthDefs.filter((def) => def.category === selectedCategory);
-
-    // Add synth
-    const handleAddSynth = async (synthDef: SynthDefResponse) => {
-        try {
-            // Backend expects CreateSynthRequest with group and bus
-            const baseURL = (audioEngineService as any).baseURL || "http://localhost:8000";
-            const response = await fetch(`${baseURL}/audio/synthesis/synths`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    synthdef: synthDef.name,
-                    parameters: synthDef.parameters,
-                    group: 1, // Synth group
-                    bus: null,
-                }),
-            });
-            const synth: SynthResponse = await response.json();
-            setActiveSynths([...activeSynths, synth]);
-        } catch (error) {
-            console.error("Failed to create synth:", error);
+    // Handle parameter change
+    const handleParameterChange = async (synthId: string, param: string, value: number) => {
+        const synth = activeSynths.find(s => s.id === synthId);
+        if (synth) {
+            await updateSynthParameter(synth.node_id, param, value);
         }
     };
 
-    // Remove synth
-    const handleRemoveSynth = async (synthId: number) => {
-        try {
-            await audioEngineService.freeSynth(synthId.toString());
-            setActiveSynths(activeSynths.filter((s) => s.id !== synthId));
-        } catch (error) {
-            console.error("Failed to remove synth:", error);
+    // Handle delete synth
+    const handleDeleteSynth = async (synthId: string) => {
+        const synth = activeSynths.find(s => s.id === synthId);
+        if (synth) {
+            await deleteSynth(synth.node_id);
+            if (selectedSynthId === synthId) {
+                setSelectedSynthId(null);
+            }
         }
     };
 
-    // Update synth parameter
-    const handleParameterChange = async (synthId: number, parameter: string, value: number) => {
-        try {
-            // Backend expects UpdateSynthRequest with parameter and value fields
-            const baseURL = (audioEngineService as any).baseURL || "http://localhost:8000";
-            const response = await fetch(`${baseURL}/audio/synthesis/synths/${synthId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    parameter,
-                    value,
-                }),
-            });
-            await response.json();
-            setActiveSynths(
-                activeSynths.map((s) =>
-                    s.id === synthId ? { ...s, parameters: { ...s.parameters, [parameter]: value } } : s
-                )
-            );
-        } catch (error) {
-            console.error("Failed to update synth parameter:", error);
-        }
-    };
+    const selectedSynth = activeSynths.find(s => s.id === selectedSynthId);
 
     return (
-        <Panel title="SYNTHESIS" className="flex flex-col">
-            <div className="flex-1 p-4 overflow-auto flex gap-4">
-                {/* Synth Browser */}
-                <div className="w-1/3 flex flex-col gap-4">
-                    <SubPanel title="SYNTH BROWSER">
-                        <div className="p-3">
-                            {/* Category filter */}
-                            <div className="flex flex-wrap gap-1 mb-3">
-                                {categories.map((category) => (
+        <div className="flex-1 flex gap-2 overflow-hidden h-full p-2">
+            {/* Synth List */}
+            <div className="w-64 flex flex-col gap-2">
+                <SubPanel title="Active Synths" className="flex-1 overflow-auto">
+                    <div className="flex flex-col gap-1 p-2">
+                        {activeSynths.length === 0 ? (
+                            <div className="p-4 text-center text-sm text-muted-foreground">
+                                No active synths
+                            </div>
+                        ) : (
+                            activeSynths.map((synth) => (
+                                <div
+                                    key={synth.id}
+                                    className={cn(
+                                        "p-3 rounded-lg transition-all border group",
+                                        selectedSynthId === synth.id
+                                            ? "bg-primary/20 border-primary text-primary"
+                                            : "bg-muted/30 border-border hover:bg-muted/50"
+                                    )}
+                                >
                                     <button
-                                        key={category}
-                                        onClick={() => setSelectedCategory(category)}
-                                        className={cn(
-                                            "px-2 py-1 text-xs font-semibold rounded transition-colors",
-                                            selectedCategory === category
-                                                ? "bg-cyan-500 text-black"
-                                                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                                        )}
+                                        onClick={() => setSelectedSynthId(synth.id)}
+                                        className="w-full text-left"
                                     >
-                                        {category.toUpperCase()}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* Synth list */}
-                            <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                                {filteredSynths.map((synthDef) => (
-                                    <div
-                                        key={synthDef.name}
-                                        className="p-2 bg-gray-800/50 rounded hover:bg-gray-700/50 transition-colors"
-                                    >
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-sm font-semibold text-cyan-400 truncate">
-                                                    {synthDef.name}
-                                                </div>
-                                                <div className="text-xs text-muted-foreground mt-1">
-                                                    {synthDef.description}
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() => handleAddSynth(synthDef)}
-                                                className="flex-shrink-0 p-1 bg-cyan-500 hover:bg-cyan-400 text-black rounded transition-colors"
-                                                title="Add synth"
-                                            >
-                                                <Plus className="w-4 h-4" />
-                                            </button>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="font-semibold">{synth.synthdef}</span>
+                                            <Waves size={16} className="text-muted-foreground" />
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </SubPanel>
-                </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            Node: {synth.node_id} • {synth.is_playing ? "Playing" : "Stopped"}
+                                        </div>
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteSynth(synth.id)}
+                                        className="mt-2 w-full p-1 rounded bg-destructive/20 hover:bg-destructive/30 text-destructive text-xs flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <Trash2 size={12} />
+                                        Delete
+                                    </button>
+                                </div>
+                            ))
+                        )}
+                        <button
+                            onClick={handleAddSynth}
+                            className="p-3 rounded-lg border border-dashed border-border hover:border-primary hover:bg-primary/10 transition-all flex items-center justify-center gap-2 text-muted-foreground hover:text-primary"
+                        >
+                            <Plus size={16} />
+                            <span className="text-sm">Add Synth</span>
+                        </button>
+                    </div>
+                </SubPanel>
+            </div>
 
-                {/* Active Synths */}
-                <div className="flex-1 flex flex-col gap-4">
-                    <SubPanel title="ACTIVE SYNTHS">
-                        <div className="p-3">
-                            {activeSynths.length === 0 ? (
-                                <div className="text-center py-8 text-muted-foreground">
-                                    No active synths. Add a synth from the browser.
+            {/* Synth Parameters */}
+            {selectedSynth ? (
+                <div className="flex-1 flex flex-col gap-2">
+                    <SubPanel title={`${selectedSynth.synthdef} Parameters`} className="flex-1 overflow-auto">
+                        <div className="p-4 space-y-4">
+                            {Object.keys(selectedSynth.parameters).length === 0 ? (
+                                <div className="text-center text-sm text-muted-foreground py-8">
+                                    No parameters available
                                 </div>
                             ) : (
-                                <div className="space-y-3">
-                                    {activeSynths.map((synth) => {
-                                        const synthDef = synthDefs.find((def) => def.name === synth.synthdef);
-                                        if (!synthDef) return null;
-
-                                        return (
-                                            <SubPanel key={synth.id} title={synthDef.name.toUpperCase()}>
-                                                <div className="p-3">
-                                                    {/* Header */}
-                                                    <div className="flex items-center justify-between mb-3">
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="text-xs text-muted-foreground">
-                                                                {synthDef.description}
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                            <button
-                                                                onClick={() => handleRemoveSynth(synth.id)}
-                                                                className="p-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors"
-                                                                title="Remove synth"
-                                                            >
-                                                                <X className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Parameters */}
-                                                    <div className="grid grid-cols-3 gap-4">
-                                                        {Object.entries(synthDef.parameter_ranges).map(
-                                                            ([param, range]) => {
-                                                                const currentValue = synth.parameters[param] ?? synthDef.parameters[param];
-                                                                return (
-                                                                    <Knob
-                                                                        key={param}
-                                                                        value={currentValue}
-                                                                        onChange={(value) =>
-                                                                            handleParameterChange(synth.id, param, value)
-                                                                        }
-                                                                        label={param.toUpperCase()}
-                                                                        min={range[0]}
-                                                                        max={range[1]}
-                                                                        format="default"
-                                                                    />
-                                                                );
-                                                            }
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </SubPanel>
-                                        );
-                                    })}
-                                </div>
+                                Object.entries(selectedSynth.parameters).map(([param, value]) => (
+                                    <div key={param}>
+                                        <div className="flex justify-between mb-1">
+                                            <label className="text-xs text-muted-foreground capitalize">
+                                                {param.replace(/_/g, " ")}
+                                            </label>
+                                            <span className="text-xs font-mono text-foreground">
+                                                {typeof value === "number" ? value.toFixed(3) : value}
+                                            </span>
+                                        </div>
+                                        {typeof value === "number" && (
+                                            <Slider
+                                                value={value}
+                                                onChange={(v) => handleParameterChange(selectedSynth.id, param, v)}
+                                                min={0}
+                                                max={1}
+                                                step={0.01}
+                                            />
+                                        )}
+                                    </div>
+                                ))
                             )}
                         </div>
                     </SubPanel>
                 </div>
-            </div>
-        </Panel>
+            ) : (
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center text-muted-foreground">
+                        <Waves size={48} className="mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Select a synth to edit parameters</p>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }
 

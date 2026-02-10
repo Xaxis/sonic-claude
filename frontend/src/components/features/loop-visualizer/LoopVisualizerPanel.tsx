@@ -9,7 +9,6 @@
  * This is the HEART of the feedback loop system.
  */
 
-import { Panel } from "@/components/ui/panel";
 import { SubPanel } from "@/components/ui/sub-panel";
 import { useEffect, useRef } from "react";
 import { useAudioEngine } from "@/contexts/AudioEngineContext";
@@ -93,8 +92,7 @@ export function LoopVisualizerPanel() {
     }, [waveform]);
 
     return (
-        <Panel title="LOOP" className="flex flex-col">
-            <div className="flex-1 flex flex-col gap-2 p-2 overflow-hidden">
+        <div className="flex-1 flex flex-col gap-2 p-2 overflow-hidden h-full">
                 {/* Waveform */}
                 <SubPanel title="Waveform" className="flex-1">
                     <canvas
@@ -117,12 +115,11 @@ export function LoopVisualizerPanel() {
                     />
                 </SubPanel>
 
-                {/* Loop Info */}
-                <div className="text-xs text-muted-foreground text-center py-1">
-                    Click to decompose • Drag to extract • Right-click for options
-                </div>
+            {/* Loop Info */}
+            <div className="text-xs text-muted-foreground text-center py-1 border-t border-border bg-muted/20">
+                Click to decompose • Drag to extract • Right-click for options
             </div>
-        </Panel>
+        </div>
     );
 }
 

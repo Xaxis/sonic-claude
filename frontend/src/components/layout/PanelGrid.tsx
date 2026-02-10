@@ -23,6 +23,7 @@ export interface PanelConfig {
     title: string;
     component: React.ReactNode;
     closeable?: boolean;
+    getSubtitle?: () => string; // Function to get dynamic subtitle
     defaultLayout?: {
         x: number;
         y: number;
@@ -72,11 +73,6 @@ export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridPro
         onLayoutChange?.([...newLayout]);
     };
 
-    const handlePanelClose = (panelId: string) => {
-        onPanelClose?.(panelId);
-        // TODO: Broadcast via BroadcastChannel
-    };
-
     // If no panels, show empty state
     if (panels.length === 0) {
         return (
@@ -92,7 +88,7 @@ export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridPro
     }
 
     return (
-        <div ref={containerRef} className="h-full w-full overflow-hidden">
+        <div ref={containerRef} className="h-full w-full overflow-auto">
             <GridLayout
                 className="layout"
                 layout={layout}
@@ -113,9 +109,10 @@ export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridPro
                     <div key={panel.id} className="grid-item-wrapper">
                         <Panel
                             title={panel.title}
+                            subtitle={panel.getSubtitle?.()}
                             draggable={true}
                             closeable={panel.closeable ?? true}
-                            onClose={() => handlePanelClose(panel.id)}
+                            onClose={() => onPanelClose?.(panel.id)}
                         >
                             {panel.component}
                         </Panel>

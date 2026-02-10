@@ -1,11 +1,48 @@
 /**
  * Layout Configuration
- * 
+ *
  * Central configuration for all layout-related settings:
  * - Default panel definitions
  * - Default tab structure
  * - Grid layout settings
  * - Storage keys
+ *
+ * ============================================================================
+ * CRITICAL PANEL ARCHITECTURE PATTERN - READ THIS BEFORE CREATING PANELS!
+ * ============================================================================
+ *
+ * 1. ALL panel components MUST wrap their content in <Panel> component
+ * 2. Panel component handles: title, subtitle, drag handle, close button
+ * 3. PanelGrid does NOT wrap panels - it renders panel.component directly
+ * 4. Each panel manages its own Panel wrapper with DYNAMIC subtitle
+ *
+ * CORRECT PATTERN:
+ * ```tsx
+ * export function MyPanel() {
+ *   const [activeTab, setActiveTab] = useState("tab1");
+ *
+ *   // Subtitle shows DYNAMIC STATUS - never static text!
+ *   const getSubtitle = () => {
+ *     return `${activeTab} • 5 items • Active`;
+ *   };
+ *
+ *   return (
+ *     <Panel title="MY PANEL" subtitle={getSubtitle()} draggable={true}>
+ *       <SubPanel title="Section">
+ *         {content}
+ *       </SubPanel>
+ *     </Panel>
+ *   );
+ * }
+ * ```
+ *
+ * SUBTITLE EXAMPLES (show context, NOT title):
+ * - INPUT: "Library • 1,247 samples loaded"
+ * - LOOP: "Active • 120 BPM • 4/4 • Position: 8.2 beats"
+ * - MIXER: "8 tracks • Master: -6.2 dB"
+ * - AI AGENT: "Ready • 3 suggestions pending"
+ *
+ * ============================================================================
  */
 
 import type { PanelConfig } from "@/components/layout";
@@ -54,6 +91,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         title: "INPUT",
         component: createElement(InputPanel),
         closeable: false,
+        getSubtitle: () => "Library • 4 samples loaded", // TODO: Make dynamic
         defaultLayout: { x: 0, y: 0, w: 3, h: 12 },
     },
 
@@ -63,6 +101,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         title: "LOOP",
         component: createElement(LoopVisualizerPanel),
         closeable: false,
+        getSubtitle: () => "Active • 120 BPM • 4/4 • Position: 8.2 beats", // TODO: Make dynamic
         defaultLayout: { x: 3, y: 0, w: 6, h: 6 },
     },
     {
@@ -70,6 +109,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         title: "SEQUENCER",
         component: createElement(SequencerPanel),
         closeable: false,
+        getSubtitle: () => "Timeline-based arrangement",
         defaultLayout: { x: 3, y: 6, w: 6, h: 4 },
     },
     {
@@ -77,6 +117,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         title: "TRANSPORT",
         component: createElement(TransportPanel),
         closeable: false,
+        getSubtitle: () => "Master playback controls",
         defaultLayout: { x: 3, y: 10, w: 6, h: 2 },
     },
 
@@ -86,6 +127,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         title: "SYNTHESIS",
         component: createElement(SynthesisPanel),
         closeable: true,
+        getSubtitle: () => "Synth voice management",
         defaultLayout: { x: 9, y: 0, w: 3, h: 4 },
     },
     {
@@ -93,6 +135,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         title: "EFFECTS",
         component: createElement(EffectsPanel),
         closeable: true,
+        getSubtitle: () => "5 effects in chain • 4 active",
         defaultLayout: { x: 9, y: 4, w: 3, h: 4 },
     },
     {
@@ -100,6 +143,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         title: "MIXER",
         component: createElement(MixerPanel),
         closeable: false,
+        getSubtitle: () => "8 tracks • Master: -6.2 dB",
         defaultLayout: { x: 9, y: 8, w: 3, h: 4 },
     },
 
@@ -109,13 +153,15 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         title: "METERING",
         component: createElement(MeteringPanel),
         closeable: true,
-        defaultLayout: { x: 0, y: 12, w: 4, h: 3 },
+        getSubtitle: () => "Peak: -3.2 dB • RMS: -12.4 dB",
+        defaultLayout: { x: 0, y: 12, w: 3, h: 3 },
     },
     {
         id: "piano-roll",
         title: "PIANO ROLL",
         component: createElement(PianoRollPanel),
         closeable: true,
+        getSubtitle: () => "Clip: Bass Line • 7 notes • C3-C6",
         defaultLayout: { x: 4, y: 12, w: 8, h: 6 },
     },
     {
@@ -123,6 +169,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         title: "AI AGENT",
         component: createElement(AIChatPanel),
         closeable: true,
+        getSubtitle: () => "Ready • 3 suggestions pending",
         defaultLayout: { x: 0, y: 15, w: 12, h: 4 },
     },
 
