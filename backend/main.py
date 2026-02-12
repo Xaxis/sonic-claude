@@ -16,8 +16,9 @@ from backend.core.engine_manager import AudioEngineManager
 from backend.services.audio_analyzer import AudioAnalyzerService
 from backend.services.audio_input_service import AudioInputService
 from backend.services.synthesis_service import SynthesisService
+from backend.services.sequencer_service import SequencerService
 from backend.services.websocket_manager import WebSocketManager
-from backend.api import audio_routes, websocket_routes
+from backend.api import audio_routes, websocket_routes, sequencer_routes, sample_routes
 
 # Configure logging
 logging.basicConfig(
@@ -31,13 +32,14 @@ engine_manager: AudioEngineManager = None
 audio_analyzer: AudioAnalyzerService = None
 audio_input_service: AudioInputService = None
 synthesis_service: SynthesisService = None
+sequencer_service: SequencerService = None
 ws_manager: WebSocketManager = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager - sets up the complete pipeline"""
-    global engine_manager, audio_analyzer, audio_input_service, synthesis_service, ws_manager
+    global engine_manager, audio_analyzer, audio_input_service, synthesis_service, sequencer_service, ws_manager
     
     logger.info("🚀 Starting Sonic Claude Backend...")
     logger.info("=" * 60)
@@ -58,6 +60,7 @@ async def lifespan(app: FastAPI):
         audio_analyzer = AudioAnalyzerService(engine_manager)
         audio_input_service = AudioInputService(engine_manager)
         synthesis_service = SynthesisService(engine_manager)
+        sequencer_service = SequencerService(engine_manager, ws_manager)
 
         # Step 4: Wire up the pipeline (Audio Analyzer → WebSocket Manager)
         logger.info("🔌 Wiring up audio pipeline...")
@@ -72,6 +75,7 @@ async def lifespan(app: FastAPI):
         
         # Step 5: Inject services into API routes
         audio_routes.set_services(synthesis_service, audio_analyzer)
+        sequencer_routes.set_sequencer_service(sequencer_service)
         
         # Step 6: Wait for SynthDefs to load (they're loaded in osc_relay.scd)
         logger.info("⏳ Waiting for SynthDefs to load in OSC relay...")
@@ -156,7 +160,9 @@ app.add_middleware(
 
 # Include routers
 app.include_router(audio_routes.router, prefix="/audio-engine/audio", tags=["audio"])
+app.include_router(sequencer_routes.router, prefix="/audio-engine/audio/sequencer", tags=["sequencer"])
 app.include_router(websocket_routes.router, prefix="/audio-engine/ws", tags=["websocket"])
+app.include_router(sample_routes.router, prefix="/api/samples", tags=["samples"])
 
 
 @app.get("/")

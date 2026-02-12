@@ -33,7 +33,7 @@
  */
 
 import * as React from "react";
-import { X } from "lucide-react";
+import { X, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface PanelProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -51,6 +51,12 @@ export interface PanelProps extends React.HTMLAttributes<HTMLDivElement> {
 
     /** Callback when close button is clicked */
     onClose?: () => void;
+
+    /** Whether panel is currently maximized */
+    isMaximized?: boolean;
+
+    /** Callback when maximize/minimize button is clicked */
+    onMaximize?: () => void;
 
     /** Additional actions to display in header (right side) */
     headerActions?: React.ReactNode;
@@ -70,6 +76,8 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
             draggable = false,
             closeable = false,
             onClose,
+            isMaximized = false,
+            onMaximize,
             headerActions,
             headerContent,
             showHeader = true,
@@ -82,7 +90,11 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
         return (
             <div
                 ref={ref}
-                className={cn("panel-glass flex flex-col overflow-hidden", className)}
+                className={cn(
+                    "panel-glass flex flex-col overflow-hidden",
+                    isMaximized && "h-full",
+                    className
+                )}
                 {...props}
             >
                 {/* Panel Header */}
@@ -103,6 +115,23 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
                                     </span>
                                     <div className="flex items-center gap-2">
                                         {headerActions}
+                                        {onMaximize && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onMaximize();
+                                                }}
+                                                className="hover:bg-primary/20 cursor-pointer touch-manipulation rounded p-2 transition-colors"
+                                                aria-label={isMaximized ? "Minimize panel" : "Maximize panel"}
+                                                title={isMaximized ? "Minimize panel" : "Maximize panel"}
+                                            >
+                                                {isMaximized ? (
+                                                    <Minimize2 className="h-4 w-4" />
+                                                ) : (
+                                                    <Maximize2 className="h-4 w-4" />
+                                                )}
+                                            </button>
+                                        )}
                                         {closeable && (
                                             <button
                                                 onClick={(e) => {

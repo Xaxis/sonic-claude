@@ -48,7 +48,8 @@ echo ""
 
 # Start frontend
 echo "⚛️  Starting React frontend (port 3000)..."
-cd frontend && npm run dev -- --host 0.0.0.0 > /tmp/frontend.log 2>&1 &
+cd frontend
+npm run dev -- --host 0.0.0.0 > /tmp/frontend.log 2>&1 &
 FRONTEND_PID=$!
 cd ..
 echo "   PID: $FRONTEND_PID"
@@ -56,33 +57,61 @@ echo ""
 
 echo "✅ All services started!"
 echo ""
-echo "📊 Logs:"
-echo "   scsynth:  tail -f /tmp/scsynth.log"
-echo "   sclang:   tail -f /tmp/sclang_relay.log"
-echo "   backend:  tail -f /tmp/backend.log"
-echo "   frontend: tail -f /tmp/frontend.log"
-echo ""
 echo "🌐 URLs:"
 echo "   Backend:  http://localhost:8000"
 echo "   Frontend: http://localhost:3000"
 echo ""
-echo "Press Ctrl+C to stop all services"
+echo "📊 Showing combined logs (backend + frontend)..."
+echo "   Press Ctrl+C to stop all services"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
 # Cleanup function
 cleanup() {
     echo ""
     echo "🛑 Stopping all services..."
-    kill $SCSYNTH_PID $SCLANG_PID $BACKEND_PID $FRONTEND_PID 2>/dev/null || true
-    sleep 1
+
+    # Kill the tail process first
+    kill $TAIL_PID 2>/dev/null || true
+
+    # Kill all child processes by finding them
+    pkill -P $SCSYNTH_PID 2>/dev/null || true
+    pkill -P $SCLANG_PID 2>/dev/null || true
+    pkill -P $BACKEND_PID 2>/dev/null || true
+    pkill -P $FRONTEND_PID 2>/dev/null || true
+
+    # Kill the parent processes
+    kill $SCSYNTH_PID 2>/dev/null || true
+    kill $SCLANG_PID 2>/dev/null || true
+    kill $BACKEND_PID 2>/dev/null || true
+    kill $FRONTEND_PID 2>/dev/null || true
+
+    sleep 2
+
+    # Force kill anything still running by name
     pkill -9 scsynth 2>/dev/null || true
     pkill -9 sclang 2>/dev/null || true
+    pkill -9 -f "uvicorn backend.main" 2>/dev/null || true
+    pkill -9 -f "vite --host" 2>/dev/null || true
+
+    # Force kill by port
+    lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+    lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+    lsof -ti:57110 | xargs kill -9 2>/dev/null || true
+    lsof -ti:57120 | xargs kill -9 2>/dev/null || true
+    lsof -ti:57121 | xargs kill -9 2>/dev/null || true
+
     echo "✅ All services stopped"
     exit 0
 }
 
 trap cleanup SIGINT SIGTERM
 
-# Wait
+# Show combined logs from backend and frontend
+tail -f /tmp/backend.log /tmp/frontend.log 2>/dev/null &
+TAIL_PID=$!
+
+# Wait for any process to exit
 wait
 

@@ -306,6 +306,13 @@ export class AudioEngineService extends BaseAPIClient {
     }
 
     /**
+     * Update a sequence (name, tempo, time_signature)
+     */
+    async updateSequence(sequenceId: string, updates: Partial<{name: string; tempo: number; time_signature: string}>): Promise<Sequence> {
+        return this.put(`/audio-engine/audio/sequencer/sequences/${sequenceId}`, updates);
+    }
+
+    /**
      * Delete a sequence
      */
     async deleteSequence(sequenceId: string): Promise<{ status: string; message?: string }> {
@@ -348,6 +355,16 @@ export class AudioEngineService extends BaseAPIClient {
         clipId: string
     ): Promise<{ status: string; message?: string }> {
         return this.delete(`/audio-engine/audio/sequencer/sequences/${sequenceId}/clips/${clipId}`);
+    }
+
+    /**
+     * Duplicate clip
+     */
+    async duplicateClip(sequenceId: string, clipId: string): Promise<SequencerClip> {
+        return this.post(
+            `/audio-engine/audio/sequencer/sequences/${sequenceId}/clips/${clipId}/duplicate`,
+            {}
+        );
     }
 
     /**
@@ -408,6 +425,61 @@ export class AudioEngineService extends BaseAPIClient {
         active_notes: number;
     }> {
         return this.get("/audio-engine/audio/sequencer/state");
+    }
+
+    // ========================================================================
+    // SEQUENCER TRACK ROUTES
+    // ========================================================================
+
+    /**
+     * Create a new sequencer track
+     */
+    async createSequencerTrack(request: {
+        sequence_id: string;
+        name: string;
+        type?: string;
+        color?: string;
+        sample_id?: string;
+        sample_name?: string;
+        sample_file_path?: string;
+    }): Promise<any> {
+        return this.post("/audio-engine/audio/sequencer/tracks", request);
+    }
+
+    /**
+     * Get all sequencer tracks (optionally filtered by sequence)
+     */
+    async getSequencerTracks(sequenceId?: string): Promise<any[]> {
+        const params = sequenceId ? { sequence_id: sequenceId } : {};
+        return this.get("/audio-engine/audio/sequencer/tracks", params);
+    }
+
+    /**
+     * Rename sequencer track
+     */
+    async renameSequencerTrack(trackId: string, newName: string): Promise<any> {
+        return this.put(`/audio-engine/audio/sequencer/tracks/${trackId}`, { name: newName });
+    }
+
+    /**
+     * Delete sequencer track
+     */
+    async deleteSequencerTrack(trackId: string): Promise<{ status: string; message?: string }> {
+        return this.delete(`/audio-engine/audio/sequencer/tracks/${trackId}`);
+    }
+
+    /**
+     * Mute/unmute sequencer track
+     */
+    async muteSequencerTrack(trackId: string, muted: boolean): Promise<any> {
+        return this.put(`/audio-engine/audio/sequencer/tracks/${trackId}/mute`, { is_muted: muted });
+    }
+
+    /**
+     * Solo/unsolo sequencer track
+     */
+    async soloSequencerTrack(trackId: string, soloed: boolean): Promise<any> {
+        return this.put(`/audio-engine/audio/sequencer/tracks/${trackId}/solo`, { is_solo: soloed });
     }
 }
 

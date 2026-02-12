@@ -17,6 +17,7 @@ import { Panel } from "@/components/ui/panel";
 import { GRID_CONFIG } from "@/config/layout.config";
 import type { GridLayoutItem } from "@/types/grid-layout";
 import { verticalCompactor } from "react-grid-layout";
+import { useLayout } from "@/contexts/LayoutContext";
 
 export interface PanelConfig {
     id: string;
@@ -41,6 +42,7 @@ interface PanelGridProps {
 export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+    const { maximizedPanel, maximizePanel, minimizePanel } = useLayout();
 
     // Measure container size
     useEffect(() => {
@@ -87,6 +89,30 @@ export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridPro
         return <div ref={containerRef} className="h-full w-full" />;
     }
 
+    // If a panel is maximized, render it full-screen
+    if (maximizedPanel) {
+        const maximizedPanelConfig = panels.find((p) => p.id === maximizedPanel);
+        if (maximizedPanelConfig) {
+            return (
+                <div ref={containerRef} className="h-full w-full flex flex-col">
+                    <Panel
+                        title={maximizedPanelConfig.title}
+                        subtitle={maximizedPanelConfig.getSubtitle?.()}
+                        draggable={false}
+                        closeable={maximizedPanelConfig.closeable ?? true}
+                        onClose={() => onPanelClose?.(maximizedPanelConfig.id)}
+                        isMaximized={true}
+                        onMaximize={minimizePanel}
+                        className="flex-1"
+                    >
+                        {maximizedPanelConfig.component}
+                    </Panel>
+                </div>
+            );
+        }
+    }
+
+    // Normal grid layout
     return (
         <div ref={containerRef} className="h-full w-full overflow-auto">
             <GridLayout
@@ -113,6 +139,9 @@ export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridPro
                             draggable={true}
                             closeable={panel.closeable ?? true}
                             onClose={() => onPanelClose?.(panel.id)}
+                            isMaximized={false}
+                            onMaximize={() => maximizePanel(panel.id)}
+                            className="h-full"
                         >
                             {panel.component}
                         </Panel>

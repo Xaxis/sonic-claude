@@ -43,6 +43,7 @@ interface LayoutState {
     activeTab: string;
     poppedOutTabs: Set<string>;
     layouts: TabLayouts;
+    maximizedPanel: string | null; // Panel ID that is currently maximized
 }
 
 interface LayoutContextValue extends LayoutState {
@@ -56,6 +57,10 @@ interface LayoutContextValue extends LayoutState {
     movePanelToTab: (panelId: string, fromTabId: string, toTabId: string) => void;
     updatePanelLayout: (tabId: string, panelId: string, layout: LayoutItem) => void;
     updateTabLayout: (tabId: string, layouts: GridLayoutItem[]) => void;
+
+    // Panel maximize/minimize
+    maximizePanel: (panelId: string) => void;
+    minimizePanel: () => void;
 
     // Window management
     popoutTab: (tabId: string, openWindow?: boolean) => void;
@@ -92,6 +97,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         return {
             ...DEFAULT_LAYOUT_STATE,
             poppedOutTabs: new Set(), // Always start with no popouts
+            maximizedPanel: null, // No panel maximized by default
         };
     });
 
@@ -300,6 +306,25 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         [broadcastState]
     );
 
+    const maximizePanel = useCallback(
+        (panelId: string) => {
+            setState((prev) => {
+                const newState = { ...prev, maximizedPanel: panelId };
+                broadcastState(newState);
+                return newState;
+            });
+        },
+        [broadcastState]
+    );
+
+    const minimizePanel = useCallback(() => {
+        setState((prev) => {
+            const newState = { ...prev, maximizedPanel: null };
+            broadcastState(newState);
+            return newState;
+        });
+    }, [broadcastState]);
+
     const value: LayoutContextValue = {
         ...state,
         setActiveTab,
@@ -309,6 +334,8 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         movePanelToTab,
         updatePanelLayout,
         updateTabLayout,
+        maximizePanel,
+        minimizePanel,
         popoutTab,
         closePopout,
     };

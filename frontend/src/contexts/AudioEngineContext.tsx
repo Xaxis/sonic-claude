@@ -56,6 +56,7 @@ interface AudioEngineState {
     // Sequencer
     sequences: Sequence[];
     activeSequenceId: string | null;
+    sequencerTracks: any[]; // Sequencer tracks (separate from mixer tracks)
     isPlaying: boolean;
     currentPosition: number; // beats
     tempo: number; // BPM
@@ -123,6 +124,20 @@ interface AudioEngineContextValue extends AudioEngineState {
     setCurrentPosition: (position: number) => void;
     setTempoValue: (tempo: number) => void;
 
+    // Clip actions (API-integrated)
+    addClip: (sequenceId: string, request: any) => Promise<void>;
+    updateClip: (sequenceId: string, clipId: string, request: any) => Promise<void>;
+    deleteClip: (sequenceId: string, clipId: string) => Promise<void>;
+    duplicateClip: (sequenceId: string, clipId: string) => Promise<void>;
+
+    // Sequencer Track actions (API-integrated)
+    loadSequencerTracks: (sequenceId?: string) => Promise<void>;
+    createSequencerTrack: (sequenceId: string, name: string, type: string, options?: any) => Promise<void>;
+    renameSequencerTrack: (trackId: string, newName: string) => Promise<void>;
+    deleteSequencerTrack: (trackId: string) => Promise<void>;
+    muteSequencerTrack: (trackId: string, muted: boolean) => Promise<void>;
+    soloSequencerTrack: (trackId: string, soloed: boolean) => Promise<void>;
+
     // Real-time data setters (called by WebSocket hooks)
     setSpectrum: (spectrum: number[]) => void;
     setMeters: (
@@ -159,6 +174,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         masterTrack: null,
         sequences: [],
         activeSequenceId: null,
+        sequencerTracks: [],
         isPlaying: false,
         currentPosition: 0,
         tempo: 120,
@@ -426,7 +442,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 const sequence = await audioEngineService.createSequence({
                     name: "Test Sequence",
                     tempo: 120,
-                    time_signature: [4, 4],
+                    time_signature: "4/4",
                 });
 
                 setState((prev) => ({
@@ -481,11 +497,14 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                     synthdef,
                     parameters: parameters || {},
                 });
-                setState((prev) => ({
-                    ...prev,
-                    activeSynths: [...prev.activeSynths, synth as any],
-                }));
-                broadcastUpdate("audioEngine.activeSynths", [...state.activeSynths, synth]);
+                setState((prev) => {
+                    const newSynths = [...prev.activeSynths, synth as any];
+                    broadcastUpdate("audioEngine.activeSynths", newSynths);
+                    return {
+                        ...prev,
+                        activeSynths: newSynths,
+                    };
+                });
                 toast.success(`Created ${synthdef} synth`);
             } catch (error) {
                 console.error("Failed to create synth:", error);
@@ -494,7 +513,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 );
             }
         },
-        [broadcastUpdate, state.activeSynths]
+        [broadcastUpdate]
     );
 
     const updateSynthParameter = useCallback(
@@ -557,16 +576,19 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                     effectdef,
                     parameters: parameters || {},
                 });
-                setState((prev) => ({
-                    ...prev,
-                    activeEffects: [...prev.activeEffects, effect as any],
-                }));
-                broadcastUpdate("audioEngine.activeEffects", [...state.activeEffects, effect]);
+                setState((prev) => {
+                    const newEffects = [...prev.activeEffects, effect as any];
+                    broadcastUpdate("audioEngine.activeEffects", newEffects);
+                    return {
+                        ...prev,
+                        activeEffects: newEffects,
+                    };
+                });
             } catch (error) {
                 console.error("Failed to create effect:", error);
             }
         },
-        [broadcastUpdate, state.activeEffects]
+        [broadcastUpdate]
     );
 
     const updateEffectParameter = useCallback(
@@ -639,16 +661,19 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         async (name: string, _type: string) => {
             try {
                 const track = await audioEngineService.createTrack({ name });
-                setState((prev) => ({
-                    ...prev,
-                    tracks: [...prev.tracks, track as any],
-                }));
-                broadcastUpdate("audioEngine.tracks", [...state.tracks, track]);
+                setState((prev) => {
+                    const newTracks = [...prev.tracks, track as any];
+                    broadcastUpdate("audioEngine.tracks", newTracks);
+                    return {
+                        ...prev,
+                        tracks: newTracks,
+                    };
+                });
             } catch (error) {
                 console.error("Failed to create track:", error);
             }
         },
-        [broadcastUpdate, state.tracks]
+        [broadcastUpdate]
     );
 
     const updateTrackVolume = useCallback(async (trackId: string, volume: number) => {
@@ -752,18 +777,21 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 const sequence = await audioEngineService.createSequence({
                     name,
                     tempo: tempo || 120,
-                    time_signature: [4, 4],
+                    time_signature: "4/4",
                 });
-                setState((prev) => ({
-                    ...prev,
-                    sequences: [...prev.sequences, sequence as any],
-                }));
-                broadcastUpdate("audioEngine.sequences", [...state.sequences, sequence]);
+                setState((prev) => {
+                    const newSequences = [...prev.sequences, sequence as any];
+                    broadcastUpdate("audioEngine.sequences", newSequences);
+                    return {
+                        ...prev,
+                        sequences: newSequences,
+                    };
+                });
             } catch (error) {
                 console.error("Failed to create sequence:", error);
             }
         },
-        [broadcastUpdate, state.sequences]
+        [broadcastUpdate]
     );
 
     const deleteSequence = useCallback(async (sequenceId: string) => {
@@ -791,6 +819,9 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 broadcastUpdate("audioEngine.activeSequenceId", sequenceId);
             } catch (error) {
                 console.error("Failed to play sequence:", error);
+                toast.error(
+                    `Failed to play sequence: ${error instanceof Error ? error.message : "Unknown error"}`
+                );
             }
         },
         [broadcastUpdate]
@@ -890,6 +921,153 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         [broadcastUpdate]
     );
 
+    // Clip actions (API-integrated)
+    const addClip = useCallback(
+        async (sequenceId: string, request: any) => {
+            try {
+                const clip = await audioEngineService.addClip(sequenceId, request);
+                // Reload sequences to get updated clips
+                await loadSequences();
+                toast.success(`Added clip to sequence`);
+            } catch (error) {
+                console.error("Failed to add clip:", error);
+                toast.error("Failed to add clip");
+            }
+        },
+        [loadSequences]
+    );
+
+    const updateClip = useCallback(
+        async (sequenceId: string, clipId: string, request: any) => {
+            try {
+                await audioEngineService.updateClip(sequenceId, clipId, request);
+                // Reload sequences to get updated clips
+                await loadSequences();
+            } catch (error) {
+                console.error("Failed to update clip:", error);
+                toast.error("Failed to update clip");
+            }
+        },
+        [loadSequences]
+    );
+
+    const deleteClip = useCallback(
+        async (sequenceId: string, clipId: string) => {
+            try {
+                await audioEngineService.removeClip(sequenceId, clipId);
+                // Reload sequences to get updated clips
+                await loadSequences();
+                toast.success("Deleted clip");
+            } catch (error) {
+                console.error("Failed to delete clip:", error);
+                toast.error("Failed to delete clip");
+            }
+        },
+        [loadSequences]
+    );
+
+    const duplicateClip = useCallback(
+        async (sequenceId: string, clipId: string) => {
+            try {
+                await audioEngineService.duplicateClip(sequenceId, clipId);
+                // Reload sequences to get updated clips
+                await loadSequences();
+                toast.success("Duplicated clip");
+            } catch (error) {
+                console.error("Failed to duplicate clip:", error);
+                toast.error("Failed to duplicate clip");
+            }
+        },
+        [loadSequences]
+    );
+
+    // Sequencer Track actions (API-integrated)
+    const loadSequencerTracks = useCallback(async (sequenceId?: string) => {
+        try {
+            const tracks = await audioEngineService.getSequencerTracks(sequenceId);
+            setState((prev) => ({ ...prev, sequencerTracks: tracks }));
+        } catch (error) {
+            console.error("Failed to load sequencer tracks:", error);
+        }
+    }, []);
+
+    const createSequencerTrack = useCallback(
+        async (sequenceId: string, name: string, type: string, options?: any) => {
+            try {
+                const track = await audioEngineService.createSequencerTrack({
+                    sequence_id: sequenceId,
+                    name,
+                    type,
+                    ...options,
+                });
+                await loadSequencerTracks(sequenceId);
+                toast.success(`Track "${name}" created`);
+            } catch (error) {
+                console.error("Failed to create sequencer track:", error);
+                toast.error("Failed to create track");
+            }
+        },
+        [loadSequencerTracks]
+    );
+
+    const renameSequencerTrack = useCallback(async (trackId: string, newName: string) => {
+        try {
+            await audioEngineService.renameSequencerTrack(trackId, newName);
+            setState((prev) => ({
+                ...prev,
+                sequencerTracks: prev.sequencerTracks.map((t) =>
+                    t.id === trackId ? { ...t, name: newName } : t
+                ),
+            }));
+            toast.success(`Track renamed to "${newName}"`);
+        } catch (error) {
+            console.error("Failed to rename sequencer track:", error);
+            toast.error("Failed to rename track");
+        }
+    }, []);
+
+    const deleteSequencerTrack = useCallback(async (trackId: string) => {
+        try {
+            await audioEngineService.deleteSequencerTrack(trackId);
+            setState((prev) => ({
+                ...prev,
+                sequencerTracks: prev.sequencerTracks.filter((t) => t.id !== trackId),
+            }));
+            toast.success("Track deleted");
+        } catch (error) {
+            console.error("Failed to delete sequencer track:", error);
+            toast.error("Failed to delete track");
+        }
+    }, []);
+
+    const muteSequencerTrack = useCallback(async (trackId: string, muted: boolean) => {
+        try {
+            await audioEngineService.muteSequencerTrack(trackId, muted);
+            setState((prev) => ({
+                ...prev,
+                sequencerTracks: prev.sequencerTracks.map((t) =>
+                    t.id === trackId ? { ...t, is_muted: muted } : t
+                ),
+            }));
+        } catch (error) {
+            console.error("Failed to mute sequencer track:", error);
+        }
+    }, []);
+
+    const soloSequencerTrack = useCallback(async (trackId: string, soloed: boolean) => {
+        try {
+            await audioEngineService.soloSequencerTrack(trackId, soloed);
+            setState((prev) => ({
+                ...prev,
+                sequencerTracks: prev.sequencerTracks.map((t) =>
+                    t.id === trackId ? { ...t, is_solo: soloed } : t
+                ),
+            }));
+        } catch (error) {
+            console.error("Failed to solo sequencer track:", error);
+        }
+    }, []);
+
     // Real-time data setters (called by WebSocket hooks)
     const setSpectrum = useCallback((spectrum: number[]) => {
         setState((prev) => ({ ...prev, spectrum }));
@@ -974,6 +1152,18 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         setIsPlaying,
         setCurrentPosition,
         setTempoValue,
+        // Clips
+        addClip,
+        updateClip,
+        deleteClip,
+        duplicateClip,
+        // Sequencer Tracks
+        loadSequencerTracks,
+        createSequencerTrack,
+        renameSequencerTrack,
+        deleteSequencerTrack,
+        muteSequencerTrack,
+        soloSequencerTrack,
         // Real-time data
         setSpectrum,
         setMeters,

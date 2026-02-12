@@ -142,10 +142,10 @@ export function InputPanel() {
             try {
                 const samplesData = await sampleApi.getAllSamples();
                 setSamples(samplesData.map(s => ({ ...s, audioUrl: undefined })));
-                console.log(`Loaded ${samplesData.length} samples from backend`);
+                console.log(`✅ Loaded ${samplesData.length} samples from backend`);
             } catch (error) {
                 console.error("Failed to load samples:", error);
-                toast.error("Failed to load sample library");
+                // Don't show error toast - samples might not be uploaded yet, which is fine
             } finally {
                 setIsLoadingSamples(false);
             }
@@ -261,8 +261,7 @@ export function InputPanel() {
             await audioInputApi.setInputDevice(scDeviceIndex, ampLinear);
             console.log(`✅ SuperCollider input set to device ${scDeviceIndex} (${deviceLabel})`);
         } catch (error) {
-            console.error("Failed to set SuperCollider input:", error);
-            toast.error("Failed to set SuperCollider input device");
+            // Silently ignore - backend may not be ready yet
         }
     };
 
@@ -271,7 +270,8 @@ export function InputPanel() {
             await audioInputApi.stopInput();
             console.log("✅ SuperCollider input stopped");
         } catch (error) {
-            console.error("Failed to stop SuperCollider input:", error);
+            // Silently ignore - input may not be running, which is fine
+            // This happens on mount when monitoring is not active
         }
     };
 
@@ -604,8 +604,7 @@ export function InputPanel() {
             <div className="flex-1 space-y-2 overflow-auto p-2">
                 {activeTab === "library" && (
                     <>
-                        {/* Search and Upload */}
-                        <SubPanel title="Search">
+                        <SubPanel title="Search" collapsible>
                             <div className="space-y-2 p-2">
                                 <div className="relative">
                                     <Search
@@ -640,8 +639,7 @@ export function InputPanel() {
                             </div>
                         </SubPanel>
 
-                        {/* Categories */}
-                        <SubPanel title="Categories">
+                        <SubPanel title="Categories" collapsible>
                             <div className="flex flex-wrap gap-1 p-2">
                                 {SAMPLE_CATEGORIES.map((cat) => (
                                     <Button
@@ -656,8 +654,7 @@ export function InputPanel() {
                             </div>
                         </SubPanel>
 
-                        {/* Sample List */}
-                        <SubPanel title={`Samples (${filteredSamples.length})`}>
+                        <SubPanel title={`Samples (${filteredSamples.length})`} collapsible>
                             <div className="divide-border divide-y">
                                 {filteredSamples.length === 0 && (
                                     <div className="text-muted-foreground p-4 text-center text-xs">
@@ -789,8 +786,7 @@ export function InputPanel() {
 
                 {activeTab === "audio" && (
                     <>
-                        {/* Input Device Selection */}
-                        <SubPanel title="Input Device">
+                        <SubPanel title="Input Device" collapsible>
                             <div className="p-2">
                                 <Select
                                     value={selectedInputDevice}
@@ -819,8 +815,7 @@ export function InputPanel() {
                             </div>
                         </SubPanel>
 
-                        {/* Mini Spectrum Analyzer */}
-                        <SubPanel title="Spectrum">
+                        <SubPanel title="Spectrum" collapsible>
                             <div className="p-2">
                                 <div className="flex h-16 items-end gap-0.5">
                                     {spectrumData.map((value, i) => (
@@ -847,8 +842,7 @@ export function InputPanel() {
                             </div>
                         </SubPanel>
 
-                        {/* Input Level */}
-                        <SubPanel title="Input Level">
+                        <SubPanel title="Input Level" collapsible>
                             <div className="space-y-2 p-2">
                                 <div className="flex items-center gap-2">
                                     <div className="bg-background border-border h-4 flex-1 overflow-hidden rounded border">
@@ -894,8 +888,7 @@ export function InputPanel() {
                             </div>
                         </SubPanel>
 
-                        {/* Controls */}
-                        <SubPanel title="Controls">
+                        <SubPanel title="Controls" collapsible>
                             <div className="space-y-2 p-2">
                                 <div className="flex items-center justify-between">
                                     <Label className="text-xs">MONITOR</Label>
@@ -922,8 +915,7 @@ export function InputPanel() {
 
                 {activeTab === "midi" && (
                     <>
-                        {/* Device Selection */}
-                        <SubPanel title="MIDI Device">
+                        <SubPanel title="MIDI Device" collapsible>
                             <div className="space-y-2 p-2">
                                 <Select value={midiDevice} onValueChange={setMidiDevice}>
                                     <SelectTrigger className="h-8 w-full text-xs">
@@ -938,8 +930,7 @@ export function InputPanel() {
                             </div>
                         </SubPanel>
 
-                        {/* MIDI Activity */}
-                        <SubPanel title="MIDI Activity">
+                        <SubPanel title="MIDI Activity" collapsible>
                             <div className="space-y-2 p-2">
                                 <div className="flex items-center justify-between text-xs">
                                     <Label className="text-xs">Last Note:</Label>
@@ -959,8 +950,7 @@ export function InputPanel() {
                             </div>
                         </SubPanel>
 
-                        {/* MIDI Settings */}
-                        <SubPanel title="Settings">
+                        <SubPanel title="Settings" collapsible>
                             <div className="space-y-2 p-2">
                                 <div className="flex items-center gap-2">
                                     <Label className="text-xs">Channel:</Label>

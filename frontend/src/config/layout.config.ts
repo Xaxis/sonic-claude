@@ -49,16 +49,17 @@ import type { PanelConfig } from "@/components/layout";
 import { InputPanel } from "@/components/features/input";
 import { LoopVisualizerPanel } from "@/components/features/loop-visualizer";
 import { SequencerPanel } from "@/components/features/sequencer";
-import { TransportPanel } from "@/components/features/transport";
-import { SynthesisPanel } from "@/components/features/synthesis";
-import { EffectsPanel } from "@/components/features/effects";
-import { MixerPanel } from "@/components/features/mixer";
-import { MeteringPanel } from "@/components/features/metering";
-import { PianoRollPanel } from "@/components/features/piano-roll";
-import { AIChatPanel } from "@/components/features/ai-chat";
-import { TranscriptionPanel } from "@/components/features/transcription";
-import { SpectralPanel } from "@/components/features/spectral";
-import { TimelinePanel } from "@/components/features/timeline";
+// TransportPanel removed - now integrated into SequencerPanel
+// Commented out unused panel imports - uncomment when adding panels to DEFAULT_PANELS
+// import { SynthesisPanel } from "@/components/features/synthesis";
+// import { EffectsPanel } from "@/components/features/effects";
+// import { MixerPanel } from "@/components/features/mixer";
+// import { MeteringPanel } from "@/components/features/metering";
+// import { PianoRollPanel } from "@/components/features/piano-roll";
+// import { AIChatPanel } from "@/components/features/ai-chat";
+// import { TranscriptionPanel } from "@/components/features/transcription";
+// import { SpectralPanel } from "@/components/features/spectral";
+// import { TimelinePanel } from "@/components/features/timeline";
 
 /**
  * Grid Layout Settings
@@ -94,12 +95,20 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         defaultLayout: { x: 0, y: 0, w: 3, h: 10 },
     },
     {
+        id: "sequencer",
+        title: "SEQUENCER",
+        component: createElement(SequencerPanel),
+        closeable: false,
+        getSubtitle: () => "Timeline + Transport • 0 tracks • 0 clips",
+        defaultLayout: { x: 3, y: 0, w: 6, h: 10 },
+    },
+    {
         id: "loop-visualizer",
         title: "LOOP",
         component: createElement(LoopVisualizerPanel),
         closeable: false,
         getSubtitle: () => "Active • 120 BPM • 4/4 • Position: 8.2 beats",
-        defaultLayout: { x: 3, y: 0, w: 6, h: 10 },
+        defaultLayout: { x: 9, y: 0, w: 3, h: 10 },
     },
     // {
     //     id: "mixer",
@@ -109,14 +118,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
     //     getSubtitle: () => "8 tracks • Master: -6.2 dB",
     //     defaultLayout: { x: 8, y: 0, w: 4, h: 8 },
     // },
-    // {
-    //     id: "sequencer",
-    //     title: "SEQUENCER",
-    //     component: createElement(SequencerPanel),
-    //     closeable: false,
-    //     getSubtitle: () => "Timeline-based arrangement",
-    //     defaultLayout: { x: 2, y: 5, w: 6, h: 3 },
-    // },
+    // TRANSPORT PANEL REMOVED - Now integrated into Sequencer Panel
     // {
     //     id: "transport",
     //     title: "TRANSPORT",
@@ -207,8 +209,7 @@ export const DEFAULT_TABS = [
         panelIds: [
             "input",
             "loop-visualizer",
-            // "synthesis",
-            // "transport",
+            "sequencer",
         ],
     },
 ];
@@ -217,7 +218,7 @@ export const DEFAULT_TABS = [
  * Storage Keys
  */
 export const STORAGE_KEYS = {
-    LAYOUT: "sonic-claude-layout",
+    LAYOUT: "sonic-claude-layout-v2", // v2: Added unified Sequencer Panel with integrated Transport
     WINDOW_STATE: "sonic-claude-window-state",
 } as const;
 

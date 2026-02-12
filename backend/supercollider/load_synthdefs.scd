@@ -72,11 +72,29 @@ SynthDef(\square, { |out=0, freq=440, amp=0.5, gate=1, attack=0.01, release=0.3,
     Out.ar(out, [sig, sig]);
 }).add;
 
+// Define sample playback synth
+SynthDef(\samplePlayer, { |out=0, bufnum, rate=1, amp=0.5, pan=0, startPos=0, loop=0, gate=1, attack=0.01, release=0.1|
+    var env = EnvGen.kr(Env.asr(attack, 1, release), gate, doneAction: 2);
+    var sig = PlayBuf.ar(
+        numChannels: 2,
+        bufnum: bufnum,
+        rate: rate * BufRateScale.kr(bufnum),
+        trigger: 1,
+        startPos: startPos * BufFrames.kr(bufnum),
+        loop: loop,
+        doneAction: if(loop == 0, 2, 0)  // Free synth when done (if not looping)
+    );
+    sig = sig * env * amp;
+    sig = Balance2.ar(sig[0], sig[1], pan);
+    Out.ar(out, sig);
+}).add;
+
 "✅ SynthDefs loaded successfully:".postln;
 "   audioMonitor: Buffer-based monitoring (chunk: %, partitions: %)".format(chunkSize, numChunks).postln;
 "   sine: Simple sine wave synth".postln;
 "   saw: Saw wave synth with filter".postln;
 "   square: Square wave synth with pulse width".postln;
+"   samplePlayer: Audio sample playback with loop and envelope".postln;
 "".postln;
 "BUFFER_IDS: waveform=%, spectrum=%".format(~waveformBuffer.bufnum, ~spectrumBuffer.bufnum).postln;
 

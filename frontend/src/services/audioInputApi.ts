@@ -3,7 +3,7 @@
  * Manages audio input device selection for SuperCollider
  */
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "http://localhost:8000/audio-engine/audio";
 
 export interface SetInputDeviceRequest {
     device_index: number;
@@ -23,7 +23,7 @@ export interface AudioInputStatus {
  * Set the audio input device for SuperCollider
  */
 export async function setInputDevice(deviceIndex: number, amp: number = 1.0): Promise<void> {
-    const response = await fetch(`${API_BASE}/api/audio/input/device`, {
+    const response = await fetch(`${API_BASE}/input/device`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -46,7 +46,7 @@ export async function setInputDevice(deviceIndex: number, amp: number = 1.0): Pr
  * Stop audio input
  */
 export async function stopInput(): Promise<void> {
-    const response = await fetch(`${API_BASE}/api/audio/input/stop`, {
+    const response = await fetch(`${API_BASE}/input/stop`, {
         method: "POST",
     });
 
@@ -62,7 +62,7 @@ export async function stopInput(): Promise<void> {
  * Set input gain
  */
 export async function setInputGain(amp: number): Promise<void> {
-    const response = await fetch(`${API_BASE}/api/audio/input/gain`, {
+    const response = await fetch(`${API_BASE}/input/gain`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -82,7 +82,7 @@ export async function setInputGain(amp: number): Promise<void> {
  * Get current audio input status
  */
 export async function getInputStatus(): Promise<AudioInputStatus> {
-    const response = await fetch(`${API_BASE}/api/audio/input/status`);
+    const response = await fetch(`${API_BASE}/input/status`);
 
     if (!response.ok) {
         const error = await response.json();
