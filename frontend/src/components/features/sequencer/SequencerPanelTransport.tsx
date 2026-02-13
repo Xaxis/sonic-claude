@@ -4,7 +4,7 @@
  * Handles play/pause/stop/record/loop controls and tempo
  */
 
-import { Play, Pause, SkipBack, Circle, Repeat } from "lucide-react";
+import { Play, Pause, SkipBack, Circle, Repeat, Music } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,13 +16,15 @@ interface SequencerPanelTransportProps {
     isPaused: boolean;
     isRecording: boolean;
     isLooping: boolean;
+    metronomeEnabled: boolean;
     tempo: number;
     tempoInput: string;
-    hasTracksOrClips: boolean; // NEW: Disable play if no tracks/clips
+    hasTracksOrClips: boolean;
     onPlayPause: () => void;
     onStop: () => void;
     onRecord: () => void;
     onLoop: () => void;
+    onMetronomeToggle: () => void;
     onTempoChange: (value: string) => void;
     onTempoBlur: () => void;
     onTempoKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -33,12 +35,14 @@ export function SequencerPanelTransport({
     isPaused,
     isRecording,
     isLooping,
+    metronomeEnabled,
     tempoInput,
     hasTracksOrClips,
     onPlayPause,
     onStop,
     onRecord,
     onLoop,
+    onMetronomeToggle,
     onTempoChange,
     onTempoBlur,
     onTempoKeyDown,
@@ -82,6 +86,13 @@ export function SequencerPanelTransport({
                     tooltip={isLooping ? "Loop enabled" : "Loop disabled"}
                     onClick={onLoop}
                     variant={isLooping ? "secondary" : "ghost"}
+                    size="icon-sm"
+                />
+                <IconButton
+                    icon={Music}
+                    tooltip={metronomeEnabled ? "Metronome enabled" : "Metronome disabled"}
+                    onClick={onMetronomeToggle}
+                    variant={metronomeEnabled ? "secondary" : "ghost"}
                     size="icon-sm"
                 />
             </div>

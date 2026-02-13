@@ -306,9 +306,9 @@ export class AudioEngineService extends BaseAPIClient {
     }
 
     /**
-     * Update a sequence (name, tempo, time_signature)
+     * Update a sequence (name, tempo, time_signature, loop settings)
      */
-    async updateSequence(sequenceId: string, updates: Partial<{name: string; tempo: number; time_signature: string}>): Promise<Sequence> {
+    async updateSequence(sequenceId: string, updates: Partial<{name: string; tempo: number; time_signature: string; loop_enabled: boolean; loop_start: number; loop_end: number}>): Promise<Sequence> {
         return this.put(`/audio-engine/audio/sequencer/sequences/${sequenceId}`, updates);
     }
 
@@ -462,6 +462,13 @@ export class AudioEngineService extends BaseAPIClient {
     }
 
     /**
+     * Update sequencer track properties (volume, pan)
+     */
+    async updateSequencerTrack(trackId: string, updates: { volume?: number; pan?: number }): Promise<any> {
+        return this.put(`/audio-engine/audio/sequencer/tracks/${trackId}`, updates);
+    }
+
+    /**
      * Delete sequencer track
      */
     async deleteSequencerTrack(trackId: string): Promise<{ status: string; message?: string }> {
@@ -480,6 +487,24 @@ export class AudioEngineService extends BaseAPIClient {
      */
     async soloSequencerTrack(trackId: string, soloed: boolean): Promise<any> {
         return this.put(`/audio-engine/audio/sequencer/tracks/${trackId}/solo`, { is_solo: soloed });
+    }
+
+    // ========================================================================
+    // METRONOME ROUTES (2 routes)
+    // ========================================================================
+
+    /**
+     * Toggle metronome on/off
+     */
+    async toggleMetronome(): Promise<{ enabled: boolean }> {
+        return this.put("/audio-engine/sequencer/metronome/toggle");
+    }
+
+    /**
+     * Set metronome volume
+     */
+    async setMetronomeVolume(volume: number): Promise<{ volume: number }> {
+        return this.put("/audio-engine/sequencer/metronome/volume", { volume });
     }
 }
 

@@ -5,9 +5,19 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Copy, Trash2 } from "lucide-react";
+import { Copy, Trash2, Volume2, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+
+interface MIDIEvent {
+    note: number;
+    note_name: string;
+    start_time: number;
+    duration: number;
+    velocity: number;
+    channel: number;
+}
 
 interface Clip {
     id: string;
@@ -17,6 +27,9 @@ interface Clip {
     duration: number;
     type: "midi" | "audio";
     audio_file_path?: string;
+    audio_offset?: number; // seconds
+    midi_events?: MIDIEvent[];
+    gain: number;
 }
 
 interface SequencerPanelClipProps {
@@ -32,6 +45,8 @@ interface SequencerPanelClipProps {
     onDelete: (clipId: string) => void;
     onMove?: (clipId: string, newStartTime: number) => void; // Drag to move
     onResize?: (clipId: string, newDuration: number) => void; // Resize duration
+    onUpdateClip?: (clipId: string, updates: { gain?: number; audio_offset?: number; midi_events?: MIDIEvent[] }) => void; // Update clip properties
+    onOpenPianoRoll?: (clipId: string) => void; // Open piano roll for MIDI clips
 }
 
 export function SequencerPanelClip({
@@ -47,6 +62,8 @@ export function SequencerPanelClip({
     onDelete,
     onMove,
     onResize,
+    onUpdateClip,
+    onOpenPianoRoll,
 }: SequencerPanelClipProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [waveformData, setWaveformData] = useState<number[]>([]);
@@ -55,6 +72,7 @@ export function SequencerPanelClip({
     const [dragStartX, setDragStartX] = useState(0);
     const [dragStartTime, setDragStartTime] = useState(0);
     const [dragStartDuration, setDragStartDuration] = useState(0);
+    const [lastClickTime, setLastClickTime] = useState(0);
 
     // Calculate clip position and width
     const left = clip.start_time * pixelsPerBeat * zoom;
@@ -210,6 +228,20 @@ export function SequencerPanelClip({
         };
     }, [isDragging, isResizing, dragStartX, dragStartTime, dragStartDuration, pixelsPerBeat, zoom, snapEnabled, clip.id, clip.start_time, clip.duration, onMove, onResize]);
 
+    const handleClick = () => {
+        const now = Date.now();
+        const timeSinceLastClick = now - lastClickTime;
+
+        // Double-click detection (within 300ms)
+        if (timeSinceLastClick < 300 && clip.type === "midi" && onOpenPianoRoll) {
+            onOpenPianoRoll(clip.id);
+        } else {
+            onSelect(clip.id);
+        }
+
+        setLastClickTime(now);
+    };
+
     return (
         <div
             className={cn(
@@ -224,7 +256,7 @@ export function SequencerPanelClip({
                 backgroundColor: `${trackColor}40`, // Track color with 25% opacity
                 borderColor: trackColor,
             }}
-            onClick={() => onSelect(clip.id)}
+            onClick={handleClick}
             onMouseDown={(e) => handleMouseDown(e, "move")}
         >
             {/* Left resize handle */}
@@ -283,6 +315,56 @@ export function SequencerPanelClip({
                     >
                         <Trash2 size={10} className="text-white" />
                     </Button>
+                </div>
+            )}
+
+            {/* Audio Offset/Trim Control (show when selected, audio clip, and wide enough) */}
+            {isSelected && width > 100 && onUpdateClip && clip.type === "audio" && (
+                <div
+                    className="absolute bottom-8 left-2 right-2 flex items-center gap-1 z-20 bg-background/90 rounded px-2 py-1"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                >
+                    <Scissors size={12} className="text-white flex-shrink-0" />
+                    <Slider
+                        value={[(clip.audio_offset || 0) * 10]}
+                        onValueChange={(values) => {
+                            const newOffset = values[0] / 10;
+                            onUpdateClip(clip.id, { audio_offset: newOffset });
+                        }}
+                        min={0}
+                        max={100}
+                        step={1}
+                        className="flex-1"
+                    />
+                    <span className="text-[10px] text-white/80 w-10 text-right flex-shrink-0">
+                        {((clip.audio_offset || 0)).toFixed(1)}s
+                    </span>
+                </div>
+            )}
+
+            {/* Gain Control (show when selected and wide enough) */}
+            {isSelected && width > 100 && onUpdateClip && (
+                <div
+                    className="absolute bottom-1 left-2 right-2 flex items-center gap-1 z-20 bg-background/90 rounded px-2 py-1"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                >
+                    <Volume2 size={12} className="text-white flex-shrink-0" />
+                    <Slider
+                        value={[clip.gain * 100]}
+                        onValueChange={(values) => {
+                            const newGain = values[0] / 100;
+                            onUpdateClip(clip.id, { gain: newGain });
+                        }}
+                        min={0}
+                        max={200}
+                        step={1}
+                        className="flex-1"
+                    />
+                    <span className="text-[10px] text-white/80 w-8 text-right flex-shrink-0">
+                        {Math.round(clip.gain * 100)}%
+                    </span>
                 </div>
             )}
         </div>

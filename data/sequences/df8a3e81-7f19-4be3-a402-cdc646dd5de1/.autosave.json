@@ -1,0 +1,50 @@
+{
+  "id": "df8a3e81-7f19-4be3-a402-cdc646dd5de1",
+  "name": "Test 1",
+  "tempo": 120.0,
+  "time_signature": "4/4",
+  "tracks": [
+    {
+      "id": "96c7b041-659f-4e36-8a7b-8b1f1a820834",
+      "name": "Recording 10:36:31 AM",
+      "sequence_id": "df8a3e81-7f19-4be3-a402-cdc646dd5de1",
+      "type": "sample",
+      "color": "#ef4444",
+      "is_muted": false,
+      "is_solo": false,
+      "is_armed": false,
+      "volume": 1.0,
+      "pan": 0.0,
+      "instrument": null,
+      "midi_channel": 0,
+      "sample_id": "2dd634c6-7860-449e-a0c7-1ee05d1139a4",
+      "sample_name": "Recording 10:36:31 AM",
+      "sample_file_path": "2dd634c6-7860-449e-a0c7-1ee05d1139a4.wav"
+    },
+    {
+      "id": "2f7a6fe7-1c45-489e-b2ca-74990c353bcd",
+      "name": "Recording 10:59:46 AM",
+      "sequence_id": "df8a3e81-7f19-4be3-a402-cdc646dd5de1",
+      "type": "sample",
+      "color": "#3b82f6",
+      "is_muted": false,
+      "is_solo": false,
+      "is_armed": false,
+      "volume": 1.0,
+      "pan": 0.0,
+      "instrument": null,
+      "midi_channel": 0,
+      "sample_id": "6e5a82d0-c3ed-48e2-a5d5-428fca6c1a4b",
+      "sample_name": "Recording 10:59:46 AM",
+      "sample_file_path": "6e5a82d0-c3ed-48e2-a5d5-428fca6c1a4b.wav"
+    }
+  ],
+  "clips": [],
+  "is_playing": false,
+  "current_position": 0.0,
+  "loop_enabled": false,
+  "loop_start": 0.0,
+  "loop_end": 16.0,
+  "created_at": "2026-02-12T19:24:52.126297",
+  "updated_at": "2026-02-12T19:39:10.724757"
+}

@@ -7,8 +7,10 @@ import logging
 import os
 import json
 import uuid
+import subprocess
 from datetime import datetime
 from typing import List, Optional
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -78,21 +80,58 @@ async def upload_sample(
     name: str = Form(...),
     category: str = Form("Uncategorized")
 ):
-    """Upload a new audio sample"""
+    """Upload a new audio sample - converts WebM to WAV for SuperCollider compatibility"""
     try:
         # Generate unique ID
         sample_id = str(uuid.uuid4())
-        
+
         # Get file extension
         file_ext = os.path.splitext(file.filename)[1] if file.filename else ".webm"
-        file_name = f"{sample_id}{file_ext}"
-        file_path = os.path.join(SAMPLES_DIR, file_name)
-        
-        # Save file
+
+        # Save uploaded file temporarily
+        temp_file_name = f"{sample_id}_temp{file_ext}"
+        temp_file_path = os.path.join(SAMPLES_DIR, temp_file_name)
+
         content = await file.read()
-        with open(file_path, 'wb') as f:
+        with open(temp_file_path, 'wb') as f:
             f.write(content)
-        
+
+        # Convert to WAV if needed (SuperCollider only supports WAV, AIFF, FLAC)
+        if file_ext.lower() in ['.webm', '.mp3', '.m4a', '.aac']:
+            logger.info(f"🔄 Converting {file_ext} to WAV for SuperCollider compatibility...")
+            final_file_name = f"{sample_id}.wav"
+            final_file_path = os.path.join(SAMPLES_DIR, final_file_name)
+
+            try:
+                # Use ffmpeg to convert to WAV
+                subprocess.run([
+                    'ffmpeg', '-i', temp_file_path,
+                    '-acodec', 'pcm_s16le',  # 16-bit PCM
+                    '-ar', '48000',  # 48kHz sample rate
+                    '-ac', '2',  # Stereo
+                    '-y',  # Overwrite output file
+                    final_file_path
+                ], check=True, capture_output=True)
+
+                # Remove temp file
+                os.remove(temp_file_path)
+                logger.info(f"✅ Converted to WAV: {final_file_name}")
+
+            except subprocess.CalledProcessError as e:
+                logger.error(f"❌ FFmpeg conversion failed: {e.stderr.decode()}")
+                # Fallback: keep original file
+                final_file_name = temp_file_name
+                final_file_path = temp_file_path
+
+        else:
+            # Already in supported format
+            final_file_name = f"{sample_id}{file_ext}"
+            final_file_path = temp_file_path
+            os.rename(temp_file_path, final_file_path)
+
+        # Get file size
+        file_size = os.path.getsize(final_file_path)
+
         # Create metadata
         now = datetime.now().isoformat()
         metadata = SampleMetadata(
@@ -100,19 +139,19 @@ async def upload_sample(
             name=name,
             category=category,
             duration=0.0,  # Will be updated later
-            size=len(content),
-            file_name=file_name,
+            size=file_size,
+            file_name=final_file_name,
             created_at=now,
             updated_at=now
         )
-        
+
         # Load existing metadata
         all_metadata = load_metadata()
         all_metadata[sample_id] = metadata.dict()
         save_metadata(all_metadata)
-        
-        logger.info(f"✅ Uploaded sample: {name} ({file_name})")
-        
+
+        logger.info(f"✅ Uploaded sample: {name} ({final_file_name})")
+
         return SampleResponse(
             success=True,
             message="Sample uploaded successfully",
@@ -211,7 +250,7 @@ async def update_sample_duration(sample_id: str, duration: float = Form(...)):
 
 @router.patch("/{sample_id}", response_model=SampleResponse)
 async def update_sample(sample_id: str, name: Optional[str] = None, category: Optional[str] = None):
-    """Update sample metadata"""
+    """Update sample metadata and propagate changes to sequencer tracks"""
     try:
         metadata = load_metadata()
         if sample_id not in metadata:
@@ -224,6 +263,13 @@ async def update_sample(sample_id: str, name: Optional[str] = None, category: Op
 
         metadata[sample_id]["updated_at"] = datetime.now().isoformat()
         save_metadata(metadata)
+
+        # Propagate sample name changes to all sequencer tracks using this sample
+        if name is not None:
+            from backend.api.sequencer_routes import sequencer_service
+            if sequencer_service:
+                updated_count = sequencer_service.update_sample_references(sample_id, name)
+                logger.info(f"📝 Updated sample name in {updated_count} sequencer tracks")
 
         return SampleResponse(
             success=True,
@@ -239,11 +285,24 @@ async def update_sample(sample_id: str, name: Optional[str] = None, category: Op
 
 @router.delete("/{sample_id}")
 async def delete_sample(sample_id: str):
-    """Delete a sample"""
+    """Delete a sample (only if not in use by sequencer tracks)"""
     try:
         metadata = load_metadata()
         if sample_id not in metadata:
             raise HTTPException(status_code=404, detail="Sample not found")
+
+        # Check if sample is being used in any sequencer tracks
+        from backend.api.sequencer_routes import sequencer_service
+        if sequencer_service:
+            is_in_use, track_names = sequencer_service.check_sample_in_use(sample_id)
+            if is_in_use:
+                tracks_list = ", ".join(track_names[:3])  # Show first 3 tracks
+                if len(track_names) > 3:
+                    tracks_list += f" and {len(track_names) - 3} more"
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot delete sample: it is being used in {len(track_names)} track(s): {tracks_list}"
+                )
 
         # Delete file
         sample_data = metadata[sample_id]

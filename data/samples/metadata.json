@@ -1,52 +1,22 @@
 {
-  "372a8b7a-b124-4a89-bc15-c6bb542c2761": {
-    "id": "372a8b7a-b124-4a89-bc15-c6bb542c2761",
-    "name": "Recording 5:40:51 AM",
+  "2dd634c6-7860-449e-a0c7-1ee05d1139a4": {
+    "id": "2dd634c6-7860-449e-a0c7-1ee05d1139a4",
+    "name": "Recording 10:36:31 AM",
     "category": "Uncategorized",
-    "duration": 3.447,
-    "size": 54687,
-    "file_name": "372a8b7a-b124-4a89-bc15-c6bb542c2761.webm",
-    "created_at": "2026-02-10T05:40:51.705130",
-    "updated_at": "2026-02-10T05:40:51.711887"
+    "duration": 5.055,
+    "size": 956238,
+    "file_name": "2dd634c6-7860-449e-a0c7-1ee05d1139a4.wav",
+    "created_at": "2026-02-12T10:36:34.008019",
+    "updated_at": "2026-02-12T11:00:08.406014"
   },
-  "21ec327f-fa42-4a70-8f94-8bf64482bd74": {
-    "id": "21ec327f-fa42-4a70-8f94-8bf64482bd74",
-    "name": "Recording 7:08:41 AM",
+  "6e5a82d0-c3ed-48e2-a5d5-428fca6c1a4b": {
+    "id": "6e5a82d0-c3ed-48e2-a5d5-428fca6c1a4b",
+    "name": "Recording 10:59:46 AM",
     "category": "Uncategorized",
-    "duration": 6.59,
-    "size": 106317,
-    "file_name": "21ec327f-fa42-4a70-8f94-8bf64482bd74.webm",
-    "created_at": "2026-02-10T07:08:41.391906",
-    "updated_at": "2026-02-10T07:08:41.418387"
-  },
-  "66d0f1bd-5e26-4f04-baef-a6e5d4882ddc": {
-    "id": "66d0f1bd-5e26-4f04-baef-a6e5d4882ddc",
-    "name": "Recording 4:09:14 PM",
-    "category": "Uncategorized",
-    "duration": 3.103,
-    "size": 49825,
-    "file_name": "66d0f1bd-5e26-4f04-baef-a6e5d4882ddc.webm",
-    "created_at": "2026-02-10T16:09:14.614527",
-    "updated_at": "2026-02-10T16:09:14.629081"
-  },
-  "87993327-2a4d-498c-91fd-fa8a8dda1031": {
-    "id": "87993327-2a4d-498c-91fd-fa8a8dda1031",
-    "name": "Recording 9:00:05 PM",
-    "category": "Uncategorized",
-    "duration": 2.348,
-    "size": 37155,
-    "file_name": "87993327-2a4d-498c-91fd-fa8a8dda1031.webm",
-    "created_at": "2026-02-10T21:00:05.239321",
-    "updated_at": "2026-02-10T21:00:21.794767"
-  },
-  "efd2625f-d766-40b8-aac2-ce824fd57aa1": {
-    "id": "efd2625f-d766-40b8-aac2-ce824fd57aa1",
-    "name": "Recording 11:28:16 AM",
-    "category": "Uncategorized",
-    "duration": 2.444,
-    "size": 39103,
-    "file_name": "efd2625f-d766-40b8-aac2-ce824fd57aa1.webm",
-    "created_at": "2026-02-11T11:28:16.129967",
-    "updated_at": "2026-02-11T11:28:33.608741"
+    "duration": 2.029,
+    "size": 357198,
+    "file_name": "6e5a82d0-c3ed-48e2-a5d5-428fca6c1a4b.wav",
+    "created_at": "2026-02-12T10:59:46.268828",
+    "updated_at": "2026-02-12T10:59:59.273432"
   }
 }

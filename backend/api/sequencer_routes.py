@@ -4,7 +4,7 @@ Sequencer Routes - REST API for sequencer control
 import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.models.sequence import (
     Sequence,
@@ -62,7 +62,7 @@ async def get_sequence(sequence_id: str):
 
 @router.put("/sequences/{sequence_id}")
 async def update_sequence(sequence_id: str, request: dict):
-    """Update sequence properties (name, tempo, time_signature)"""
+    """Update sequence properties (name, tempo, time_signature, loop settings)"""
     sequence = sequencer_service.get_sequence(sequence_id)
     if not sequence:
         raise HTTPException(status_code=404, detail=f"Sequence {sequence_id} not found")
@@ -74,6 +74,12 @@ async def update_sequence(sequence_id: str, request: dict):
         sequence.tempo = request["tempo"]
     if "time_signature" in request:
         sequence.time_signature = request["time_signature"]
+    if "loop_enabled" in request:
+        sequence.loop_enabled = request["loop_enabled"]
+    if "loop_start" in request:
+        sequence.loop_start = request["loop_start"]
+    if "loop_end" in request:
+        sequence.loop_end = request["loop_end"]
 
     # Save to disk
     sequencer_service.storage.save_sequence(sequence)
@@ -221,18 +227,25 @@ class CreateTrackRequest(BaseModel):
 @router.post("/tracks", response_model=SequencerTrack)
 async def create_track(request: CreateTrackRequest):
     """Create a new track in a sequence"""
-    track = sequencer_service.create_track(
-        sequence_id=request.sequence_id,
-        name=request.name,
-        track_type=request.type,
-        color=request.color,
-        sample_id=request.sample_id,
-        sample_name=request.sample_name,
-        sample_file_path=request.sample_file_path
-    )
-    if not track:
-        raise HTTPException(status_code=404, detail=f"Sequence {request.sequence_id} not found")
-    return track
+    try:
+        logger.info(f"Creating track: {request.dict()}")
+        track = sequencer_service.create_track(
+            sequence_id=request.sequence_id,
+            name=request.name,
+            track_type=request.type,
+            color=request.color,
+            sample_id=request.sample_id,
+            sample_name=request.sample_name,
+            sample_file_path=request.sample_file_path
+        )
+        if not track:
+            raise HTTPException(status_code=404, detail=f"Sequence {request.sequence_id} not found")
+        return track
+    except Exception as e:
+        logger.error(f"❌ Failed to create track: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 @router.get("/tracks", response_model=list[SequencerTrack])
@@ -281,6 +294,8 @@ async def update_track_solo(track_id: str, request: UpdateTrackSoloRequest):
 class UpdateTrackRequest(BaseModel):
     """Request to update track properties"""
     name: Optional[str] = None
+    volume: Optional[float] = Field(None, ge=0.0, le=2.0)
+    pan: Optional[float] = Field(None, ge=-1.0, le=1.0)
 
 
 @router.put("/tracks/{track_id}", response_model=SequencerTrack)
@@ -293,6 +308,10 @@ async def update_track(track_id: str, request: UpdateTrackRequest):
     # Update fields
     if request.name is not None:
         track.name = request.name
+    if request.volume is not None:
+        track.volume = request.volume
+    if request.pan is not None:
+        track.pan = request.pan
 
     # Save the sequence containing this track
     sequence = sequencer_service.get_sequence(track.sequence_id)
@@ -305,16 +324,24 @@ async def update_track(track_id: str, request: UpdateTrackRequest):
 @router.delete("/tracks/{track_id}")
 async def delete_track(track_id: str):
     """Delete a track"""
-    track = sequencer_service.get_track(track_id)
-    if not track:
-        raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
+    try:
+        track = sequencer_service.get_track(track_id)
+        if not track:
+            raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
 
-    sequence_id = track.sequence_id
-    success = sequencer_service.delete_track(track_id)
-    if not success:
-        raise HTTPException(status_code=500, detail=f"Failed to delete track {track_id}")
+        sequence_id = track.sequence_id
+        success = sequencer_service.delete_track(track_id)
+        if not success:
+            raise HTTPException(status_code=500, detail=f"Failed to delete track {track_id}")
 
-    return {"status": "ok", "message": f"Track {track_id} deleted"}
+        return {"status": "ok", "message": f"Track {track_id} deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to delete track {track_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to delete track: {str(e)}")
 
 
 # ============================================================================
@@ -373,9 +400,9 @@ async def set_tempo(request: SetTempoRequest):
 
 @router.put("/seek")
 async def seek(request: SeekRequest):
-    """Seek to position"""
-    sequencer_service.seek(request.position)
-    return {"status": "ok", "position": request.position}
+    """Seek to position with optional audio scrubbing"""
+    await sequencer_service.seek(request.position, request.trigger_audio)
+    return {"status": "ok", "position": request.position, "trigger_audio": request.trigger_audio}
 
 
 @router.get("/state")
@@ -384,3 +411,34 @@ async def get_playback_state():
     return sequencer_service.get_playback_state()
 
 
+
+
+
+# ============================================================================
+# METRONOME ROUTES
+# ============================================================================
+
+@router.put("/metronome/toggle")
+async def toggle_metronome():
+    """Toggle metronome on/off"""
+    try:
+        enabled = sequencer_service.toggle_metronome()
+        return {"enabled": enabled}
+    except Exception as e:
+        logger.error(f"❌ Failed to toggle metronome: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class SetMetronomeVolumeRequest(BaseModel):
+    volume: float
+
+
+@router.put("/metronome/volume")
+async def set_metronome_volume(request: SetMetronomeVolumeRequest):
+    """Set metronome volume (0.0 to 1.0)"""
+    try:
+        sequencer_service.set_metronome_volume(request.volume)
+        return {"volume": request.volume}
+    except Exception as e:
+        logger.error(f"❌ Failed to set metronome volume: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

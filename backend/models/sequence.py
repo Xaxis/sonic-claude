@@ -58,10 +58,11 @@ class Clip(BaseModel):
     duration: float = Field(..., gt=0)
     is_muted: bool = False
     is_looped: bool = False
-    
+    gain: float = Field(default=1.0, ge=0.0, le=2.0, description="Clip gain/volume (0.0-2.0, 1.0 = unity)")
+
     # MIDI-specific
     midi_events: Optional[List[MIDINote]] = None
-    
+
     # Audio-specific
     audio_file_path: Optional[str] = None
     audio_offset: Optional[float] = None
@@ -81,6 +82,10 @@ class SequencerTrack(BaseModel):
     is_muted: bool = False
     is_solo: bool = False
     is_armed: bool = False
+
+    # Mixing
+    volume: float = Field(default=1.0, ge=0.0, le=2.0, description="Track volume (0.0-2.0, 1.0 = unity)")
+    pan: float = Field(default=0.0, ge=-1.0, le=1.0, description="Track pan (-1.0 = left, 0.0 = center, 1.0 = right)")
 
     # MIDI-specific
     instrument: Optional[str] = None  # Synth name
@@ -142,6 +147,8 @@ class UpdateClipRequest(BaseModel):
     midi_events: Optional[List[MIDINote]] = None
     is_muted: Optional[bool] = None
     is_looped: Optional[bool] = None
+    gain: Optional[float] = Field(None, ge=0.0, le=2.0)
+    audio_offset: Optional[float] = Field(None, ge=0.0)
 
 
 class SetTempoRequest(BaseModel):
@@ -152,4 +159,5 @@ class SetTempoRequest(BaseModel):
 class SeekRequest(BaseModel):
     """Request to seek to position"""
     position: float = Field(..., ge=0, description="Position in beats")
+    trigger_audio: bool = Field(default=True, description="Whether to trigger audio at the new position (for scrubbing)")
 

@@ -42,7 +42,7 @@ export function useTransportWebSocket() {
             if (isCleaningUpRef.current) return;
 
             try {
-                const ws = new WebSocket("ws://localhost:8000/ws/transport");
+                const ws = new WebSocket("ws://localhost:8000/audio-engine/ws/transport");
                 wsRef.current = ws;
 
                 ws.onopen = () => {

@@ -131,18 +131,21 @@ class WebSocketManager:
     async def broadcast_transport(self, data: Dict[str, Any]):
         """Broadcast transport data to all connected clients"""
         if not self.transport_clients:
+            logger.debug(f"⚠️ No transport clients connected, skipping broadcast")
             return
-        
+
         message = json.dumps(data)
         disconnected = set()
-        
+
+        logger.debug(f"📡 Broadcasting transport to {len(self.transport_clients)} clients: position={data.get('position_beats', 0):.2f}")
+
         for client in self.transport_clients:
             try:
                 await client.send_text(message)
             except Exception as e:
                 logger.error(f"❌ Error sending to transport client: {e}")
                 disconnected.add(client)
-        
+
         for client in disconnected:
             self.disconnect_transport(client)
 

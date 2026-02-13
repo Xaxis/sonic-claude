@@ -1,14 +1,15 @@
 {
-  "id": "7ee7b739-99b1-4675-abbc-f38e65458b5f",
-  "name": "Sequence 2",
+  "id": "df8a3e81-7f19-4be3-a402-cdc646dd5de1",
+  "name": "Test 1",
   "tempo": 120.0,
   "time_signature": "4/4",
+  "tracks": [],
   "clips": [],
   "is_playing": false,
   "current_position": 0.0,
   "loop_enabled": false,
   "loop_start": 0.0,
   "loop_end": 16.0,
-  "created_at": "2026-02-10T16:34:46.637735",
-  "updated_at": "2026-02-10T16:34:46.637901"
+  "created_at": "2026-02-12T19:24:52.126297",
+  "updated_at": "2026-02-12T19:24:52.126428"
 }

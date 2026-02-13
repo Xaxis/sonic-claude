@@ -132,6 +132,8 @@ class SequenceStorage:
 
         except Exception as e:
             logger.error(f"❌ Failed to save sequence {sequence.id}: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
 
@@ -247,6 +249,77 @@ class SequenceStorage:
         except Exception as e:
             logger.error(f"❌ Failed to recover autosave for {sequence_id}: {e}")
             return None
+
+    def promote_autosave(self, sequence_id: str) -> bool:
+        """
+        Promote autosave to main sequence file
+
+        This should be called on clean shutdown or periodically to ensure
+        autosaved changes are persisted to the main sequence.json file.
+        """
+        try:
+            autosave_file = self.storage_dir / sequence_id / ".autosave.json"
+
+            if not autosave_file.exists():
+                logger.debug(f"No autosave to promote for sequence: {sequence_id}")
+                return False
+
+            # Load autosave
+            with open(autosave_file, 'r') as f:
+                data = json.load(f)
+
+            sequence = Sequence(**data)
+
+            # Save as main sequence file
+            success = self.save_sequence(sequence, create_version=False)
+
+            if success:
+                logger.info(f"✅ Promoted autosave to main file for sequence: {sequence.name}")
+
+            return success
+
+        except Exception as e:
+            logger.error(f"❌ Failed to promote autosave for {sequence_id}: {e}")
+            return False
+
+    def promote_all_autosaves(self):
+        """Promote all autosave files to main sequence files"""
+        index = self._load_index()
+        promoted_count = 0
+
+        for sequence_id in index.keys():
+            if self.promote_autosave(sequence_id):
+                promoted_count += 1
+
+        if promoted_count > 0:
+            logger.info(f"✅ Promoted {promoted_count} autosave files")
+
+        return promoted_count
+
+    def promote_autosave(self, sequence_id: str) -> bool:
+        """Promote autosave to main sequence file"""
+        try:
+            autosave_file = self.storage_dir / sequence_id / ".autosave.json"
+
+            if not autosave_file.exists():
+                logger.warning(f"No autosave to promote for sequence: {sequence_id}")
+                return False
+
+            # Load autosave
+            sequence = self.recover_from_autosave(sequence_id)
+            if not sequence:
+                return False
+
+            # Save as main sequence
+            success = self.save_sequence(sequence)
+            if success:
+                logger.info(f"✅ Promoted autosave to main sequence: {sequence.name}")
+
+            return success
+
+        except Exception as e:
+            logger.error(f"❌ Failed to promote autosave for {sequence_id}: {e}")
+            return False
 
     # ========================================================================
     # VERSION HISTORY

@@ -8,48 +8,53 @@ set -e  # Exit on error
 echo "🎵 Sonic Claude - Starting..."
 echo ""
 
-# Kill any existing processes
+# Kill any existing processes - AGGRESSIVE CLEANUP
 echo "🧹 Cleaning up existing processes..."
 pkill -9 scsynth 2>/dev/null || true
 pkill -9 sclang 2>/dev/null || true
+pkill -9 -f "uvicorn" 2>/dev/null || true
+pkill -9 -f "backend.main" 2>/dev/null || true
+pkill -9 -f "vite" 2>/dev/null || true
+pkill -9 -f "node.*vite" 2>/dev/null || true
 lsof -ti:8000 | xargs kill -9 2>/dev/null || true
 lsof -ti:3000 | xargs kill -9 2>/dev/null || true
 lsof -ti:57110 | xargs kill -9 2>/dev/null || true
 lsof -ti:57120 | xargs kill -9 2>/dev/null || true
 lsof -ti:57121 | xargs kill -9 2>/dev/null || true
-sleep 1
+sleep 3
+echo "✅ All old processes killed"
 echo ""
 
-# Start scsynth (SuperCollider audio server)
+# Start scsynth (SuperCollider audio server) - SILENT
 echo "🎹 Starting scsynth (port 57110)..."
-scsynth -u 57110 -a 48000 -z 64 > /tmp/scsynth.log 2>&1 &
+scsynth -u 57110 -a 48000 -z 64 > /dev/null 2>&1 &
 SCSYNTH_PID=$!
 echo "   PID: $SCSYNTH_PID"
 sleep 3
 echo ""
 
-# Start sclang OSC relay
+# Start sclang OSC relay - SILENT
 echo "🔗 Starting sclang OSC relay (port 57120 → 57121)..."
 export XDG_CONFIG_HOME="$(pwd)/backend/supercollider"
-sclang backend/supercollider/osc_relay.scd > /tmp/sclang_relay.log 2>&1 &
+sclang backend/supercollider/osc_relay.scd > /dev/null 2>&1 &
 SCLANG_PID=$!
 unset XDG_CONFIG_HOME
 echo "   PID: $SCLANG_PID"
 sleep 2
 echo ""
 
-# Start backend
+# Start backend - LOGS TO STDOUT
 echo "🐍 Starting Python backend (port 8000)..."
-uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload > /tmp/backend.log 2>&1 &
+uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000 --log-level info &
 BACKEND_PID=$!
 echo "   PID: $BACKEND_PID"
 sleep 3
 echo ""
 
-# Start frontend
+# Start frontend - SILENT
 echo "⚛️  Starting React frontend (port 3000)..."
 cd frontend
-npm run dev -- --host 0.0.0.0 > /tmp/frontend.log 2>&1 &
+npm run dev -- --host 0.0.0.0 > /dev/null 2>&1 &
 FRONTEND_PID=$!
 cd ..
 echo "   PID: $FRONTEND_PID"
@@ -61,9 +66,7 @@ echo "🌐 URLs:"
 echo "   Backend:  http://localhost:8000"
 echo "   Frontend: http://localhost:3000"
 echo ""
-echo "📊 Showing combined logs (backend + frontend)..."
-echo "   Press Ctrl+C to stop all services"
-echo ""
+echo "📊 Backend logs streaming below (Press Ctrl+C to stop all services)..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
@@ -71,9 +74,6 @@ echo ""
 cleanup() {
     echo ""
     echo "🛑 Stopping all services..."
-
-    # Kill the tail process first
-    kill $TAIL_PID 2>/dev/null || true
 
     # Kill all child processes by finding them
     pkill -P $SCSYNTH_PID 2>/dev/null || true
@@ -108,10 +108,6 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
-# Show combined logs from backend and frontend
-tail -f /tmp/backend.log /tmp/frontend.log 2>/dev/null &
-TAIL_PID=$!
-
-# Wait for any process to exit
-wait
+# Wait for backend process (logs are already streaming to stdout)
+wait $BACKEND_PID
 

@@ -60,6 +60,7 @@ interface AudioEngineState {
     isPlaying: boolean;
     currentPosition: number; // beats
     tempo: number; // BPM
+    metronomeEnabled: boolean;
 
     // Real-time data (from WebSockets - SuperCollider output monitoring)
     spectrum: number[];
@@ -118,11 +119,13 @@ interface AudioEngineContextValue extends AudioEngineState {
     pausePlayback: () => Promise<void>;
     resumePlayback: () => Promise<void>;
     setTempo: (tempo: number) => Promise<void>;
+    toggleMetronome: () => Promise<void>;
     setSequences: (sequences: Sequence[]) => void;
     setActiveSequenceId: (sequenceId: string | null) => void;
     setIsPlaying: (isPlaying: boolean) => void;
     setCurrentPosition: (position: number) => void;
     setTempoValue: (tempo: number) => void;
+    setMetronomeEnabled: (enabled: boolean) => void;
 
     // Clip actions (API-integrated)
     addClip: (sequenceId: string, request: any) => Promise<void>;
@@ -134,6 +137,7 @@ interface AudioEngineContextValue extends AudioEngineState {
     loadSequencerTracks: (sequenceId?: string) => Promise<void>;
     createSequencerTrack: (sequenceId: string, name: string, type: string, options?: any) => Promise<void>;
     renameSequencerTrack: (trackId: string, newName: string) => Promise<void>;
+    updateSequencerTrack: (trackId: string, updates: { volume?: number; pan?: number }) => Promise<void>;
     deleteSequencerTrack: (trackId: string) => Promise<void>;
     muteSequencerTrack: (trackId: string, muted: boolean) => Promise<void>;
     soloSequencerTrack: (trackId: string, soloed: boolean) => Promise<void>;
@@ -178,6 +182,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         isPlaying: false,
         currentPosition: 0,
         tempo: 120,
+        metronomeEnabled: false,
         spectrum: [],
         meters: {},
         waveform: { left: [], right: [] },
@@ -416,10 +421,10 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         };
     }, []);
 
-    // Initialize with a default test sequence
+    // Load existing sequences on mount (NO DEFAULT CREATION)
     const hasInitializedRef = useRef(false);
     useEffect(() => {
-        const initializeDefaultSequence = async () => {
+        const loadExistingSequences = async () => {
             if (hasInitializedRef.current) return;
             hasInitializedRef.current = true;
 
@@ -427,7 +432,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 // Wait a bit for backend to be ready
                 await new Promise((resolve) => setTimeout(resolve, 1000));
 
-                // Check if sequences already exist
+                // Load existing sequences
                 const sequences = await audioEngineService.getSequences();
                 if (sequences.length > 0) {
                     setState((prev) => ({
@@ -435,29 +440,20 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                         sequences: sequences as any[],
                         activeSequenceId: sequences[0].id,
                     }));
-                    return;
+                } else {
+                    // No sequences exist - user can create one manually
+                    setState((prev) => ({
+                        ...prev,
+                        sequences: [],
+                        activeSequenceId: null,
+                    }));
                 }
-
-                // Create a default test sequence
-                const sequence = await audioEngineService.createSequence({
-                    name: "Test Sequence",
-                    tempo: 120,
-                    time_signature: "4/4",
-                });
-
-                setState((prev) => ({
-                    ...prev,
-                    sequences: [sequence as any],
-                    activeSequenceId: sequence.id,
-                }));
-
-                toast.success("Created default test sequence");
             } catch (error) {
-                console.error("Failed to initialize default sequence:", error);
+                console.error("Failed to load sequences:", error);
             }
         };
 
-        initializeDefaultSequence();
+        loadExistingSequences();
     }, []);
 
     // Engine actions
@@ -881,6 +877,16 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         [broadcastUpdate]
     );
 
+    const toggleMetronome = useCallback(async () => {
+        try {
+            const response = await audioEngineService.toggleMetronome();
+            setState((prev) => ({ ...prev, metronomeEnabled: response.enabled }));
+            broadcastUpdate("audioEngine.metronomeEnabled", response.enabled);
+        } catch (error) {
+            console.error("Failed to toggle metronome:", error);
+        }
+    }, [broadcastUpdate]);
+
     const setSequences = useCallback(
         (sequences: Sequence[]) => {
             setState((prev) => ({ ...prev, sequences }));
@@ -917,6 +923,14 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         (tempo: number) => {
             setState((prev) => ({ ...prev, tempo }));
             broadcastUpdate("audioEngine.tempo", tempo);
+        },
+        [broadcastUpdate]
+    );
+
+    const setMetronomeEnabled = useCallback(
+        (enabled: boolean) => {
+            setState((prev) => ({ ...prev, metronomeEnabled: enabled }));
+            broadcastUpdate("audioEngine.metronomeEnabled", enabled);
         },
         [broadcastUpdate]
     );
@@ -1023,6 +1037,21 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             console.error("Failed to rename sequencer track:", error);
             toast.error("Failed to rename track");
+        }
+    }, []);
+
+    const updateSequencerTrack = useCallback(async (trackId: string, updates: { volume?: number; pan?: number }) => {
+        try {
+            await audioEngineService.updateSequencerTrack(trackId, updates);
+            setState((prev) => ({
+                ...prev,
+                sequencerTracks: prev.sequencerTracks.map((t) =>
+                    t.id === trackId ? { ...t, ...updates } : t
+                ),
+            }));
+        } catch (error) {
+            console.error("Failed to update sequencer track:", error);
+            toast.error("Failed to update track");
         }
     }, []);
 
@@ -1147,11 +1176,13 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         pausePlayback,
         resumePlayback,
         setTempo,
+        toggleMetronome,
         setSequences,
         setActiveSequenceId,
         setIsPlaying,
         setCurrentPosition,
         setTempoValue,
+        setMetronomeEnabled,
         // Clips
         addClip,
         updateClip,
@@ -1161,6 +1192,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         loadSequencerTracks,
         createSequencerTrack,
         renameSequencerTrack,
+        updateSequencerTrack,
         deleteSequencerTrack,
         muteSequencerTrack,
         soloSequencerTrack,

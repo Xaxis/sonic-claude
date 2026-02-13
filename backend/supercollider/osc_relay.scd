@@ -120,9 +120,32 @@ Routine({
         Out.ar(out, [sig, sig]);
     }).add;
 
+    SynthDef(\samplePlayer, { |out=0, bufnum, rate=1, amp=0.5, pan=0, startPos=0, loop=0, gate=1, attack=0.01, release=0.1|
+        var env = EnvGen.kr(Env.asr(attack, 1, release), gate, doneAction: 2);
+        var sig = PlayBuf.ar(
+            numChannels: 2,
+            bufnum: bufnum,
+            rate: rate * BufRateScale.kr(bufnum),
+            trigger: 1,
+            startPos: startPos * BufFrames.kr(bufnum),
+            loop: loop,
+            doneAction: if(loop == 0, 2, 0)
+        );
+        sig = sig * env * amp;
+        sig = Balance2.ar(sig[0], sig[1], pan);
+        Out.ar(out, sig);
+    }).add;
+
+    SynthDef(\metronome, { |out=0, freq=1000, amp=0.3, accent=0|
+        var env = EnvGen.kr(Env.perc(0.001, 0.05), doneAction: 2);
+        var sig = SinOsc.ar(if(accent > 0, freq * 2, freq)) * env * amp;
+        Out.ar(out, [sig, sig]);
+    }).add;
+
     s.sync;
 
     "✅ SynthDefs loaded".postln;
+    "   audioMonitor, audioInputMonitor, sine, saw, square, samplePlayer, metronome".postln;
     "BUFFER_IDS: waveform=%, spectrum=%".format(~waveformBuffer.bufnum, ~spectrumBuffer.bufnum).postln;
 
     // Create NetAddr for Python backend

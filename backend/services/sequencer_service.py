@@ -57,6 +57,11 @@ class SequencerService:
         self.playhead_position = 0.0  # beats
         self.tempo = 120.0  # BPM
 
+        # Metronome state
+        self.metronome_enabled = False
+        self.metronome_volume = 0.3
+        self.last_metronome_beat = -1  # Track last beat we triggered metronome on
+
         # Playback task tracking
         self.playback_task: Optional[asyncio.Task] = None
         self.active_synths: Dict[str, int] = {}  # clip_id -> node_id
@@ -97,14 +102,17 @@ class SequencerService:
     async def _playback_loop(self):
         """Background task that advances playhead and triggers clips"""
         if not self.current_sequence_id:
+            logger.error("❌ Playback loop: No current_sequence_id!")
             return
 
         sequence = self.sequences.get(self.current_sequence_id)
         if not sequence:
+            logger.error(f"❌ Playback loop: Sequence {self.current_sequence_id} not found!")
             return
 
         logger.info(f"🎵 Starting playback loop for sequence {sequence.name}")
         logger.info(f"   Tempo: {self.tempo} BPM, WebSocket: {'connected' if self.websocket_manager else 'not available'}")
+        logger.info(f"   WebSocket has {len(self.websocket_manager.transport_clients) if self.websocket_manager else 0} connected clients")
 
         # Calculate time per beat in seconds
         beat_duration = 60.0 / self.tempo  # seconds per beat
@@ -115,12 +123,14 @@ class SequencerService:
         loop_count = 0
 
         try:
+            logger.info("🔄 Entering playback loop...")
             while self.is_playing:
                 loop_count += 1
 
                 # Log every 50 iterations (once per second at 50Hz)
                 if loop_count % 50 == 0:
-                    logger.debug(f"🔄 Playback loop running: position={self.playhead_position:.2f} beats")
+                    logger.info(f"🔄 Playback loop running: position={self.playhead_position:.2f} beats, is_playing={self.is_playing}")
+
                 current_time = time.time()
                 delta_time = current_time - last_time
                 last_time = current_time
@@ -129,40 +139,106 @@ class SequencerService:
                 delta_beats = (delta_time / beat_duration)
                 self.playhead_position += delta_beats
 
+                # Handle loop region: if loop is enabled and we've passed loop_end, jump back to loop_start
+                if sequence.loop_enabled and self.playhead_position >= sequence.loop_end:
+                    # Free all active synths before looping back
+                    if self.engine_manager:
+                        for clip_id, node_id in list(self.active_synths.items()):
+                            self.engine_manager.send_message("/n_free", node_id)
+                        self.active_synths.clear()
+
+                    # Jump back to loop start
+                    self.playhead_position = sequence.loop_start
+                    logger.info(f"🔁 Looping back: {sequence.loop_end:.2f} → {sequence.loop_start:.2f} beats")
+
                 # Update sequence position
                 sequence.current_position = self.playhead_position
 
                 # Check for clips that need to be triggered
                 await self._check_and_trigger_clips(sequence, self.playhead_position)
 
+                # Trigger metronome on every beat if enabled
+                if self.metronome_enabled and self.engine_manager:
+                    current_beat = int(self.playhead_position)
+                    if current_beat != self.last_metronome_beat:
+                        self.last_metronome_beat = current_beat
+                        # Parse time signature to determine accent (downbeat)
+                        time_sig_parts = sequence.time_signature.split("/")
+                        time_sig_num = int(time_sig_parts[0]) if len(time_sig_parts) > 0 else 4
+                        # Accent on first beat of measure
+                        beat_in_measure = current_beat % time_sig_num
+                        accent = 1 if beat_in_measure == 0 else 0
+                        # Trigger metronome click
+                        node_id = self.engine_manager.allocate_node_id()
+                        self.engine_manager.send_message(
+                            "/s_new",
+                            "metronome",
+                            node_id,
+                            0,  # addAction
+                            1,  # target
+                            "freq", 1000,
+                            "amp", self.metronome_volume,
+                            "accent", accent
+                        )
+
                 # Send position update to frontend via WebSocket
                 if self.websocket_manager:
-                    await self.websocket_manager.broadcast_transport({
+                    # Parse time signature (e.g., "4/4" -> num=4, den=4)
+                    time_sig_parts = sequence.time_signature.split("/")
+                    time_sig_num = int(time_sig_parts[0]) if len(time_sig_parts) > 0 else 4
+                    time_sig_den = int(time_sig_parts[1]) if len(time_sig_parts) > 1 else 4
+
+                    transport_data = {
                         "type": "transport",
                         "is_playing": self.is_playing,
                         "position_beats": self.playhead_position,
                         "position_seconds": self.playhead_position * (60.0 / self.tempo),
                         "tempo": self.tempo,
-                        "time_signature_num": sequence.time_signature_num,
-                        "time_signature_den": sequence.time_signature_den,
+                        "time_signature_num": time_sig_num,
+                        "time_signature_den": time_sig_den,
                         "loop_enabled": sequence.loop_enabled,
                         "loop_start": sequence.loop_start,
                         "loop_end": sequence.loop_end,
-                    })
+                    }
+                    if loop_count == 1:
+                        logger.info(f"📡 Broadcasting first transport update: {transport_data}")
+                    await self.websocket_manager.broadcast_transport(transport_data)
 
                 # Sleep until next update
                 await asyncio.sleep(update_interval)
+
+            logger.info(f"🛑 Playback loop exited: is_playing={self.is_playing}, loop_count={loop_count}")
 
         except asyncio.CancelledError:
             logger.info("🛑 Playback loop cancelled")
             raise
         except Exception as e:
-            logger.error(f"❌ Error in playback loop: {e}")
+            logger.error(f"❌ Error in playback loop: {e}", exc_info=True)
             self.is_playing = False
 
     async def _check_and_trigger_clips(self, sequence: Sequence, position: float):
         """Check if any clips should be triggered at the current position"""
-        # Iterate over clips in the sequence
+        # First, stop any clips that are playing but shouldn't be (playhead moved outside their range)
+        clips_to_stop = []
+        for clip_id, node_id in list(self.active_synths.items()):
+            # Find the clip
+            clip = next((c for c in sequence.clips if c.id == clip_id), None)
+            if clip:
+                clip_start = clip.start_time
+                clip_end = clip.start_time + clip.duration
+
+                # If playhead is outside clip range, stop it
+                if not (clip_start <= position < clip_end):
+                    clips_to_stop.append((clip_id, node_id))
+
+        # Stop clips that are out of range
+        for clip_id, node_id in clips_to_stop:
+            logger.info(f"🛑 Stopping clip {clip_id} (node {node_id}) - playhead outside range")
+            if self.engine_manager:
+                self.engine_manager.send_message("/n_free", node_id)
+            del self.active_synths[clip_id]
+
+        # Now check for clips that should start playing
         for clip in sequence.clips:
             # Skip muted clips
             if clip.is_muted:
@@ -171,6 +247,7 @@ class SequencerService:
             # Find the track for this clip
             track = next((t for t in sequence.tracks if t.id == clip.track_id), None)
             if not track:
+                logger.warning(f"⚠️ Clip {clip.id} has no matching track (track_id: {clip.track_id})")
                 continue
 
             # Skip if track is muted
@@ -181,11 +258,11 @@ class SequencerService:
             clip_start = clip.start_time
             clip_end = clip.start_time + clip.duration
 
-            # Check if we just crossed the clip start boundary
-            # (within the last update interval)
+            # Check if playhead is within clip range
             if clip_start <= position < clip_end:
                 # Check if this clip is already playing
                 if clip.id not in self.active_synths:
+                    logger.info(f"🎯 Triggering clip {clip.id} at position {position:.2f} (clip range: {clip_start:.2f}-{clip_end:.2f})")
                     await self._trigger_clip(clip, track, position - clip_start)
 
     async def _trigger_clip(self, clip: Clip, track: SequencerTrack, offset: float = 0.0):
@@ -199,28 +276,39 @@ class SequencerService:
             if track.type == "sample" and track.sample_id:
                 # Load sample into buffer if not already loaded
                 sample_id = track.sample_id or track.id
+                logger.info(f"🔍 Looking for sample: {sample_id}")
 
                 # Resolve sample file path
+                sample_path = None
+
                 # If sample_file_path is set and exists, use it
-                if track.sample_file_path and Path(track.sample_file_path).exists():
-                    sample_path = Path(track.sample_file_path)
-                else:
-                    # Construct path to data/samples/ directory
-                    samples_dir = Path(__file__).parent.parent / "data" / "samples"
+                if track.sample_file_path:
+                    potential_path = Path(track.sample_file_path)
+                    logger.info(f"   Checking track.sample_file_path: {potential_path}")
+                    if potential_path.exists():
+                        sample_path = potential_path
+                        logger.info(f"   ✅ Found at: {sample_path}")
+
+                # If not found, search in data/samples/ directory
+                if not sample_path:
+                    # Go from backend/services/sequencer_service.py -> backend/services -> backend -> project_root
+                    samples_dir = Path(__file__).parent.parent.parent / "data" / "samples"
+                    logger.info(f"   Searching in: {samples_dir}")
 
                     # Try to find the file with any extension
-                    found_file = None
                     for ext in ['.webm', '.wav', '.mp3', '.ogg', '.flac']:
                         potential_path = samples_dir / f"{sample_id}{ext}"
+                        logger.info(f"   Trying: {potential_path}")
                         if potential_path.exists():
-                            found_file = potential_path
+                            sample_path = potential_path
+                            logger.info(f"   ✅ Found: {sample_path}")
                             break
 
-                    if not found_file:
-                        logger.error(f"❌ Sample file not found for track sample ID: {sample_id}")
-                        return
-
-                    sample_path = found_file
+                if not sample_path:
+                    logger.error(f"❌ Sample file not found for track sample ID: {sample_id}")
+                    logger.error(f"   Searched in: {samples_dir}")
+                    logger.error(f"   track.sample_file_path was: {track.sample_file_path}")
+                    return
 
                 buffer_num = await self.buffer_manager.load_sample(sample_id, str(sample_path))
 
@@ -228,7 +316,8 @@ class SequencerService:
                 node_id = self.engine_manager.allocate_node_id()
 
                 # Calculate playback parameters
-                start_pos = offset / clip.duration if clip.duration > 0 else 0.0
+                # Add audio_offset to the start position (trim the sample)
+                start_pos = (offset + (clip.audio_offset or 0.0)) / clip.duration if clip.duration > 0 else 0.0
                 loop_enabled = 1 if clip.is_looped else 0
 
                 # Send /s_new message to create samplePlayer synth
@@ -240,8 +329,8 @@ class SequencerService:
                     1,  # target (1 = default group)
                     "bufnum", buffer_num,
                     "rate", 1.0,
-                    "amp", 0.8,  # Default amplitude
-                    "pan", 0.0,  # Center pan
+                    "amp", 0.8 * clip.gain * track.volume,  # Apply clip gain and track volume
+                    "pan", track.pan,  # Apply track pan
                     "startPos", start_pos,
                     "loop", loop_enabled,
                     "gate", 1
@@ -251,37 +340,37 @@ class SequencerService:
                 self.active_synths[clip.id] = node_id
 
                 logger.info(f"🎵 Triggered sample clip {clip.id} (node {node_id}, buffer {buffer_num}, sample: {track.sample_name})")
+                logger.info(f"   Volume: track={track.volume:.2f}, clip_gain={clip.gain:.2f}, final_amp={0.8 * clip.gain * track.volume:.2f}")
+                logger.info(f"   Pan: {track.pan:.2f}")
 
             # Handle audio clips (clip has audio file reference)
             elif clip.type == "audio" and clip.audio_file_path:
                 # Resolve audio file path
-                # If it's just a sample ID (UUID), construct path to data/samples/
                 audio_file_path = clip.audio_file_path
+                audio_path = None
+
+                # If it's just a sample ID (UUID), construct path to data/samples/
                 if not audio_file_path.endswith(('.wav', '.mp3', '.webm', '.ogg', '.flac')):
                     # Assume it's a sample ID, construct full path
-                    # Try common extensions
-                    from pathlib import Path
-                    samples_dir = Path(__file__).parent.parent / "data" / "samples"
+                    # Go from backend/services/sequencer_service.py -> backend/services -> backend -> project_root
+                    samples_dir = Path(__file__).parent.parent.parent / "data" / "samples"
 
                     # Try to find the file with any extension
-                    found_file = None
                     for ext in ['.webm', '.wav', '.mp3', '.ogg', '.flac']:
                         potential_path = samples_dir / f"{audio_file_path}{ext}"
                         if potential_path.exists():
-                            found_file = potential_path
+                            audio_path = potential_path
                             break
 
-                    if not found_file:
+                    if not audio_path:
                         logger.error(f"❌ Sample file not found for ID: {audio_file_path}")
                         return
-
-                    audio_path = found_file
                 else:
                     # It's already a path, resolve it
                     audio_path = Path(audio_file_path)
                     if not audio_path.is_absolute():
                         # Make it relative to project root
-                        audio_path = Path(__file__).parent.parent / audio_path
+                        audio_path = Path(__file__).parent.parent.parent / audio_path
 
                 buffer_num = await self.buffer_manager.load_sample(clip.id, str(audio_path))
 
@@ -301,8 +390,8 @@ class SequencerService:
                     1,  # target (1 = default group)
                     "bufnum", buffer_num,
                     "rate", 1.0,
-                    "amp", 0.8,  # Default amplitude
-                    "pan", 0.0,  # Center pan
+                    "amp", 0.8 * clip.gain * track.volume,  # Apply clip gain and track volume
+                    "pan", track.pan,  # Apply track pan
                     "startPos", start_pos,
                     "loop", loop_enabled,
                     "gate", 1
@@ -312,6 +401,8 @@ class SequencerService:
                 self.active_synths[clip.id] = node_id
 
                 logger.info(f"🎵 Triggered audio clip {clip.id} (node {node_id}, buffer {buffer_num})")
+                logger.info(f"   Volume: track={track.volume:.2f}, clip_gain={clip.gain:.2f}, final_amp={0.8 * clip.gain * track.volume:.2f}")
+                logger.info(f"   Pan: {track.pan:.2f}")
 
             # Handle MIDI clips
             elif clip.type == "midi" and clip.midi_events:
@@ -335,7 +426,8 @@ class SequencerService:
                             0,  # addAction
                             1,  # target
                             "freq", freq,
-                            "amp", note.velocity / 127.0 * 0.8,
+                            "amp", note.velocity / 127.0 * 0.8 * clip.gain * track.volume,  # Apply clip gain and track volume
+                            "pan", track.pan,  # Apply track pan
                             "gate", 1
                         )
 
@@ -392,6 +484,56 @@ class SequencerService:
             return True
         return False
 
+    def update_sample_references(self, sample_id: str, new_name: str) -> int:
+        """
+        Update sample_name in all tracks that reference this sample.
+        Called when a sample is renamed in the Input panel.
+
+        Args:
+            sample_id: The ID of the sample that was updated
+            new_name: The new name for the sample
+
+        Returns:
+            Number of tracks updated
+        """
+        updated_count = 0
+
+        for sequence in self.sequences.values():
+            sequence_modified = False
+
+            for track in sequence.tracks:
+                if track.sample_id == sample_id:
+                    logger.info(f"📝 Updating track '{track.name}' sample name: '{track.sample_name}' -> '{new_name}'")
+                    track.sample_name = new_name
+                    updated_count += 1
+                    sequence_modified = True
+
+            # Save sequence if any tracks were updated
+            if sequence_modified:
+                self.storage.save_sequence(sequence)
+                logger.info(f"💾 Saved sequence '{sequence.name}' with updated sample references")
+
+        return updated_count
+
+    def check_sample_in_use(self, sample_id: str) -> tuple[bool, list[str]]:
+        """
+        Check if a sample is being used in any sequencer tracks.
+
+        Args:
+            sample_id: The ID of the sample to check
+
+        Returns:
+            Tuple of (is_in_use, list_of_track_names)
+        """
+        tracks_using_sample = []
+
+        for sequence in self.sequences.values():
+            for track in sequence.tracks:
+                if track.sample_id == sample_id:
+                    tracks_using_sample.append(f"{sequence.name} / {track.name}")
+
+        return len(tracks_using_sample) > 0, tracks_using_sample
+
     # ========================================================================
     # CLIP MANAGEMENT
     # ========================================================================
@@ -414,6 +556,7 @@ class SequencerService:
             audio_file_path=request.audio_file_path,
             is_muted=False,
             is_looped=False,
+            gain=1.0,
         )
 
         sequence.clips.append(clip)
@@ -453,6 +596,10 @@ class SequencerService:
             clip.is_muted = request.is_muted
         if request.is_looped is not None:
             clip.is_looped = request.is_looped
+        if request.gain is not None:
+            clip.gain = request.gain
+        if request.audio_offset is not None:
+            clip.audio_offset = request.audio_offset
 
         sequence.updated_at = datetime.now()
 
@@ -547,6 +694,8 @@ class SequencerService:
             is_muted=False,
             is_solo=False,
             is_armed=False,
+            volume=1.0,  # Unity gain
+            pan=0.0,  # Center
             sample_id=sample_id,
             sample_name=sample_name,
             sample_file_path=sample_file_path
@@ -605,11 +754,13 @@ class SequencerService:
         """Delete a track from its sequence"""
         track = self.tracks.get(track_id)
         if not track:
+            logger.warning(f"Track {track_id} not found in tracks dict")
             return False
 
         # Find the sequence containing this track
         sequence = self.sequences.get(track.sequence_id)
         if not sequence:
+            logger.warning(f"Sequence {track.sequence_id} not found for track {track_id}")
             return False
 
         # Remove track from sequence
@@ -621,10 +772,13 @@ class SequencerService:
         # Remove all clips belonging to this track
         sequence.clips = [c for c in sequence.clips if c.track_id != track_id]
 
+        # Update timestamp
+        sequence.updated_at = datetime.now()
+
         # Auto-save the sequence
         self.storage.autosave_sequence(sequence)
 
-        logger.info(f"✅ Deleted track {track_id}")
+        logger.info(f"✅ Deleted track {track_id} from sequence {track.sequence_id}")
         return True
 
     # ========================================================================
@@ -693,7 +847,7 @@ class SequencerService:
         logger.info("⏹️  Stopped playback")
 
     async def pause_playback(self):
-        """Pause playback"""
+        """Pause playback and stop all active audio"""
         if self.is_playing:
             self.is_playing = False
             self.is_paused = True
@@ -706,6 +860,13 @@ class SequencerService:
                 except asyncio.CancelledError:
                     pass
                 self.playback_task = None
+
+            # CRITICAL: Stop all active synths immediately when pausing
+            if self.engine_manager:
+                for clip_id, node_id in self.active_synths.items():
+                    self.engine_manager.send_message("/n_free", node_id)
+                self.active_synths.clear()
+                logger.info(f"🔇 Stopped all active audio on pause")
 
             logger.info("⏸️  Paused playback")
 
@@ -733,15 +894,52 @@ class SequencerService:
         logger.info(f"🎵 Set tempo: {tempo} BPM")
         # TODO: Send OSC to SuperCollider to update tempo
 
-    def seek(self, position: float):
-        """Seek to position"""
+    async def seek(self, position: float, trigger_audio: bool = True):
+        """
+        Seek to position and optionally trigger audio for scrubbing effect.
+
+        Args:
+            position: Position in beats to seek to
+            trigger_audio: If True, trigger clips at the new position (for scrubbing)
+        """
         self.playhead_position = position
         if self.current_sequence_id:
             sequence = self.sequences.get(self.current_sequence_id)
             if sequence:
                 sequence.current_position = position
-        logger.info(f"⏩ Seek to position: {position} beats")
-        # TODO: Send OSC to SuperCollider to seek
+
+                # For audio scrubbing: stop all active clips and trigger clips at new position
+                if trigger_audio and self.engine_manager:
+                    # Stop all currently playing clips
+                    for clip_id, node_id in list(self.active_synths.items()):
+                        self.engine_manager.send_message("/n_free", node_id)
+                    self.active_synths.clear()
+
+                    # Trigger clips at the new position
+                    await self._check_and_trigger_clips(sequence, position)
+
+                # Broadcast position update via WebSocket so frontend updates immediately
+                if self.websocket_manager:
+                    # Parse time signature (e.g., "4/4" -> num=4, den=4)
+                    time_sig_parts = sequence.time_signature.split("/")
+                    time_sig_num = int(time_sig_parts[0]) if len(time_sig_parts) > 0 else 4
+                    time_sig_den = int(time_sig_parts[1]) if len(time_sig_parts) > 1 else 4
+
+                    transport_data = {
+                        "type": "transport",
+                        "is_playing": self.is_playing,
+                        "position_beats": self.playhead_position,
+                        "position_seconds": self.playhead_position * (60.0 / self.tempo),
+                        "tempo": self.tempo,
+                        "time_signature_num": time_sig_num,
+                        "time_signature_den": time_sig_den,
+                        "loop_enabled": sequence.loop_enabled,
+                        "loop_start": sequence.loop_start,
+                        "loop_end": sequence.loop_end,
+                    }
+                    await self.websocket_manager.broadcast_transport(transport_data)
+
+        logger.info(f"⏩ Seek to position: {position:.2f} beats (trigger_audio={trigger_audio})")
 
     def get_playback_state(self) -> dict:
         """Get current playback state"""
@@ -753,3 +951,19 @@ class SequencerService:
             "active_notes": 0,  # TODO: Track active notes
         }
 
+
+
+    # ========================================================================
+    # METRONOME CONTROL
+    # ========================================================================
+
+    def toggle_metronome(self) -> bool:
+        """Toggle metronome on/off"""
+        self.metronome_enabled = not self.metronome_enabled
+        logger.info(f"🎵 Metronome {'enabled' if self.metronome_enabled else 'disabled'}")
+        return self.metronome_enabled
+
+    def set_metronome_volume(self, volume: float) -> None:
+        """Set metronome volume (0.0 to 1.0)"""
+        self.metronome_volume = max(0.0, min(1.0, volume))
+        logger.info(f"🔊 Metronome volume set to {self.metronome_volume:.2f}")

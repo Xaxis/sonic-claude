@@ -25,6 +25,10 @@ export interface SequencerTrack {
     is_solo: boolean;
     is_armed: boolean;
 
+    // Mixing
+    volume: number; // 0.0-2.0, 1.0 = unity
+    pan: number; // -1.0 to 1.0 (left to right)
+
     // MIDI-specific
     instrument?: string; // Synth name
     midi_channel: number;
@@ -68,6 +72,7 @@ export interface SequencerClip {
 
     is_muted: boolean;
     is_looped: boolean;
+    gain: number; // 0.0-2.0, 1.0 = unity
 }
 
 export interface CreateSequenceRequest {
@@ -91,6 +96,8 @@ export interface UpdateClipRequest {
     midi_events?: MIDIEvent[];
     is_muted?: boolean;
     is_looped?: boolean;
+    gain?: number;
+    audio_offset?: number; // seconds
 }
 
 export interface SetTempoRequest {
@@ -99,6 +106,7 @@ export interface SetTempoRequest {
 
 export interface SeekRequest {
     position: number; // beats
+    trigger_audio?: boolean; // Whether to trigger audio at the new position (for scrubbing)
 }
 
 // ============================================================================

@@ -20,11 +20,13 @@ from backend.services.sequencer_service import SequencerService
 from backend.services.websocket_manager import WebSocketManager
 from backend.api import audio_routes, websocket_routes, sequencer_routes, sample_routes
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Configure logging (only if not already configured)
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        force=True
+    )
 logger = logging.getLogger(__name__)
 
 # Global service instances
@@ -125,6 +127,11 @@ async def lifespan(app: FastAPI):
     finally:
         # Cleanup
         logger.info("🛑 Shutting down Sonic Claude Backend...")
+
+        # Promote all autosaves before shutdown
+        if sequencer_service and sequencer_service.storage:
+            logger.info("💾 Promoting autosaves to main sequence files...")
+            sequencer_service.storage.promote_all_autosaves()
 
         if audio_analyzer:
             await audio_analyzer.stop_monitoring()
