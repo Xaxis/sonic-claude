@@ -1,5 +1,5 @@
 /**
- * Sequence Manager Modal
+ * Sequencer Panel Sequence Manager
  *
  * Provides UI for:
  * - Creating new sequences
@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { audioEngineService } from "@/services/api/audio-engine.service";
 import { toast } from "sonner";
 
-interface SequenceManagerModalProps {
+interface SequencerPanelSequenceManagerProps {
     isOpen: boolean;
     onClose: () => void;
     currentSequenceId: string | null;
@@ -50,12 +50,12 @@ interface VersionInfo {
     file_path: string;
 }
 
-export function SequenceManagerModal({
+export function SequencerPanelSequenceManager({
     isOpen,
     onClose,
     currentSequenceId,
     onSequenceChange,
-}: SequenceManagerModalProps) {
+}: SequencerPanelSequenceManagerProps) {
     const [sequences, setSequences] = useState<SequenceInfo[]>([]);
     const [versions, setVersions] = useState<VersionInfo[]>([]);
     const [newSequenceName, setNewSequenceName] = useState("");

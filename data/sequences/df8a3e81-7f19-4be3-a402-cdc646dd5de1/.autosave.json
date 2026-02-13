@@ -5,7 +5,7 @@
   "time_signature": "4/4",
   "tracks": [
     {
-      "id": "96c7b041-659f-4e36-8a7b-8b1f1a820834",
+      "id": "4e99b97a-d626-43c7-9bfc-1b2d3a11c3d2",
       "name": "Recording 10:36:31 AM",
       "sequence_id": "df8a3e81-7f19-4be3-a402-cdc646dd5de1",
       "type": "sample",
@@ -22,8 +22,8 @@
       "sample_file_path": "2dd634c6-7860-449e-a0c7-1ee05d1139a4.wav"
     },
     {
-      "id": "2f7a6fe7-1c45-489e-b2ca-74990c353bcd",
-      "name": "Recording 10:59:46 AM",
+      "id": "906fb4c7-af7c-4a9b-bf09-75374a0ffa86",
+      "name": "Recording 10:36:31 AM",
       "sequence_id": "df8a3e81-7f19-4be3-a402-cdc646dd5de1",
       "type": "sample",
       "color": "#3b82f6",
@@ -34,17 +34,490 @@
       "pan": 0.0,
       "instrument": null,
       "midi_channel": 0,
-      "sample_id": "6e5a82d0-c3ed-48e2-a5d5-428fca6c1a4b",
-      "sample_name": "Recording 10:59:46 AM",
-      "sample_file_path": "6e5a82d0-c3ed-48e2-a5d5-428fca6c1a4b.wav"
+      "sample_id": "2dd634c6-7860-449e-a0c7-1ee05d1139a4",
+      "sample_name": "Recording 10:36:31 AM",
+      "sample_file_path": "2dd634c6-7860-449e-a0c7-1ee05d1139a4.wav"
+    },
+    {
+      "id": "fb1b3b8d-5add-4dcd-8a17-a4b9210058cc",
+      "name": "MIDI 3",
+      "sequence_id": "df8a3e81-7f19-4be3-a402-cdc646dd5de1",
+      "type": "midi",
+      "color": "#8b5cf6",
+      "is_muted": false,
+      "is_solo": false,
+      "is_armed": false,
+      "volume": 1.0,
+      "pan": 0.0,
+      "instrument": null,
+      "midi_channel": 0,
+      "sample_id": null,
+      "sample_name": null,
+      "sample_file_path": null
+    },
+    {
+      "id": "eabcbea8-8d3e-49b0-a1bd-8f5ab3b0ae10",
+      "name": "MIDI 4",
+      "sequence_id": "df8a3e81-7f19-4be3-a402-cdc646dd5de1",
+      "type": "midi",
+      "color": "#10b981",
+      "is_muted": false,
+      "is_solo": false,
+      "is_armed": false,
+      "volume": 1.0,
+      "pan": 0.0,
+      "instrument": null,
+      "midi_channel": 0,
+      "sample_id": null,
+      "sample_name": null,
+      "sample_file_path": null
+    },
+    {
+      "id": "89c16fe2-1f68-4926-b3de-8884bced7ceb",
+      "name": "MIDI 5",
+      "sequence_id": "df8a3e81-7f19-4be3-a402-cdc646dd5de1",
+      "type": "midi",
+      "color": "#f59e0b",
+      "is_muted": false,
+      "is_solo": false,
+      "is_armed": false,
+      "volume": 1.0,
+      "pan": 0.0,
+      "instrument": null,
+      "midi_channel": 0,
+      "sample_id": null,
+      "sample_name": null,
+      "sample_file_path": null
+    },
+    {
+      "id": "219f9d33-29f1-4010-ba7d-d76e5d6fa61b",
+      "name": "MIDI 6",
+      "sequence_id": "df8a3e81-7f19-4be3-a402-cdc646dd5de1",
+      "type": "midi",
+      "color": "#ec4899",
+      "is_muted": false,
+      "is_solo": false,
+      "is_armed": false,
+      "volume": 1.0,
+      "pan": 0.0,
+      "instrument": null,
+      "midi_channel": 0,
+      "sample_id": null,
+      "sample_name": null,
+      "sample_file_path": null
     }
   ],
-  "clips": [],
+  "clips": [
+    {
+      "id": "60cd2728-32c1-4f76-a76e-455752486cfb",
+      "name": "Clip 1",
+      "type": "midi",
+      "track_id": "fb1b3b8d-5add-4dcd-8a17-a4b9210058cc",
+      "start_time": 1.625,
+      "duration": 4.0,
+      "is_muted": false,
+      "is_looped": false,
+      "gain": 1.0,
+      "midi_events": [
+        {
+          "note": 60,
+          "note_name": "C4",
+          "start_time": 0.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 64,
+          "note_name": "E4",
+          "start_time": 1.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 67,
+          "note_name": "G4",
+          "start_time": 2.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 72,
+          "note_name": "C5",
+          "start_time": 3.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        }
+      ],
+      "audio_file_path": null,
+      "audio_offset": null
+    },
+    {
+      "id": "1590aa7c-2d9f-4dd0-9446-c60bbc2cbf60",
+      "name": "Clip 2",
+      "type": "midi",
+      "track_id": "fb1b3b8d-5add-4dcd-8a17-a4b9210058cc",
+      "start_time": 45.0625,
+      "duration": 4.0,
+      "is_muted": false,
+      "is_looped": false,
+      "gain": 1.0,
+      "midi_events": [
+        {
+          "note": 60,
+          "note_name": "C4",
+          "start_time": 0.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 64,
+          "note_name": "E4",
+          "start_time": 1.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 67,
+          "note_name": "G4",
+          "start_time": 2.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 72,
+          "note_name": "C5",
+          "start_time": 3.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        }
+      ],
+      "audio_file_path": null,
+      "audio_offset": null
+    },
+    {
+      "id": "02beb78a-9bf7-4348-8514-c373eac6ac10",
+      "name": "Clip 5",
+      "type": "midi",
+      "track_id": "fb1b3b8d-5add-4dcd-8a17-a4b9210058cc",
+      "start_time": 6.4375,
+      "duration": 4.0,
+      "is_muted": false,
+      "is_looped": false,
+      "gain": 1.45,
+      "midi_events": [
+        {
+          "note": 60,
+          "note_name": "C4",
+          "start_time": 0.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 64,
+          "note_name": "E4",
+          "start_time": 1.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 67,
+          "note_name": "G4",
+          "start_time": 2.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 72,
+          "note_name": "C5",
+          "start_time": 3.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        }
+      ],
+      "audio_file_path": null,
+      "audio_offset": null
+    },
+    {
+      "id": "3e7154fa-3700-4a7a-b339-c19829f838a1",
+      "name": "Clip 4",
+      "type": "midi",
+      "track_id": "fb1b3b8d-5add-4dcd-8a17-a4b9210058cc",
+      "start_time": 15.875,
+      "duration": 4.0,
+      "is_muted": false,
+      "is_looped": false,
+      "gain": 1.0,
+      "midi_events": [
+        {
+          "note": 60,
+          "note_name": "C4",
+          "start_time": 0.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 64,
+          "note_name": "E4",
+          "start_time": 1.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 67,
+          "note_name": "G4",
+          "start_time": 2.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 72,
+          "note_name": "C5",
+          "start_time": 3.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        }
+      ],
+      "audio_file_path": null,
+      "audio_offset": null
+    },
+    {
+      "id": "a56d5e48-4b9a-488a-b4ab-15600b6e6b70",
+      "name": "Clip 5",
+      "type": "midi",
+      "track_id": "fb1b3b8d-5add-4dcd-8a17-a4b9210058cc",
+      "start_time": 14.1875,
+      "duration": 4.0,
+      "is_muted": false,
+      "is_looped": false,
+      "gain": 1.0,
+      "midi_events": [
+        {
+          "note": 60,
+          "note_name": "C4",
+          "start_time": 0.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 64,
+          "note_name": "E4",
+          "start_time": 1.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 67,
+          "note_name": "G4",
+          "start_time": 2.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 72,
+          "note_name": "C5",
+          "start_time": 3.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        }
+      ],
+      "audio_file_path": null,
+      "audio_offset": null
+    },
+    {
+      "id": "e5fd29b8-7ee9-4c31-81a6-75fbb4dd60fc",
+      "name": "Clip 6",
+      "type": "midi",
+      "track_id": "fb1b3b8d-5add-4dcd-8a17-a4b9210058cc",
+      "start_time": 12.5625,
+      "duration": 4.0,
+      "is_muted": false,
+      "is_looped": false,
+      "gain": 1.0,
+      "midi_events": [
+        {
+          "note": 60,
+          "note_name": "C4",
+          "start_time": 0.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 64,
+          "note_name": "E4",
+          "start_time": 1.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 67,
+          "note_name": "G4",
+          "start_time": 2.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 72,
+          "note_name": "C5",
+          "start_time": 3.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        }
+      ],
+      "audio_file_path": null,
+      "audio_offset": null
+    },
+    {
+      "id": "67465883-ad9d-4809-b46a-308076a037b1",
+      "name": "Clip 7",
+      "type": "audio",
+      "track_id": "906fb4c7-af7c-4a9b-bf09-75374a0ffa86",
+      "start_time": 0.0625,
+      "duration": 10.11,
+      "is_muted": false,
+      "is_looped": false,
+      "gain": 1.0,
+      "midi_events": null,
+      "audio_file_path": "2dd634c6-7860-449e-a0c7-1ee05d1139a4",
+      "audio_offset": null
+    },
+    {
+      "id": "4afd17fb-0625-4523-a1f6-ba11edb32e3d",
+      "name": "Clip 8",
+      "type": "audio",
+      "track_id": "906fb4c7-af7c-4a9b-bf09-75374a0ffa86",
+      "start_time": 24.9375,
+      "duration": 12.1875,
+      "is_muted": false,
+      "is_looped": false,
+      "gain": 1.0,
+      "midi_events": null,
+      "audio_file_path": "2dd634c6-7860-449e-a0c7-1ee05d1139a4",
+      "audio_offset": 2.2
+    },
+    {
+      "id": "a8c83578-3d49-4568-8795-6a36795ee2e7",
+      "name": "Clip 9",
+      "type": "midi",
+      "track_id": "fb1b3b8d-5add-4dcd-8a17-a4b9210058cc",
+      "start_time": 30.0,
+      "duration": 4.0,
+      "is_muted": false,
+      "is_looped": false,
+      "gain": 1.0,
+      "midi_events": [
+        {
+          "note": 60,
+          "note_name": "C4",
+          "start_time": 0.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 64,
+          "note_name": "E4",
+          "start_time": 1.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 67,
+          "note_name": "G4",
+          "start_time": 2.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 72,
+          "note_name": "C5",
+          "start_time": 3.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        }
+      ],
+      "audio_file_path": null,
+      "audio_offset": null
+    },
+    {
+      "id": "86f4cb46-0780-4033-82b0-987f8d96040b",
+      "name": "Clip 2 (copy)",
+      "type": "midi",
+      "track_id": "fb1b3b8d-5add-4dcd-8a17-a4b9210058cc",
+      "start_time": 49.0625,
+      "duration": 4.0,
+      "is_muted": false,
+      "is_looped": false,
+      "gain": 1.0,
+      "midi_events": [
+        {
+          "note": 60,
+          "note_name": "C4",
+          "start_time": 0.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 64,
+          "note_name": "E4",
+          "start_time": 1.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 67,
+          "note_name": "G4",
+          "start_time": 2.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 72,
+          "note_name": "C5",
+          "start_time": 3.0,
+          "duration": 0.5,
+          "velocity": 100,
+          "channel": 0
+        }
+      ],
+      "audio_file_path": null,
+      "audio_offset": null
+    }
+  ],
   "is_playing": false,
   "current_position": 0.0,
   "loop_enabled": false,
   "loop_start": 0.0,
   "loop_end": 16.0,
   "created_at": "2026-02-12T19:24:52.126297",
-  "updated_at": "2026-02-12T19:39:10.724757"
+  "updated_at": "2026-02-13T07:33:54.383556"
 }

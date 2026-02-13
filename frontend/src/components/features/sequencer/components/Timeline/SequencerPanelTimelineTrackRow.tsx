@@ -6,7 +6,7 @@
  */
 
 import { useRef } from "react";
-import { SequencerPanelClip } from "../SequencerPanelClip.tsx";
+import { SequencerPanelClip } from "../Clips/SequencerPanelClip.tsx";
 
 interface Clip {
     id: string;
@@ -30,6 +30,7 @@ interface SequencerPanelTimelineTrackRowProps {
     track: Track;
     clips: Clip[];
     selectedClip: string | null;
+    pianoRollClipId?: string | null;
     zoom: number;
     pixelsPerBeat: number;
     snapEnabled: boolean;
@@ -48,6 +49,7 @@ export function SequencerPanelTimelineTrackRow({
     track,
     clips,
     selectedClip,
+    pianoRollClipId,
     zoom,
     pixelsPerBeat,
     snapEnabled,
@@ -99,7 +101,7 @@ export function SequencerPanelTimelineTrackRow({
 
     return (
         <div
-            className="relative h-16 border-b border-border cursor-pointer hover:bg-muted/10 transition-colors"
+            className="relative h-20 border-b border-border cursor-pointer hover:bg-muted/10 transition-colors"
             onMouseDown={handleTrackMouseDown}
             onClick={handleTrackClick}
             title="Click to add clip"
@@ -113,6 +115,7 @@ export function SequencerPanelTimelineTrackRow({
                         clip={clip}
                         trackColor={track.color}
                         isSelected={selectedClip === clip.id}
+                        isEditingInPianoRoll={pianoRollClipId === clip.id}
                         zoom={zoom}
                         pixelsPerBeat={pixelsPerBeat}
                         snapEnabled={snapEnabled}
@@ -122,7 +125,7 @@ export function SequencerPanelTimelineTrackRow({
                         onDelete={onDeleteClip}
                         onMove={onMoveClip}
                         onResize={onResizeClip}
-                        onUpdate={onUpdateClip}
+                        onUpdateClip={onUpdateClip}
                         onOpenPianoRoll={onOpenPianoRoll}
                     />
                 ))}

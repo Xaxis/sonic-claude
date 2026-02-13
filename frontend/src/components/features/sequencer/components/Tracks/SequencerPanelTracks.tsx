@@ -1,5 +1,5 @@
 /**
- * SequencerPanelTrackList - Track headers with controls
+ * SequencerPanelTracks - Track headers with controls
  *
  * Displays track names and mute/solo/arm controls
  */
@@ -41,7 +41,7 @@ interface SequencerPanelTrackListProps {
     onUpdateTrack?: (trackId: string, updates: { volume?: number; pan?: number }) => void;
 }
 
-export function SequencerPanelTrackList({
+export function SequencerPanelTracks({
     tracks,
     onToggleMute,
     onToggleSolo,
@@ -81,9 +81,9 @@ export function SequencerPanelTrackList({
     };
 
     return (
-        <div className="flex flex-col h-full min-h-full">
+        <div className="flex flex-col">
             {tracks.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                <div className="flex flex-col items-center justify-center p-8 text-center">
                     <div className="text-muted-foreground">
                         <Volume2 size={48} className="mx-auto mb-4 opacity-20" />
                         <div className="text-base font-medium mb-1">No tracks yet</div>
@@ -96,7 +96,7 @@ export function SequencerPanelTrackList({
                 tracks.map((track) => (
                     <div
                         key={track.id}
-                        className="flex flex-col gap-1 px-3 py-2 border-b border-border flex-shrink-0 hover:bg-muted/30 transition-colors group"
+                        className="flex flex-col gap-1 px-3 py-2 border-b border-border flex-shrink-0 hover:bg-muted/30 transition-colors group h-20"
                     >
                         {/* Top Row: Name and Controls */}
                         <div className="flex items-center gap-2">

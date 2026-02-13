@@ -36,6 +36,7 @@ interface SequencerPanelClipProps {
     clip: Clip;
     trackColor?: string; // Track color for clip background
     isSelected: boolean;
+    isEditingInPianoRoll?: boolean; // True if this clip is currently open in piano roll
     zoom: number;
     pixelsPerBeat: number;
     snapEnabled: boolean;
@@ -53,6 +54,7 @@ export function SequencerPanelClip({
     clip,
     trackColor = "#3b82f6",
     isSelected,
+    isEditingInPianoRoll = false,
     zoom,
     pixelsPerBeat,
     snapEnabled,
@@ -245,16 +247,22 @@ export function SequencerPanelClip({
     return (
         <div
             className={cn(
-                "absolute top-1 bottom-1 rounded border-2 cursor-move overflow-hidden transition-shadow",
-                isSelected ? "border-white shadow-lg" : "border-white/40",
+                "absolute top-1 bottom-1 rounded border-2 cursor-move overflow-hidden transition-all",
+                isEditingInPianoRoll
+                    ? "border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.6)] ring-2 ring-cyan-400/50"
+                    : isSelected
+                        ? "border-white shadow-lg"
+                        : "border-white/40",
                 isDragging && "opacity-70",
                 isResizing && "opacity-70"
             )}
             style={{
                 left: `${left}px`,
                 width: `${width}px`,
-                backgroundColor: `${trackColor}40`, // Track color with 25% opacity
-                borderColor: trackColor,
+                backgroundColor: isEditingInPianoRoll
+                    ? `${trackColor}60` // Brighter when editing
+                    : `${trackColor}40`, // Track color with 25% opacity
+                borderColor: isEditingInPianoRoll ? "#22d3ee" : trackColor,
             }}
             onClick={handleClick}
             onMouseDown={(e) => handleMouseDown(e, "move")}

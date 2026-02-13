@@ -1,6 +1,6 @@
 /**
- * Sample Browser Modal
- * 
+ * Sequencer Panel Sample Browser
+ *
  * Allows users to select samples from the sample library when creating tracks
  */
 
@@ -12,13 +12,13 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import * as sampleApi from "@/services/sampleApi";
 
-interface SampleBrowserModalProps {
+interface SequencerPanelSampleBrowserProps {
     isOpen: boolean;
     onClose: () => void;
     onSelectSample: (sample: sampleApi.SampleMetadata) => void;
 }
 
-export function SampleBrowserModal({ isOpen, onClose, onSelectSample }: SampleBrowserModalProps) {
+export function SequencerPanelSampleBrowser({ isOpen, onClose, onSelectSample }: SequencerPanelSampleBrowserProps) {
     const [samples, setSamples] = useState<sampleApi.SampleMetadata[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedSample, setSelectedSample] = useState<sampleApi.SampleMetadata | null>(null);

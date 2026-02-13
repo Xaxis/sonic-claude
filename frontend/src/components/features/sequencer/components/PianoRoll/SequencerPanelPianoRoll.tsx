@@ -11,16 +11,19 @@ import { Button } from "@/components/ui/button.tsx";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { SequencerPanelPianoRollGrid } from "./SequencerPanelPianoRollGrid.tsx";
 import { SequencerPanelPianoRollKeyboard } from "./SequencerPanelPianoRollKeyboard.tsx";
-import type { MIDIEvent } from "../types.ts";
+import type { MIDIEvent } from "../../types.ts";
 
 interface SequencerPanelPianoRollProps {
     isOpen: boolean;
     clipId: string;
     clipName: string;
     clipDuration: number; // beats
+    clipStartTime: number; // beats - position in sequence
     midiEvents: MIDIEvent[];
     snapEnabled: boolean;
     gridSize: number;
+    zoom: number; // Match timeline zoom
+    totalBeats: number; // Total composition length in beats
     onClose: () => void;
     onUpdateNotes: (clipId: string, notes: MIDIEvent[]) => void;
 }
@@ -32,9 +35,12 @@ export function SequencerPanelPianoRoll({
     clipId,
     clipName,
     clipDuration,
+    clipStartTime,
     midiEvents,
     snapEnabled: initialSnapEnabled,
     gridSize: initialGridSize,
+    zoom,
+    totalBeats,
     onClose,
     onUpdateNotes,
 }: SequencerPanelPianoRollProps) {
@@ -44,11 +50,12 @@ export function SequencerPanelPianoRoll({
     const [gridSize, setGridSize] = useState(initialGridSize);
     const [copiedNotes, setCopiedNotes] = useState<MIDIEvent[]>([]);
 
-    // Piano roll settings
-    const minPitch = 36; // C2
-    const maxPitch = 96; // C7
-    const beatWidth = 80; // pixels per beat
-    const noteHeight = 16; // pixels per note row
+    // Piano roll settings - MATCH TIMELINE
+    const minPitch = 21; // A0 - Full piano range
+    const maxPitch = 108; // C8
+    const pixelsPerBeat = 40; // Match timeline's base pixels per beat
+    const beatWidth = pixelsPerBeat * zoom; // Apply zoom to match timeline
+    const noteHeight = 20; // pixels per note row (taller for better clicking)
 
     // Update notes when midiEvents prop changes
     useEffect(() => {
@@ -166,9 +173,14 @@ export function SequencerPanelPianoRoll({
         <div className="flex flex-col h-full bg-background">
             {/* Header */}
             <div className="px-4 py-2 border-b border-border bg-muted/20 flex items-center justify-between flex-shrink-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                     <span className="text-sm font-semibold">MIDI Editor - {clipName}</span>
-                    <span className="text-xs text-muted-foreground">({notes.length} notes)</span>
+                    <span className="text-xs text-muted-foreground">
+                        {notes.length} {notes.length === 1 ? 'note' : 'notes'}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                        • Bar {Math.floor(clipStartTime / 4) + 1} • {clipDuration} beats
+                    </span>
                 </div>
                 <div className="flex items-center gap-2">
                     <IconButton
@@ -196,42 +208,49 @@ export function SequencerPanelPianoRoll({
                 </div>
             </div>
 
-            {/* Piano Roll Content */}
+            {/* Piano Roll Content - Match Timeline Layout */}
             <div className="flex-1 flex overflow-hidden">
-                {/* Piano Keyboard (Left) */}
-                <SequencerPanelPianoRollKeyboard
-                    minPitch={minPitch}
-                    maxPitch={maxPitch}
-                    noteHeight={noteHeight}
-                />
+                {/* Left Sidebar - Match timeline's 256px track list width */}
+                <div className="w-64 border-r border-border flex-shrink-0 bg-background">
+                    {/* Piano Keyboard */}
+                    <SequencerPanelPianoRollKeyboard
+                        minPitch={minPitch}
+                        maxPitch={maxPitch}
+                        noteHeight={noteHeight}
+                    />
+                </div>
 
-                {/* Piano Roll Grid (Right) */}
-                <SequencerPanelPianoRollGrid
-                    notes={notes}
-                    selectedNotes={selectedNotes}
-                    minPitch={minPitch}
-                    maxPitch={maxPitch}
-                    clipDuration={clipDuration}
-                    beatWidth={beatWidth}
-                    noteHeight={noteHeight}
-                    snapEnabled={snapEnabled}
-                    gridSize={gridSize}
-                    onAddNote={handleAddNote}
-                    onMoveNote={handleMoveNote}
-                    onResizeNote={handleResizeNote}
-                    onUpdateVelocity={handleUpdateVelocity}
-                    onDeleteNote={handleDeleteNote}
-                    onSelectNote={(index) => setSelectedNotes(new Set([index]))}
-                    onToggleSelectNote={(index) => {
-                        const newSelected = new Set(selectedNotes);
-                        if (newSelected.has(index)) {
-                            newSelected.delete(index);
-                        } else {
-                            newSelected.add(index);
-                        }
-                        setSelectedNotes(newSelected);
-                    }}
-                />
+                {/* Right Grid - Scrollable, matches timeline width */}
+                <div className="flex-1 overflow-auto">
+                    <SequencerPanelPianoRollGrid
+                        notes={notes}
+                        selectedNotes={selectedNotes}
+                        minPitch={minPitch}
+                        maxPitch={maxPitch}
+                        clipStartTime={clipStartTime}
+                        clipDuration={clipDuration}
+                        totalBeats={totalBeats}
+                        beatWidth={beatWidth}
+                        noteHeight={noteHeight}
+                        snapEnabled={snapEnabled}
+                        gridSize={gridSize}
+                        onAddNote={handleAddNote}
+                        onMoveNote={handleMoveNote}
+                        onResizeNote={handleResizeNote}
+                        onUpdateVelocity={handleUpdateVelocity}
+                        onDeleteNote={handleDeleteNote}
+                        onSelectNote={(index) => setSelectedNotes(new Set([index]))}
+                        onToggleSelectNote={(index) => {
+                            const newSelected = new Set(selectedNotes);
+                            if (newSelected.has(index)) {
+                                newSelected.delete(index);
+                            } else {
+                                newSelected.add(index);
+                            }
+                            setSelectedNotes(newSelected);
+                        }}
+                    />
+                </div>
             </div>
         </div>
     );

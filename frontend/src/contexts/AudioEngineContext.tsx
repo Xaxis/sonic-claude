@@ -128,7 +128,7 @@ interface AudioEngineContextValue extends AudioEngineState {
     setMetronomeEnabled: (enabled: boolean) => void;
 
     // Clip actions (API-integrated)
-    addClip: (sequenceId: string, request: any) => Promise<void>;
+    addClip: (sequenceId: string, request: any) => Promise<any>;
     updateClip: (sequenceId: string, clipId: string, request: any) => Promise<void>;
     deleteClip: (sequenceId: string, clipId: string) => Promise<void>;
     duplicateClip: (sequenceId: string, clipId: string) => Promise<void>;
@@ -939,13 +939,18 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
     const addClip = useCallback(
         async (sequenceId: string, request: any) => {
             try {
+                console.log("🔧 AudioEngineContext.addClip called:", { sequenceId, request });
                 const clip = await audioEngineService.addClip(sequenceId, request);
+                console.log("🔧 Clip created from backend:", clip);
                 // Reload sequences to get updated clips
                 await loadSequences();
+                console.log("🔧 Sequences reloaded");
                 toast.success(`Added clip to sequence`);
+                return clip;
             } catch (error) {
                 console.error("Failed to add clip:", error);
                 toast.error("Failed to add clip");
+                throw error;
             }
         },
         [loadSequences]

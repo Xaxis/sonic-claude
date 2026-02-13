@@ -13,7 +13,9 @@ interface SequencerPanelPianoRollGridProps {
     selectedNotes: Set<number>;
     minPitch: number;
     maxPitch: number;
-    clipDuration: number; // beats
+    clipStartTime: number; // beats - where clip starts in composition
+    clipDuration: number; // beats - clip length
+    totalBeats: number; // beats - total composition length
     beatWidth: number; // pixels per beat
     noteHeight: number; // pixels per note row
     snapEnabled: boolean;
@@ -32,7 +34,9 @@ export function SequencerPanelPianoRollGrid({
     selectedNotes,
     minPitch,
     maxPitch,
+    clipStartTime,
     clipDuration,
+    totalBeats,
     beatWidth,
     noteHeight,
     snapEnabled,
@@ -54,8 +58,13 @@ export function SequencerPanelPianoRollGrid({
     const [dragStartPitch, setDragStartPitch] = useState(0);
     const [dragStartDuration, setDragStartDuration] = useState(0);
 
-    const totalWidth = clipDuration * beatWidth;
+    // Grid spans the full composition width (like timeline)
+    const totalWidth = totalBeats * beatWidth;
     const totalHeight = (maxPitch - minPitch + 1) * noteHeight;
+
+    // Clip region boundaries
+    const clipStartX = clipStartTime * beatWidth;
+    const clipEndX = (clipStartTime + clipDuration) * beatWidth;
 
     const isBlackKey = (pitch: number): boolean => {
         const note = pitch % 12;
@@ -80,10 +89,15 @@ export function SequencerPanelPianoRollGrid({
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        const pitch = pixelsToPitch(y);
-        const startTime = pixelsToBeats(x);
+        // Only allow adding notes within the clip region
+        if (x < clipStartX || x >= clipEndX) return;
 
-        onAddNote(pitch, startTime);
+        const pitch = pixelsToPitch(y);
+        const absoluteTime = pixelsToBeats(x);
+        // Convert to clip-relative time
+        const clipRelativeTime = absoluteTime - clipStartTime;
+
+        onAddNote(pitch, clipRelativeTime);
     };
 
     const handleNoteMouseDown = (e: React.MouseEvent, index: number, action: "move" | "resize") => {
@@ -188,8 +202,8 @@ export function SequencerPanelPianoRollGrid({
                     );
                 })}
 
-                {/* Vertical grid lines (beats) */}
-                {Array.from({ length: Math.ceil(clipDuration) + 1 }, (_, i) => (
+                {/* Vertical grid lines (beats) - Full composition */}
+                {Array.from({ length: Math.ceil(totalBeats) + 1 }, (_, i) => (
                     <div
                         key={`beat-${i}`}
                         className="absolute top-0 bottom-0 border-l border-border/30"
@@ -197,10 +211,20 @@ export function SequencerPanelPianoRollGrid({
                     />
                 ))}
 
-                {/* MIDI Notes */}
+                {/* Clip Region Highlight */}
+                <div
+                    className="absolute top-0 bottom-0 bg-cyan-500/5 border-l-2 border-r-2 border-cyan-500/30 pointer-events-none"
+                    style={{
+                        left: `${clipStartX}px`,
+                        width: `${clipEndX - clipStartX}px`,
+                    }}
+                />
+
+                {/* MIDI Notes - Positioned at absolute time */}
                 {notes.map((note, index) => {
                     const y = (maxPitch - note.note) * noteHeight;
-                    const x = note.start_time * beatWidth;
+                    // Note times are clip-relative, convert to absolute
+                    const x = (clipStartTime + note.start_time) * beatWidth;
                     const width = note.duration * beatWidth;
                     const isSelected = selectedNotes.has(index);
 

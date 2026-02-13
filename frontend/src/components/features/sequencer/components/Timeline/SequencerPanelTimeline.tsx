@@ -45,6 +45,7 @@ interface SequencerPanelTimelineProps {
     snapEnabled: boolean;
     gridSize: number;
     selectedClip: string | null;
+    pianoRollClipId?: string | null; // ID of clip currently open in piano roll
     onSelectClip: (clipId: string) => void;
     onDuplicateClip: (clipId: string) => void;
     onDeleteClip: (clipId: string) => void;
@@ -69,6 +70,7 @@ export function SequencerPanelTimeline({
     snapEnabled,
     gridSize,
     selectedClip,
+    pianoRollClipId,
     onSelectClip,
     onDuplicateClip,
     onDeleteClip,
@@ -144,49 +146,52 @@ export function SequencerPanelTimeline({
     }, [playheadX]);
 
     return (
-        <div ref={timelineContainerRef} className="flex flex-col h-full overflow-x-auto overflow-y-hidden">
+        <div ref={timelineContainerRef} className="flex flex-col">
             {/* Ruler - Sticky header */}
-            <SequencerPanelTimelineRuler
-                rulerMarkers={rulerMarkers}
-                totalWidth={totalWidth}
-                onSeek={onSeek}
-                pixelsPerBeat={pixelsPerBeat}
-                zoom={zoom}
-                snapEnabled={snapEnabled}
-                gridSize={gridSize}
-            />
+            <div className="flex-shrink-0">
+                <SequencerPanelTimelineRuler
+                    rulerMarkers={rulerMarkers}
+                    totalWidth={totalWidth}
+                    onSeek={onSeek}
+                    pixelsPerBeat={pixelsPerBeat}
+                    zoom={zoom}
+                    snapEnabled={snapEnabled}
+                    gridSize={gridSize}
+                />
+            </div>
 
-            {/* Tracks and Clips - Scrollable content */}
-            <div className="flex-1 min-h-0 overflow-y-hidden">
-                <div className="relative" style={{ width: `${totalWidth}px` }}>
-                    {/* Grid Lines */}
-                    <SequencerPanelTimelineGrid rulerMarkers={rulerMarkers} />
+            {/* Tracks and Clips - Grows vertically */}
+            {tracks.length === 0 ? (
+                <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+                    No tracks. Add a track to start sequencing.
+                </div>
+            ) : (
+                <div className="flex-shrink-0">
+                    <div className="relative" style={{ width: `${totalWidth}px` }}>
+                        {/* Grid Lines */}
+                        <SequencerPanelTimelineGrid rulerMarkers={rulerMarkers} />
 
-                    {/* Loop Region */}
-                    <SequencerPanelTimelineLoopRegion
-                        isLooping={isLooping}
-                        loopStart={loopStart}
-                        loopEnd={loopEnd}
-                        pixelsPerBeat={pixelsPerBeat}
-                        zoom={zoom}
-                        snapEnabled={snapEnabled}
-                        gridSize={gridSize}
-                        onLoopStartChange={onLoopStartChange}
-                        onLoopEndChange={onLoopEndChange}
-                    />
+                        {/* Loop Region */}
+                        <SequencerPanelTimelineLoopRegion
+                            isLooping={isLooping}
+                            loopStart={loopStart}
+                            loopEnd={loopEnd}
+                            pixelsPerBeat={pixelsPerBeat}
+                            zoom={zoom}
+                            snapEnabled={snapEnabled}
+                            gridSize={gridSize}
+                            onLoopStartChange={onLoopStartChange}
+                            onLoopEndChange={onLoopEndChange}
+                        />
 
-                    {/* Track Rows */}
-                    {tracks.length === 0 ? (
-                        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-                            No tracks. Add a track to start sequencing.
-                        </div>
-                    ) : (
-                        tracks.map((track) => (
+                        {/* Track Rows */}
+                        {tracks.map((track) => (
                             <SequencerPanelTimelineTrackRow
                                 key={track.id}
                                 track={track}
                                 clips={clips}
                                 selectedClip={selectedClip}
+                                pianoRollClipId={pianoRollClipId}
                                 zoom={zoom}
                                 pixelsPerBeat={pixelsPerBeat}
                                 snapEnabled={snapEnabled}
@@ -200,20 +205,20 @@ export function SequencerPanelTimeline({
                                 onUpdateClip={onUpdateClip}
                                 onOpenPianoRoll={onOpenPianoRoll}
                             />
-                        ))
-                    )}
+                        ))}
 
-                    {/* Playhead - Rendered AFTER tracks so it appears on top */}
-                    <SequencerPanelTimelinePlayhead
-                        currentPosition={currentPosition}
-                        pixelsPerBeat={pixelsPerBeat}
-                        zoom={zoom}
-                        snapEnabled={snapEnabled}
-                        gridSize={gridSize}
-                        onSeek={onSeek}
-                    />
+                        {/* Playhead - Rendered AFTER tracks so it appears on top */}
+                        <SequencerPanelTimelinePlayhead
+                            currentPosition={currentPosition}
+                            pixelsPerBeat={pixelsPerBeat}
+                            zoom={zoom}
+                            snapEnabled={snapEnabled}
+                            gridSize={gridSize}
+                            onSeek={onSeek}
+                        />
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }
