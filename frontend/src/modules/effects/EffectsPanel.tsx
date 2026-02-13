@@ -1,0 +1,216 @@
+/**
+ * Effects Panel
+ *
+ * Audio effects chain management.
+ * Shows active effects with their parameters and routing.
+ * Integrates with AudioEngineContext for real effect management.
+ *
+ * Uses professional Knob components in grid layout for parameters.
+ */
+
+import { useState, useEffect } from "react";
+import { SubPanel } from "@/components/ui/sub-panel.tsx";
+import { Knob } from "@/components/ui/knob.tsx";
+import { Plus, Power, Zap, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils.ts";
+import { useAudioEngine } from "@/contexts/AudioEngineContext.tsx";
+
+export function EffectsPanel() {
+    const {
+        activeEffects,
+        effectDefs,
+        loadEffectDefs,
+        createEffect,
+        updateEffectParameter,
+        deleteEffect,
+        bypassEffect,
+    } = useAudioEngine();
+
+    const [selectedEffectId, setSelectedEffectId] = useState<string | null>(null);
+
+    // Load effect definitions on mount
+    useEffect(() => {
+        loadEffectDefs();
+    }, [loadEffectDefs]);
+
+    // Auto-select first effect if none selected
+    useEffect(() => {
+        if (!selectedEffectId && activeEffects.length > 0) {
+            setSelectedEffectId(activeEffects[0].id);
+        }
+    }, [activeEffects, selectedEffectId]);
+
+    // Handle adding a new effect
+    const handleAddEffect = async () => {
+        if (effectDefs.length > 0) {
+            await createEffect(effectDefs[0].name);
+        } else {
+            console.warn("No effect definitions available");
+        }
+    };
+
+    // Handle toggle effect bypass
+    const handleToggleEffect = async (effectId: string) => {
+        const effect = activeEffects.find((e) => e.id === effectId);
+        if (effect) {
+            await bypassEffect(effect.node_id, !effect.is_active);
+        }
+    };
+
+    // Handle parameter change
+    const handleParameterChange = async (effectId: string, param: string, value: number) => {
+        const effect = activeEffects.find((e) => e.id === effectId);
+        if (effect) {
+            await updateEffectParameter(effect.node_id, param, value);
+        }
+    };
+
+    // Handle delete effect
+    const handleDeleteEffect = async (effectId: string) => {
+        const effect = activeEffects.find((e) => e.id === effectId);
+        if (effect) {
+            await deleteEffect(effect.node_id);
+            if (selectedEffectId === effectId) {
+                setSelectedEffectId(null);
+            }
+        }
+    };
+
+    const selectedEffect = activeEffects.find((e) => e.id === selectedEffectId);
+    const enabledCount = activeEffects.filter((e) => e.is_active).length;
+
+    return (
+        <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
+            {/* Effects Chain */}
+            <SubPanel title={`Effects Chain (${enabledCount} active)`} className="flex-shrink-0">
+                <div className="space-y-1 p-2">
+                    {activeEffects.length === 0 ? (
+                        <div className="text-muted-foreground p-4 text-center text-sm">
+                            No active effects
+                        </div>
+                    ) : (
+                        activeEffects.map((effect, index) => (
+                            <div
+                                key={effect.id}
+                                className={cn(
+                                    "group rounded-lg border p-2 transition-all",
+                                    selectedEffectId === effect.id
+                                        ? "bg-primary/20 border-primary"
+                                        : "bg-muted/30 border-border hover:bg-muted/50",
+                                    !effect.is_active && "opacity-50"
+                                )}
+                            >
+                                <div
+                                    onClick={() => setSelectedEffectId(effect.id)}
+                                    className="flex cursor-pointer items-center justify-between"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground w-4 font-mono text-xs">
+                                            {index + 1}
+                                        </span>
+                                        <Zap size={14} className="text-primary" />
+                                        <div>
+                                            <div className="text-sm font-semibold">
+                                                {effect.effectdef}
+                                            </div>
+                                            <div className="text-muted-foreground text-xs">
+                                                Node: {effect.node_id}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleToggleEffect(effect.id);
+                                        }}
+                                        className={cn(
+                                            "rounded p-1.5 transition-colors",
+                                            effect.is_active
+                                                ? "bg-primary/30 text-primary hover:bg-primary/40"
+                                                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                        )}
+                                        title={effect.is_active ? "Bypass" : "Enable"}
+                                    >
+                                        <Power size={14} />
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={() => handleDeleteEffect(effect.id)}
+                                    className="bg-destructive/20 hover:bg-destructive/30 text-destructive mt-2 flex w-full items-center justify-center gap-1 rounded p-1 text-xs opacity-0 transition-opacity group-hover:opacity-100"
+                                >
+                                    <Trash2 size={12} />
+                                    Delete
+                                </button>
+                            </div>
+                        ))
+                    )}
+                    <button
+                        onClick={handleAddEffect}
+                        className="border-border hover:border-primary hover:bg-primary/10 text-muted-foreground hover:text-primary flex w-full items-center justify-center gap-2 rounded-lg border border-dashed p-2 transition-all"
+                    >
+                        <Plus size={14} />
+                        <span className="text-xs">Add Effect</span>
+                    </button>
+                </div>
+            </SubPanel>
+
+            {/* Effect Parameters */}
+            {selectedEffect ? (
+                <SubPanel
+                    title={`${selectedEffect.effectdef} Parameters`}
+                    className="flex-1 overflow-auto"
+                >
+                    <div className="p-4">
+                        {Object.keys(selectedEffect.parameters).length === 0 ? (
+                            <div className="text-muted-foreground py-8 text-center text-sm">
+                                No parameters available
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-3 gap-4">
+                                {Object.entries(selectedEffect.parameters).map(([param, value]) => {
+                                    if (typeof value !== "number") return null;
+
+                                    // Determine format based on parameter name
+                                    const paramLower = param.toLowerCase();
+                                    const format = paramLower.includes("pan")
+                                        ? "pan"
+                                        : paramLower.includes("mix") || paramLower.includes("wet")
+                                          ? "percent"
+                                          : "default";
+                                    const min = paramLower.includes("pan") ? -1 : 0;
+                                    const max = 1;
+
+                                    return (
+                                        <div key={param} className="flex justify-center">
+                                            <Knob
+                                                value={value}
+                                                onChange={(v) =>
+                                                    handleParameterChange(
+                                                        selectedEffect.id,
+                                                        param,
+                                                        v
+                                                    )
+                                                }
+                                                label={param.replace(/_/g, " ")}
+                                                format={format}
+                                                min={min}
+                                                max={max}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </SubPanel>
+            ) : (
+                <div className="flex flex-1 items-center justify-center">
+                    <div className="text-muted-foreground text-center">
+                        <Zap size={48} className="mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Select an effect to edit parameters</p>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

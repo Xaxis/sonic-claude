@@ -46,9 +46,9 @@
  */
 
 import type { PanelConfig } from "@/components/layout";
-import { InputPanel } from "@/components/features/input";
-import { LoopVisualizerPanel } from "@/components/features/loop-visualizer";
-import { SequencerPanel } from "@/components/features/sequencer";
+import { InputPanel } from "@/modules/input";
+import { LoopVisualizerPanel } from "@/modules/loop-visualizer";
+import { SequencerPanel } from "@/modules/sequencer";
 // TransportPanel removed - now integrated into SequencerPanel
 // Commented out unused panel imports - uncomment when adding panels to DEFAULT_PANELS
 // import { SynthesisPanel } from "@/components/features/synthesis";

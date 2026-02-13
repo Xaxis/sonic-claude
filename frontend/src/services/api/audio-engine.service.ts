@@ -11,13 +11,13 @@ import type {
     Synth,
     CreateSynthRequest,
     UpdateSynthRequest,
-} from "@/components/features/synthesis";
+} from "@/modules/synthesis";
 import type {
     EffectDefInfo,
     Effect,
     CreateEffectRequest,
     UpdateEffectRequest,
-} from "@/components/features/effects";
+} from "@/modules/effects";
 import type {
     MixerTrack,
     CreateTrackRequest,
@@ -26,7 +26,7 @@ import type {
     SetSendLevelRequest,
     AddEffectToTrackRequest,
     SetTrackGroupRequest,
-} from "@/components/features/mixer";
+} from "@/modules/mixer";
 import type {
     Sequence,
     SequencerClip,
@@ -35,7 +35,7 @@ import type {
     UpdateClipRequest,
     SetTempoRequest,
     SeekRequest,
-} from "@/components/features/sequencer";
+} from "@/modules/sequencer";
 
 export class AudioEngineService extends BaseAPIClient {
     // ========================================================================

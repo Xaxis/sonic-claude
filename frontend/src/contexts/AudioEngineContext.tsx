@@ -17,10 +17,10 @@ import { windowManager } from "@/services/WindowManager";
 import { audioEngineService } from "@/services/api/audio-engine.service";
 import { toast } from "sonner";
 import type { AudioEngineStatus } from "@/types";
-import type { Synth } from "@/components/features/synthesis";
-import type { Effect } from "@/components/features/effects";
-import type { MixerTrack } from "@/components/features/mixer";
-import type { Sequence } from "@/components/features/sequencer";
+import type { Synth } from "@/modules/synthesis";
+import type { Effect } from "@/modules/effects";
+import type { MixerTrack } from "@/modules/mixer";
+import type { Sequence } from "@/modules/sequencer";
 
 // WebSocket message types
 interface TransportWebSocketData {

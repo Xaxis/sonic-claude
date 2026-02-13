@@ -1,1 +1,0 @@
-export { SpectrumPanel } from "./SpectrumPanel";
