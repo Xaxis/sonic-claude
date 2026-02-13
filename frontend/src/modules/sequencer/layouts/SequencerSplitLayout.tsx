@@ -30,7 +30,9 @@ interface SequencerSplitLayoutProps {
     
     // Scroll
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
+    pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
     onTimelineScroll: (e: React.UIEvent<HTMLDivElement>) => void;
+    onPianoRollScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     
     // Track handlers
     onToggleMute: (trackId: string) => Promise<void>;
@@ -67,6 +69,8 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
         zoom,
         snapEnabled,
         gridSize,
+        pianoRollScrollRef,
+        onPianoRollScroll,
         onClosePianoRoll,
         onUpdateMIDINotes,
         ...timelineSectionProps
@@ -111,6 +115,8 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                             gridSize={gridSize}
                             zoom={zoom}
                             totalBeats={totalBeats}
+                            pianoRollScrollRef={pianoRollScrollRef}
+                            onPianoRollScroll={onPianoRollScroll}
                             onClose={onClosePianoRoll}
                             onUpdateNotes={onUpdateMIDINotes}
                         />

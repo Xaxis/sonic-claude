@@ -58,11 +58,12 @@ export function SequencerPanelPianoRollGrid({
     const [dragStartPitch, setDragStartPitch] = useState(0);
     const [dragStartDuration, setDragStartDuration] = useState(0);
 
-    // Grid spans the full composition width (like timeline)
+    // Grid spans the full composition width (like timeline) - allows scrolling freely
+    // Clip region is visually highlighted so user knows the clip boundaries
     const totalWidth = totalBeats * beatWidth;
     const totalHeight = (maxPitch - minPitch + 1) * noteHeight;
 
-    // Clip region boundaries
+    // Clip region boundaries (for visual highlight)
     const clipStartX = clipStartTime * beatWidth;
     const clipEndX = (clipStartTime + clipDuration) * beatWidth;
 

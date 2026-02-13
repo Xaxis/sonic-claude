@@ -208,7 +208,7 @@
       "type": "midi",
       "track_id": "fb1b3b8d-5add-4dcd-8a17-a4b9210058cc",
       "start_time": 6.4375,
-      "duration": 4.0,
+      "duration": 9.0,
       "is_muted": false,
       "is_looped": false,
       "gain": 1.45,
@@ -519,5 +519,5 @@
   "loop_start": 0.0,
   "loop_end": 16.0,
   "created_at": "2026-02-12T19:24:52.126297",
-  "updated_at": "2026-02-13T09:56:34.486963"
+  "updated_at": "2026-02-13T13:18:30.366674"
 }

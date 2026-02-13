@@ -9,8 +9,7 @@ import { useState, useEffect } from "react";
 import { X, Trash2, Grid3x3, Save } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { IconButton } from "@/components/ui/icon-button.tsx";
-import { SequencerPanelPianoRollGrid } from "./SequencerPanelPianoRollGrid.tsx";
-import { SequencerPanelPianoRollKeyboard } from "./SequencerPanelPianoRollKeyboard.tsx";
+import { SequencerPianoRollSection } from "../../layouts/SequencerPianoRollSection.tsx";
 import type { MIDIEvent } from "../../types.ts";
 
 interface SequencerPanelPianoRollProps {
@@ -24,6 +23,8 @@ interface SequencerPanelPianoRollProps {
     gridSize: number;
     zoom: number; // Match timeline zoom
     totalBeats: number; // Total composition length in beats
+    pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
+    onPianoRollScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     onClose: () => void;
     onUpdateNotes: (clipId: string, notes: MIDIEvent[]) => void;
 }
@@ -41,6 +42,8 @@ export function SequencerPanelPianoRoll({
     gridSize: initialGridSize,
     zoom,
     totalBeats,
+    pianoRollScrollRef,
+    onPianoRollScroll,
     onClose,
     onUpdateNotes,
 }: SequencerPanelPianoRollProps) {
@@ -56,6 +59,8 @@ export function SequencerPanelPianoRoll({
     const pixelsPerBeat = 40; // Match timeline's base pixels per beat
     const beatWidth = pixelsPerBeat * zoom; // Apply zoom to match timeline
     const noteHeight = 20; // pixels per note row (taller for better clicking)
+
+
 
     // Update notes when midiEvents prop changes
     useEffect(() => {
@@ -208,50 +213,37 @@ export function SequencerPanelPianoRoll({
                 </div>
             </div>
 
-            {/* Piano Roll Content - Match Timeline Layout */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* Left Sidebar - Match timeline's 256px track list width */}
-                <div className="w-64 border-r border-border flex-shrink-0 bg-background">
-                    {/* Piano Keyboard */}
-                    <SequencerPanelPianoRollKeyboard
-                        minPitch={minPitch}
-                        maxPitch={maxPitch}
-                        noteHeight={noteHeight}
-                    />
-                </div>
-
-                {/* Right Grid - Scrollable, matches timeline width */}
-                <div className="flex-1 overflow-auto">
-                    <SequencerPanelPianoRollGrid
-                        notes={notes}
-                        selectedNotes={selectedNotes}
-                        minPitch={minPitch}
-                        maxPitch={maxPitch}
-                        clipStartTime={clipStartTime}
-                        clipDuration={clipDuration}
-                        totalBeats={totalBeats}
-                        beatWidth={beatWidth}
-                        noteHeight={noteHeight}
-                        snapEnabled={snapEnabled}
-                        gridSize={gridSize}
-                        onAddNote={handleAddNote}
-                        onMoveNote={handleMoveNote}
-                        onResizeNote={handleResizeNote}
-                        onUpdateVelocity={handleUpdateVelocity}
-                        onDeleteNote={handleDeleteNote}
-                        onSelectNote={(index) => setSelectedNotes(new Set([index]))}
-                        onToggleSelectNote={(index) => {
-                            const newSelected = new Set(selectedNotes);
-                            if (newSelected.has(index)) {
-                                newSelected.delete(index);
-                            } else {
-                                newSelected.add(index);
-                            }
-                            setSelectedNotes(newSelected);
-                        }}
-                    />
-                </div>
-            </div>
+            {/* Piano Roll Content - Use dedicated layout component */}
+            <SequencerPianoRollSection
+                notes={notes}
+                selectedNotes={selectedNotes}
+                minPitch={minPitch}
+                maxPitch={maxPitch}
+                noteHeight={noteHeight}
+                clipStartTime={clipStartTime}
+                clipDuration={clipDuration}
+                totalBeats={totalBeats}
+                beatWidth={beatWidth}
+                snapEnabled={snapEnabled}
+                gridSize={gridSize}
+                pianoRollScrollRef={pianoRollScrollRef}
+                onPianoRollScroll={onPianoRollScroll}
+                onAddNote={handleAddNote}
+                onMoveNote={handleMoveNote}
+                onResizeNote={handleResizeNote}
+                onUpdateVelocity={handleUpdateVelocity}
+                onDeleteNote={handleDeleteNote}
+                onSelectNote={(index) => setSelectedNotes(new Set([index]))}
+                onToggleSelectNote={(index) => {
+                    const newSelected = new Set(selectedNotes);
+                    if (newSelected.has(index)) {
+                        newSelected.delete(index);
+                    } else {
+                        newSelected.add(index);
+                    }
+                    setSelectedNotes(newSelected);
+                }}
+            />
         </div>
     );
 }

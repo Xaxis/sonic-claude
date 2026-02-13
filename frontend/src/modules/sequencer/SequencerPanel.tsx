@@ -66,8 +66,8 @@ export function SequencerPanel() {
     // Use WebSocket position if connected, otherwise fall back to context
     const currentPosition = isTransportConnected ? transport.position_beats : 0;
 
-    // Scroll synchronization
-    const { timelineScrollRef, handleTimelineScroll } = useSequencerScroll();
+    // Scroll synchronization (timeline + piano roll)
+    const { timelineScrollRef, pianoRollScrollRef, handleTimelineScroll, handlePianoRollScroll } = useSequencerScroll();
 
     // Event handlers - Transport, Sequences, Tracks
     const {
@@ -255,7 +255,9 @@ export function SequencerPanel() {
                             selectedClip={state.selectedClip}
                             showPianoRoll={state.showPianoRoll}
                             timelineScrollRef={timelineScrollRef}
+                            pianoRollScrollRef={pianoRollScrollRef}
                             onTimelineScroll={handleTimelineScroll}
+                            onPianoRollScroll={handlePianoRollScroll}
                             onToggleMute={handleToggleMute}
                             onToggleSolo={handleToggleSolo}
                             onDeleteTrack={deleteSequencerTrack}
