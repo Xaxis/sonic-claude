@@ -7,6 +7,7 @@
 
 import { useRef } from "react";
 import { SequencerPanelClip } from "../Clips/SequencerPanelClip.tsx";
+import { cn } from "@/lib/utils.ts";
 
 interface Clip {
     id: string;
@@ -35,6 +36,7 @@ interface SequencerPanelTimelineTrackRowProps {
     pixelsPerBeat: number;
     snapEnabled: boolean;
     gridSize: number;
+    isExpanded?: boolean; // Track header expansion state
     onSelectClip: (clipId: string) => void;
     onDuplicateClip: (clipId: string) => void;
     onDeleteClip: (clipId: string) => void;
@@ -43,6 +45,7 @@ interface SequencerPanelTimelineTrackRowProps {
     onResizeClip?: (clipId: string, newDuration: number) => void;
     onUpdateClip?: (clipId: string, updates: { gain?: number; audio_offset?: number }) => void;
     onOpenPianoRoll?: (clipId: string) => void;
+    onClipDragStateChange?: (clipId: string, dragState: { startTime: number; duration: number } | null) => void;
 }
 
 export function SequencerPanelTimelineTrackRow({
@@ -54,6 +57,7 @@ export function SequencerPanelTimelineTrackRow({
     pixelsPerBeat,
     snapEnabled,
     gridSize,
+    isExpanded = false,
     onSelectClip,
     onDuplicateClip,
     onDeleteClip,
@@ -62,6 +66,7 @@ export function SequencerPanelTimelineTrackRow({
     onResizeClip,
     onUpdateClip,
     onOpenPianoRoll,
+    onClipDragStateChange,
 }: SequencerPanelTimelineTrackRowProps) {
     const mouseDownPosRef = useRef<{ x: number; y: number; target: EventTarget | null } | null>(null);
 
@@ -101,7 +106,10 @@ export function SequencerPanelTimelineTrackRow({
 
     return (
         <div
-            className="relative h-20 border-b border-border cursor-pointer hover:bg-muted/10 transition-colors"
+            className={cn(
+                "relative border-b border-border cursor-pointer hover:bg-muted/10 transition-all",
+                isExpanded ? "h-32" : "h-16"
+            )}
             onMouseDown={handleTrackMouseDown}
             onClick={handleTrackClick}
             title="Click to add clip"
@@ -120,6 +128,7 @@ export function SequencerPanelTimelineTrackRow({
                         pixelsPerBeat={pixelsPerBeat}
                         snapEnabled={snapEnabled}
                         gridSize={gridSize}
+                        isTrackExpanded={isExpanded}
                         onSelect={onSelectClip}
                         onDuplicate={onDuplicateClip}
                         onDelete={onDeleteClip}
@@ -127,6 +136,7 @@ export function SequencerPanelTimelineTrackRow({
                         onResize={onResizeClip}
                         onUpdateClip={onUpdateClip}
                         onOpenPianoRoll={onOpenPianoRoll}
+                        onClipDragStateChange={onClipDragStateChange}
                     />
                 ))}
         </div>

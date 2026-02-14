@@ -23,7 +23,7 @@
  */
 
 import { useState } from "react";
-import { Volume2, VolumeX, Radio, Trash2, Edit2, Check, X, MoreVertical, Copy, Settings } from "lucide-react";
+import { Volume2, VolumeX, Radio, Trash2, Edit2, Check, X, MoreVertical, Copy, Settings, ChevronDown } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { cn } from "@/lib/utils.ts";
@@ -55,6 +55,8 @@ interface TrackHeaderProps {
     onRename?: (trackId: string, newName: string) => void;
     onDelete?: (trackId: string) => void;
     onUpdateTrack?: (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => void;
+    isExpanded?: boolean; // Track header expansion state
+    onToggleExpand?: (trackId: string) => void; // Toggle expanded/minimized
 }
 
 export function TrackHeader({
@@ -64,6 +66,8 @@ export function TrackHeader({
     onRename,
     onDelete,
     onUpdateTrack,
+    isExpanded = false,
+    onToggleExpand,
 }: TrackHeaderProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState(track.name);
@@ -95,8 +99,15 @@ export function TrackHeader({
 
     return (
         <div
-            className="relative flex flex-col gap-1.5 px-2 py-1.5 border-b border-border hover:bg-muted/30 transition-colors group h-20"
+            className={cn(
+                "relative flex flex-col border-b border-border hover:bg-muted/30 transition-all group",
+                isExpanded ? "h-32 px-3 py-2 gap-2" : "h-16 px-2 py-1 gap-1"
+            )}
             style={{ borderLeftColor: track.color, borderLeftWidth: "3px" }}
+            onContextMenu={(e) => {
+                e.preventDefault();
+                // Context menu will be handled by the dropdown
+            }}
         >
             {/* Hover Action Menu - Top Right */}
             <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
@@ -106,7 +117,7 @@ export function TrackHeader({
                             <MoreVertical size={12} className="text-muted-foreground" />
                         </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-36">
+                    <DropdownMenuContent align="end" className="w-36 mr-2">
                         <DropdownMenuItem onClick={handleStartEdit} className="text-xs py-1">
                             <Edit2 size={10} className="mr-1.5" />
                             Rename
@@ -131,15 +142,19 @@ export function TrackHeader({
                 </DropdownMenu>
             </div>
 
-            {/* ROW 1: IDENTITY - Track name, type, instrument */}
-            <div className="flex items-center gap-1.5 pr-4">
-                {/* Type Badge */}
-                <div className={typeBadgeClass}>{track.type}</div>
+            {/* MINIMIZED MODE - Single row with essentials */}
+            {!isExpanded && (
+                <div className="flex items-center gap-2 h-full">
+                    {/* Type Badge */}
+                    <div className={typeBadgeClass}>{track.type}</div>
 
-                {/* Track Name - Editable - ALWAYS VISIBLE */}
-                <div className="min-w-[80px] max-w-[120px]">
-                    {isEditing ? (
-                        <div className="flex items-center gap-1">
+                    {/* Track Name - Always visible, click to expand */}
+                    <div
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() => onToggleExpand?.(track.id)}
+                        title="Click to expand track controls"
+                    >
+                        {isEditing ? (
                             <input
                                 type="text"
                                 value={editName}
@@ -148,110 +163,169 @@ export function TrackHeader({
                                     if (e.key === "Enter") handleSaveEdit();
                                     if (e.key === "Escape") handleCancelEdit();
                                 }}
+                                onClick={(e) => e.stopPropagation()}
                                 autoFocus
                                 className="w-full px-1.5 py-0.5 text-xs font-medium bg-background border border-primary rounded"
                             />
-                            <IconButton icon={Check} onClick={handleSaveEdit} size="icon-xs" variant="ghost" tooltip="Save" />
-                            <IconButton icon={X} onClick={handleCancelEdit} size="icon-xs" variant="ghost" tooltip="Cancel" />
+                        ) : (
+                            <div className="text-sm font-medium truncate">{track.name}</div>
+                        )}
+                    </div>
+
+                    {/* Mute/Solo - Always visible */}
+                    <button
+                        onClick={() => onToggleMute(track.id)}
+                        className={cn(
+                            "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase transition-all",
+                            track.is_muted
+                                ? "bg-yellow-500/20 text-yellow-500"
+                                : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                        )}
+                        title={track.is_muted ? "Unmute" : "Mute"}
+                    >
+                        M
+                    </button>
+
+                    <button
+                        onClick={() => onToggleSolo(track.id)}
+                        className={cn(
+                            "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase transition-all",
+                            track.is_solo
+                                ? "bg-blue-500/20 text-blue-500"
+                                : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                        )}
+                        title={track.is_solo ? "Unsolo" : "Solo"}
+                    >
+                        S
+                    </button>
+                </div>
+            )}
+
+            {/* EXPANDED MODE - Full controls */}
+            {isExpanded && (
+                <>
+                    {/* ROW 1: IDENTITY */}
+                    <div className="flex items-center gap-2">
+                        {/* Collapse Button */}
+                        <button
+                            onClick={() => onToggleExpand?.(track.id)}
+                            className="p-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
+                            title="Minimize track header"
+                        >
+                            <ChevronDown size={14} className="text-muted-foreground" />
+                        </button>
+
+                        <div className={typeBadgeClass}>{track.type}</div>
+
+                        <div className="flex-1 min-w-0">
+                            {isEditing ? (
+                                <div className="flex items-center gap-1">
+                                    <input
+                                        type="text"
+                                        value={editName}
+                                        onChange={(e) => setEditName(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") handleSaveEdit();
+                                            if (e.key === "Escape") handleCancelEdit();
+                                        }}
+                                        autoFocus
+                                        className="flex-1 px-1.5 py-0.5 text-sm font-medium bg-background border border-primary rounded"
+                                    />
+                                    <IconButton icon={Check} onClick={handleSaveEdit} size="icon-xs" variant="ghost" tooltip="Save" />
+                                    <IconButton icon={X} onClick={handleCancelEdit} size="icon-xs" variant="ghost" tooltip="Cancel" />
+                                </div>
+                            ) : (
+                                <div className="text-sm font-medium truncate">
+                                    {track.name}
+                                </div>
+                            )}
                         </div>
-                    ) : (
-                        <div className="text-xs font-medium truncate" title={track.name}>{track.name}</div>
-                    )}
-                </div>
 
-                {/* Instrument Selector - MIDI tracks only */}
-                {track.type === "midi" && onUpdateTrack && (
-                    <InstrumentSelector
-                        trackId={track.id}
-                        currentInstrument={track.instrument}
-                        onInstrumentChange={(trackId, instrument) => {
-                            onUpdateTrack(trackId, { instrument });
-                        }}
-                    />
-                )}
-            </div>
-
-            {/* ROW 2: TRANSPORT - Mute, Solo, Arm */}
-            <div className="flex items-center gap-1">
-                {/* Mute */}
-                <button
-                    onClick={() => onToggleMute(track.id)}
-                    className={cn(
-                        "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide transition-all",
-                        "border hover:border-yellow-500/50",
-                        track.is_muted
-                            ? "bg-yellow-500/20 text-yellow-500 border-yellow-500/50"
-                            : "bg-muted/50 text-muted-foreground border-border"
-                    )}
-                    title={track.is_muted ? "Unmute track" : "Mute track"}
-                >
-                    M
-                </button>
-
-                {/* Solo */}
-                <button
-                    onClick={() => onToggleSolo(track.id)}
-                    className={cn(
-                        "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide transition-all",
-                        "border hover:border-blue-500/50",
-                        track.is_solo
-                            ? "bg-blue-500/20 text-blue-500 border-blue-500/50"
-                            : "bg-muted/50 text-muted-foreground border-border"
-                    )}
-                    title={track.is_solo ? "Unsolo track" : "Solo track"}
-                >
-                    S
-                </button>
-
-                {/* Arm (placeholder for future MIDI recording) */}
-                <button
-                    disabled
-                    className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-muted/30 text-muted-foreground/50 border border-border cursor-not-allowed"
-                    title="Record arm (coming soon)"
-                >
-                    R
-                </button>
-            </div>
-
-            {/* ROW 3: MIXING - Volume and Pan */}
-            {onUpdateTrack && (
-                <div className="flex items-center gap-2 text-[9px]">
-                    {/* Volume Slider */}
-                    <div className="flex items-center gap-1 flex-1 min-w-0">
-                        <span className="text-muted-foreground w-5 flex-shrink-0 font-medium">Vol</span>
-                        <Slider
-                            value={[track.volume * 100]}
-                            onValueChange={(values) => {
-                                onUpdateTrack(track.id, { volume: values[0] / 100 });
-                            }}
-                            min={0}
-                            max={200}
-                            step={1}
-                            className="flex-1 min-w-0"
-                        />
-                        <span className="text-muted-foreground w-8 text-right flex-shrink-0 font-mono text-[8px]">
-                            {Math.round(track.volume * 100)}%
-                        </span>
+                        {/* Instrument Selector - MIDI tracks only */}
+                        {track.type === "midi" && onUpdateTrack && (
+                            <InstrumentSelector
+                                trackId={track.id}
+                                currentInstrument={track.instrument}
+                                onInstrumentChange={(trackId, instrument) => {
+                                    onUpdateTrack(trackId, { instrument });
+                                }}
+                            />
+                        )}
                     </div>
 
-                    {/* Pan Slider */}
-                    <div className="flex items-center gap-1 flex-1 min-w-0">
-                        <span className="text-muted-foreground w-5 flex-shrink-0 font-medium">Pan</span>
-                        <Slider
-                            value={[track.pan * 100]}
-                            onValueChange={(values) => {
-                                onUpdateTrack(track.id, { pan: values[0] / 100 });
-                            }}
-                            min={-100}
-                            max={100}
-                            step={1}
-                            className="flex-1 min-w-0"
-                        />
-                        <span className="text-muted-foreground w-7 text-right flex-shrink-0 font-mono text-[8px]">
-                            {track.pan === 0 ? "C" : track.pan > 0 ? `R${Math.round(track.pan * 100)}` : `L${Math.round(Math.abs(track.pan) * 100)}`}
-                        </span>
+                    {/* ROW 2: TRANSPORT - Mute, Solo, Arm */}
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            onClick={() => onToggleMute(track.id)}
+                            className={cn(
+                                "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide transition-all border",
+                                track.is_muted
+                                    ? "bg-yellow-500/20 text-yellow-500 border-yellow-500/50"
+                                    : "bg-muted/50 text-muted-foreground border-border hover:border-yellow-500/30"
+                            )}
+                        >
+                            M
+                        </button>
+
+                        <button
+                            onClick={() => onToggleSolo(track.id)}
+                            className={cn(
+                                "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide transition-all border",
+                                track.is_solo
+                                    ? "bg-blue-500/20 text-blue-500 border-blue-500/50"
+                                    : "bg-muted/50 text-muted-foreground border-border hover:border-blue-500/30"
+                            )}
+                        >
+                            S
+                        </button>
+
+                        <button
+                            disabled
+                            className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide bg-muted/30 text-muted-foreground/50 border border-border cursor-not-allowed"
+                        >
+                            R
+                        </button>
                     </div>
-                </div>
+
+                    {/* ROW 3: MIXING - Volume and Pan */}
+                    {onUpdateTrack && (
+                        <div className="flex items-center gap-3 text-[10px]">
+                            <div className="flex items-center gap-1.5 flex-1">
+                                <span className="text-muted-foreground w-7 flex-shrink-0">Vol</span>
+                                <Slider
+                                    value={[track.volume * 100]}
+                                    onValueChange={(values) => {
+                                        onUpdateTrack(track.id, { volume: values[0] / 100 });
+                                    }}
+                                    min={0}
+                                    max={200}
+                                    step={1}
+                                    className="flex-1"
+                                />
+                                <span className="text-muted-foreground w-10 text-right flex-shrink-0 font-mono">
+                                    {Math.round(track.volume * 100)}%
+                                </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 flex-1">
+                                <span className="text-muted-foreground w-7 flex-shrink-0">Pan</span>
+                                <Slider
+                                    value={[track.pan * 100]}
+                                    onValueChange={(values) => {
+                                        onUpdateTrack(track.id, { pan: values[0] / 100 });
+                                    }}
+                                    min={-100}
+                                    max={100}
+                                    step={1}
+                                    className="flex-1"
+                                />
+                                <span className="text-muted-foreground w-9 text-right flex-shrink-0 font-mono">
+                                    {track.pan === 0 ? "C" : track.pan > 0 ? `R${Math.round(track.pan * 100)}` : `L${Math.round(Math.abs(track.pan) * 100)}`}
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );

@@ -9,7 +9,7 @@
  * - Timeline (right): Flexible width, single scrollbar controls both
  */
 
-import React from "react";
+import React, { useState } from "react";
 import { SequencerPanelTracks } from "../components/Tracks/SequencerPanelTracks.tsx";
 import { SequencerPanelTimeline } from "../components/Timeline/SequencerPanelTimeline.tsx";
 import type { SequencerTrack, Clip } from "@/types/sequencer";
@@ -57,6 +57,9 @@ interface SequencerTimelineSectionProps {
     onLoopStartChange: (start: number) => void;
     onLoopEndChange: (end: number) => void;
     onSeek: (position: number, triggerAudio?: boolean) => Promise<void>;
+
+    // Drag state handler (for piano roll sync)
+    onClipDragStateChange?: (clipId: string, dragState: { startTime: number; duration: number } | null) => void;
 }
 
 export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
@@ -92,7 +95,11 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
         onLoopStartChange,
         onLoopEndChange,
         onSeek,
+        onClipDragStateChange,
     } = props;
+
+    // Manage expanded tracks state
+    const [expandedTracks, setExpandedTracks] = useState<Set<string>>(new Set());
 
     return (
         <div className="flex flex-1 min-h-0 relative">
@@ -116,6 +123,8 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
                         onDeleteTrack={onDeleteTrack}
                         onRenameTrack={onRenameTrack}
                         onUpdateTrack={onUpdateTrack}
+                        expandedTracks={expandedTracks}
+                        onExpandedTracksChange={setExpandedTracks}
                     />
                 </div>
             </div>
@@ -141,6 +150,7 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
                     gridSize={gridSize}
                     selectedClip={selectedClip}
                     pianoRollClipId={pianoRollClipId}
+                    expandedTracks={expandedTracks}
                     onSelectClip={onSelectClip}
                     onDuplicateClip={onDuplicateClip}
                     onDeleteClip={onDeleteClip}
@@ -152,6 +162,7 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
                     onLoopStartChange={onLoopStartChange}
                     onLoopEndChange={onLoopEndChange}
                     onSeek={onSeek}
+                    onClipDragStateChange={onClipDragStateChange}
                 />
             </div>
         </div>

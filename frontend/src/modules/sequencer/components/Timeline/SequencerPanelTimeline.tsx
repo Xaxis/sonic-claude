@@ -48,6 +48,7 @@ interface SequencerPanelTimelineProps {
     gridSize: number;
     selectedClip: string | null;
     pianoRollClipId?: string | null; // ID of clip currently open in piano roll
+    expandedTracks?: Set<string>; // Track header expansion state
     onSelectClip: (clipId: string) => void;
     onDuplicateClip: (clipId: string) => void;
     onDeleteClip: (clipId: string) => void;
@@ -59,6 +60,7 @@ interface SequencerPanelTimelineProps {
     onLoopStartChange?: (newLoopStart: number) => void;
     onLoopEndChange?: (newLoopEnd: number) => void;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
+    onClipDragStateChange?: (clipId: string, dragState: { startTime: number; duration: number } | null) => void;
 }
 
 export function SequencerPanelTimeline({
@@ -75,6 +77,7 @@ export function SequencerPanelTimeline({
     gridSize,
     selectedClip,
     pianoRollClipId,
+    expandedTracks,
     onSelectClip,
     onDuplicateClip,
     onDeleteClip,
@@ -86,6 +89,7 @@ export function SequencerPanelTimeline({
     onLoopStartChange,
     onLoopEndChange,
     onSeek,
+    onClipDragStateChange,
 }: SequencerPanelTimelineProps) {
     const pixelsPerBeat = 40;
     const beatsPerMeasure = 4;
@@ -205,6 +209,7 @@ export function SequencerPanelTimeline({
                                 pixelsPerBeat={pixelsPerBeat}
                                 snapEnabled={snapEnabled}
                                 gridSize={gridSize}
+                                isExpanded={expandedTracks?.has(track.id)}
                                 onSelectClip={onSelectClip}
                                 onDuplicateClip={onDuplicateClip}
                                 onDeleteClip={onDeleteClip}
@@ -213,6 +218,7 @@ export function SequencerPanelTimeline({
                                 onResizeClip={onResizeClip}
                                 onUpdateClip={onUpdateClip}
                                 onOpenPianoRoll={onOpenPianoRoll}
+                                onClipDragStateChange={onClipDragStateChange}
                             />
                         ))}
 

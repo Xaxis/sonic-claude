@@ -92,6 +92,22 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
     });
     const [isDragging, setIsDragging] = useState(false);
 
+    // Track clip drag states for piano roll sync
+    const [clipDragStates, setClipDragStates] = useState<Map<string, { startTime: number; duration: number } | null>>(new Map());
+
+    // Handle clip drag state changes from timeline
+    const handleClipDragStateChange = useCallback((clipId: string, dragState: { startTime: number; duration: number } | null) => {
+        setClipDragStates(prev => {
+            const next = new Map(prev);
+            if (dragState === null) {
+                next.delete(clipId);
+            } else {
+                next.set(clipId, dragState);
+            }
+            return next;
+        });
+    }, []);
+
     // Save split ratio to localStorage
     useEffect(() => {
         localStorage.setItem('sequencer-split-ratio', timelineHeightPercent.toString());
@@ -141,6 +157,9 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
     // Find the clip for piano roll
     const clip = clips.find(c => c.id === pianoRollClipId);
 
+    // Get drag state for piano roll clip (if being dragged)
+    const pianoRollClipDragState = pianoRollClipId ? clipDragStates.get(pianoRollClipId) : null;
+
     // Calculate totalBeats (same as timeline)
     const minBeats = 64; // Minimum 16 measures
     const maxClipEnd = clips.length > 0
@@ -165,6 +184,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                     timelineScrollRef={timelineScrollRef}
                     isPlaying={props.isPlaying}
                     tempo={props.tempo}
+                    onClipDragStateChange={handleClipDragStateChange}
                 />
             </div>
 
@@ -186,6 +206,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                 <div className="h-full flex flex-col overflow-hidden">
                     <PianoRollWrapper
                         clip={clip}
+                        clipDragState={pianoRollClipDragState}
                         zoom={zoom}
                         snapEnabled={snapEnabled}
                         gridSize={gridSize}

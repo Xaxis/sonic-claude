@@ -18,6 +18,9 @@ interface PianoRollWrapperProps {
     // Clip data
     clip: Clip | undefined;
 
+    // Drag state (for real-time sync with timeline)
+    clipDragState?: { startTime: number; duration: number } | null;
+
     // State (shared with timeline - Ableton pattern)
     zoom: number; // Timeline zoom (shared)
     snapEnabled: boolean;
@@ -39,6 +42,7 @@ interface PianoRollWrapperProps {
 export function PianoRollWrapper(props: PianoRollWrapperProps) {
     const {
         clip,
+        clipDragState,
         zoom,
         snapEnabled,
         gridSize,
@@ -83,12 +87,20 @@ export function PianoRollWrapper(props: PianoRollWrapperProps) {
     }
 
     // Valid MIDI clip - render piano roll
+    // Use drag state if available (for real-time sync with timeline), otherwise use clip props
+    const effectiveStartTime = clipDragState?.startTime ?? clip.start_time;
+    const effectiveDuration = clipDragState?.duration ?? clip.duration;
+
+    // Use key to force re-render when clip data changes
+    const clipKey = `${clip.id}-${effectiveDuration}-${effectiveStartTime}-${clip.midi_events?.length || 0}`;
+
     return (
         <SequencerPanelPianoRoll
+            key={clipKey}
             clipId={clip.id}
             clipName={clip.name}
-            clipDuration={clip.duration}
-            clipStartTime={clip.start_time}
+            clipDuration={effectiveDuration}
+            clipStartTime={effectiveStartTime}
             midiEvents={clip.midi_events || []}
             snapEnabled={snapEnabled}
             gridSize={gridSize}

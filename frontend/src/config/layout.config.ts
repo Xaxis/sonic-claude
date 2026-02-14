@@ -204,8 +204,8 @@ export const DEFAULT_PANELS: PanelConfig[] = [
  */
 export const DEFAULT_TABS = [
     {
-        id: "loop",
-        name: "LOOP",
+        id: "compose",
+        name: "COMPOSE",
         panelIds: [
             "input",
             "loop-visualizer",
@@ -236,7 +236,7 @@ export const BROADCAST_KEYS = {
  */
 export const DEFAULT_LAYOUT_STATE = {
     tabs: DEFAULT_TABS,
-    activeTab: "loop",
+    activeTab: "compose",
     poppedOutTabs: [] as string[],
     layouts: {} as Record<string, Record<string, { x: number; y: number; w: number; h: number }>>,
 };

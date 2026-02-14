@@ -41,6 +41,7 @@ interface SequencerPanelClipProps {
     pixelsPerBeat: number;
     snapEnabled: boolean;
     gridSize: number; // Grid size: 4 = 1/4 note, 8 = 1/8 note, etc.
+    isTrackExpanded?: boolean; // Whether the parent track is in expanded mode
     onSelect: (clipId: string) => void;
     onDuplicate: (clipId: string) => void;
     onDelete: (clipId: string) => void;
@@ -48,6 +49,7 @@ interface SequencerPanelClipProps {
     onResize?: (clipId: string, newDuration: number) => void; // Resize duration
     onUpdateClip?: (clipId: string, updates: { gain?: number; audio_offset?: number; midi_events?: MIDIEvent[] }) => void; // Update clip properties
     onOpenPianoRoll?: (clipId: string) => void; // Open piano roll for MIDI clips
+    onClipDragStateChange?: (clipId: string, dragState: { startTime: number; duration: number } | null) => void; // Report live drag state for piano roll sync
 }
 
 export function SequencerPanelClip({
@@ -59,6 +61,7 @@ export function SequencerPanelClip({
     pixelsPerBeat,
     snapEnabled,
     gridSize,
+    isTrackExpanded = false,
     onSelect,
     onDuplicate,
     onDelete,
@@ -66,6 +69,7 @@ export function SequencerPanelClip({
     onResize,
     onUpdateClip,
     onOpenPianoRoll,
+    onClipDragStateChange,
 }: SequencerPanelClipProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [waveformData, setWaveformData] = useState<number[]>([]);
@@ -78,6 +82,13 @@ export function SequencerPanelClip({
 
     // Drag state - use state instead of ref so it triggers re-renders
     const [dragState, setDragState] = useState<{ startTime: number; duration: number } | null>(null);
+
+    // Report drag state changes to parent (for piano roll sync)
+    useEffect(() => {
+        if (onClipDragStateChange) {
+            onClipDragStateChange(clip.id, dragState);
+        }
+    }, [dragState, clip.id, onClipDragStateChange]);
 
     // Clear drag state when backend syncs (clip props match drag state)
     useEffect(() => {
@@ -210,9 +221,10 @@ export function SequencerPanelClip({
                     newStartTime = Math.round(newStartTime * gridSize) / gridSize;
                 }
                 // Update drag state for immediate visual feedback
+                // Use current display duration (which may include previous resize)
                 setDragState({
                     startTime: newStartTime,
-                    duration: clip.duration,
+                    duration: displayDuration,
                 });
             } else if (isResizing === "left") {
                 // Resize from left (changes both start time and duration)
@@ -231,8 +243,9 @@ export function SequencerPanelClip({
                 if (snapEnabled) {
                     newDuration = Math.round(newDuration * gridSize) / gridSize;
                 }
+                // Use current display start time (which may include previous move)
                 setDragState({
-                    startTime: clip.start_time,
+                    startTime: displayStartTime,
                     duration: newDuration,
                 });
             }
@@ -263,7 +276,7 @@ export function SequencerPanelClip({
             window.removeEventListener("mousemove", handleMouseMove);
             window.removeEventListener("mouseup", handleMouseUp);
         };
-    }, [isDragging, isResizing, dragStartX, dragStartTime, dragStartDuration, pixelsPerBeat, zoom, snapEnabled, clip.id, clip.start_time, clip.duration, onMove, onResize]);
+    }, [isDragging, isResizing, dragStartX, dragStartTime, dragStartDuration, pixelsPerBeat, zoom, snapEnabled, gridSize, clip.id, displayStartTime, displayDuration, dragState, onMove, onResize]);
 
     const handleClick = () => {
         const now = Date.now();
@@ -339,10 +352,27 @@ export function SequencerPanelClip({
                 />
             )}
 
-            {/* Clip Info */}
-            <div className="relative z-10 px-2 py-1 text-xs font-medium text-white truncate pointer-events-none">
-                {clip.name}
-            </div>
+            {/* Clip Info - Different layout for expanded vs minimized tracks */}
+            {isTrackExpanded ? (
+                /* EXPANDED MODE: Label at bottom in dedicated bar */
+                <div className="absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-sm border-t border-white/10 px-2 py-1 z-10 pointer-events-none">
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-white truncate flex-1">
+                            {clip.name}
+                        </span>
+                        {clip.type === "midi" && clip.midi_events && (
+                            <span className="text-[10px] text-white/60 flex-shrink-0">
+                                {clip.midi_events.length} notes
+                            </span>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                /* MINIMIZED MODE: Label at top (original) */
+                <div className="relative z-10 px-2 py-1 text-xs font-medium text-white truncate pointer-events-none">
+                    {clip.name}
+                </div>
+            )}
 
             {/* Actions (show on hover/select) */}
             {isSelected && (

@@ -90,15 +90,13 @@ export function InstrumentSelector({
             onValueChange={handleValueChange}
             disabled={disabled}
         >
-            <SelectTrigger className="h-7 w-32 text-xs border-border/50 hover:border-border transition-colors">
-                <div className="flex items-center gap-1.5 min-w-0">
+            <SelectTrigger className="h-7 w-32 text-xs border-border/50 hover:border-border transition-colors min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0 w-full overflow-hidden">
                     <Music size={12} className="text-muted-foreground flex-shrink-0" />
-                    <SelectValue placeholder="Instrument">
-                        <span className="truncate">{displayValue}</span>
-                    </SelectValue>
+                    <span className="truncate text-xs">{displayValue}</span>
                 </div>
             </SelectTrigger>
-            <SelectContent className="max-h-80">
+            <SelectContent className="max-h-80" align="start">
                 {Object.entries(groupedSynthDefs).map(([category, defs]) => (
                     <SelectGroup key={category}>
                         <SelectLabel className="text-xs font-semibold text-muted-foreground">

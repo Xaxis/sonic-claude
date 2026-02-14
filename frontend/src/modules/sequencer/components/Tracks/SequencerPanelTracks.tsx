@@ -40,6 +40,8 @@ interface SequencerPanelTrackListProps {
     onDeleteTrack?: (trackId: string) => void;
     onRenameTrack?: (trackId: string, newName: string) => void;
     onUpdateTrack?: (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => void;
+    expandedTracks?: Set<string>;
+    onExpandedTracksChange?: (expandedTracks: Set<string>) => void;
 }
 
 export function SequencerPanelTracks({
@@ -49,9 +51,16 @@ export function SequencerPanelTracks({
     onDeleteTrack,
     onRenameTrack,
     onUpdateTrack,
+    expandedTracks: externalExpandedTracks,
+    onExpandedTracksChange,
 }: SequencerPanelTrackListProps) {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [trackToDelete, setTrackToDelete] = useState<{ id: string; name: string } | null>(null);
+    const [internalExpandedTracks, setInternalExpandedTracks] = useState<Set<string>>(new Set());
+
+    // Use external state if provided, otherwise use internal state
+    const expandedTracks = externalExpandedTracks ?? internalExpandedTracks;
+    const setExpandedTracks = onExpandedTracksChange ?? setInternalExpandedTracks;
 
     const handleDeleteClick = (trackId: string) => {
         const track = tracks.find((t) => t.id === trackId);
@@ -67,6 +76,18 @@ export function SequencerPanelTracks({
         }
         setDeleteDialogOpen(false);
         setTrackToDelete(null);
+    };
+
+    const handleToggleExpand = (trackId: string) => {
+        setExpandedTracks((prev) => {
+            const next = new Set(prev);
+            if (next.has(trackId)) {
+                next.delete(trackId);
+            } else {
+                next.add(trackId);
+            }
+            return next;
+        });
     };
 
     return (
@@ -91,6 +112,8 @@ export function SequencerPanelTracks({
                         onRename={onRenameTrack}
                         onDelete={onDeleteTrack ? handleDeleteClick : undefined}
                         onUpdateTrack={onUpdateTrack}
+                        isExpanded={expandedTracks.has(track.id)}
+                        onToggleExpand={handleToggleExpand}
                     />
                 ))
             )}
