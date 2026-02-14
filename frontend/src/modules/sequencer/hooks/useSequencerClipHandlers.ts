@@ -78,8 +78,8 @@ export function useSequencerClipHandlers(props: UseSequencerClipHandlersProps) {
         if (track.type === "sample" && track.sample_id) {
             try {
                 // Fetch sample metadata to get duration using proper API
-                const { getSample } = await import("@/services/sampleApi.ts");
-                const sampleData = await getSample(track.sample_id);
+                const { api } = await import("@/services/api");
+                const sampleData = await api.samples.getById(track.sample_id);
 
                 // Convert sample duration (seconds) to beats
                 const durationBeats = sampleData.duration

@@ -22,7 +22,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select.tsx";
-import { audioEngineService } from "@/services/api/audio-engine.service.ts";
+import { audioEngineService } from "@/services/audio-engine/audio-engine.service.ts";
 import type { SynthDefInfo } from "../../types.ts";
 
 interface InstrumentSelectorProps {

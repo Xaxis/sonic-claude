@@ -27,7 +27,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog.tsx";
 import { cn } from "@/lib/utils.ts";
-import { audioEngineService } from "@/services/api/audio-engine.service.ts";
+import { audioEngineService } from "@/services/audio-engine/audio-engine.service.ts";
 import { toast } from "sonner";
 
 interface SequencerPanelSequenceManagerProps {

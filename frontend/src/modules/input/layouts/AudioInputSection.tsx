@@ -8,7 +8,7 @@
 import { useCallback } from "react";
 import { useAudioInput } from "../hooks/useAudioInput.ts";
 import { AudioInputControls } from "../components/AudioInputControls.tsx";
-import * as sampleApi from "@/services/sampleApi.ts";
+import { api } from "@/services/api";
 import { toast } from "sonner";
 
 interface AudioInputSectionProps {
@@ -28,10 +28,10 @@ export function AudioInputSection({
                 
                 // Upload to backend
                 toast.info("Saving recording...");
-                const metadata = await sampleApi.uploadSample(file, name, "Uncategorized");
+                const metadata = await api.samples.upload(file, name, "Uncategorized");
 
                 // Update duration on backend
-                await sampleApi.updateSampleDuration(metadata.id, duration);
+                await api.samples.updateDuration(metadata.id, duration);
 
                 toast.success(`Recording saved: ${name}`);
 

@@ -142,10 +142,104 @@ Routine({
         Out.ar(out, [sig, sig]);
     }).add;
 
+    // FM Synth - Frequency modulation synthesis
+    SynthDef(\fm, { |out=0, freq=440, amp=0.5, gate=1, attack=0.01, decay=0.3, sustain=0.7, release=0.5, modRatio=2.0, modIndex=2.0|
+        var env = EnvGen.kr(Env.adsr(attack, decay, sustain, release), gate, doneAction: 2);
+        var modulator = SinOsc.ar(freq * modRatio) * freq * modIndex;
+        var carrier = SinOsc.ar(freq + modulator);
+        var sig = carrier * env * amp;
+        Out.ar(out, [sig, sig]);
+    }).add;
+
+    // Pad Synth - Lush, detuned pad sound
+    SynthDef(\pad, { |out=0, freq=440, amp=0.3, gate=1, attack=0.5, decay=0.3, sustain=0.8, release=1.5, detune=0.08, cutoff=3000|
+        var env = EnvGen.kr(Env.adsr(attack, decay, sustain, release), gate, doneAction: 2);
+        var sig = Mix([
+            Saw.ar(freq * (1 - detune)),
+            Saw.ar(freq),
+            Saw.ar(freq * (1 + detune)),
+            Saw.ar(freq * (1 - (detune * 0.5))),
+            Saw.ar(freq * (1 + (detune * 0.5))),
+            Saw.ar(freq * 2) * 0.3
+        ]) * 0.2;
+        sig = LPF.ar(sig, cutoff);
+        sig = sig * env * amp;
+        Out.ar(out, [sig, sig]);
+    }).add;
+
+    // Bass Synth - Deep, punchy bass sound
+    SynthDef(\bass, { |out=0, freq=220, amp=0.6, gate=1, attack=0.01, decay=0.2, sustain=0.5, release=0.3, cutoff=800, resonance=0.3, drive=1.0|
+        var env = EnvGen.kr(Env.adsr(attack, decay, sustain, release), gate, doneAction: 2);
+        var sub = SinOsc.ar(freq * 0.5) * 0.6;
+        var main = Saw.ar(freq) * 0.4;
+        var sig = (sub + main) * drive;
+        sig = RLPF.ar(sig, cutoff, resonance.linlin(0, 1, 1, 0.1));
+        sig = sig.tanh;
+        sig = sig * env * amp;
+        Out.ar(out, [sig, sig]);
+    }).add;
+
+    // Lead Synth - Bright, cutting lead sound
+    SynthDef(\lead, { |out=0, freq=440, amp=0.5, gate=1, attack=0.001, decay=0.1, sustain=0.7, release=0.2, cutoff=4000, resonance=0.4, detune=0.02|
+        var env = EnvGen.kr(Env.adsr(attack, decay, sustain, release), gate, doneAction: 2);
+        var filterEnv = EnvGen.kr(Env.adsr(attack, decay * 0.5, sustain * 0.3, release));
+        var sig = Mix([
+            Saw.ar(freq * (1 - detune)),
+            Saw.ar(freq * (1 + detune))
+        ]) * 0.5;
+        var cutoffMod = cutoff + (cutoff * 2 * filterEnv);
+        sig = RLPF.ar(sig, cutoffMod.clip(20, 20000), resonance.linlin(0, 1, 1, 0.1));
+        sig = sig * env * amp;
+        Out.ar(out, [sig, sig]);
+    }).add;
+
+    // Pluck Synth - Karplus-Strong plucked string
+    SynthDef(\pluck, { |out=0, freq=440, amp=0.5, gate=1, attack=0.001, release=2.0, coef=0.5|
+        var env = EnvGen.kr(Env.perc(attack, release), gate, doneAction: 2);
+        var sig = Pluck.ar(
+            in: WhiteNoise.ar(0.1),
+            trig: gate,
+            maxdelaytime: 0.1,
+            delaytime: freq.reciprocal,
+            decaytime: release,
+            coef: coef
+        );
+        sig = sig * env * amp;
+        Out.ar(out, [sig, sig]);
+    }).add;
+
+    // Bell Synth - Metallic bell/mallet sound
+    SynthDef(\bell, { |out=0, freq=440, amp=0.5, gate=1, attack=0.001, release=3.0, brightness=1.0|
+        var env = EnvGen.kr(Env.perc(attack, release, curve: -4), gate, doneAction: 2);
+        var sig = Mix([
+            SinOsc.ar(freq) * 0.5,
+            SinOsc.ar(freq * 2.76) * 0.3,
+            SinOsc.ar(freq * 5.4) * 0.15,
+            SinOsc.ar(freq * 8.93) * 0.05
+        ]) * brightness;
+        sig = sig * env * amp;
+        Out.ar(out, [sig, sig]);
+    }).add;
+
+    // Organ Synth - Classic tonewheel organ sound
+    SynthDef(\organ, { |out=0, freq=440, amp=0.5, gate=1, attack=0.01, release=0.1, drawbar1=0.8, drawbar2=0.6, drawbar3=0.4|
+        var env = EnvGen.kr(Env.asr(attack, 1, release), gate, doneAction: 2);
+        var sig = Mix([
+            SinOsc.ar(freq * 0.5) * drawbar1,
+            SinOsc.ar(freq) * drawbar2,
+            SinOsc.ar(freq * 2) * drawbar3,
+            SinOsc.ar(freq * 3) * (drawbar3 * 0.5)
+        ]) * 0.3;
+        sig = sig * env * amp;
+        Out.ar(out, [sig, sig]);
+    }).add;
+
     s.sync;
 
     "✅ SynthDefs loaded".postln;
-    "   audioMonitor, audioInputMonitor, sine, saw, square, samplePlayer, metronome".postln;
+    "   MONITORING: audioMonitor, audioInputMonitor".postln;
+    "   BASIC: sine, saw, square, samplePlayer, metronome".postln;
+    "   INSTRUMENTS: fm, pad, bass, lead, pluck, bell, organ".postln;
     "BUFFER_IDS: waveform=%, spectrum=%".format(~waveformBuffer.bufnum, ~spectrumBuffer.bufnum).postln;
 
     // Create NetAddr for Python backend

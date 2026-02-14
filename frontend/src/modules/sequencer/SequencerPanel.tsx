@@ -23,7 +23,7 @@ import { SequencerPanelTransport } from "./components/Transport/SequencerPanelTr
 import { SequencerPanelToolbar } from "./components/Toolbar/SequencerPanelToolbar.tsx";
 import { SequencerTimelineSection } from "./layouts/SequencerTimelineSection.tsx";
 import { SequencerSplitLayout } from "./layouts/SequencerSplitLayout.tsx";
-import { audioEngineService } from "@/services/api/audio-engine.service.ts";
+import { audioEngineService } from "@/services/audio-engine/audio-engine.service.ts";
 import { toast } from "sonner";
 
 export function SequencerPanel() {

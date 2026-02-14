@@ -262,8 +262,10 @@ class SequencerService:
             if clip_start <= position < clip_end:
                 # Check if this clip is already playing
                 if clip.id not in self.active_synths:
+                    # Calculate offset within the clip
+                    offset = position - clip_start
                     logger.info(f"🎯 Triggering clip {clip.id} at position {position:.2f} (clip range: {clip_start:.2f}-{clip_end:.2f})")
-                    await self._trigger_clip(clip, track, position - clip_start)
+                    await self._trigger_clip(clip, track, offset)
 
     async def _trigger_clip(self, clip: Clip, track: SequencerTrack, offset: float = 0.0):
         """Trigger a clip to start playing"""
@@ -406,42 +408,66 @@ class SequencerService:
 
             # Handle MIDI clips
             elif clip.type == "midi" and clip.midi_events:
+                logger.info(f"🎹 MIDI CLIP TRIGGERED:")
+                logger.info(f"   Clip ID: {clip.id}")
+                logger.info(f"   Clip type: {clip.type}")
+                logger.info(f"   MIDI events count: {len(clip.midi_events)}")
+                logger.info(f"   Offset: {offset:.2f} beats")
+
                 # Get instrument synthdef from track
                 synthdef = track.instrument or "sine"
+                logger.info(f"   Instrument: {synthdef}")
 
-                # Trigger each MIDI note and schedule release
+                # Trigger each MIDI note with scheduled start time
+                triggered_count = 0
                 for note in clip.midi_events:
-                    # Only trigger notes that should be playing at this offset
-                    if note.start_time <= offset < note.start_time + note.duration:
+                    logger.info(f"   Checking note: {note.note_name} (start={note.start_time:.2f}, duration={note.duration:.2f}, end={note.start_time + note.duration:.2f})")
+
+                    # Calculate when this note should start relative to now
+                    # If offset is 6.0 and note starts at 1.0, we've already passed it - skip
+                    # If offset is 6.0 and note starts at 8.0, schedule it for 2.0 beats from now
+                    if note.start_time >= offset:
+                        # Note hasn't started yet - schedule it
+                        delay_beats = note.start_time - offset
+                        delay_seconds = delay_beats * (60.0 / self.tempo)
+
                         node_id = self.engine_manager.allocate_node_id()
 
                         # Convert MIDI note to frequency
                         freq = 440.0 * (2.0 ** ((note.note - 69) / 12.0))
 
-                        # Send /s_new message
-                        self.engine_manager.send_message(
-                            "/s_new",
-                            synthdef,  # Use track's instrument
-                            node_id,
-                            0,  # addAction
-                            1,  # target
-                            "freq", freq,
-                            "amp", note.velocity / 127.0 * 0.8 * clip.gain * track.volume,  # Apply clip gain and track volume
-                            "pan", track.pan,  # Apply track pan
-                            "gate", 1
-                        )
+                        # Calculate amplitude (apply velocity, clip gain, track volume)
+                        amp = note.velocity / 127.0 * 0.8 * clip.gain * track.volume
 
-                        logger.info(f"🎵 Triggered MIDI note {note.note_name} (node {node_id}, instrument: {synthdef}, freq={freq:.2f}Hz)")
+                        triggered_count += 1
+                        logger.info(f"      ✅ SCHEDULED! node={node_id}, freq={freq:.2f}Hz, amp={amp:.2f}, delay={delay_seconds:.2f}s")
 
-                        # Schedule note release after duration
-                        note_duration = note.duration * (60.0 / self.tempo)  # Convert beats to seconds
-                        async def release_note(nid, dur):
-                            await asyncio.sleep(dur)
+                        # Schedule note start and release
+                        async def play_note(nid, freq_val, amp_val, synth, delay, dur_beats):
+                            await asyncio.sleep(delay)
                             if self.engine_manager:
+                                # Start the note
+                                self.engine_manager.send_message(
+                                    "/s_new",
+                                    synth,
+                                    nid,
+                                    0,  # addAction
+                                    1,  # target
+                                    "freq", freq_val,
+                                    "amp", amp_val,
+                                    "gate", 1
+                                )
+                                # Schedule release
+                                note_duration = dur_beats * (60.0 / self.tempo)
+                                await asyncio.sleep(note_duration)
                                 self.engine_manager.send_message("/n_set", nid, "gate", 0)
                                 logger.debug(f"🔇 Released MIDI note {nid}")
 
-                        asyncio.create_task(release_note(node_id, note_duration))
+                        asyncio.create_task(play_note(node_id, freq, amp, synthdef, delay_seconds, note.duration))
+                    else:
+                        logger.info(f"      ❌ SKIPPED (note already passed: offset={offset:.2f}, note_start={note.start_time:.2f})")
+
+                logger.info(f"   Total notes scheduled: {triggered_count}/{len(clip.midi_events)}")
 
                 # Track that this MIDI clip is active (for stopping when playhead leaves clip range)
                 self.active_synths[clip.id] = self.engine_manager.allocate_node_id()  # Dummy node ID for tracking
@@ -1013,7 +1039,11 @@ class SequencerService:
             instrument: Instrument/synthdef to use
         """
         if not self.engine_manager:
-            logger.warning("⚠️ Cannot preview note: engine_manager not available")
+            logger.error("❌ Cannot preview note: engine_manager not available")
+            return
+
+        if not self.engine_manager.is_connected:
+            logger.error("❌ Cannot preview note: engine_manager not connected to SuperCollider")
             return
 
         # Allocate node ID
@@ -1025,25 +1055,38 @@ class SequencerService:
         # Calculate amplitude from velocity
         amp = (velocity / 127.0) * 0.8
 
-        # Send /s_new message to create synth
-        self.engine_manager.send_message(
-            "/s_new",
-            instrument,
-            node_id,
-            0,  # addAction
-            1,  # target
-            "freq", freq,
-            "amp", amp,
-            "gate", 1
-        )
+        logger.info(f"🎹 PREVIEW NOTE REQUEST:")
+        logger.info(f"   Note: {note} → Freq: {freq:.2f}Hz")
+        logger.info(f"   Velocity: {velocity} → Amp: {amp:.2f}")
+        logger.info(f"   Instrument: {instrument}")
+        logger.info(f"   Node ID: {node_id}")
+        logger.info(f"   Duration: {duration}s")
 
-        logger.info(f"🎵 Preview note {note} (freq={freq:.2f}Hz, instrument={instrument})")
+        # Send /s_new message to create synth
+        try:
+            self.engine_manager.send_message(
+                "/s_new",
+                instrument,
+                node_id,
+                0,  # addAction (0 = add to head)
+                1,  # target (1 = default group)
+                "freq", freq,
+                "amp", amp,
+                "gate", 1
+            )
+            logger.info(f"✅ Sent /s_new message to SuperCollider")
+        except Exception as e:
+            logger.error(f"❌ Failed to send /s_new message: {e}")
+            return
 
         # Schedule note release after duration
         async def release_note():
             await asyncio.sleep(duration)
-            self.engine_manager.send_message("/n_set", node_id, "gate", 0)
-            logger.debug(f"🔇 Released preview note {node_id}")
+            try:
+                self.engine_manager.send_message("/n_set", node_id, "gate", 0)
+                logger.info(f"🔇 Released preview note {node_id}")
+            except Exception as e:
+                logger.error(f"❌ Failed to release note {node_id}: {e}")
 
         # Run release in background
         asyncio.create_task(release_note())

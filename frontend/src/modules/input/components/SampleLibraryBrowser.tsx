@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Search, Upload, Music, Play, Edit2, Trash2 } from "lucide-react";
-import type { SampleMetadata } from "@/services/sampleApi.ts";
+import type { SampleMetadata } from "@/services/samples";
 
 const SAMPLE_CATEGORIES = [
     "All",

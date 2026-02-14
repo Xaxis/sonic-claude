@@ -13,8 +13,8 @@ import {
     ReactNode,
     useRef,
 } from "react";
-import { windowManager } from "@/services/WindowManager";
-import { audioEngineService } from "@/services/api/audio-engine.service";
+import { windowManager } from "@/services/window-manager";
+import { audioEngineService } from "@/services/audio-engine/audio-engine.service";
 import { toast } from "sonner";
 import type { AudioEngineStatus } from "@/types";
 import type { Synth } from "@/modules/synthesis";

@@ -1,10 +1,21 @@
 /**
  * Audio Engine Service
  * Handles all SuperCollider audio engine API calls
- * Covers: Engine, Synthesis, Effects, Mixer, Sequencer (48 routes total)
+ *
+ * Route Organization:
+ * - Engine: 4 routes (start, stop, restart, status)
+ * - Synthesis: 5 routes (synthdefs, create, get, update, free)
+ * - Effects: 6 routes (effectdefs, create, get, update, bypass, free)
+ * - Mixer: 17 routes (tracks CRUD, volume, pan, mute, solo, sends, effects, master)
+ * - Sequencer: 17 routes (sequences CRUD, play/stop/pause/resume, tempo, seek, state)
+ * - Sequencer Tracks: 6 routes (create, get, update, rename, mute, solo)
+ * - Metronome: 2 routes (toggle, volume)
+ * - Note Preview: 1 route (preview)
+ *
+ * Total: 58 routes
  */
 
-import { BaseAPIClient } from "./base";
+import { BaseAPIClient } from "../api/base";
 import type { AudioEngineStatus } from "@/types";
 import type {
     SynthDefInfo as SynthesisSynthDefInfo,

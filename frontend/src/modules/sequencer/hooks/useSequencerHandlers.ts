@@ -14,7 +14,7 @@
 
 import { useCallback } from "react";
 import { toast } from "sonner";
-import { audioEngineService } from "@/services/api/audio-engine.service.ts";
+import { audioEngineService } from "@/services/audio-engine/audio-engine.service.ts";
 import type { SampleMetadata } from "@/services/sampleApi.ts";
 import type { MIDIEvent, AddClipRequest } from "../types.ts";
 import type { SequencerTrack, Clip } from "@/types/sequencer";

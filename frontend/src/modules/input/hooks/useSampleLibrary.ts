@@ -6,8 +6,8 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import * as sampleApi from "@/services/sampleApi.ts";
-import type { SampleMetadata } from "@/services/sampleApi.ts";
+import { api } from "@/services/api";
+import type { SampleMetadata } from "@/services/samples";
 import { toast } from "sonner";
 
 interface UseSampleLibraryProps {
@@ -31,7 +31,7 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
     // Load all samples from backend
     const loadSamples = useCallback(async () => {
         try {
-            const loadedSamples = await sampleApi.getAllSamples();
+            const loadedSamples = await api.samples.getAll();
             setSamples(loadedSamples);
             console.log(`✅ Loaded ${loadedSamples.length} samples`);
         } catch (error) {
@@ -49,13 +49,13 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
     const handleUploadSample = useCallback(async (file: File, name: string, category: string = "Uncategorized") => {
         setIsUploading(true);
         try {
-            const uploadedSample = await sampleApi.uploadSample(file, name, category);
-            
+            const uploadedSample = await api.samples.upload(file, name, category);
+
             // Update duration after upload
-            const audio = new Audio(sampleApi.getSampleDownloadUrl(uploadedSample.id));
+            const audio = new Audio(api.samples.getDownloadUrl(uploadedSample.id));
             audio.addEventListener("loadedmetadata", async () => {
                 const duration = audio.duration;
-                await sampleApi.updateSampleDuration(uploadedSample.id, duration);
+                await api.samples.updateDuration(uploadedSample.id, duration);
                 await loadSamples(); // Reload to get updated duration
             });
             
@@ -141,7 +141,7 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
             }
 
             // Fetch and decode audio
-            const url = sampleApi.getSampleDownloadUrl(sampleId);
+            const url = api.samples.getDownloadUrl(sampleId);
             const response = await fetch(url);
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);

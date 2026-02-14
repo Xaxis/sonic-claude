@@ -10,7 +10,7 @@
  */
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
-import { windowManager } from "@/services/WindowManager";
+import { windowManager } from "@/services/window-manager";
 import { DEFAULT_LAYOUT_STATE, STORAGE_KEYS, BROADCAST_KEYS } from "@/config/layout.config";
 import type { GridLayoutItem } from "@/types/grid-layout";
 

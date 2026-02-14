@@ -10,18 +10,19 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { cn } from "@/lib/utils.ts";
-import * as sampleApi from "@/services/sampleApi.ts";
+import { api } from "@/services/api";
+import type { SampleMetadata } from "@/services/samples";
 
 interface SequencerPanelSampleBrowserProps {
     isOpen: boolean;
     onClose: () => void;
-    onSelectSample: (sample: sampleApi.SampleMetadata) => void;
+    onSelectSample: (sample: SampleMetadata) => void;
 }
 
 export function SequencerPanelSampleBrowser({ isOpen, onClose, onSelectSample }: SequencerPanelSampleBrowserProps) {
-    const [samples, setSamples] = useState<sampleApi.SampleMetadata[]>([]);
+    const [samples, setSamples] = useState<SampleMetadata[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
-    const [selectedSample, setSelectedSample] = useState<sampleApi.SampleMetadata | null>(null);
+    const [selectedSample, setSelectedSample] = useState<SampleMetadata | null>(null);
     const [playingSampleId, setPlayingSampleId] = useState<string | null>(null);
     const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
 
@@ -34,7 +35,7 @@ export function SequencerPanelSampleBrowser({ isOpen, onClose, onSelectSample }:
 
     const loadSamples = async () => {
         try {
-            const samplesData = await sampleApi.getAllSamples();
+            const samplesData = await api.samples.getAll();
             setSamples(samplesData);
         } catch (error) {
             console.error("Failed to load samples:", error);

@@ -68,10 +68,19 @@ export class BaseAPIClient {
     }
 
     /**
-     * GET request
+     * GET request with optional query parameters
      */
-    protected async get<T>(endpoint: string): Promise<T> {
-        return this.request<T>(endpoint, { method: "GET" });
+    protected async get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
+        let url = endpoint;
+        if (params && Object.keys(params).length > 0) {
+            const queryString = new URLSearchParams(
+                Object.entries(params)
+                    .filter(([_, value]) => value !== undefined && value !== null)
+                    .map(([key, value]) => [key, String(value)])
+            ).toString();
+            url = `${endpoint}?${queryString}`;
+        }
+        return this.request<T>(url, { method: "GET" });
     }
 
     /**
@@ -90,6 +99,16 @@ export class BaseAPIClient {
     protected async put<T>(endpoint: string, data?: any): Promise<T> {
         return this.request<T>(endpoint, {
             method: "PUT",
+            body: data ? JSON.stringify(data) : undefined,
+        });
+    }
+
+    /**
+     * PATCH request
+     */
+    protected async patch<T>(endpoint: string, data?: any): Promise<T> {
+        return this.request<T>(endpoint, {
+            method: "PATCH",
             body: data ? JSON.stringify(data) : undefined,
         });
     }
