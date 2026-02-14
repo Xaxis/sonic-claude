@@ -475,12 +475,23 @@ class SequencerService:
             if self.current_sequence_id == sequence_id:
                 self.stop_playback()
 
+            # Get the sequence to access its tracks
+            sequence = self.sequences[sequence_id]
+
+            # Remove all tracks belonging to this sequence from global tracks dict
+            track_ids_to_remove = [track.id for track in sequence.tracks]
+            for track_id in track_ids_to_remove:
+                if track_id in self.tracks:
+                    del self.tracks[track_id]
+                    logger.info(f"  ✅ Removed track {track_id} from global tracks dict")
+
+            # Delete sequence from memory
             del self.sequences[sequence_id]
 
             # Delete from disk
             self.storage.delete_sequence(sequence_id)
 
-            logger.info(f"✅ Deleted sequence: {sequence_id}")
+            logger.info(f"✅ Deleted sequence: {sequence_id} (removed {len(track_ids_to_remove)} tracks)")
             return True
         return False
 

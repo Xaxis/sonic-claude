@@ -35,6 +35,7 @@ interface SequencerPanelSequenceManagerProps {
     onClose: () => void;
     currentSequenceId: string | null;
     onSequenceChange: (sequenceId: string) => void;
+    onDeleteSequence: (sequenceId: string) => Promise<void>;
 }
 
 interface SequenceInfo {
@@ -55,6 +56,7 @@ export function SequencerPanelSequenceManager({
     onClose,
     currentSequenceId,
     onSequenceChange,
+    onDeleteSequence,
 }: SequencerPanelSequenceManagerProps) {
     const [sequences, setSequences] = useState<SequenceInfo[]>([]);
     const [versions, setVersions] = useState<VersionInfo[]>([]);
@@ -72,9 +74,10 @@ export function SequencerPanelSequenceManager({
     useEffect(() => {
         if (isOpen) {
             loadSequences();
-            if (currentSequenceId) {
-                loadVersions(currentSequenceId);
-            }
+            // Version loading disabled - feature not implemented yet
+            // if (currentSequenceId) {
+            //     loadVersions(currentSequenceId);
+            // }
         }
     }, [isOpen, currentSequenceId]);
 
@@ -178,18 +181,14 @@ export function SequencerPanelSequenceManager({
 
         setIsLoading(true);
         try {
-            await audioEngineService.deleteSequence(sequenceToDelete);
-            toast.success("Sequence deleted");
+            // Use the context's deleteSequence method which handles all state updates
+            await onDeleteSequence(sequenceToDelete);
+
+            // Reload local sequences list to reflect the deletion
             await loadSequences();
-            if (sequenceToDelete === currentSequenceId && sequences.length > 1) {
-                const nextSeq = sequences.find((s) => s.id !== sequenceToDelete);
-                if (nextSeq) {
-                    onSequenceChange(nextSeq.id);
-                }
-            }
         } catch (error) {
             console.error("Failed to delete sequence:", error);
-            toast.error("Failed to delete sequence");
+            // Error toast is already shown by the context
         } finally {
             setIsLoading(false);
             setDeleteDialogOpen(false);

@@ -7,7 +7,7 @@
 
 import React from "react";
 import { SequencerTimelineSection } from "./SequencerTimelineSection.tsx";
-import { SequencerPanelPianoRoll } from "../components/PianoRoll/SequencerPanelPianoRoll.tsx";
+import { PianoRollWrapper } from "./PianoRollWrapper.tsx";
 import type { SequencerTrack, Clip } from "@/types/sequencer";
 import type { MIDIEvent } from "../types.ts";
 
@@ -55,7 +55,11 @@ interface SequencerSplitLayoutProps {
     onLoopStartChange: (start: number) => void;
     onLoopEndChange: (end: number) => void;
     onSeek: (position: number, triggerAudio?: boolean) => Promise<void>;
-    
+
+    // Timeline controls (shared with piano roll)
+    onToggleSnap: () => void;
+    onSetGridSize: (size: number) => void;
+
     // Piano roll handlers
     onClosePianoRoll: () => void;
     onUpdateMIDINotes: (clipId: string, notes: MIDIEvent[]) => Promise<void>;
@@ -73,23 +77,26 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
         onPianoRollScroll,
         onClosePianoRoll,
         onUpdateMIDINotes,
+        onToggleSnap,
+        onSetGridSize,
+        timelineScrollRef,
         ...timelineSectionProps
     } = props;
 
     // Find the clip for piano roll
     const clip = clips.find(c => c.id === pianoRollClipId);
-    
+
     // Calculate totalBeats (same as timeline)
-    const minBeats = 128;
+    const minBeats = 64; // Minimum 16 measures
     const maxClipEnd = clips.length > 0
         ? Math.max(...clips.map(c => c.start_time + c.duration))
         : 0;
-    const totalBeats = Math.max(minBeats, Math.ceil(maxClipEnd) + 32);
+    const totalBeats = Math.max(minBeats, Math.ceil(maxClipEnd) + 128); // Always add 128 beats (32 measures) padding after last clip
 
     return (
-        <div className="flex-1 min-h-0 flex flex-col">
-            {/* Timeline Section - Top Half */}
-            <div className="flex-1 min-h-0 flex relative">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            {/* Timeline Section - Top Half (50%) */}
+            <div className="flex-1 min-h-0 flex relative overflow-hidden">
                 <SequencerTimelineSection
                     {...timelineSectionProps}
                     clips={clips}
@@ -97,31 +104,28 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                     snapEnabled={snapEnabled}
                     gridSize={gridSize}
                     pianoRollClipId={pianoRollClipId}
+                    timelineScrollRef={timelineScrollRef}
                 />
             </div>
 
-            {/* Piano Roll Section - Bottom Half */}
-            <div className="flex-1 min-h-0 border-t border-border">
-                {clip && clip.type === "midi" && (
-                    <div className="h-full flex flex-col bg-gray-950 overflow-hidden">
-                        <SequencerPanelPianoRoll
-                            isOpen={showPianoRoll}
-                            clipId={clip.id}
-                            clipName={clip.name}
-                            clipDuration={clip.duration}
-                            clipStartTime={clip.start_time}
-                            midiEvents={clip.midi_events || []}
-                            snapEnabled={snapEnabled}
-                            gridSize={gridSize}
-                            zoom={zoom}
-                            totalBeats={totalBeats}
-                            pianoRollScrollRef={pianoRollScrollRef}
-                            onPianoRollScroll={onPianoRollScroll}
-                            onClose={onClosePianoRoll}
-                            onUpdateNotes={onUpdateMIDINotes}
-                        />
-                    </div>
-                )}
+            {/* Piano Roll Section - Bottom Half (50%) */}
+            <div className="flex-1 min-h-0 border-t border-border overflow-hidden">
+                <div className="h-full flex flex-col overflow-hidden">
+                    <PianoRollWrapper
+                        clip={clip}
+                        zoom={zoom}
+                        snapEnabled={snapEnabled}
+                        gridSize={gridSize}
+                        totalBeats={totalBeats}
+                        timelineScrollRef={timelineScrollRef}
+                        pianoRollScrollRef={pianoRollScrollRef}
+                        onPianoRollScroll={onPianoRollScroll}
+                        onClose={onClosePianoRoll}
+                        onUpdateNotes={onUpdateMIDINotes}
+                        onToggleSnap={onToggleSnap}
+                        onSetGridSize={onSetGridSize}
+                    />
+                </div>
             </div>
         </div>
     );

@@ -87,15 +87,31 @@ export function SequencerPanelTimeline({
     const beatsPerMeasure = 4;
 
     // Calculate timeline width dynamically based on clips
-    const minBeats = 128; // Minimum 32 measures
+    const minBeats = 64; // Minimum 16 measures
     const maxClipEnd = clips.length > 0
         ? Math.max(...clips.map(c => c.start_time + c.duration))
         : 0;
-    const totalBeats = Math.max(minBeats, Math.ceil(maxClipEnd) + 32);
+    const totalBeats = Math.max(minBeats, Math.ceil(maxClipEnd) + 128); // Always add 128 beats (32 measures) padding after last clip
     const totalWidth = totalBeats * pixelsPerBeat * zoom;
 
     // Ref for timeline container to enable auto-scroll
     const timelineContainerRef = useRef<HTMLDivElement>(null);
+
+    // Debug: Check if width is being applied
+    useEffect(() => {
+        if (timelineContainerRef.current) {
+            const el = timelineContainerRef.current;
+            const parent = el.parentElement;
+            console.log('📏 TIMELINE WIDTH CHECK:', {
+                totalWidth,
+                'element.style.width': el.style.width,
+                'element.offsetWidth': el.offsetWidth,
+                'element.scrollWidth': el.scrollWidth,
+                'parent?.offsetWidth': parent?.offsetWidth,
+                'parent?.scrollWidth': parent?.scrollWidth,
+            });
+        }
+    }, [totalWidth]);
 
     // Generate ruler markers
     const rulerMarkers = [];
@@ -146,7 +162,7 @@ export function SequencerPanelTimeline({
     }, [playheadX]);
 
     return (
-        <div ref={timelineContainerRef} className="flex flex-col">
+        <div ref={timelineContainerRef} className="flex flex-col flex-shrink-0" style={{ width: `${totalWidth}px`, minWidth: `${totalWidth}px` }}>
             {/* Ruler - Sticky header */}
             <div className="flex-shrink-0">
                 <SequencerPanelTimelineRuler
@@ -166,7 +182,7 @@ export function SequencerPanelTimeline({
                     No tracks. Add a track to start sequencing.
                 </div>
             ) : (
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0" style={{ width: `${totalWidth}px` }}>
                     <div className="relative" style={{ width: `${totalWidth}px` }}>
                         {/* Grid Lines */}
                         <SequencerPanelTimelineGrid rulerMarkers={rulerMarkers} />

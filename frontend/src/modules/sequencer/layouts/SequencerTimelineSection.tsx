@@ -119,7 +119,8 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
             {/* Timeline (Right) - ONLY scrollbar, controls everything */}
             <div
                 ref={timelineScrollRef}
-                className="flex-1 min-w-0 min-h-0 overflow-auto pl-64"
+                className="min-w-0 min-h-0 overflow-auto pl-64"
+                style={{ flex: '1 1 0' }}
                 onScroll={onTimelineScroll}
             >
                 <SequencerPanelTimeline

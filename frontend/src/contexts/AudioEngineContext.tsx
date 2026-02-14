@@ -775,32 +775,59 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                     tempo: tempo || 120,
                     time_signature: "4/4",
                 });
-                setState((prev) => {
-                    const newSequences = [...prev.sequences, sequence as any];
-                    broadcastUpdate("audioEngine.sequences", newSequences);
-                    return {
-                        ...prev,
-                        sequences: newSequences,
-                    };
-                });
+
+                // Reload sequences from backend to ensure consistency
+                await loadSequences();
+
+                // Set the new sequence as active
+                setState((prev) => ({
+                    ...prev,
+                    activeSequenceId: sequence.id,
+                    sequencerTracks: [], // Clear tracks for new sequence
+                }));
+
+                toast.success(`Created sequence: ${name}`);
             } catch (error) {
                 console.error("Failed to create sequence:", error);
+                toast.error("Failed to create sequence");
             }
         },
-        [broadcastUpdate]
+        [loadSequences]
     );
 
     const deleteSequence = useCallback(async (sequenceId: string) => {
         try {
             await audioEngineService.deleteSequence(sequenceId);
-            setState((prev) => ({
-                ...prev,
-                sequences: prev.sequences.filter((s) => s.id !== sequenceId),
-            }));
+
+            // Reload sequences from backend to ensure consistency
+            await loadSequences();
+
+            // If the deleted sequence was the active sequence, handle state cleanup
+            setState((prev) => {
+                const wasActiveSequence = prev.activeSequenceId === sequenceId;
+                const remainingSequences = prev.sequences.filter((s) => s.id !== sequenceId);
+
+                if (wasActiveSequence) {
+                    // If there are remaining sequences, switch to the first one
+                    // Otherwise, set activeSequenceId to null (empty state)
+                    const newActiveId = remainingSequences.length > 0 ? remainingSequences[0].id : null;
+
+                    return {
+                        ...prev,
+                        activeSequenceId: newActiveId,
+                        sequencerTracks: [], // Clear tracks when switching/clearing
+                    };
+                }
+
+                return prev;
+            });
+
+            toast.success("Sequence deleted");
         } catch (error) {
             console.error("Failed to delete sequence:", error);
+            toast.error("Failed to delete sequence");
         }
-    }, []);
+    }, [loadSequences]);
 
     const playSequence = useCallback(
         async (sequenceId: string) => {

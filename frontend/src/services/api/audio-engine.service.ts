@@ -306,9 +306,9 @@ export class AudioEngineService extends BaseAPIClient {
     }
 
     /**
-     * Update a sequence (name, tempo, time_signature, loop settings)
+     * Update a sequence (name, tempo, time_signature, loop settings, UI settings)
      */
-    async updateSequence(sequenceId: string, updates: Partial<{name: string; tempo: number; time_signature: string; loop_enabled: boolean; loop_start: number; loop_end: number}>): Promise<Sequence> {
+    async updateSequence(sequenceId: string, updates: Partial<{name: string; tempo: number; time_signature: string; loop_enabled: boolean; loop_start: number; loop_end: number; zoom: number; snap_enabled: boolean; grid_size: number}>): Promise<Sequence> {
         return this.put(`/audio-engine/audio/sequencer/sequences/${sequenceId}`, updates);
     }
 

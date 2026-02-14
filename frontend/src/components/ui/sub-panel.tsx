@@ -24,6 +24,7 @@ export interface SubPanelProps extends React.HTMLAttributes<HTMLDivElement> {
     showHeader?: boolean;
     collapsible?: boolean;
     defaultCollapsed?: boolean;
+    contentOverflow?: 'auto' | 'hidden'; // Control overflow behavior
 }
 
 export const SubPanel = React.forwardRef<HTMLDivElement, SubPanelProps>(
@@ -34,6 +35,7 @@ export const SubPanel = React.forwardRef<HTMLDivElement, SubPanelProps>(
             showHeader = true,
             collapsible = false,
             defaultCollapsed = false,
+            contentOverflow = 'auto',
             className,
             children,
             ...props
@@ -46,7 +48,7 @@ export const SubPanel = React.forwardRef<HTMLDivElement, SubPanelProps>(
             <div
                 ref={ref}
                 className={cn(
-                    "bg-card/20 border-primary/5 flex flex-col overflow-hidden border",
+                    "bg-card/20 border-primary/5 flex flex-1 flex-col overflow-hidden border min-h-0",
                     className
                 )}
                 {...props}
@@ -79,7 +81,10 @@ export const SubPanel = React.forwardRef<HTMLDivElement, SubPanelProps>(
                     </div>
                 )}
                 {!isCollapsed && (
-                    <div className="flex min-h-0 flex-1 flex-col overflow-auto">{children}</div>
+                    <div className={cn(
+                        "flex min-h-0 flex-1 flex-col",
+                        contentOverflow === 'auto' ? 'overflow-auto' : 'overflow-hidden'
+                    )}>{children}</div>
                 )}
             </div>
         );

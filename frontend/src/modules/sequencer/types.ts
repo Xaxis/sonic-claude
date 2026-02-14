@@ -48,9 +48,17 @@ export interface Sequence {
     clips: SequencerClip[];
     is_playing: boolean;
     current_position: number; // beats
+
+    // Loop settings
     loop_enabled: boolean;
     loop_start: number; // beats
     loop_end: number; // beats
+
+    // UI settings (per-sequence)
+    zoom: number; // Timeline zoom level
+    snap_enabled: boolean; // Grid snapping enabled
+    grid_size: number; // Grid size (1/16 note = 16)
+
     created_at: string; // ISO datetime string
     updated_at: string; // ISO datetime string
 }

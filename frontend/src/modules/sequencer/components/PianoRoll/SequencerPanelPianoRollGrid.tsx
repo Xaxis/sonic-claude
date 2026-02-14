@@ -181,36 +181,19 @@ export function SequencerPanelPianoRollGrid({
             <div
                 ref={gridRef}
                 className="relative cursor-crosshair"
-                style={{ width: `${totalWidth}px`, height: `${totalHeight}px` }}
+                style={{
+                    width: `${totalWidth}px`,
+                    height: `${totalHeight}px`,
+                    // Use background-size for precise grid alignment (avoids gradient rounding issues)
+                    backgroundImage: `
+                        linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px)
+                    `,
+                    backgroundSize: `${beatWidth}px ${noteHeight}px`,
+                    backgroundColor: '#0a0a0a'
+                }}
                 onClick={handleGridClick}
             >
-                {/* Grid Background */}
-                {Array.from({ length: maxPitch - minPitch + 1 }, (_, i) => {
-                    const pitch = maxPitch - i;
-                    const isBlack = isBlackKey(pitch);
-                    return (
-                        <div
-                            key={`row-${pitch}`}
-                            className={cn(
-                                "absolute left-0 right-0 border-b border-border",
-                                isBlack ? "bg-gray-800/30" : "bg-gray-900/30"
-                            )}
-                            style={{
-                                top: `${i * noteHeight}px`,
-                                height: `${noteHeight}px`,
-                            }}
-                        />
-                    );
-                })}
-
-                {/* Vertical grid lines (beats) - Full composition */}
-                {Array.from({ length: Math.ceil(totalBeats) + 1 }, (_, i) => (
-                    <div
-                        key={`beat-${i}`}
-                        className="absolute top-0 bottom-0 border-l border-border/30"
-                        style={{ left: `${i * beatWidth}px` }}
-                    />
-                ))}
 
                 {/* Clip Region Highlight */}
                 <div

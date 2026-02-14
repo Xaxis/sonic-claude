@@ -45,6 +45,7 @@ interface UseSequencerHandlersProps {
     setTempo: (tempo: number) => Promise<void>;
     setActiveSequenceId: (sequenceId: string) => void;
     createSequence: (name: string, tempo: number) => Promise<void>;
+    loadSequencerTracks: (sequenceId?: string) => Promise<void>;
     createSequencerTrack: (sequenceId: string, name: string, type: string, metadata?: any) => Promise<void>;
     muteSequencerTrack: (trackId: string, muted: boolean) => Promise<void>;
     soloSequencerTrack: (trackId: string, solo: boolean) => Promise<void>;
@@ -89,6 +90,7 @@ export function useSequencerHandlers(props: UseSequencerHandlersProps) {
         setTempo,
         setActiveSequenceId,
         createSequence,
+        loadSequencerTracks,
         createSequencerTrack,
         muteSequencerTrack,
         soloSequencerTrack,
@@ -210,9 +212,28 @@ export function useSequencerHandlers(props: UseSequencerHandlersProps) {
         await createSequence(`Sequence ${sequences.length + 1}`, 120);
     }, [sequences.length, createSequence]);
 
-    const handleSequenceChange = useCallback((sequenceId: string) => {
+    const handleSequenceChange = useCallback(async (sequenceId: string) => {
+        // Close piano roll when switching sequences
+        actions.closePianoRoll();
+
+        // Find the sequence to load its settings
+        const sequence = sequences.find(s => s.id === sequenceId);
+        if (sequence) {
+            // Load sequence-specific UI settings
+            actions.setZoom(sequence.zoom);
+            actions.setSnapEnabled(sequence.snap_enabled);
+            actions.setGridSize(sequence.grid_size);
+            actions.setIsLooping(sequence.loop_enabled);
+            actions.setLoopStart(sequence.loop_start);
+            actions.setLoopEnd(sequence.loop_end);
+        }
+
+        // Set active sequence
         setActiveSequenceId(sequenceId);
-    }, [setActiveSequenceId]);
+
+        // Load tracks for the new sequence
+        await loadSequencerTracks(sequenceId);
+    }, [setActiveSequenceId, loadSequencerTracks, sequences, actions]);
 
     // ========================================================================
     // TRACK HANDLERS

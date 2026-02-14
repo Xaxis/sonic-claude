@@ -90,7 +90,7 @@ export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps)
                     data-piano-keyboard
                     className="flex-1 overflow-hidden"
                 >
-                    <SequencerPianoRollKeyboard
+                    <SequencerPanelPianoRollKeyboard
                         minPitch={minPitch}
                         maxPitch={maxPitch}
                         noteHeight={noteHeight}

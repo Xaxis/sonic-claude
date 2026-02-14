@@ -81,6 +81,14 @@ async def update_sequence(sequence_id: str, request: dict):
     if "loop_end" in request:
         sequence.loop_end = request["loop_end"]
 
+    # UI settings
+    if "zoom" in request:
+        sequence.zoom = request["zoom"]
+    if "snap_enabled" in request:
+        sequence.snap_enabled = request["snap_enabled"]
+    if "grid_size" in request:
+        sequence.grid_size = request["grid_size"]
+
     # Save to disk
     sequencer_service.storage.save_sequence(sequence)
 

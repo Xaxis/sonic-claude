@@ -7,7 +7,6 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils.ts";
-import { useAudioEngine } from "@/contexts/AudioEngineContext.tsx";
 
 interface SequencerPanelPianoRollKeyboardProps {
     minPitch: number; // MIDI note number (e.g., 36 = C2)
@@ -22,7 +21,6 @@ export function SequencerPanelPianoRollKeyboard({
     maxPitch,
     noteHeight,
 }: SequencerPanelPianoRollKeyboardProps) {
-    const { playTestNote } = useAudioEngine();
     const [activeKey, setActiveKey] = useState<number | null>(null);
 
     const getNoteName = (pitch: number): string => {
@@ -36,9 +34,9 @@ export function SequencerPanelPianoRollKeyboard({
         return [1, 3, 6, 8, 10].includes(note); // C#, D#, F#, G#, A#
     };
 
-    const handleKeyClick = async (pitch: number) => {
+    const handleKeyClick = (pitch: number) => {
+        // TODO: Implement test note playback
         setActiveKey(pitch);
-        await playTestNote(pitch, 100, 300); // Play note for 300ms
         setTimeout(() => setActiveKey(null), 300);
     };
 

@@ -37,6 +37,7 @@ export function SequencerPanel() {
         metronomeEnabled,
         loadSequences,
         createSequence,
+        deleteSequence,
         loadSequencerTracks,
         createSequencerTrack,
         deleteSequencerTrack,
@@ -101,6 +102,7 @@ export function SequencerPanel() {
         setTempo,
         setActiveSequenceId,
         createSequence,
+        loadSequencerTracks,
         createSequencerTrack,
         muteSequencerTrack,
         soloSequencerTrack,
@@ -131,6 +133,25 @@ export function SequencerPanel() {
             loadSequencerTracks(activeSequenceId);
         }
     }, [activeSequenceId, loadSequencerTracks]);
+
+    // Save UI settings when they change (debounced)
+    useEffect(() => {
+        if (!activeSequenceId) return;
+
+        const timeoutId = setTimeout(async () => {
+            try {
+                await audioEngineService.updateSequence(activeSequenceId, {
+                    zoom: state.zoom,
+                    snap_enabled: state.snapEnabled,
+                    grid_size: state.gridSize,
+                });
+            } catch (error) {
+                console.error("Failed to save UI settings:", error);
+            }
+        }, 500); // Debounce 500ms
+
+        return () => clearTimeout(timeoutId);
+    }, [activeSequenceId, state.zoom, state.snapEnabled, state.gridSize]);
 
     // Get active sequence and prepare data
     const activeSequence = sequences.find((s) => s.id === activeSequenceId);
@@ -212,7 +233,7 @@ export function SequencerPanel() {
 
             {/* Sequencer Timeline - Flexible, takes remaining space */}
             <div className="flex-1 min-h-0 flex flex-col">
-                <SubPanel title="TIMELINE" showHeader={false}>
+                <SubPanel title="TIMELINE" showHeader={false} contentOverflow="hidden">
                     {/* Toolbar - Fixed */}
                     <div className="border-b border-border bg-muted/20 px-3 py-2 flex-shrink-0">
                         <SequencerPanelToolbar
@@ -239,9 +260,10 @@ export function SequencerPanel() {
                             onCreateSequence={handleAddSequence}
                             onOpenSequenceManager={() => actions.setShowSequenceManager(true)}
                         />
-                    ) : state.pianoRollClipId ? (
-                        // Piano roll is open - use split layout
-                        <SequencerSplitLayout
+                    ) : (
+                        // Flex container for split layout (ensures 50/50 height split)
+                        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                            <SequencerSplitLayout
                             tracks={tracks}
                             clips={clips}
                             pianoRollClipId={state.pianoRollClipId}
@@ -274,42 +296,12 @@ export function SequencerPanel() {
                             onLoopStartChange={actions.setLoopStart}
                             onLoopEndChange={actions.setLoopEnd}
                             onSeek={handleSeek}
+                            onToggleSnap={actions.toggleSnap}
+                            onSetGridSize={actions.setGridSize}
                             onClosePianoRoll={actions.closePianoRoll}
                             onUpdateMIDINotes={handleUpdateMIDINotes}
                         />
-                    ) : (
-                        // Piano roll is closed - use timeline section only
-                        <SequencerTimelineSection
-                            tracks={tracks}
-                            clips={clips}
-                            zoom={state.zoom}
-                            currentPosition={currentPosition}
-                            isLooping={state.isLooping}
-                            loopStart={state.loopStart}
-                            loopEnd={state.loopEnd}
-                            snapEnabled={state.snapEnabled}
-                            gridSize={state.gridSize}
-                            selectedClip={state.selectedClip}
-                            pianoRollClipId={state.pianoRollClipId}
-                            timelineScrollRef={timelineScrollRef}
-                            onTimelineScroll={handleTimelineScroll}
-                            onToggleMute={handleToggleMute}
-                            onToggleSolo={handleToggleSolo}
-                            onDeleteTrack={deleteSequencerTrack}
-                            onRenameTrack={renameSequencerTrack}
-                            onUpdateTrack={handleUpdateTrack}
-                            onSelectClip={actions.setSelectedClip}
-                            onDuplicateClip={handleDuplicateClip}
-                            onDeleteClip={handleDeleteClip}
-                            onAddClipToTrack={handleAddClipToTrack}
-                            onMoveClip={handleMoveClip}
-                            onResizeClip={handleResizeClip}
-                            onUpdateClip={handleUpdateClip}
-                            onOpenPianoRoll={handleOpenPianoRoll}
-                            onLoopStartChange={actions.setLoopStart}
-                            onLoopEndChange={actions.setLoopEnd}
-                            onSeek={handleSeek}
-                        />
+                        </div>
                     )}
                 </SubPanel>
             </div>
@@ -327,6 +319,7 @@ export function SequencerPanel() {
                 onClose={() => actions.setShowSequenceManager(false)}
                 currentSequenceId={activeSequenceId}
                 onSequenceChange={handleSequenceChange}
+                onDeleteSequence={deleteSequence}
             />
 
             {/* Sequence Settings Dialog */}

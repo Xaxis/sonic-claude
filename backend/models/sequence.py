@@ -111,9 +111,17 @@ class Sequence(BaseModel):
     clips: List[Clip] = Field(default_factory=list)
     is_playing: bool = False
     current_position: float = Field(default=0.0, ge=0, description="Playhead position in beats")
+
+    # Loop settings
     loop_enabled: bool = False
     loop_start: float = Field(default=0.0, ge=0)
     loop_end: float = Field(default=16.0, gt=0)
+
+    # UI settings (per-sequence)
+    zoom: float = Field(default=0.5, gt=0, le=2.0, description="Timeline zoom level")
+    snap_enabled: bool = Field(default=True, description="Grid snapping enabled")
+    grid_size: int = Field(default=16, gt=0, description="Grid size (1/16 note = 16)")
+
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
