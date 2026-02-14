@@ -93,7 +93,7 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
     return (
         <div className="flex flex-1 min-h-0 relative">
             {/* Track List (Left) - Fixed width, NO scrollbar */}
-            <div className="w-64 border-r border-border flex flex-col flex-shrink-0 bg-background absolute left-0 top-0 bottom-0 z-10">
+            <div className="w-64 border-r border-border flex flex-col flex-shrink-0 bg-background absolute left-0 top-0 bottom-0 z-[60]">
                 {/* Header - Fixed */}
                 <div className="h-8 border-b border-border bg-muted/30 flex items-center px-3 flex-shrink-0">
                     <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">

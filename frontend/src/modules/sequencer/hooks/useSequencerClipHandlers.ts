@@ -107,28 +107,15 @@ export function useSequencerClipHandlers(props: UseSequencerClipHandlersProps) {
                 await addClip(activeSequenceId, clipRequest);
             }
         } else {
-            // For MIDI tracks, create MIDI clip and auto-open piano roll
+            // For MIDI tracks, create empty MIDI clip and auto-open piano roll
             console.log("🎹 Creating MIDI clip...");
-
-            // Helper function to convert MIDI note number to note name
-            const midiNoteToName = (note: number): string => {
-                const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-                const octave = Math.floor(note / 12) - 1;
-                const noteName = noteNames[note % 12];
-                return `${noteName}${octave}`;
-            };
 
             const clipRequest = {
                 clip_type: "midi" as const,
                 track_id: trackId,
                 start_time: startBeat,
                 duration: 4,
-                midi_events: [
-                    { note: 60, note_name: midiNoteToName(60), velocity: 100, start_time: 0, duration: 0.5, channel: 0 },
-                    { note: 64, note_name: midiNoteToName(64), velocity: 100, start_time: 1, duration: 0.5, channel: 0 },
-                    { note: 67, note_name: midiNoteToName(67), velocity: 100, start_time: 2, duration: 0.5, channel: 0 },
-                    { note: 72, note_name: midiNoteToName(72), velocity: 100, start_time: 3, duration: 0.5, channel: 0 },
-                ],
+                midi_events: [], // Start with empty clip
             };
             console.log("🎹 Clip request:", clipRequest);
             const newClip = await addClip(activeSequenceId, clipRequest);
@@ -138,7 +125,7 @@ export function useSequencerClipHandlers(props: UseSequencerClipHandlersProps) {
             if (newClip) {
                 console.log("🎹 Opening piano roll for clip:", newClip.id);
                 actions.openPianoRoll(newClip.id);
-                toast.success("MIDI clip created - edit notes in piano roll below");
+                toast.success("MIDI clip created - add notes in piano roll below");
             }
         }
     }, [activeSequenceId, tracks, tempo, addClip, actions]);
@@ -206,9 +193,11 @@ export function useSequencerClipHandlers(props: UseSequencerClipHandlersProps) {
         const clip = clips.find((c) => c.id === clipId);
         if (!clip) return;
 
+        console.log("🎯 handleMoveClip called:", { clipId, oldStartTime: clip.start_time, newStartTime });
         await updateClip(activeSequenceId, clipId, {
             start_time: newStartTime,
         });
+        console.log("🎯 handleMoveClip completed");
     }, [activeSequenceId, clips, updateClip]);
 
     const handleResizeClip = useCallback(async (clipId: string, newDuration: number) => {

@@ -97,17 +97,22 @@ export function SequencerPanelTimeline({
     // Ref for timeline container to enable auto-scroll
     const timelineContainerRef = useRef<HTMLDivElement>(null);
 
-    // Generate ruler markers
+    // Generate ruler markers - always show beats, not grid subdivisions
+    // Grid subdivisions are too cluttered in the ruler/grid
+    // The gridSize only affects snapping behavior, not visual grid
     const rulerMarkers = [];
+
     for (let beat = 0; beat <= totalBeats; beat++) {
         const x = beat * pixelsPerBeat * zoom;
         const isMeasure = beat % beatsPerMeasure === 0;
+        const isBeat = true; // All markers are beat markers
         const measure = Math.floor(beat / beatsPerMeasure) + 1;
 
         rulerMarkers.push({
             beat,
             x,
             isMeasure,
+            isBeat,
             label: isMeasure ? `${measure}` : "",
         });
     }

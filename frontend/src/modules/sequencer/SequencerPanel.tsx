@@ -127,12 +127,34 @@ export function SequencerPanel() {
         actions.setTempoInput(tempo.toString());
     }, [tempo, actions]);
 
+    // Get active sequence and prepare data (MUST be before useEffects that use it)
+    const activeSequence = sequences.find((s) => s.id === activeSequenceId);
+    const clips = activeSequence?.clips || [];
+    const tracks = sequencerTracks || [];
+
     // Load tracks when active sequence changes
     useEffect(() => {
         if (activeSequenceId) {
             loadSequencerTracks(activeSequenceId);
         }
     }, [activeSequenceId, loadSequencerTracks]);
+
+    // Load UI settings from active sequence when it changes
+    useEffect(() => {
+        if (activeSequence) {
+            // Load persisted UI settings from sequence
+            // Only update if values are different to avoid infinite loop
+            if (state.zoom !== activeSequence.zoom) {
+                actions.setZoom(activeSequence.zoom);
+            }
+            if (state.snapEnabled !== activeSequence.snap_enabled) {
+                actions.setSnapEnabled(activeSequence.snap_enabled);
+            }
+            if (state.gridSize !== activeSequence.grid_size) {
+                actions.setGridSize(activeSequence.grid_size);
+            }
+        }
+    }, [activeSequence?.id, activeSequence?.zoom, activeSequence?.snap_enabled, activeSequence?.grid_size]); // Only when sequence ID or settings change
 
     // Save UI settings when they change (debounced)
     useEffect(() => {
@@ -152,11 +174,6 @@ export function SequencerPanel() {
 
         return () => clearTimeout(timeoutId);
     }, [activeSequenceId, state.zoom, state.snapEnabled, state.gridSize]);
-
-    // Get active sequence and prepare data
-    const activeSequence = sequences.find((s) => s.id === activeSequenceId);
-    const clips = activeSequence?.clips || [];
-    const tracks = sequencerTracks || [];
 
     // Event handlers - Clips
     const {

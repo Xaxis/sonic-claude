@@ -9,6 +9,7 @@ interface RulerMarker {
     beat: number;
     x: number;
     isMeasure: boolean;
+    isBeat?: boolean;
     label: string;
 }
 
@@ -54,11 +55,11 @@ export function SequencerPanelTimelineRuler({
             title="Click to seek"
         >
             <div className="relative h-full pointer-events-none" style={{ width: `${totalWidth}px` }}>
-                {rulerMarkers.map((marker) => (
+                {rulerMarkers.map((marker, index) => (
                     <div
-                        key={marker.beat}
-                        className="absolute top-0 bottom-0 flex flex-col items-center"
-                        style={{ left: `${marker.x}px` }}
+                        key={`${marker.beat}-${index}`}
+                        className="absolute top-0 bottom-0 flex flex-col"
+                        style={{ left: `${marker.x}px`, transform: 'translateX(-0.5px)' }}
                     >
                         {marker.isMeasure ? (
                             <>
@@ -68,7 +69,7 @@ export function SequencerPanelTimelineRuler({
                                 <div className="flex-1 w-px bg-border" />
                             </>
                         ) : (
-                            <div className="flex-1 w-px bg-border/30 mt-4" />
+                            <div className="flex-1 w-px bg-border/40 mt-4" />
                         )}
                     </div>
                 ))}

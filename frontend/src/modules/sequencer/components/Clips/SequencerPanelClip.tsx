@@ -76,9 +76,27 @@ export function SequencerPanelClip({
     const [dragStartDuration, setDragStartDuration] = useState(0);
     const [lastClickTime, setLastClickTime] = useState(0);
 
-    // Calculate clip position and width
-    const left = clip.start_time * pixelsPerBeat * zoom;
-    const width = clip.duration * pixelsPerBeat * zoom;
+    // Drag state - use state instead of ref so it triggers re-renders
+    const [dragState, setDragState] = useState<{ startTime: number; duration: number } | null>(null);
+
+    // Clear drag state when backend syncs (clip props match drag state)
+    useEffect(() => {
+        if (dragState && !isDragging && !isResizing) {
+            // Check if backend has synced (within tolerance)
+            const startTimeMatches = Math.abs(clip.start_time - dragState.startTime) < 0.01;
+            const durationMatches = Math.abs(clip.duration - dragState.duration) < 0.01;
+
+            if (startTimeMatches && durationMatches) {
+                setDragState(null);
+            }
+        }
+    }, [clip.start_time, clip.duration, dragState, isDragging, isResizing]);
+
+    // Calculate clip position and width (use drag state if dragging, otherwise use clip props)
+    const displayStartTime = dragState?.startTime ?? clip.start_time;
+    const displayDuration = dragState?.duration ?? clip.duration;
+    const left = displayStartTime * pixelsPerBeat * zoom;
+    const width = displayDuration * pixelsPerBeat * zoom;
 
     // Load waveform data for audio clips
     useEffect(() => {
@@ -163,8 +181,10 @@ export function SequencerPanelClip({
     const handleMouseDown = (e: React.MouseEvent, action: "move" | "resize-left" | "resize-right") => {
         e.stopPropagation();
         setDragStartX(e.clientX);
-        setDragStartTime(clip.start_time);
-        setDragStartDuration(clip.duration);
+        // Use displayStartTime/displayDuration which includes any pending drag state
+        // This ensures we start from the current visual position, not the backend position
+        setDragStartTime(displayStartTime);
+        setDragStartDuration(displayDuration);
 
         if (action === "move") {
             setIsDragging(true);
@@ -183,42 +203,57 @@ export function SequencerPanelClip({
             const deltaX = e.clientX - dragStartX;
             const deltaBeats = deltaX / (pixelsPerBeat * zoom);
 
-            if (isDragging && onMove) {
-                // During drag, don't snap - use exact position for smooth dragging
-                const newStartTime = Math.max(0, dragStartTime + deltaBeats);
-                onMove(clip.id, newStartTime);
-            } else if (isResizing === "left" && onResize && onMove) {
+            if (isDragging) {
+                // Calculate new position with snap
+                let newStartTime = Math.max(0, dragStartTime + deltaBeats);
+                if (snapEnabled) {
+                    newStartTime = Math.round(newStartTime * gridSize) / gridSize;
+                }
+                // Update drag state for immediate visual feedback
+                setDragState({
+                    startTime: newStartTime,
+                    duration: clip.duration,
+                });
+            } else if (isResizing === "left") {
                 // Resize from left (changes both start time and duration)
-                const newStartTime = Math.max(0, dragStartTime + deltaBeats);
+                let newStartTime = Math.max(0, dragStartTime + deltaBeats);
+                if (snapEnabled) {
+                    newStartTime = Math.round(newStartTime * gridSize) / gridSize;
+                }
                 const newDuration = Math.max(0.25, dragStartDuration - (newStartTime - dragStartTime));
-                onMove(clip.id, newStartTime);
-                onResize(clip.id, newDuration);
-            } else if (isResizing === "right" && onResize) {
+                setDragState({
+                    startTime: newStartTime,
+                    duration: newDuration,
+                });
+            } else if (isResizing === "right") {
                 // Resize from right (changes only duration)
-                const newDuration = Math.max(0.25, dragStartDuration + deltaBeats);
-                onResize(clip.id, newDuration);
+                let newDuration = Math.max(0.25, dragStartDuration + deltaBeats);
+                if (snapEnabled) {
+                    newDuration = Math.round(newDuration * gridSize) / gridSize;
+                }
+                setDragState({
+                    startTime: clip.start_time,
+                    duration: newDuration,
+                });
             }
         };
 
         const handleMouseUp = () => {
-            // Apply snap on mouse up if snap is enabled (gridSize determines snap resolution)
-            if (snapEnabled) {
-                if (isDragging && onMove) {
-                    const snappedStartTime = Math.round(clip.start_time * gridSize) / gridSize;
-                    onMove(clip.id, snappedStartTime);
-                } else if (isResizing === "left" && onResize && onMove) {
-                    const snappedStartTime = Math.round(clip.start_time * gridSize) / gridSize;
-                    const snappedDuration = Math.round(clip.duration * gridSize) / gridSize;
-                    onMove(clip.id, snappedStartTime);
-                    onResize(clip.id, snappedDuration);
-                } else if (isResizing === "right" && onResize) {
-                    const snappedDuration = Math.round(clip.duration * gridSize) / gridSize;
-                    onResize(clip.id, snappedDuration);
-                }
+            // Apply final values to backend on mouse up
+            if (isDragging && onMove && dragState) {
+                onMove(clip.id, dragState.startTime);
+            } else if (isResizing === "left" && onResize && onMove && dragState) {
+                onMove(clip.id, dragState.startTime);
+                onResize(clip.id, dragState.duration);
+            } else if (isResizing === "right" && onResize && dragState) {
+                onResize(clip.id, dragState.duration);
             }
 
+            // Clean up drag state
             setIsDragging(false);
             setIsResizing(null);
+
+            // Don't clear dragState here - let the useEffect clear it when backend syncs
         };
 
         window.addEventListener("mousemove", handleMouseMove);
@@ -245,25 +280,36 @@ export function SequencerPanelClip({
     };
 
     return (
-        <div
-            className={cn(
-                "absolute top-1 bottom-1 rounded border-2 cursor-move overflow-hidden transition-all",
-                isEditingInPianoRoll
-                    ? "border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.6)] ring-2 ring-cyan-400/50"
-                    : isSelected
-                        ? "border-white shadow-lg"
-                        : "border-white/40",
-                isDragging && "opacity-70",
-                isResizing && "opacity-70"
+        <>
+            {/* Snap guide - show where clip will land when dragging */}
+            {(isDragging || isResizing) && snapEnabled && dragState && (
+                <div
+                    className="absolute top-0 bottom-0 border-l-2 border-dashed border-teal-400/60 pointer-events-none z-10"
+                    style={{
+                        left: `${dragState.startTime * pixelsPerBeat * zoom}px`,
+                    }}
+                />
             )}
-            style={{
-                left: `${left}px`,
-                width: `${width}px`,
-                backgroundColor: isEditingInPianoRoll
-                    ? `${trackColor}60` // Brighter when editing
-                    : `${trackColor}40`, // Track color with 25% opacity
-                borderColor: isEditingInPianoRoll ? "#22d3ee" : trackColor,
-            }}
+
+            <div
+                className={cn(
+                    "absolute top-1 bottom-1 rounded border-2 cursor-move overflow-hidden transition-all",
+                    isEditingInPianoRoll
+                        ? "border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.6)] ring-2 ring-cyan-400/50"
+                        : isSelected
+                            ? "border-white shadow-lg"
+                            : "border-white/40",
+                    isDragging && "opacity-70",
+                    isResizing && "opacity-70"
+                )}
+                style={{
+                    left: `${left}px`,
+                    width: `${width}px`,
+                    backgroundColor: isEditingInPianoRoll
+                        ? `${trackColor}60` // Brighter when editing
+                        : `${trackColor}40`, // Track color with 25% opacity
+                    borderColor: isEditingInPianoRoll ? "#22d3ee" : trackColor,
+                }}
             onClick={handleClick}
             onMouseDown={(e) => handleMouseDown(e, "move")}
         >
@@ -375,7 +421,8 @@ export function SequencerPanelClip({
                     </span>
                 </div>
             )}
-        </div>
+            </div>
+        </>
     );
 }
 

@@ -62,6 +62,9 @@ interface AudioEngineState {
     tempo: number; // BPM
     metronomeEnabled: boolean;
 
+    // Dragging clips cache (for optimistic updates during drag)
+    draggingClips: Map<string, { start_time: number; duration: number }>;
+
     // Real-time data (from WebSockets - SuperCollider output monitoring)
     spectrum: number[];
     meters: Record<string, { peakL: number; peakR: number; rmsL: number; rmsR: number }>;
@@ -133,6 +136,10 @@ interface AudioEngineContextValue extends AudioEngineState {
     deleteClip: (sequenceId: string, clipId: string) => Promise<void>;
     duplicateClip: (sequenceId: string, clipId: string) => Promise<void>;
 
+    // Clip drag state (for optimistic updates)
+    setClipDragging: (clipId: string, position: { start_time: number; duration: number }) => void;
+    clearClipDragging: (clipId: string) => void;
+
     // Sequencer Track actions (API-integrated)
     loadSequencerTracks: (sequenceId?: string) => Promise<void>;
     createSequencerTrack: (sequenceId: string, name: string, type: string, options?: any) => Promise<void>;
@@ -183,6 +190,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         currentPosition: 0,
         tempo: 120,
         metronomeEnabled: false,
+        draggingClips: new Map(),
         spectrum: [],
         meters: {},
         waveform: { left: [], right: [] },
@@ -1027,6 +1035,23 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         [loadSequences]
     );
 
+    // Clip drag state management (for optimistic updates during drag)
+    const setClipDragging = useCallback((clipId: string, position: { start_time: number; duration: number }) => {
+        setState((prev) => {
+            const newDraggingClips = new Map(prev.draggingClips);
+            newDraggingClips.set(clipId, position);
+            return { ...prev, draggingClips: newDraggingClips };
+        });
+    }, []);
+
+    const clearClipDragging = useCallback((clipId: string) => {
+        setState((prev) => {
+            const newDraggingClips = new Map(prev.draggingClips);
+            newDraggingClips.delete(clipId);
+            return { ...prev, draggingClips: newDraggingClips };
+        });
+    }, []);
+
     // Sequencer Track actions (API-integrated)
     const loadSequencerTracks = useCallback(async (sequenceId?: string) => {
         try {
@@ -1220,6 +1245,8 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         updateClip,
         deleteClip,
         duplicateClip,
+        setClipDragging,
+        clearClipDragging,
         // Sequencer Tracks
         loadSequencerTracks,
         createSequencerTrack,
