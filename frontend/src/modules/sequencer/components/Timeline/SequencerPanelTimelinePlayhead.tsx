@@ -1,8 +1,11 @@
 /**
  * SequencerPanelTimelinePlayhead - Playhead indicator with drag support
- * 
- * Displays the current playback position as a red vertical bar with triangle.
- * Supports dragging to scrub through the timeline.
+ *
+ * Professional implementation with:
+ * - GPU-accelerated rendering (transform instead of left)
+ * - requestAnimationFrame for smooth 60fps interpolation
+ * - Dead reckoning between WebSocket updates
+ * - Instant snap on loop reset
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -13,6 +16,8 @@ interface SequencerPanelTimelinePlayheadProps {
     zoom: number;
     snapEnabled: boolean;
     gridSize: number;
+    isPlaying?: boolean;
+    tempo?: number;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
 }
 
@@ -22,6 +27,8 @@ export function SequencerPanelTimelinePlayhead({
     zoom,
     snapEnabled,
     gridSize,
+    isPlaying = false,
+    tempo = 120,
     onSeek,
 }: SequencerPanelTimelinePlayheadProps) {
     const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
@@ -29,7 +36,76 @@ export function SequencerPanelTimelinePlayhead({
     const dragStartXRef = useRef<number>(0);
     const dragStartValueRef = useRef<number>(0);
 
-    // Calculate playhead position (use dragged position during drag, otherwise use current position)
+    // Animation state for smooth interpolation
+    const playheadRef = useRef<HTMLDivElement>(null);
+    const animationFrameRef = useRef<number | null>(null);
+    const lastUpdateTimeRef = useRef<number>(Date.now());
+    const targetPositionRef = useRef<number>(currentPosition);
+    const interpolatedPositionRef = useRef<number>(currentPosition);
+    const lastReceivedPositionRef = useRef<number>(currentPosition);
+
+    // Update target position when currentPosition changes from WebSocket
+    useEffect(() => {
+        const now = Date.now();
+        const positionJumped = Math.abs(currentPosition - lastReceivedPositionRef.current) > 1;
+
+        if (positionJumped) {
+            // Loop reset or seek - snap instantly
+            interpolatedPositionRef.current = currentPosition;
+            targetPositionRef.current = currentPosition;
+        } else {
+            // Normal update - set as target for interpolation
+            targetPositionRef.current = currentPosition;
+        }
+
+        lastReceivedPositionRef.current = currentPosition;
+        lastUpdateTimeRef.current = now;
+    }, [currentPosition]);
+
+    // Smooth animation loop using requestAnimationFrame
+    useEffect(() => {
+        if (!isPlaying || isDraggingPlayhead) {
+            // Not playing or dragging - just use exact position
+            interpolatedPositionRef.current = draggedPlayheadPosition ?? currentPosition;
+            if (playheadRef.current) {
+                const x = interpolatedPositionRef.current * pixelsPerBeat * zoom;
+                playheadRef.current.style.transform = `translateX(${x}px)`;
+            }
+            return;
+        }
+
+        // Animation loop for smooth playback
+        const animate = () => {
+            const now = Date.now();
+            const deltaTime = (now - lastUpdateTimeRef.current) / 1000; // seconds
+
+            // Dead reckoning: extrapolate position based on tempo
+            const beatsPerSecond = tempo / 60;
+            const expectedPosition = targetPositionRef.current + (deltaTime * beatsPerSecond);
+
+            // Smooth interpolation towards expected position
+            const lerpFactor = 0.3; // Adjust for smoothness vs accuracy
+            interpolatedPositionRef.current += (expectedPosition - interpolatedPositionRef.current) * lerpFactor;
+
+            // Update DOM directly for performance (avoid React re-renders)
+            if (playheadRef.current) {
+                const x = interpolatedPositionRef.current * pixelsPerBeat * zoom;
+                playheadRef.current.style.transform = `translateX(${x}px)`;
+            }
+
+            animationFrameRef.current = requestAnimationFrame(animate);
+        };
+
+        animationFrameRef.current = requestAnimationFrame(animate);
+
+        return () => {
+            if (animationFrameRef.current !== null) {
+                cancelAnimationFrame(animationFrameRef.current);
+            }
+        };
+    }, [isPlaying, isDraggingPlayhead, tempo, pixelsPerBeat, zoom, currentPosition, draggedPlayheadPosition]);
+
+    // Calculate display position for initial render
     const displayPosition = draggedPlayheadPosition !== null ? draggedPlayheadPosition : currentPosition;
     const playheadX = displayPosition * pixelsPerBeat * zoom;
 
@@ -86,8 +162,13 @@ export function SequencerPanelTimelinePlayhead({
 
     return (
         <div
+            ref={playheadRef}
             className="absolute top-0 bottom-0 w-1 bg-red-500 z-50 cursor-ew-resize pointer-events-auto"
-            style={{ left: `${playheadX}px`, boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)' }}
+            style={{
+                transform: `translateX(${playheadX}px)`,
+                boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)',
+                willChange: 'transform',
+            }}
             onMouseDown={handlePlayheadMouseDown}
             title="Drag to scrub"
         >

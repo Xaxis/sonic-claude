@@ -286,6 +286,8 @@ export function SequencerPanel() {
                             pianoRollClipId={state.pianoRollClipId}
                             zoom={state.zoom}
                             currentPosition={currentPosition}
+                            isPlaying={isPlaying}
+                            tempo={tempo}
                             isLooping={state.isLooping}
                             loopStart={state.loopStart}
                             loopEnd={state.loopEnd}

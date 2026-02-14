@@ -39,6 +39,8 @@ interface SequencerPanelTimelineProps {
     clips: Clip[];
     zoom: number;
     currentPosition: number;
+    isPlaying?: boolean;
+    tempo?: number;
     isLooping: boolean;
     loopStart: number;
     loopEnd: number;
@@ -64,6 +66,8 @@ export function SequencerPanelTimeline({
     clips,
     zoom,
     currentPosition,
+    isPlaying = false,
+    tempo = 120,
     isLooping,
     loopStart,
     loopEnd,
@@ -219,6 +223,8 @@ export function SequencerPanelTimeline({
                             zoom={zoom}
                             snapEnabled={snapEnabled}
                             gridSize={gridSize}
+                            isPlaying={isPlaying}
+                            tempo={tempo}
                             onSeek={onSeek}
                         />
                     </div>

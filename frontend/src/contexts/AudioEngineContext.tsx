@@ -838,9 +838,11 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
     }, [loadSequences]);
 
     const playSequence = useCallback(
-        async (sequenceId: string) => {
+        async (sequenceId: string, position?: number) => {
             try {
-                await audioEngineService.playSequence(sequenceId);
+                // Use provided position, or current position, or 0
+                const startPosition = position !== undefined ? position : state.currentPosition;
+                await audioEngineService.playSequence(sequenceId, startPosition);
                 setState((prev) => ({
                     ...prev,
                     activeSequenceId: sequenceId,
@@ -855,7 +857,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 );
             }
         },
-        [broadcastUpdate]
+        [broadcastUpdate, state.currentPosition]
     );
 
     const stopPlayback = useCallback(async () => {

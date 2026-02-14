@@ -802,9 +802,15 @@ class SequencerService:
         if not sequence:
             raise ValueError(f"Sequence {sequence_id} not found")
 
+        # If loop is enabled and starting from position 0, start from loop_start instead
+        if sequence.loop_enabled and position == 0.0:
+            position = sequence.loop_start
+            logger.info(f"🔁 Loop enabled - starting from loop_start: {position} beats")
+
         logger.info(f"▶️  Starting playback for sequence '{sequence.name}' (ID: {sequence_id})")
         logger.info(f"   Tracks: {len(sequence.tracks)}, Clips: {len(sequence.clips)}")
         logger.info(f"   Tempo: {sequence.tempo} BPM, Position: {position} beats")
+        logger.info(f"   Loop: {'enabled' if sequence.loop_enabled else 'disabled'} ({sequence.loop_start} - {sequence.loop_end} beats)")
 
         self.current_sequence_id = sequence_id
         self.playhead_position = position

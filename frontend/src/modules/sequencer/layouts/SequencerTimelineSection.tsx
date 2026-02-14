@@ -18,10 +18,12 @@ interface SequencerTimelineSectionProps {
     // Data
     tracks: SequencerTrack[];
     clips: Clip[];
-    
+
     // State
     zoom: number;
     currentPosition: number;
+    isPlaying?: boolean;
+    tempo?: number;
     isLooping: boolean;
     loopStart: number;
     loopEnd: number;
@@ -63,6 +65,8 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
         clips,
         zoom,
         currentPosition,
+        isPlaying = false,
+        tempo = 120,
         isLooping,
         loopStart,
         loopEnd,
@@ -128,6 +132,8 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
                     clips={clips}
                     zoom={zoom}
                     currentPosition={currentPosition}
+                    isPlaying={isPlaying}
+                    tempo={tempo}
                     isLooping={isLooping}
                     loopStart={loopStart}
                     loopEnd={loopEnd}

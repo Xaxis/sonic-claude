@@ -16,10 +16,12 @@ interface SequencerSplitLayoutProps {
     tracks: SequencerTrack[];
     clips: Clip[];
     pianoRollClipId: string | null;
-    
+
     // State
     zoom: number;
     currentPosition: number;
+    isPlaying?: boolean;
+    tempo?: number;
     isLooping: boolean;
     loopStart: number;
     loopEnd: number;
@@ -161,6 +163,8 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                     gridSize={gridSize}
                     pianoRollClipId={pianoRollClipId}
                     timelineScrollRef={timelineScrollRef}
+                    isPlaying={props.isPlaying}
+                    tempo={props.tempo}
                 />
             </div>
 
