@@ -7,7 +7,7 @@
 import { BaseAPIClient } from "./base";
 import type { AudioEngineStatus } from "@/types";
 import type {
-    SynthDefInfo,
+    SynthDefInfo as SynthesisSynthDefInfo,
     Synth,
     CreateSynthRequest,
     UpdateSynthRequest,
@@ -35,6 +35,7 @@ import type {
     UpdateClipRequest,
     SetTempoRequest,
     SeekRequest,
+    SynthDefInfo,
 } from "@/modules/sequencer";
 
 export class AudioEngineService extends BaseAPIClient {
@@ -75,9 +76,9 @@ export class AudioEngineService extends BaseAPIClient {
     // ========================================================================
 
     /**
-     * Get all available SynthDefs
+     * Get all available SynthDefs (for synthesis module)
      */
-    async getSynthDefs(): Promise<SynthDefInfo[]> {
+    async getSynthDefs(): Promise<SynthesisSynthDefInfo[]> {
         return this.get("/audio-engine/audio/synthesis/synthdefs");
     }
 
@@ -462,9 +463,9 @@ export class AudioEngineService extends BaseAPIClient {
     }
 
     /**
-     * Update sequencer track properties (volume, pan)
+     * Update sequencer track properties (volume, pan, instrument)
      */
-    async updateSequencerTrack(trackId: string, updates: { volume?: number; pan?: number }): Promise<any> {
+    async updateSequencerTrack(trackId: string, updates: { volume?: number; pan?: number; instrument?: string }): Promise<any> {
         return this.put(`/audio-engine/audio/sequencer/tracks/${trackId}`, updates);
     }
 
@@ -473,6 +474,17 @@ export class AudioEngineService extends BaseAPIClient {
      */
     async deleteSequencerTrack(trackId: string): Promise<{ status: string; message?: string }> {
         return this.delete(`/audio-engine/audio/sequencer/tracks/${trackId}`);
+    }
+
+    // ========================================================================
+    // SYNTHDEF ROUTES
+    // ========================================================================
+
+    /**
+     * Get list of available SynthDefs for MIDI tracks (sequencer instruments)
+     */
+    async getSequencerSynthDefs(): Promise<SynthDefInfo[]> {
+        return this.get("/audio-engine/audio/sequencer/synthdefs");
     }
 
     /**

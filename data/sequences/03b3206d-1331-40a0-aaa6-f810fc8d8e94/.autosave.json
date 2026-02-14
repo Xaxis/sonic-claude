@@ -20,6 +20,23 @@
       "sample_id": null,
       "sample_name": null,
       "sample_file_path": null
+    },
+    {
+      "id": "16fd3f7a-9084-464b-963f-da03e579855d",
+      "name": "MIDI 2",
+      "sequence_id": "03b3206d-1331-40a0-aaa6-f810fc8d8e94",
+      "type": "midi",
+      "color": "#3b82f6",
+      "is_muted": false,
+      "is_solo": false,
+      "is_armed": false,
+      "volume": 1.0,
+      "pan": 0.0,
+      "instrument": null,
+      "midi_channel": 0,
+      "sample_id": null,
+      "sample_name": null,
+      "sample_file_path": null
     }
   ],
   "clips": [
@@ -52,14 +69,14 @@
       "audio_offset": null
     }
   ],
-  "is_playing": false,
-  "current_position": 0.0,
-  "loop_enabled": false,
-  "loop_start": 0.0,
-  "loop_end": 16.0,
-  "zoom": 0.36,
+  "is_playing": true,
+  "current_position": 6.934341907501221,
+  "loop_enabled": true,
+  "loop_start": 6.0,
+  "loop_end": 22.0,
+  "zoom": 0.25,
   "snap_enabled": true,
   "grid_size": 1,
   "created_at": "2026-02-13T14:49:01.328412",
-  "updated_at": "2026-02-13T16:00:09.773754"
+  "updated_at": "2026-02-13T16:24:44.616276"
 }

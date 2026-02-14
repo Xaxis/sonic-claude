@@ -304,11 +304,12 @@ class UpdateTrackRequest(BaseModel):
     name: Optional[str] = None
     volume: Optional[float] = Field(None, ge=0.0, le=2.0)
     pan: Optional[float] = Field(None, ge=-1.0, le=1.0)
+    instrument: Optional[str] = None  # For MIDI tracks
 
 
 @router.put("/tracks/{track_id}", response_model=SequencerTrack)
 async def update_track(track_id: str, request: UpdateTrackRequest):
-    """Update track properties (e.g., rename)"""
+    """Update track properties (name, volume, pan, instrument)"""
     track = sequencer_service.get_track(track_id)
     if not track:
         raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
@@ -320,6 +321,11 @@ async def update_track(track_id: str, request: UpdateTrackRequest):
         track.volume = request.volume
     if request.pan is not None:
         track.pan = request.pan
+    if request.instrument is not None:
+        if track.type != "midi":
+            raise HTTPException(status_code=400, detail="Instrument can only be set on MIDI tracks")
+        track.instrument = request.instrument
+        logger.info(f"✅ Track {track_id} instrument set to: {request.instrument}")
 
     # Save the sequence containing this track
     sequence = sequencer_service.get_sequence(track.sequence_id)
@@ -350,6 +356,110 @@ async def delete_track(track_id: str):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to delete track: {str(e)}")
+
+
+# ============================================================================
+# SYNTHDEF ROUTES
+# ============================================================================
+
+class SynthDefInfo(BaseModel):
+    """SynthDef information"""
+    name: str
+    display_name: str
+    category: str
+    description: str
+    parameters: list[str]
+
+
+@router.get("/synthdefs", response_model=list[SynthDefInfo])
+async def get_synthdefs():
+    """Get list of available SynthDefs for MIDI tracks"""
+    # This is a static list based on what's loaded in load_synthdefs.scd
+    # In a more advanced system, this could query SuperCollider dynamically
+    synthdefs = [
+        # Basic Synths
+        SynthDefInfo(
+            name="sine",
+            display_name="Sine Wave",
+            category="Basic",
+            description="Simple sine wave oscillator",
+            parameters=["attack", "release"]
+        ),
+        SynthDefInfo(
+            name="saw",
+            display_name="Saw Wave",
+            category="Basic",
+            description="Sawtooth wave with low-pass filter",
+            parameters=["attack", "release", "cutoff"]
+        ),
+        SynthDefInfo(
+            name="square",
+            display_name="Square Wave",
+            category="Basic",
+            description="Square/pulse wave with variable width",
+            parameters=["attack", "release", "width"]
+        ),
+
+        # Professional Instruments
+        SynthDefInfo(
+            name="fm",
+            display_name="FM Synth",
+            category="Synth",
+            description="Frequency modulation synthesis",
+            parameters=["attack", "decay", "sustain", "release", "modRatio", "modIndex"]
+        ),
+        SynthDefInfo(
+            name="subtractive",
+            display_name="Subtractive Synth",
+            category="Synth",
+            description="Analog-style subtractive synthesis",
+            parameters=["attack", "decay", "sustain", "release", "cutoff", "resonance", "filterEnv"]
+        ),
+        SynthDefInfo(
+            name="pad",
+            display_name="Pad Synth",
+            category="Synth",
+            description="Lush, detuned pad sound",
+            parameters=["attack", "decay", "sustain", "release", "detune", "cutoff"]
+        ),
+        SynthDefInfo(
+            name="bass",
+            display_name="Bass Synth",
+            category="Bass",
+            description="Deep, punchy bass sound",
+            parameters=["attack", "decay", "sustain", "release", "cutoff", "resonance", "drive"]
+        ),
+        SynthDefInfo(
+            name="lead",
+            display_name="Lead Synth",
+            category="Lead",
+            description="Bright, cutting lead sound",
+            parameters=["attack", "decay", "sustain", "release", "cutoff", "resonance", "detune"]
+        ),
+        SynthDefInfo(
+            name="pluck",
+            display_name="Plucked String",
+            category="Acoustic",
+            description="Karplus-Strong plucked string",
+            parameters=["attack", "release", "coef"]
+        ),
+        SynthDefInfo(
+            name="bell",
+            display_name="Bell",
+            category="Acoustic",
+            description="Metallic bell/mallet sound",
+            parameters=["attack", "release", "brightness"]
+        ),
+        SynthDefInfo(
+            name="organ",
+            display_name="Organ",
+            category="Keys",
+            description="Tonewheel organ sound",
+            parameters=["attack", "release", "drawbar1", "drawbar2", "drawbar3"]
+        ),
+    ]
+
+    return synthdefs
 
 
 # ============================================================================

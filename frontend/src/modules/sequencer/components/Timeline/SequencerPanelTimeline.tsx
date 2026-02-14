@@ -225,6 +225,9 @@ export function SequencerPanelTimeline({
                             gridSize={gridSize}
                             isPlaying={isPlaying}
                             tempo={tempo}
+                            loopEnabled={isLooping}
+                            loopStart={loopStart}
+                            loopEnd={loopEnd}
                             onSeek={onSeek}
                         />
                     </div>

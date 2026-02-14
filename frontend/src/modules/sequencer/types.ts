@@ -116,3 +116,15 @@ export interface SeekRequest {
     position: number; // beats
     trigger_audio?: boolean; // Whether to trigger audio at the new position (for scrubbing)
 }
+
+// ============================================================================
+// SYNTHDEF (Instrument Library)
+// ============================================================================
+
+export interface SynthDefInfo {
+    name: string; // Internal synth name (e.g., "fm", "bass")
+    display_name: string; // User-friendly name (e.g., "FM Synth", "Bass Synth")
+    category: string; // Category (e.g., "Basic", "Synth", "Bass", "Lead", "Acoustic", "Keys")
+    description: string; // Short description
+    parameters: string[]; // List of available parameters
+}

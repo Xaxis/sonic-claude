@@ -9,6 +9,7 @@ import { IconButton } from "@/components/ui/icon-button.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { cn } from "@/lib/utils.ts";
 import { useState } from "react";
+import { InstrumentSelector } from "../Instruments/InstrumentSelector.tsx";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -30,6 +31,7 @@ interface Track {
     pan: number;
     type?: string;
     sample_name?: string;
+    instrument?: string; // MIDI track instrument (SynthDef name)
 }
 
 interface SequencerPanelTrackListProps {
@@ -38,7 +40,7 @@ interface SequencerPanelTrackListProps {
     onToggleSolo: (trackId: string) => void;
     onDeleteTrack?: (trackId: string) => void;
     onRenameTrack?: (trackId: string, newName: string) => void;
-    onUpdateTrack?: (trackId: string, updates: { volume?: number; pan?: number }) => void;
+    onUpdateTrack?: (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => void;
 }
 
 export function SequencerPanelTracks({
@@ -124,6 +126,17 @@ export function SequencerPanelTracks({
                                     </div>
                                 )}
                             </div>
+
+                            {/* Instrument Selector - MIDI tracks only */}
+                            {track.type === "midi" && onUpdateTrack && (
+                                <InstrumentSelector
+                                    trackId={track.id}
+                                    currentInstrument={track.instrument}
+                                    onInstrumentChange={(trackId, instrument) => {
+                                        onUpdateTrack(trackId, { instrument });
+                                    }}
+                                />
+                            )}
 
                             {/* Controls */}
                             <div className="flex items-center gap-1">

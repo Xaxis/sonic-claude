@@ -64,8 +64,11 @@ export function SequencerPanel() {
     // Sequencer UI State
     const { state, actions } = useSequencerState(tempo);
 
-    // Use WebSocket position if connected, otherwise fall back to context
+    // Use WebSocket data as source of truth when connected
     const currentPosition = isTransportConnected ? transport.position_beats : 0;
+    const wsLoopEnabled = transport.loop_enabled ?? state.isLooping;
+    const wsLoopStart = transport.loop_start ?? state.loopStart;
+    const wsLoopEnd = transport.loop_end ?? state.loopEnd;
 
     // Scroll synchronization (timeline + piano roll)
     const { timelineScrollRef, pianoRollScrollRef, handleTimelineScroll, handlePianoRollScroll } = useSequencerScroll();
@@ -288,9 +291,9 @@ export function SequencerPanel() {
                             currentPosition={currentPosition}
                             isPlaying={isPlaying}
                             tempo={tempo}
-                            isLooping={state.isLooping}
-                            loopStart={state.loopStart}
-                            loopEnd={state.loopEnd}
+                            isLooping={wsLoopEnabled}
+                            loopStart={wsLoopStart}
+                            loopEnd={wsLoopEnd}
                             snapEnabled={state.snapEnabled}
                             gridSize={state.gridSize}
                             selectedClip={state.selectedClip}

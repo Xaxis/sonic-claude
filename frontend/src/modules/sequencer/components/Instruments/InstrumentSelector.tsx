@@ -1,0 +1,127 @@
+/**
+ * InstrumentSelector Component
+ * 
+ * Dropdown selector for choosing MIDI track instruments (SynthDefs).
+ * Displays instrument name with category grouping.
+ * 
+ * Architecture:
+ * - Fetches available SynthDefs from API
+ * - Groups instruments by category
+ * - Updates track instrument via API on selection
+ * - Shows current instrument or placeholder
+ */
+
+import { useEffect, useState } from "react";
+import { Music } from "lucide-react";
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select.tsx";
+import { audioEngineService } from "@/services/api/audio-engine.service.ts";
+import type { SynthDefInfo } from "../../types.ts";
+
+interface InstrumentSelectorProps {
+    trackId: string;
+    currentInstrument?: string;
+    onInstrumentChange: (trackId: string, instrument: string) => void;
+    disabled?: boolean;
+}
+
+export function InstrumentSelector({
+    trackId,
+    currentInstrument,
+    onInstrumentChange,
+    disabled = false,
+}: InstrumentSelectorProps) {
+    const [synthDefs, setSynthDefs] = useState<SynthDefInfo[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Load available SynthDefs on mount
+    useEffect(() => {
+        const loadSynthDefs = async () => {
+            try {
+                setIsLoading(true);
+                const defs = await audioEngineService.getSequencerSynthDefs();
+                setSynthDefs(defs);
+            } catch (error) {
+                console.error("Failed to load SynthDefs:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadSynthDefs();
+    }, []);
+
+    // Group SynthDefs by category
+    const groupedSynthDefs = synthDefs.reduce((acc, synthDef) => {
+        if (!acc[synthDef.category]) {
+            acc[synthDef.category] = [];
+        }
+        acc[synthDef.category].push(synthDef);
+        return acc;
+    }, {} as Record<string, SynthDefInfo[]>);
+
+    // Get display name for current instrument
+    const currentSynthDef = synthDefs.find((def) => def.name === currentInstrument);
+    const displayValue = currentSynthDef?.display_name || currentInstrument || "Select Instrument";
+
+    const handleValueChange = (value: string) => {
+        onInstrumentChange(trackId, value);
+    };
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground">
+                <Music size={12} />
+                <span>Loading...</span>
+            </div>
+        );
+    }
+
+    return (
+        <Select
+            value={currentInstrument || ""}
+            onValueChange={handleValueChange}
+            disabled={disabled}
+        >
+            <SelectTrigger className="h-7 w-32 text-xs border-border/50 hover:border-border transition-colors">
+                <div className="flex items-center gap-1.5">
+                    <Music size={12} className="text-muted-foreground flex-shrink-0" />
+                    <SelectValue placeholder="Select Instrument">
+                        {displayValue}
+                    </SelectValue>
+                </div>
+            </SelectTrigger>
+            <SelectContent className="max-h-80">
+                {Object.entries(groupedSynthDefs).map(([category, defs]) => (
+                    <SelectGroup key={category}>
+                        <SelectLabel className="text-xs font-semibold text-muted-foreground">
+                            {category}
+                        </SelectLabel>
+                        {defs.map((synthDef) => (
+                            <SelectItem
+                                key={synthDef.name}
+                                value={synthDef.name}
+                                className="text-xs"
+                            >
+                                <div className="flex flex-col">
+                                    <span className="font-medium">{synthDef.display_name}</span>
+                                    <span className="text-[10px] text-muted-foreground">
+                                        {synthDef.description}
+                                    </span>
+                                </div>
+                            </SelectItem>
+                        ))}
+                    </SelectGroup>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+

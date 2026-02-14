@@ -18,6 +18,9 @@ interface SequencerPanelTimelinePlayheadProps {
     gridSize: number;
     isPlaying?: boolean;
     tempo?: number;
+    loopEnabled?: boolean;
+    loopStart?: number;
+    loopEnd?: number;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
 }
 
@@ -29,6 +32,9 @@ export function SequencerPanelTimelinePlayhead({
     gridSize,
     isPlaying = false,
     tempo = 120,
+    loopEnabled = false,
+    loopStart = 0,
+    loopEnd = 16,
     onSeek,
 }: SequencerPanelTimelinePlayheadProps) {
     const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
@@ -81,7 +87,15 @@ export function SequencerPanelTimelinePlayhead({
 
             // Dead reckoning: extrapolate position based on tempo
             const beatsPerSecond = tempo / 60;
-            const expectedPosition = targetPositionRef.current + (deltaTime * beatsPerSecond);
+            let expectedPosition = targetPositionRef.current + (deltaTime * beatsPerSecond);
+
+            // Clamp to loop boundaries if loop is enabled
+            if (loopEnabled) {
+                if (expectedPosition >= loopEnd) {
+                    // Don't extrapolate past loop end - wait for WebSocket to send loop reset
+                    expectedPosition = loopEnd - 0.01; // Just before loop end
+                }
+            }
 
             // Smooth interpolation towards expected position
             const lerpFactor = 0.3; // Adjust for smoothness vs accuracy
@@ -103,7 +117,7 @@ export function SequencerPanelTimelinePlayhead({
                 cancelAnimationFrame(animationFrameRef.current);
             }
         };
-    }, [isPlaying, isDraggingPlayhead, tempo, pixelsPerBeat, zoom, currentPosition, draggedPlayheadPosition]);
+    }, [isPlaying, isDraggingPlayhead, tempo, pixelsPerBeat, zoom, currentPosition, draggedPlayheadPosition, loopEnabled, loopEnd]);
 
     // Calculate display position for initial render
     const displayPosition = draggedPlayheadPosition !== null ? draggedPlayheadPosition : currentPosition;

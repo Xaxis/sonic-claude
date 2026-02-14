@@ -144,7 +144,7 @@ interface AudioEngineContextValue extends AudioEngineState {
     loadSequencerTracks: (sequenceId?: string) => Promise<void>;
     createSequencerTrack: (sequenceId: string, name: string, type: string, options?: any) => Promise<void>;
     renameSequencerTrack: (trackId: string, newName: string) => Promise<void>;
-    updateSequencerTrack: (trackId: string, updates: { volume?: number; pan?: number }) => Promise<void>;
+    updateSequencerTrack: (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => Promise<void>;
     deleteSequencerTrack: (trackId: string) => Promise<void>;
     muteSequencerTrack: (trackId: string, muted: boolean) => Promise<void>;
     soloSequencerTrack: (trackId: string, soloed: boolean) => Promise<void>;
@@ -1099,7 +1099,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    const updateSequencerTrack = useCallback(async (trackId: string, updates: { volume?: number; pan?: number }) => {
+    const updateSequencerTrack = useCallback(async (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => {
         try {
             await audioEngineService.updateSequencerTrack(trackId, updates);
             setState((prev) => ({
@@ -1108,6 +1108,10 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                     t.id === trackId ? { ...t, ...updates } : t
                 ),
             }));
+            // Show success toast for instrument changes
+            if (updates.instrument) {
+                toast.success(`Instrument changed to ${updates.instrument}`);
+            }
         } catch (error) {
             console.error("Failed to update sequencer track:", error);
             toast.error("Failed to update track");
