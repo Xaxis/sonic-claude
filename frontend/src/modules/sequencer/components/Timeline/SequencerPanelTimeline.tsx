@@ -97,22 +97,6 @@ export function SequencerPanelTimeline({
     // Ref for timeline container to enable auto-scroll
     const timelineContainerRef = useRef<HTMLDivElement>(null);
 
-    // Debug: Check if width is being applied
-    useEffect(() => {
-        if (timelineContainerRef.current) {
-            const el = timelineContainerRef.current;
-            const parent = el.parentElement;
-            console.log('📏 TIMELINE WIDTH CHECK:', {
-                totalWidth,
-                'element.style.width': el.style.width,
-                'element.offsetWidth': el.offsetWidth,
-                'element.scrollWidth': el.scrollWidth,
-                'parent?.offsetWidth': parent?.offsetWidth,
-                'parent?.scrollWidth': parent?.scrollWidth,
-            });
-        }
-    }, [totalWidth]);
-
     // Generate ruler markers
     const rulerMarkers = [];
     for (let beat = 0; beat <= totalBeats; beat++) {

@@ -120,7 +120,7 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
             <div
                 ref={timelineScrollRef}
                 className="min-w-0 min-h-0 overflow-auto pl-64"
-                style={{ flex: '1 1 0' }}
+                style={{ flex: '1 1 0', width: 0 }}
                 onScroll={onTimelineScroll}
             >
                 <SequencerPanelTimeline
