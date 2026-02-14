@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils.ts";
 import type { MIDIEvent } from "../types.ts";
+import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
 interface SequencerPanelPianoRollGridProps {
     notes: MIDIEvent[];
@@ -20,6 +21,8 @@ interface SequencerPanelPianoRollGridProps {
     noteHeight: number; // pixels per note row
     snapEnabled: boolean;
     gridSize: number;
+    clipId: string; // Clip ID for matching active notes
+    activeNotes?: ActiveNote[]; // Currently playing notes for visual feedback
     onAddNote: (pitch: number, startTime: number) => void;
     onMoveNote: (index: number, newStartTime: number, newPitch: number) => void;
     onResizeNote: (index: number, newDuration: number) => void;
@@ -41,6 +44,8 @@ export function SequencerPanelPianoRollGrid({
     noteHeight,
     snapEnabled,
     gridSize,
+    clipId,
+    activeNotes,
     onAddNote,
     onMoveNote,
     onResizeNote,
@@ -212,6 +217,11 @@ export function SequencerPanelPianoRollGrid({
                     const width = note.duration * beatWidth;
                     const isSelected = selectedNotes.has(index);
 
+                    // Check if this note is currently playing
+                    const isPlaying = activeNotes?.some(
+                        an => an.clip_id === clipId && an.note === note.note
+                    ) ?? false;
+
                     // Velocity determines color intensity (0-127 -> 0.3-1.0 opacity)
                     const velocityOpacity = 0.3 + (note.velocity / 127) * 0.7;
 
@@ -222,7 +232,8 @@ export function SequencerPanelPianoRollGrid({
                                 "absolute rounded cursor-move transition-colors group",
                                 isSelected
                                     ? "border-2 border-cyan-300 z-10"
-                                    : "border border-cyan-500 hover:border-cyan-300"
+                                    : "border border-cyan-500 hover:border-cyan-300",
+                                isPlaying && "animate-pulse ring-2 ring-cyan-400 shadow-lg shadow-cyan-400/50"
                             )}
                             style={{
                                 left: `${x}px`,
@@ -232,6 +243,7 @@ export function SequencerPanelPianoRollGrid({
                                 backgroundColor: isSelected
                                     ? `rgba(6, 182, 212, ${velocityOpacity})`
                                     : `rgba(8, 145, 178, ${velocityOpacity})`,
+                                boxShadow: isPlaying ? '0 0 20px rgba(6, 182, 212, 0.8)' : undefined,
                             }}
                             onMouseDown={(e) => handleNoteMouseDown(e, index, "move")}
                             title={`Velocity: ${note.velocity}`}

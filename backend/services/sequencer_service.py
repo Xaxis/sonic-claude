@@ -66,6 +66,10 @@ class SequencerService:
         self.playback_task: Optional[asyncio.Task] = None
         self.active_synths: Dict[str, int] = {}  # clip_id -> node_id
 
+        # Active MIDI notes (for visual feedback in piano roll)
+        # Format: {node_id: {"clip_id": str, "note": int, "start_time": float}}
+        self.active_midi_notes: Dict[int, Dict[str, Any]] = {}
+
         # Load sequences from disk
         self._load_sequences_from_disk()
 
@@ -188,6 +192,12 @@ class SequencerService:
                     time_sig_num = int(time_sig_parts[0]) if len(time_sig_parts) > 0 else 4
                     time_sig_den = int(time_sig_parts[1]) if len(time_sig_parts) > 1 else 4
 
+                    # Build active notes list for visual feedback
+                    active_notes_list = [
+                        {"clip_id": note_data["clip_id"], "note": note_data["note"]}
+                        for note_data in self.active_midi_notes.values()
+                    ]
+
                     transport_data = {
                         "type": "transport",
                         "is_playing": self.is_playing,
@@ -199,6 +209,7 @@ class SequencerService:
                         "loop_enabled": sequence.loop_enabled,
                         "loop_start": sequence.loop_start,
                         "loop_end": sequence.loop_end,
+                        "active_notes": active_notes_list,
                     }
                     if loop_count == 1:
                         logger.info(f"📡 Broadcasting first transport update: {transport_data}")
@@ -443,7 +454,7 @@ class SequencerService:
                         logger.info(f"      ✅ SCHEDULED! node={node_id}, freq={freq:.2f}Hz, amp={amp:.2f}, delay={delay_seconds:.2f}s")
 
                         # Schedule note start and release
-                        async def play_note(nid, freq_val, amp_val, synth, delay, dur_beats):
+                        async def play_note(nid, freq_val, amp_val, synth, delay, dur_beats, note_pitch, clip_id_val):
                             await asyncio.sleep(delay)
                             if self.engine_manager:
                                 # Start the note
@@ -457,13 +468,22 @@ class SequencerService:
                                     "amp", amp_val,
                                     "gate", 1
                                 )
+                                # Track active note for visual feedback
+                                self.active_midi_notes[nid] = {
+                                    "clip_id": clip_id_val,
+                                    "note": note_pitch,
+                                    "start_time": time.time()
+                                }
                                 # Schedule release
                                 note_duration = dur_beats * (60.0 / self.tempo)
                                 await asyncio.sleep(note_duration)
                                 self.engine_manager.send_message("/n_set", nid, "gate", 0)
+                                # Remove from active notes
+                                if nid in self.active_midi_notes:
+                                    del self.active_midi_notes[nid]
                                 logger.debug(f"🔇 Released MIDI note {nid}")
 
-                        asyncio.create_task(play_note(node_id, freq, amp, synthdef, delay_seconds, note.duration))
+                        asyncio.create_task(play_note(node_id, freq, amp, synthdef, delay_seconds, note.duration, note.note, clip.id))
                     else:
                         logger.info(f"      ❌ SKIPPED (note already passed: offset={offset:.2f}, note_start={note.start_time:.2f})")
 

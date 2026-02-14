@@ -7,6 +7,11 @@
 
 import { useEffect, useState, useRef } from "react";
 
+export interface ActiveNote {
+    clip_id: string;
+    note: number;
+}
+
 export interface TransportData {
     type: "transport";
     is_playing: boolean;
@@ -18,6 +23,7 @@ export interface TransportData {
     loop_enabled?: boolean;
     loop_start?: number;
     loop_end?: number;
+    active_notes?: ActiveNote[];
 }
 
 export function useTransportWebSocket() {

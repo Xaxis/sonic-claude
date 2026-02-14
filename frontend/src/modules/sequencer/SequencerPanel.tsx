@@ -69,6 +69,7 @@ export function SequencerPanel() {
     const wsLoopEnabled = transport.loop_enabled ?? state.isLooping;
     const wsLoopStart = transport.loop_start ?? state.loopStart;
     const wsLoopEnd = transport.loop_end ?? state.loopEnd;
+    const activeNotes = transport.active_notes ?? [];
 
     // Scroll synchronization (timeline + piano roll)
     const { timelineScrollRef, pianoRollScrollRef, handleTimelineScroll, handlePianoRollScroll } = useSequencerScroll();
@@ -298,6 +299,7 @@ export function SequencerPanel() {
                             gridSize={state.gridSize}
                             selectedClip={state.selectedClip}
                             showPianoRoll={state.showPianoRoll}
+                            activeNotes={activeNotes}
                             timelineScrollRef={timelineScrollRef}
                             pianoRollScrollRef={pianoRollScrollRef}
                             onTimelineScroll={handleTimelineScroll}

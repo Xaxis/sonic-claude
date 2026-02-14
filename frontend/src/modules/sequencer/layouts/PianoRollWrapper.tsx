@@ -13,6 +13,7 @@ import { SequencerPanelPianoRoll } from "../components/PianoRoll/SequencerPanelP
 import { Music } from "lucide-react";
 import type { Clip, SequencerTrack } from "@/types/sequencer";
 import type { MIDIEvent } from "../types.ts";
+import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
 interface PianoRollWrapperProps {
     // Clip data
@@ -27,6 +28,7 @@ interface PianoRollWrapperProps {
     snapEnabled: boolean;
     gridSize: number;
     totalBeats: number;
+    activeNotes?: ActiveNote[];
 
     // Scroll refs
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
@@ -109,6 +111,7 @@ export function PianoRollWrapper(props: PianoRollWrapperProps) {
             zoom={zoom}
             totalBeats={totalBeats}
             instrument={track?.instrument}
+            activeNotes={props.activeNotes}
             pianoRollScrollRef={pianoRollScrollRef}
             onPianoRollScroll={onPianoRollScroll}
             onClose={onClose}

@@ -10,6 +10,7 @@ import { SequencerTimelineSection } from "./SequencerTimelineSection.tsx";
 import { PianoRollWrapper } from "./PianoRollWrapper.tsx";
 import type { SequencerTrack, Clip } from "@/types/sequencer";
 import type { MIDIEvent } from "../types.ts";
+import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
 interface SequencerSplitLayoutProps {
     // Data
@@ -29,7 +30,8 @@ interface SequencerSplitLayoutProps {
     gridSize: number;
     selectedClip: string | null;
     showPianoRoll: boolean;
-    
+    activeNotes?: ActiveNote[];
+
     // Scroll
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
@@ -215,6 +217,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                         snapEnabled={snapEnabled}
                         gridSize={gridSize}
                         totalBeats={totalBeats}
+                        activeNotes={props.activeNotes}
                         timelineScrollRef={timelineScrollRef}
                         pianoRollScrollRef={pianoRollScrollRef}
                         onPianoRollScroll={onPianoRollScroll}

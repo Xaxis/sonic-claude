@@ -14,6 +14,7 @@ import React from "react";
 import { SequencerPanelPianoRollKeyboard } from "../components/PianoRoll/SequencerPanelPianoRollKeyboard.tsx";
 import { SequencerPanelPianoRollGrid } from "../components/PianoRoll/SequencerPanelPianoRollGrid.tsx";
 import type { MIDIEvent } from "../types.ts";
+import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
 interface SequencerPianoRollSectionProps {
     // Data
@@ -31,6 +32,8 @@ interface SequencerPianoRollSectionProps {
     snapEnabled: boolean;
     gridSize: number;
     instrument?: string; // Instrument/synthdef for note preview
+    clipId: string; // Clip ID for matching active notes
+    activeNotes?: ActiveNote[]; // Currently playing notes for visual feedback
 
     // Scroll
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
@@ -60,6 +63,8 @@ export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps)
         snapEnabled,
         gridSize,
         instrument,
+        clipId,
+        activeNotes,
         pianoRollScrollRef,
         onPianoRollScroll,
         onAddNote,
@@ -119,6 +124,8 @@ export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps)
                     noteHeight={noteHeight}
                     snapEnabled={snapEnabled}
                     gridSize={gridSize}
+                    clipId={clipId}
+                    activeNotes={activeNotes}
                     onAddNote={onAddNote}
                     onMoveNote={onMoveNote}
                     onResizeNote={onResizeNote}

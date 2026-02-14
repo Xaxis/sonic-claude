@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label.tsx";
 import { SequencerPianoRollSection } from "../../layouts/SequencerPianoRollSection.tsx";
 import type { MIDIEvent } from "../../types.ts";
+import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 import { api } from "@/services/api";
 
 interface SequencerPanelPianoRollProps {
@@ -26,6 +27,7 @@ interface SequencerPanelPianoRollProps {
     zoom: number; // SHARED with timeline (Ableton pattern)
     totalBeats: number; // Total composition length in beats
     instrument?: string; // Instrument/synthdef for note preview
+    activeNotes?: ActiveNote[]; // Currently playing notes for visual feedback
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
     onPianoRollScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     onClose: () => void;
@@ -47,6 +49,7 @@ export function SequencerPanelPianoRoll({
     zoom,
     totalBeats,
     instrument,
+    activeNotes,
     pianoRollScrollRef,
     onPianoRollScroll,
     onClose,
@@ -266,6 +269,8 @@ export function SequencerPanelPianoRoll({
                 snapEnabled={snapEnabled}
                 gridSize={gridSize}
                 instrument={instrument}
+                clipId={clipId}
+                activeNotes={activeNotes}
                 pianoRollScrollRef={pianoRollScrollRef}
                 onPianoRollScroll={onPianoRollScroll}
                 onAddNote={handleAddNote}
