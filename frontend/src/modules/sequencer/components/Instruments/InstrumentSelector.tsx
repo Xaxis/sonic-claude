@@ -69,7 +69,7 @@ export function InstrumentSelector({
 
     // Get display name for current instrument
     const currentSynthDef = synthDefs.find((def) => def.name === currentInstrument);
-    const displayValue = currentSynthDef?.display_name || currentInstrument || "Select Instrument";
+    const displayValue = currentSynthDef?.display_name || currentInstrument || "Instrument";
 
     const handleValueChange = (value: string) => {
         onInstrumentChange(trackId, value);
@@ -91,10 +91,10 @@ export function InstrumentSelector({
             disabled={disabled}
         >
             <SelectTrigger className="h-7 w-32 text-xs border-border/50 hover:border-border transition-colors">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 min-w-0">
                     <Music size={12} className="text-muted-foreground flex-shrink-0" />
-                    <SelectValue placeholder="Select Instrument">
-                        {displayValue}
+                    <SelectValue placeholder="Instrument">
+                        <span className="truncate">{displayValue}</span>
                     </SelectValue>
                 </div>
             </SelectTrigger>

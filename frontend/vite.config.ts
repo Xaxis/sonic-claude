@@ -4,6 +4,11 @@ import path from "path";
 
 export default defineConfig({
     plugins: [react()],
+    define: {
+        // Disable React DevTools Profiler to prevent DataCloneError memory issues
+        // The profiler tries to clone large state objects causing "out of memory" errors
+        __REACT_DEVTOOLS_GLOBAL_HOOK__: "({ isDisabled: true })",
+    },
     resolve: {
         alias: {
             "@": path.resolve(__dirname, "./src"),
