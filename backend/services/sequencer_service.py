@@ -409,7 +409,7 @@ class SequencerService:
                 # Get instrument synthdef from track
                 synthdef = track.instrument or "sine"
 
-                # Trigger each MIDI note
+                # Trigger each MIDI note and schedule release
                 for note in clip.midi_events:
                     # Only trigger notes that should be playing at this offset
                     if note.start_time <= offset < note.start_time + note.duration:
@@ -431,7 +431,20 @@ class SequencerService:
                             "gate", 1
                         )
 
-                        logger.info(f"🎵 Triggered MIDI note {note.note_name} (node {node_id}, instrument: {synthdef})")
+                        logger.info(f"🎵 Triggered MIDI note {note.note_name} (node {node_id}, instrument: {synthdef}, freq={freq:.2f}Hz)")
+
+                        # Schedule note release after duration
+                        note_duration = note.duration * (60.0 / self.tempo)  # Convert beats to seconds
+                        async def release_note(nid, dur):
+                            await asyncio.sleep(dur)
+                            if self.engine_manager:
+                                self.engine_manager.send_message("/n_set", nid, "gate", 0)
+                                logger.debug(f"🔇 Released MIDI note {nid}")
+
+                        asyncio.create_task(release_note(node_id, note_duration))
+
+                # Track that this MIDI clip is active (for stopping when playhead leaves clip range)
+                self.active_synths[clip.id] = self.engine_manager.allocate_node_id()  # Dummy node ID for tracking
 
         except Exception as e:
             logger.error(f"❌ Failed to trigger clip {clip.id}: {e}")
@@ -984,3 +997,53 @@ class SequencerService:
         """Set metronome volume (0.0 to 1.0)"""
         self.metronome_volume = max(0.0, min(1.0, volume))
         logger.info(f"🔊 Metronome volume set to {self.metronome_volume:.2f}")
+
+    # ========================================================================
+    # NOTE PREVIEW
+    # ========================================================================
+
+    async def preview_note(self, note: int, velocity: int, duration: float, instrument: str):
+        """
+        Preview a MIDI note with one-shot playback
+
+        Args:
+            note: MIDI note number (0-127)
+            velocity: Note velocity (1-127)
+            duration: Note duration in seconds
+            instrument: Instrument/synthdef to use
+        """
+        if not self.engine_manager:
+            logger.warning("⚠️ Cannot preview note: engine_manager not available")
+            return
+
+        # Allocate node ID
+        node_id = self.engine_manager.allocate_node_id()
+
+        # Convert MIDI note to frequency
+        freq = 440.0 * (2.0 ** ((note - 69) / 12.0))
+
+        # Calculate amplitude from velocity
+        amp = (velocity / 127.0) * 0.8
+
+        # Send /s_new message to create synth
+        self.engine_manager.send_message(
+            "/s_new",
+            instrument,
+            node_id,
+            0,  # addAction
+            1,  # target
+            "freq", freq,
+            "amp", amp,
+            "gate", 1
+        )
+
+        logger.info(f"🎵 Preview note {note} (freq={freq:.2f}Hz, instrument={instrument})")
+
+        # Schedule note release after duration
+        async def release_note():
+            await asyncio.sleep(duration)
+            self.engine_manager.send_message("/n_set", node_id, "gate", 0)
+            logger.debug(f"🔇 Released preview note {node_id}")
+
+        # Run release in background
+        asyncio.create_task(release_note())

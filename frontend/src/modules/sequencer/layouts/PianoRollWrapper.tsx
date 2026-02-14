@@ -11,12 +11,13 @@
 
 import { SequencerPanelPianoRoll } from "../components/PianoRoll/SequencerPanelPianoRoll.tsx";
 import { Music } from "lucide-react";
-import type { Clip } from "@/types/sequencer";
+import type { Clip, SequencerTrack } from "@/types/sequencer";
 import type { MIDIEvent } from "../types.ts";
 
 interface PianoRollWrapperProps {
     // Clip data
     clip: Clip | undefined;
+    track: SequencerTrack | undefined; // Track for instrument info
 
     // Drag state (for real-time sync with timeline)
     clipDragState?: { startTime: number; duration: number } | null;
@@ -42,6 +43,7 @@ interface PianoRollWrapperProps {
 export function PianoRollWrapper(props: PianoRollWrapperProps) {
     const {
         clip,
+        track,
         clipDragState,
         zoom,
         snapEnabled,
@@ -106,6 +108,7 @@ export function PianoRollWrapper(props: PianoRollWrapperProps) {
             gridSize={gridSize}
             zoom={zoom}
             totalBeats={totalBeats}
+            instrument={track?.instrument}
             pianoRollScrollRef={pianoRollScrollRef}
             onPianoRollScroll={onPianoRollScroll}
             onClose={onClose}

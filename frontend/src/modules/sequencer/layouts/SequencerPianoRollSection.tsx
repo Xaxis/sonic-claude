@@ -30,7 +30,8 @@ interface SequencerPianoRollSectionProps {
     beatWidth: number;
     snapEnabled: boolean;
     gridSize: number;
-    
+    instrument?: string; // Instrument/synthdef for note preview
+
     // Scroll
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
     onPianoRollScroll: (e: React.UIEvent<HTMLDivElement>) => void;
@@ -58,6 +59,7 @@ export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps)
         beatWidth,
         snapEnabled,
         gridSize,
+        instrument,
         pianoRollScrollRef,
         onPianoRollScroll,
         onAddNote,
@@ -94,6 +96,7 @@ export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps)
                         minPitch={minPitch}
                         maxPitch={maxPitch}
                         noteHeight={noteHeight}
+                        instrument={instrument}
                     />
                 </div>
             </div>

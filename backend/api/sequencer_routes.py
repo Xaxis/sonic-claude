@@ -529,9 +529,6 @@ async def get_playback_state():
     return sequencer_service.get_playback_state()
 
 
-
-
-
 # ============================================================================
 # METRONOME ROUTES
 # ============================================================================
@@ -551,6 +548,14 @@ class SetMetronomeVolumeRequest(BaseModel):
     volume: float
 
 
+class PreviewNoteRequest(BaseModel):
+    """Request model for previewing a MIDI note"""
+    note: int = Field(..., ge=0, le=127, description="MIDI note number (0-127)")
+    velocity: int = Field(default=100, ge=1, le=127, description="Note velocity (1-127)")
+    duration: float = Field(default=0.5, gt=0, description="Note duration in seconds")
+    instrument: str = Field(default="sine", description="Instrument/synthdef to use")
+
+
 @router.put("/metronome/volume")
 async def set_metronome_volume(request: SetMetronomeVolumeRequest):
     """Set metronome volume (0.0 to 1.0)"""
@@ -559,4 +564,34 @@ async def set_metronome_volume(request: SetMetronomeVolumeRequest):
         return {"volume": request.volume}
     except Exception as e:
         logger.error(f"❌ Failed to set metronome volume: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# NOTE PREVIEW ROUTES
+# ============================================================================
+
+@router.post("/preview-note")
+async def preview_note(request: PreviewNoteRequest):
+    """
+    Preview a MIDI note with specified instrument
+
+    Triggers a one-shot note playback for UI feedback (piano keyboard clicks, note editing, etc.)
+    """
+    try:
+        await sequencer_service.preview_note(
+            note=request.note,
+            velocity=request.velocity,
+            duration=request.duration,
+            instrument=request.instrument
+        )
+        return {
+            "status": "ok",
+            "note": request.note,
+            "velocity": request.velocity,
+            "duration": request.duration,
+            "instrument": request.instrument
+        }
+    except Exception as e:
+        logger.error(f"❌ Failed to preview note: {e}")
         raise HTTPException(status_code=500, detail=str(e))

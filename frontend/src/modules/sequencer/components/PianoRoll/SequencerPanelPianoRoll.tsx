@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label.tsx";
 import { SequencerPianoRollSection } from "../../layouts/SequencerPianoRollSection.tsx";
 import type { MIDIEvent } from "../../types.ts";
+import { api } from "@/services/api";
 
 interface SequencerPanelPianoRollProps {
     clipId: string;
@@ -24,6 +25,7 @@ interface SequencerPanelPianoRollProps {
     gridSize: number; // Controlled from parent
     zoom: number; // SHARED with timeline (Ableton pattern)
     totalBeats: number; // Total composition length in beats
+    instrument?: string; // Instrument/synthdef for note preview
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
     onPianoRollScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     onClose: () => void;
@@ -44,6 +46,7 @@ export function SequencerPanelPianoRoll({
     gridSize,
     zoom,
     totalBeats,
+    instrument,
     pianoRollScrollRef,
     onPianoRollScroll,
     onClose,
@@ -68,7 +71,7 @@ export function SequencerPanelPianoRoll({
         return `${noteName}${octave}`;
     };
 
-    const handleAddNote = (pitch: number, startTime: number) => {
+    const handleAddNote = async (pitch: number, startTime: number) => {
         const newNote: MIDIEvent = {
             note: pitch,
             note_name: getNoteName(pitch),
@@ -78,10 +81,18 @@ export function SequencerPanelPianoRoll({
             channel: 0,
         };
         onUpdateNotes(clipId, [...midiEvents, newNote]);
+
+        // Preview the note
+        try {
+            await api.audioEngine.previewNote(pitch, 100, 0.5, instrument || "sine");
+        } catch (error) {
+            console.error("Failed to preview note:", error);
+        }
     };
 
-    const handleMoveNote = (index: number, newStartTime: number, newPitch: number) => {
+    const handleMoveNote = async (index: number, newStartTime: number, newPitch: number) => {
         const updatedNotes = [...midiEvents];
+        const oldPitch = updatedNotes[index].note;
         updatedNotes[index] = {
             ...updatedNotes[index],
             note: newPitch,
@@ -89,6 +100,15 @@ export function SequencerPanelPianoRoll({
             start_time: snapEnabled ? Math.round(newStartTime * gridSize) / gridSize : newStartTime,
         };
         onUpdateNotes(clipId, updatedNotes);
+
+        // Preview the note only if pitch changed
+        if (newPitch !== oldPitch) {
+            try {
+                await api.audioEngine.previewNote(newPitch, updatedNotes[index].velocity, 0.5, instrument || "sine");
+            } catch (error) {
+                console.error("Failed to preview note:", error);
+            }
+        }
     };
 
     const handleResizeNote = (index: number, newDuration: number) => {
@@ -245,6 +265,7 @@ export function SequencerPanelPianoRoll({
                 beatWidth={beatWidth}
                 snapEnabled={snapEnabled}
                 gridSize={gridSize}
+                instrument={instrument}
                 pianoRollScrollRef={pianoRollScrollRef}
                 onPianoRollScroll={onPianoRollScroll}
                 onAddNote={handleAddNote}

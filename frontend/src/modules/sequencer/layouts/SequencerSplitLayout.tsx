@@ -157,6 +157,9 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
     // Find the clip for piano roll
     const clip = clips.find(c => c.id === pianoRollClipId);
 
+    // Find the track for the clip (to get instrument)
+    const track = clip ? props.tracks.find(t => t.id === clip.track_id) : undefined;
+
     // Get drag state for piano roll clip (if being dragged)
     const pianoRollClipDragState = pianoRollClipId ? clipDragStates.get(pianoRollClipId) : null;
 
@@ -206,6 +209,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                 <div className="h-full flex flex-col overflow-hidden">
                     <PianoRollWrapper
                         clip={clip}
+                        track={track}
                         clipDragState={pianoRollClipDragState}
                         zoom={zoom}
                         snapEnabled={snapEnabled}

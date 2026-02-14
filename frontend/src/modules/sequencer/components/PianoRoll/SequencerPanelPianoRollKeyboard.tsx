@@ -7,11 +7,13 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils.ts";
+import { api } from "@/services/api";
 
 interface SequencerPanelPianoRollKeyboardProps {
     minPitch: number; // MIDI note number (e.g., 36 = C2)
     maxPitch: number; // MIDI note number (e.g., 96 = C7)
     noteHeight: number; // pixels per note row
+    instrument?: string; // Instrument/synthdef to use for preview
 }
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -20,6 +22,7 @@ export function SequencerPanelPianoRollKeyboard({
     minPitch,
     maxPitch,
     noteHeight,
+    instrument = "sine",
 }: SequencerPanelPianoRollKeyboardProps) {
     const [activeKey, setActiveKey] = useState<number | null>(null);
 
@@ -34,10 +37,16 @@ export function SequencerPanelPianoRollKeyboard({
         return [1, 3, 6, 8, 10].includes(note); // C#, D#, F#, G#, A#
     };
 
-    const handleKeyClick = (pitch: number) => {
-        // TODO: Implement test note playback
+    const handleKeyClick = async (pitch: number) => {
+        // Preview note with track's instrument
         setActiveKey(pitch);
         setTimeout(() => setActiveKey(null), 300);
+
+        try {
+            await api.audioEngine.previewNote(pitch, 100, 0.5, instrument);
+        } catch (error) {
+            console.error("Failed to preview note:", error);
+        }
     };
 
     const totalHeight = (maxPitch - minPitch + 1) * noteHeight;

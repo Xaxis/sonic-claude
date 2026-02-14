@@ -518,6 +518,29 @@ export class AudioEngineService extends BaseAPIClient {
     async setMetronomeVolume(volume: number): Promise<{ volume: number }> {
         return this.put("/audio-engine/sequencer/metronome/volume", { volume });
     }
+
+    // ========================================================================
+    // NOTE PREVIEW ROUTES (1 route)
+    // ========================================================================
+
+    /**
+     * Preview a MIDI note with specified instrument
+     *
+     * Triggers a one-shot note playback for UI feedback (piano keyboard clicks, note editing, etc.)
+     */
+    async previewNote(
+        note: number,
+        velocity: number = 100,
+        duration: number = 0.5,
+        instrument: string = "sine"
+    ): Promise<{ status: string; note: number; velocity: number; duration: number; instrument: string }> {
+        return this.post("/audio-engine/audio/sequencer/preview-note", {
+            note,
+            velocity,
+            duration,
+            instrument,
+        });
+    }
 }
 
 // Export singleton instance

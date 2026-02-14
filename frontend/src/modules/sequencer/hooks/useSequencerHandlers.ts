@@ -297,7 +297,7 @@ export function useSequencerHandlers(props: UseSequencerHandlersProps) {
         }
     }, [tracks, soloSequencerTrack]);
 
-    const handleUpdateTrack = useCallback(async (trackId: string, updates: { volume?: number; pan?: number }) => {
+    const handleUpdateTrack = useCallback(async (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => {
         if (!activeSequenceId) return;
         await updateSequencerTrack(trackId, updates);
     }, [activeSequenceId, updateSequencerTrack]);

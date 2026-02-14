@@ -23,7 +23,7 @@
  */
 
 import { useState } from "react";
-import { Volume2, VolumeX, Radio, Trash2, Edit2, Check, X, MoreVertical, Copy, Settings, ChevronDown } from "lucide-react";
+import {  Trash2, Edit2, Check, X, MoreVertical, Copy, Settings, ChevronDown } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { cn } from "@/lib/utils.ts";

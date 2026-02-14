@@ -96,7 +96,7 @@ export function InstrumentSelector({
                     <span className="truncate text-xs">{displayValue}</span>
                 </div>
             </SelectTrigger>
-            <SelectContent className="max-h-80" align="start">
+            <SelectContent className="max-h-80 z-[9999]" align="start" position="popper" sideOffset={4}>
                 {Object.entries(groupedSynthDefs).map(([category, defs]) => (
                     <SelectGroup key={category}>
                         <SelectLabel className="text-xs font-semibold text-muted-foreground">
