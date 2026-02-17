@@ -15,28 +15,11 @@ import { SequencerPanelTimelineGrid } from "./SequencerPanelTimelineGrid.tsx";
 import { SequencerPanelTimelineLoopRegion } from "./SequencerPanelTimelineLoopRegion.tsx";
 import { SequencerPanelTimelinePlayhead } from "./SequencerPanelTimelinePlayhead.tsx";
 import { SequencerPanelTimelineTrackRow } from "./SequencerPanelTimelineTrackRow.tsx";
-
-interface Clip {
-    id: string;
-    name: string;
-    track_id: string;
-    start_time: number;
-    duration: number;
-    type: "midi" | "audio";
-    audio_file_path?: string;
-    audio_offset?: number;
-    gain: number;
-}
-
-interface Track {
-    id: string;
-    name: string;
-    color?: string;
-}
+import type { SequencerClip, SequencerTrack } from "../../types.ts";
 
 interface SequencerPanelTimelineProps {
-    tracks: Track[];
-    clips: Clip[];
+    tracks: SequencerTrack[];
+    clips: SequencerClip[];
     zoom: number;
     currentPosition: number;
     isPlaying?: boolean;

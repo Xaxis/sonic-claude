@@ -9,31 +9,11 @@ import { Copy, Trash2, Volume2, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { cn } from "@/lib/utils.ts";
-
-interface MIDIEvent {
-    note: number;
-    note_name: string;
-    start_time: number;
-    duration: number;
-    velocity: number;
-    channel: number;
-}
-
-interface Clip {
-    id: string;
-    name: string;
-    track_id: string;
-    start_time: number;
-    duration: number;
-    type: "midi" | "audio";
-    audio_file_path?: string;
-    audio_offset?: number; // seconds
-    midi_events?: MIDIEvent[];
-    gain: number;
-}
+import type { MIDIEvent, SequencerClip } from "../../types.ts";
+import { WaveformDisplay } from "../Shared/WaveformDisplay.tsx";
 
 interface SequencerPanelClipProps {
-    clip: Clip;
+    clip: SequencerClip;
     trackColor?: string; // Track color for clip background
     isSelected: boolean;
     isEditingInPianoRoll?: boolean; // True if this clip is currently open in piano roll
@@ -71,7 +51,6 @@ export function SequencerPanelClip({
     onOpenPianoRoll,
     onClipDragStateChange,
 }: SequencerPanelClipProps) {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
     const [waveformData, setWaveformData] = useState<number[]>([]);
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null);
@@ -116,13 +95,6 @@ export function SequencerPanelClip({
         }
     }, [clip.type, clip.audio_file_path]);
 
-    // Render waveform when data or canvas size changes
-    useEffect(() => {
-        if (waveformData.length > 0 && canvasRef.current) {
-            renderWaveform();
-        }
-    }, [waveformData, width]);
-
     const loadWaveform = async (sampleId: string) => {
         try {
             // Fetch audio file using sample ID
@@ -163,30 +135,7 @@ export function SequencerPanelClip({
         }
     };
 
-    const renderWaveform = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
 
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        const { width: canvasWidth, height: canvasHeight } = canvas;
-        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
-        // Draw waveform with better visibility
-        const barWidth = canvasWidth / waveformData.length;
-        const centerY = canvasHeight / 2;
-
-        // Draw waveform bars
-        ctx.fillStyle = "rgba(255, 255, 255, 0.6)"; // Increased opacity for better visibility
-
-        waveformData.forEach((value, index) => {
-            const barHeight = value * canvasHeight * 0.9; // Scale to 90% of height for padding
-            const x = index * barWidth;
-            const y = centerY - barHeight / 2;
-            ctx.fillRect(x, y, Math.max(1, barWidth - 0.5), barHeight);
-        });
-    };
 
     // Drag and resize handlers
     const handleMouseDown = (e: React.MouseEvent, action: "move" | "resize-left" | "resize-right") => {
@@ -342,14 +291,20 @@ export function SequencerPanelClip({
                 />
             )}
 
-            {/* Waveform Canvas */}
-            {clip.type === "audio" && (
-                <canvas
-                    ref={canvasRef}
-                    width={width}
-                    height={60}
-                    className="absolute inset-0 w-full h-full pointer-events-none"
-                />
+            {/* Waveform Display */}
+            {clip.type === "audio" && waveformData.length > 0 && (
+                <div className="absolute inset-0 w-full h-full pointer-events-none">
+                    <WaveformDisplay
+                        data={waveformData}
+                        width={width}
+                        height={60}
+                        color="rgba(255, 255, 255, 0.6)"
+                        backgroundColor="transparent"
+                        showGrid={false}
+                        glowEffect={false}
+                        className="w-full h-full"
+                    />
+                </div>
             )}
 
             {/* Clip Info - Different layout for expanded vs minimized tracks */}

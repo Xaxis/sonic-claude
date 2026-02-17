@@ -15,11 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select.tsx";
-
-interface Sequence {
-    id: string;
-    name: string;
-}
+import type { Sequence } from "../../types.ts";
 
 interface SequencerPanelToolbarProps {
     sequences: Sequence[];

@@ -1,0 +1,4 @@
+- volume control on track header seemingly has no effect
+- metronome feature unselectable (cant turn it on) and doesnt work
+- beats per minute adjustment has no effect and doesnt work
+- opening up sequencer panel doesnt maintain state of opened piano roll or current clip selection

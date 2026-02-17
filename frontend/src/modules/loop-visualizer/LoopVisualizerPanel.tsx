@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useAudioEngine } from "@/contexts/AudioEngineContext.tsx";
 import { Activity, Waves, BarChart3, AlertTriangle } from "lucide-react";
+import { WaveformDisplay } from "../sequencer/components/Shared/WaveformDisplay.tsx";
 
 // Theme colors from globals.css
 const THEME_COLORS = {
@@ -39,7 +40,6 @@ interface AudioStats {
 export function LoopVisualizerPanel() {
     const { spectrum, waveform } = useAudioEngine();
     const spectrumCanvasRef = useRef<HTMLCanvasElement>(null);
-    const waveformCanvasRef = useRef<HTMLCanvasElement>(null);
     const [stats, setStats] = useState<AudioStats>({
         peakFrequency: 0,
         peakLeft: 0,
@@ -141,83 +141,23 @@ export function LoopVisualizerPanel() {
         });
     }, [spectrum]);
 
-    // Draw waveform visualization
-    useEffect(() => {
-        const canvas = waveformCanvasRef.current;
-        if (!canvas || waveform.left.length === 0) return;
 
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * window.devicePixelRatio;
-        canvas.height = rect.height * window.devicePixelRatio;
-        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-        const width = rect.width;
-        const height = rect.height;
-        const midY = height / 2;
-
-        ctx.fillStyle = THEME_COLORS.background;
-        ctx.fillRect(0, 0, width, height);
-
-        ctx.strokeStyle = THEME_COLORS.border;
-        ctx.lineWidth = 1;
-
-        for (let i = 0; i <= 4; i++) {
-            const y = (height / 4) * i;
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(width, y);
-            ctx.stroke();
-        }
-
-        for (let i = 0; i <= 8; i++) {
-            const x = (width / 8) * i;
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, height);
-            ctx.stroke();
-        }
-
-        ctx.strokeStyle = THEME_COLORS.primary;
-        ctx.lineWidth = 2;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = THEME_COLORS.primary;
-        ctx.beginPath();
-        waveform.left.forEach((value, index) => {
-            const x = (index / waveform.left.length) * width;
-            const y = midY - value * midY * 0.8;
-            if (index === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-
-        ctx.strokeStyle = THEME_COLORS.secondary;
-        ctx.shadowColor = THEME_COLORS.secondary;
-        ctx.beginPath();
-        waveform.right.forEach((value, index) => {
-            const x = (index / waveform.right.length) * width;
-            const y = midY + value * midY * 0.8;
-            if (index === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = THEME_COLORS.border;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(0, midY);
-        ctx.lineTo(width, midY);
-        ctx.stroke();
-    }, [waveform]);
 
     return (
         <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
             <SubPanel title="WAVEFORM" className="flex-1" collapsible>
                 <div className="relative h-full w-full">
-                    <canvas ref={waveformCanvasRef} className="h-full w-full" />
+                    <WaveformDisplay
+                        data={waveform.left}
+                        rightData={waveform.right}
+                        color={THEME_COLORS.primary}
+                        rightColor={THEME_COLORS.secondary}
+                        backgroundColor={THEME_COLORS.background}
+                        gridColor={THEME_COLORS.border}
+                        showGrid={true}
+                        glowEffect={true}
+                        className="h-full w-full"
+                    />
                     <div className="absolute left-2 top-2 flex items-center gap-2">
                         <Waves className="h-3 w-3 text-primary" />
                         <Label className="text-xs text-primary">L</Label>

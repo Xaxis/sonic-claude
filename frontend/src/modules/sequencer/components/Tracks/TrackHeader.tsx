@@ -26,8 +26,10 @@ import { useState } from "react";
 import {  Trash2, Edit2, Check, X, MoreVertical, Copy, Settings, ChevronDown } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
 import { InstrumentSelector } from "../Instruments/InstrumentSelector.tsx";
+import { TrackButton } from "./TrackButton.tsx";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -89,14 +91,6 @@ export function TrackHeader({
         setIsEditing(false);
     };
 
-    // Type badge styling
-    const typeBadgeClass = cn(
-        "px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider",
-        track.type === "midi" && "bg-purple-500/20 text-purple-400 border border-purple-500/30",
-        track.type === "audio" && "bg-blue-500/20 text-blue-400 border border-blue-500/30",
-        track.type === "sample" && "bg-green-500/20 text-green-400 border border-green-500/30"
-    );
-
     return (
         <div
             className={cn(
@@ -146,7 +140,9 @@ export function TrackHeader({
             {!isExpanded && (
                 <div className="flex items-center gap-2 h-full">
                     {/* Type Badge */}
-                    <div className={typeBadgeClass}>{track.type}</div>
+                    <Badge variant={track.type} rounded="default" className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                        {track.type}
+                    </Badge>
 
                     {/* Track Name - Always visible, click to expand */}
                     <div
@@ -173,31 +169,23 @@ export function TrackHeader({
                     </div>
 
                     {/* Mute/Solo - Always visible */}
-                    <button
+                    <TrackButton
+                        variant="mute"
+                        active={track.is_muted}
                         onClick={() => onToggleMute(track.id)}
-                        className={cn(
-                            "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase transition-all",
-                            track.is_muted
-                                ? "bg-yellow-500/20 text-yellow-500"
-                                : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                        )}
-                        title={track.is_muted ? "Unmute" : "Mute"}
+                        size="xs"
                     >
                         M
-                    </button>
+                    </TrackButton>
 
-                    <button
+                    <TrackButton
+                        variant="solo"
+                        active={track.is_solo}
                         onClick={() => onToggleSolo(track.id)}
-                        className={cn(
-                            "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase transition-all",
-                            track.is_solo
-                                ? "bg-blue-500/20 text-blue-500"
-                                : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                        )}
-                        title={track.is_solo ? "Unsolo" : "Solo"}
+                        size="xs"
                     >
                         S
-                    </button>
+                    </TrackButton>
                 </div>
             )}
 
@@ -215,7 +203,9 @@ export function TrackHeader({
                             <ChevronDown size={14} className="text-muted-foreground" />
                         </button>
 
-                        <div className={typeBadgeClass}>{track.type}</div>
+                        <Badge variant={track.type} rounded="default" className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                            {track.type}
+                        </Badge>
 
                         <div className="flex-1 min-w-0">
                             {isEditing ? (
@@ -240,51 +230,54 @@ export function TrackHeader({
                                 </div>
                             )}
                         </div>
-
-                        {/* Instrument Selector - MIDI tracks only */}
-                        {track.type === "midi" && onUpdateTrack && (
-                            <InstrumentSelector
-                                trackId={track.id}
-                                currentInstrument={track.instrument}
-                                onInstrumentChange={(trackId, instrument) => {
-                                    onUpdateTrack(trackId, { instrument });
-                                }}
-                            />
-                        )}
                     </div>
 
-                    {/* ROW 2: TRANSPORT - Mute, Solo, Arm */}
-                    <div className="flex items-center gap-1.5">
-                        <button
-                            onClick={() => onToggleMute(track.id)}
-                            className={cn(
-                                "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide transition-all border",
-                                track.is_muted
-                                    ? "bg-yellow-500/20 text-yellow-500 border-yellow-500/50"
-                                    : "bg-muted/50 text-muted-foreground border-border hover:border-yellow-500/30"
-                            )}
-                        >
-                            M
-                        </button>
+                    {/* ROW 2: INSTRUMENT & TRANSPORT - Instrument, Mute, Solo, Arm */}
+                    <div className="flex items-center gap-2">
+                        {track.type === "midi" && onUpdateTrack && (
+                            <div className="flex items-center gap-2">
+                                <InstrumentSelector
+                                    trackId={track.id}
+                                    currentInstrument={track.instrument}
+                                    onInstrumentChange={(trackId, instrument) => {
+                                        onUpdateTrack(trackId, { instrument });
+                                    }}
+                                />
+                            </div>
+                        )}
 
-                        <button
-                            onClick={() => onToggleSolo(track.id)}
-                            className={cn(
-                                "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide transition-all border",
-                                track.is_solo
-                                    ? "bg-blue-500/20 text-blue-500 border-blue-500/50"
-                                    : "bg-muted/50 text-muted-foreground border-border hover:border-blue-500/30"
-                            )}
-                        >
-                            S
-                        </button>
+                        {/* TRANSPORT - Mute, Solo, Arm */}
+                        <div className="flex items-center gap-1.5">
+                            <TrackButton
+                                variant="mute"
+                                active={track.is_muted}
+                                onClick={() => onToggleMute(track.id)}
+                                size="sm"
+                                bordered
+                            >
+                                M
+                            </TrackButton>
 
-                        <button
-                            disabled
-                            className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide bg-muted/30 text-muted-foreground/50 border border-border cursor-not-allowed"
-                        >
-                            R
-                        </button>
+                            <TrackButton
+                                variant="solo"
+                                active={track.is_solo}
+                                onClick={() => onToggleSolo(track.id)}
+                                size="sm"
+                                bordered
+                            >
+                                S
+                            </TrackButton>
+
+                            <TrackButton
+                                variant="arm"
+                                active={track.is_armed}
+                                disabled
+                                size="sm"
+                                bordered
+                            >
+                                R
+                            </TrackButton>
+                        </div>
                     </div>
 
                     {/* ROW 3: MIXING - Volume and Pan */}
