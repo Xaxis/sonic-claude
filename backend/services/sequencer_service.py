@@ -5,7 +5,7 @@ import logging
 import uuid
 import asyncio
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
 
@@ -18,8 +18,11 @@ from backend.models.sequence import (
     AddClipRequest,
     UpdateClipRequest,
 )
+from backend.models.types import ActiveMIDINote, PlaybackState
 from backend.services.sequence_storage import SequenceStorage
 from backend.services.buffer_manager import BufferManager
+from backend.core.engine_manager import AudioEngineManager
+from backend.services.websocket_manager import WebSocketManager
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +39,18 @@ class SequencerService:
     - Persist sequences to disk with autosave and versioning
     """
 
-    def __init__(self, engine_manager=None, websocket_manager=None):
+    def __init__(
+        self,
+        engine_manager: Optional[AudioEngineManager] = None,
+        websocket_manager: Optional[WebSocketManager] = None
+    ) -> None:
+        """
+        Initialize sequencer service
+
+        Args:
+            engine_manager: Audio engine manager for OSC communication
+            websocket_manager: WebSocket manager for real-time updates
+        """
         self.engine_manager = engine_manager
         self.websocket_manager = websocket_manager
 
@@ -67,15 +81,14 @@ class SequencerService:
         self.active_synths: Dict[str, int] = {}  # clip_id -> node_id
 
         # Active MIDI notes (for visual feedback in piano roll)
-        # Format: {node_id: {"clip_id": str, "note": int, "start_time": float}}
-        self.active_midi_notes: Dict[int, Dict[str, Any]] = {}
+        self.active_midi_notes: Dict[int, ActiveMIDINote] = {}
 
         # Load sequences from disk
         self._load_sequences_from_disk()
 
         logger.info("✅ SequencerService initialized")
 
-    def _load_sequences_from_disk(self):
+    def _load_sequences_from_disk(self) -> None:
         """Load all sequences from persistent storage"""
         try:
             sequences = self.storage.load_all_sequences()
@@ -103,7 +116,7 @@ class SequencerService:
     # PLAYBACK ENGINE
     # ========================================================================
 
-    async def _playback_loop(self):
+    async def _playback_loop(self) -> None:
         """Background task that advances playhead and triggers clips"""
         if not self.current_sequence_id:
             logger.error("❌ Playback loop: No current_sequence_id!")
@@ -227,8 +240,14 @@ class SequencerService:
             logger.error(f"❌ Error in playback loop: {e}", exc_info=True)
             self.is_playing = False
 
-    async def _check_and_trigger_clips(self, sequence: Sequence, position: float):
-        """Check if any clips should be triggered at the current position"""
+    async def _check_and_trigger_clips(self, sequence: Sequence, position: float) -> None:
+        """
+        Check if any clips should be triggered at the current position
+
+        Args:
+            sequence: Sequence being played
+            position: Current playhead position in beats
+        """
         # First, stop any clips that are playing but shouldn't be (playhead moved outside their range)
         clips_to_stop = []
         for clip_id, node_id in list(self.active_synths.items()):
@@ -278,8 +297,15 @@ class SequencerService:
                     logger.info(f"🎯 Triggering clip {clip.id} at position {position:.2f} (clip range: {clip_start:.2f}-{clip_end:.2f})")
                     await self._trigger_clip(clip, track, offset)
 
-    async def _trigger_clip(self, clip: Clip, track: SequencerTrack, offset: float = 0.0):
-        """Trigger a clip to start playing"""
+    async def _trigger_clip(self, clip: Clip, track: SequencerTrack, offset: float = 0.0) -> None:
+        """
+        Trigger a clip to start playing
+
+        Args:
+            clip: Clip to trigger
+            track: Track containing the clip
+            offset: Offset within the clip in beats
+        """
         if not self.engine_manager or not self.buffer_manager:
             logger.warning("⚠️ Cannot trigger clip: engine_manager or buffer_manager not available")
             return
@@ -585,7 +611,7 @@ class SequencerService:
 
         return updated_count
 
-    def check_sample_in_use(self, sample_id: str) -> tuple[bool, list[str]]:
+    def check_sample_in_use(self, sample_id: str) -> Tuple[bool, List[str]]:
         """
         Check if a sample is being used in any sequencer tracks.
 
@@ -1017,14 +1043,20 @@ class SequencerService:
 
         logger.info(f"⏩ Seek to position: {position:.2f} beats (trigger_audio={trigger_audio})")
 
-    def get_playback_state(self) -> dict:
-        """Get current playback state"""
+    def get_playback_state(self) -> PlaybackState:
+        """
+        Get current playback state
+
+        Returns:
+            Current playback state including position, tempo, and flags
+        """
         return {
             "is_playing": self.is_playing,
             "current_sequence": self.current_sequence_id,
             "playhead_position": self.playhead_position,
             "tempo": self.tempo,
-            "active_notes": 0,  # TODO: Track active notes
+            "is_paused": self.is_paused,
+            "metronome_enabled": self.metronome_enabled
         }
 
 

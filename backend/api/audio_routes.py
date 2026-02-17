@@ -5,22 +5,16 @@ Provides REST endpoints for synth creation, control, and audio input
 """
 import logging
 from typing import Optional, Dict
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+
+from backend.core.dependencies import get_synthesis_service, get_audio_analyzer
+from backend.core.exceptions import SynthNotFoundError, ServiceError
+from backend.services.synthesis_service import SynthesisService
+from backend.services.audio_analyzer import AudioAnalyzerService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-# Will be injected from main.py
-synthesis_service = None
-audio_analyzer = None
-
-
-def set_services(synth_svc, analyzer_svc):
-    """Set service instances"""
-    global synthesis_service, audio_analyzer
-    synthesis_service = synth_svc
-    audio_analyzer = analyzer_svc
 
 
 class CreateSynthRequest(BaseModel):
@@ -38,7 +32,10 @@ class SetParamRequest(BaseModel):
 
 
 @router.post("/synthesis/synths")
-async def create_synth(request: CreateSynthRequest):
+async def create_synth(
+    request: CreateSynthRequest,
+    synthesis_service: SynthesisService = Depends(get_synthesis_service)
+):
     """Create a new synth"""
     try:
         synth_info = await synthesis_service.create_synth(
@@ -50,39 +47,53 @@ async def create_synth(request: CreateSynthRequest):
         return synth_info
     except Exception as e:
         logger.error(f"❌ Failed to create synth: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise ServiceError(f"Failed to create synth: {str(e)}")
 
 
 @router.get("/synthesis/synths")
-async def get_active_synths():
+async def get_active_synths(
+    synthesis_service: SynthesisService = Depends(get_synthesis_service)
+):
     """Get all active synths"""
     return synthesis_service.get_active_synths()
 
 
 @router.get("/synthesis/synths/{synth_id}")
-async def get_synth(synth_id: int):
+async def get_synth(
+    synth_id: int,
+    synthesis_service: SynthesisService = Depends(get_synthesis_service)
+):
     """Get info for a specific synth"""
     synth_info = synthesis_service.get_synth_info(synth_id)
     if not synth_info:
-        raise HTTPException(status_code=404, detail=f"Synth {synth_id} not found")
+        raise SynthNotFoundError(synth_id)
     return synth_info
 
 
 @router.put("/synthesis/synths/{synth_id}")
-async def set_synth_param(synth_id: int, request: SetParamRequest):
+async def set_synth_param(
+    synth_id: int,
+    request: SetParamRequest,
+    synthesis_service: SynthesisService = Depends(get_synthesis_service)
+):
     """Set a synth parameter"""
     try:
         await synthesis_service.set_synth_param(synth_id, request.param, request.value)
         return {"status": "ok"}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        # ValueError is raised when synth is not found
+        raise SynthNotFoundError(synth_id)
     except Exception as e:
         logger.error(f"❌ Failed to set synth parameter: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise ServiceError(f"Failed to set synth parameter: {str(e)}")
 
 
 @router.delete("/synthesis/synths/{synth_id}")
-async def delete_synth(synth_id: int, release: bool = True):
+async def delete_synth(
+    synth_id: int,
+    release: bool = True,
+    synthesis_service: SynthesisService = Depends(get_synthesis_service)
+):
     """Delete a synth (release or free immediately)"""
     try:
         if release:
@@ -91,21 +102,24 @@ async def delete_synth(synth_id: int, release: bool = True):
             await synthesis_service.free_synth(synth_id)
         return {"status": "ok"}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        # ValueError is raised when synth is not found
+        raise SynthNotFoundError(synth_id)
     except Exception as e:
         logger.error(f"❌ Failed to delete synth: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise ServiceError(f"Failed to delete synth: {str(e)}")
 
 
 @router.delete("/synthesis/synths")
-async def delete_all_synths():
+async def delete_all_synths(
+    synthesis_service: SynthesisService = Depends(get_synthesis_service)
+):
     """Delete all active synths"""
     try:
         await synthesis_service.free_all_synths()
         return {"status": "ok"}
     except Exception as e:
         logger.error(f"❌ Failed to delete all synths: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise ServiceError(f"Failed to delete all synths: {str(e)}")
 
 
 # ============================================================================

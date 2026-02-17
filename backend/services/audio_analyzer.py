@@ -10,7 +10,9 @@ CORRECT ARCHITECTURE:
 import logging
 import asyncio
 import numpy as np
-from typing import Optional, Callable
+from typing import Optional, Callable, List, Dict, Any
+
+from backend.core.engine_manager import AudioEngineManager
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +20,7 @@ logger = logging.getLogger(__name__)
 class AudioAnalyzerService:
     """
     Analyzes audio data received from SuperCollider
-    
+
     Data flow:
     1. scsynth writes audio to buffer partitions (BufWr)
     2. scsynth signals when partition is ready (SendReply)
@@ -27,28 +29,34 @@ class AudioAnalyzerService:
     5. Python analyzes data (FFT, peak/RMS)
     6. Python sends to frontend (WebSocket)
     """
-    
-    def __init__(self, engine_manager):
+
+    def __init__(self, engine_manager: AudioEngineManager) -> None:
+        """
+        Initialize audio analyzer service
+
+        Args:
+            engine_manager: Audio engine manager for OSC communication
+        """
         self.engine_manager = engine_manager
-        self.is_monitoring = False
+        self.is_monitoring: bool = False
         self.monitor_synth_id: Optional[int] = None
         self.waveform_buffer_id: Optional[int] = None
         self.spectrum_buffer_id: Optional[int] = None
-        
+
         # Callbacks for sending data to frontend
         self.on_waveform_update: Optional[Callable] = None
         self.on_spectrum_update: Optional[Callable] = None
         self.on_meter_update: Optional[Callable] = None
-        
+
         # Register callbacks with engine manager
         engine_manager.on_waveform_data = self._handle_waveform_data
         engine_manager.on_spectrum_data = self._handle_spectrum_data
         engine_manager.on_meter_data = self._handle_meter_data
     
-    async def start_monitoring(self, waveform_buffer_id: int, spectrum_buffer_id: int):
+    async def start_monitoring(self, waveform_buffer_id: int, spectrum_buffer_id: int) -> None:
         """
         Start audio monitoring
-        
+
         Args:
             waveform_buffer_id: Buffer ID for waveform data
             spectrum_buffer_id: Buffer ID for spectrum data
@@ -90,7 +98,7 @@ class AudioAnalyzerService:
             logger.error(f"❌ Failed to start audio monitoring: {e}")
             raise
     
-    async def stop_monitoring(self):
+    async def stop_monitoring(self) -> None:
         """Stop audio monitoring"""
         if not self.is_monitoring:
             return
@@ -106,8 +114,13 @@ class AudioAnalyzerService:
         except Exception as e:
             logger.error(f"❌ Failed to stop audio monitoring: {e}")
     
-    def _handle_waveform_data(self, samples: list):
-        """Handle waveform data from sclang"""
+    def _handle_waveform_data(self, samples: List[float]) -> None:
+        """
+        Handle waveform data from sclang
+
+        Args:
+            samples: Audio sample data
+        """
         if not self.on_waveform_update or not self.on_spectrum_update:
             return
 
@@ -147,12 +160,22 @@ class AudioAnalyzerService:
         except Exception as e:
             logger.error(f"❌ Error processing waveform data: {e}")
     
-    def _handle_spectrum_data(self, samples: list):
-        """Handle spectrum data from sclang (NOT USED - we compute FFT from waveform)"""
+    def _handle_spectrum_data(self, samples: List[float]) -> None:
+        """
+        Handle spectrum data from sclang (NOT USED - we compute FFT from waveform)
+
+        Args:
+            samples: Spectrum data (unused)
+        """
         pass
-    
-    def _handle_meter_data(self, meter_data: dict):
-        """Handle meter data from sclang"""
+
+    def _handle_meter_data(self, meter_data: Dict[str, float]) -> None:
+        """
+        Handle meter data from sclang
+
+        Args:
+            meter_data: Dictionary containing peakL, peakR, rmsL, rmsR values
+        """
         if not self.on_meter_update:
             return
         

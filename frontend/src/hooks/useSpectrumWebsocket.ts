@@ -23,7 +23,7 @@ export function useSpectrumWebSocket() {
             if (isCleaningUpRef.current) return;
 
             try {
-                const ws = new WebSocket("ws://localhost:8000/ws/spectrum");
+                const ws = new WebSocket("ws://localhost:8000/audio-engine/ws/spectrum");
                 wsRef.current = ws;
 
                 ws.onopen = () => {

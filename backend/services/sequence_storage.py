@@ -37,9 +37,15 @@ class SequenceStorage:
                 ...
     """
 
-    def __init__(self, storage_dir: str = "data/sequences"):
+    def __init__(self, storage_dir: str = "data/sequences") -> None:
+        """
+        Initialize sequence storage
+
+        Args:
+            storage_dir: Directory for storing sequence files
+        """
         self.storage_dir = Path(storage_dir)
-        self.index_file = self.storage_dir / "sequences.json"
+        self.index_file: Path = self.storage_dir / "sequences.json"
 
         # Create directory structure
         self.storage_dir.mkdir(parents=True, exist_ok=True)
@@ -54,8 +60,13 @@ class SequenceStorage:
     # INDEX MANAGEMENT
     # ========================================================================
 
-    def _load_index(self) -> Dict:
-        """Load sequence index"""
+    def _load_index(self) -> Dict[str, str]:
+        """
+        Load sequence index
+
+        Returns:
+            Dictionary mapping sequence IDs to names
+        """
         try:
             with open(self.index_file, 'r') as f:
                 return json.load(f)
@@ -63,8 +74,13 @@ class SequenceStorage:
             logger.error(f"Failed to load index: {e}")
             return {}
 
-    def _save_index(self, index: Dict):
-        """Save sequence index atomically"""
+    def _save_index(self, index: Dict[str, str]) -> None:
+        """
+        Save sequence index atomically
+
+        Args:
+            index: Dictionary mapping sequence IDs to names
+        """
         try:
             # Write to temp file first
             temp_file = self.index_file.with_suffix('.tmp')

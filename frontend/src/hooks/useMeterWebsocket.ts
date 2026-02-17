@@ -39,7 +39,7 @@ export function useMeterWebSocket() {
             if (isCleaningUpRef.current) return;
 
             try {
-                const ws = new WebSocket("ws://localhost:8000/ws/meters");
+                const ws = new WebSocket("ws://localhost:8000/audio-engine/ws/meters");
                 wsRef.current = ws;
 
                 ws.onopen = () => {

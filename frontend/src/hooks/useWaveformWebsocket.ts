@@ -28,7 +28,7 @@ export function useWaveformWebSocket() {
             if (isCleaningUpRef.current) return;
 
             try {
-                const ws = new WebSocket("ws://localhost:8000/ws/waveform");
+                const ws = new WebSocket("ws://localhost:8000/audio-engine/ws/waveform");
                 wsRef.current = ws;
 
                 ws.onopen = () => {

@@ -10,21 +10,34 @@ import logging
 from typing import Dict, Optional
 from pathlib import Path
 
+from backend.core.engine_manager import AudioEngineManager
+
 logger = logging.getLogger(__name__)
 
 
 class BufferManager:
     """Manages SuperCollider audio buffers"""
-    
-    def __init__(self, engine_manager):
+
+    def __init__(self, engine_manager: AudioEngineManager) -> None:
+        """
+        Initialize buffer manager
+
+        Args:
+            engine_manager: Audio engine manager for OSC communication
+        """
         self.engine_manager = engine_manager
         self.buffers: Dict[str, int] = {}  # sample_id -> buffer_num
-        self.next_buffer_num = 100  # Start at 100 to avoid conflicts with system buffers
-        
+        self.next_buffer_num: int = 100  # Start at 100 to avoid conflicts with system buffers
+
         logger.info("✅ BufferManager initialized")
     
     def allocate_buffer_num(self) -> int:
-        """Allocate a new buffer number"""
+        """
+        Allocate a new buffer number
+
+        Returns:
+            Next available buffer number
+        """
         buffer_num = self.next_buffer_num
         self.next_buffer_num += 1
         return buffer_num
@@ -75,11 +88,24 @@ class BufferManager:
             raise
     
     def get_buffer(self, sample_id: str) -> Optional[int]:
-        """Get buffer number for a sample"""
+        """
+        Get buffer number for a sample
+
+        Args:
+            sample_id: Sample identifier
+
+        Returns:
+            Buffer number if sample is loaded, None otherwise
+        """
         return self.buffers.get(sample_id)
-    
-    async def free_buffer(self, sample_id: str):
-        """Free a buffer"""
+
+    async def free_buffer(self, sample_id: str) -> None:
+        """
+        Free a buffer
+
+        Args:
+            sample_id: Sample identifier
+        """
         if sample_id not in self.buffers:
             return
         
@@ -98,14 +124,19 @@ class BufferManager:
             logger.error(f"❌ Failed to free buffer {buffer_num}: {e}")
             raise
     
-    async def free_all_buffers(self):
+    async def free_all_buffers(self) -> None:
         """Free all buffers"""
         for sample_id in list(self.buffers.keys()):
             await self.free_buffer(sample_id)
-        
+
         logger.info("🗑️  Freed all buffers")
-    
+
     def get_all_buffers(self) -> Dict[str, int]:
-        """Get all buffer mappings"""
+        """
+        Get all buffer mappings
+
+        Returns:
+            Dictionary mapping sample IDs to buffer numbers
+        """
         return self.buffers.copy()
 

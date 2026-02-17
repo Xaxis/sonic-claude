@@ -1,5 +1,6 @@
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
+pydantic-settings==2.1.0  # Configuration management with environment variables
 websockets==12.0
 anthropic==0.18.1
 pyaudio==0.2.14
@@ -10,4 +11,9 @@ soundfile>=0.12.1
 demucs>=4.0.1
 # aubio==0.4.9  # Optional - may fail to build on some systems, using librosa instead
 python-osc==1.8.3  # OSC protocol for SuperCollider communication
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+httpx==0.26.0  # For testing FastAPI endpoints
 

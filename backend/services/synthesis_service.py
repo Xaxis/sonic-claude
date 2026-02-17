@@ -6,29 +6,38 @@ Clean, organized service layer for synth management
 import logging
 from typing import Dict, Optional
 
+from backend.core.engine_manager import AudioEngineManager
+from backend.models.types import SynthInfo
+
 logger = logging.getLogger(__name__)
 
 
 class SynthesisService:
     """
     Manages synth creation, control, and lifecycle
-    
+
     Node ID allocation:
     - 1000-2999: System synths (audioMonitor, etc.)
     - 3000+: User synths
     """
-    
-    def __init__(self, engine_manager):
+
+    def __init__(self, engine_manager: AudioEngineManager) -> None:
+        """
+        Initialize synthesis service
+
+        Args:
+            engine_manager: Audio engine manager for OSC communication
+        """
         self.engine_manager = engine_manager
-        self.active_synths: Dict[int, dict] = {}
+        self.active_synths: Dict[int, SynthInfo] = {}
     
     async def create_synth(
         self,
         synthdef: str,
-        params: Optional[Dict] = None,
+        params: Optional[Dict[str, float]] = None,
         group: int = 1,
         bus: Optional[int] = None
-    ) -> dict:
+    ) -> SynthInfo:
         """
         Create a new synth
         
@@ -87,8 +96,18 @@ class SynthesisService:
             logger.error(f"❌ Failed to create synth: {e}")
             raise
     
-    async def set_synth_param(self, synth_id: int, param: str, value: float):
-        """Set a synth parameter"""
+    async def set_synth_param(self, synth_id: int, param: str, value: float) -> None:
+        """
+        Set a synth parameter
+
+        Args:
+            synth_id: Node ID of the synth
+            param: Parameter name
+            value: Parameter value
+
+        Raises:
+            ValueError: If synth_id not found
+        """
         try:
             if synth_id not in self.active_synths:
                 raise ValueError(f"Synth {synth_id} not found")
@@ -105,8 +124,16 @@ class SynthesisService:
             logger.error(f"❌ Failed to set synth parameter: {e}")
             raise
     
-    async def release_synth(self, synth_id: int):
-        """Release a synth (trigger gate=0, synth will free itself)"""
+    async def release_synth(self, synth_id: int) -> None:
+        """
+        Release a synth (trigger gate=0, synth will free itself)
+
+        Args:
+            synth_id: Node ID of the synth to release
+
+        Raises:
+            ValueError: If synth_id not found
+        """
         try:
             if synth_id not in self.active_synths:
                 raise ValueError(f"Synth {synth_id} not found")
@@ -123,8 +150,16 @@ class SynthesisService:
             logger.error(f"❌ Failed to release synth: {e}")
             raise
     
-    async def free_synth(self, synth_id: int):
-        """Free a synth immediately (no release envelope)"""
+    async def free_synth(self, synth_id: int) -> None:
+        """
+        Free a synth immediately (no release envelope)
+
+        Args:
+            synth_id: Node ID of the synth to free
+
+        Raises:
+            ValueError: If synth_id not found
+        """
         try:
             if synth_id not in self.active_synths:
                 raise ValueError(f"Synth {synth_id} not found")
@@ -141,7 +176,7 @@ class SynthesisService:
             logger.error(f"❌ Failed to free synth: {e}")
             raise
     
-    async def free_all_synths(self):
+    async def free_all_synths(self) -> None:
         """Free all active synths"""
         try:
             synth_ids = list(self.active_synths.keys())
@@ -154,11 +189,24 @@ class SynthesisService:
             logger.error(f"❌ Failed to free all synths: {e}")
             raise
     
-    def get_active_synths(self) -> Dict[int, dict]:
-        """Get all active synths"""
+    def get_active_synths(self) -> Dict[int, SynthInfo]:
+        """
+        Get all active synths
+
+        Returns:
+            Dictionary mapping synth IDs to synth info
+        """
         return self.active_synths.copy()
-    
-    def get_synth_info(self, synth_id: int) -> Optional[dict]:
-        """Get info for a specific synth"""
+
+    def get_synth_info(self, synth_id: int) -> Optional[SynthInfo]:
+        """
+        Get info for a specific synth
+
+        Args:
+            synth_id: Node ID of the synth
+
+        Returns:
+            Synth info if found, None otherwise
+        """
         return self.active_synths.get(synth_id)
 

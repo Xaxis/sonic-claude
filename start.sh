@@ -26,8 +26,9 @@ echo "✅ All old processes killed"
 echo ""
 
 # Start scsynth (SuperCollider audio server) - SILENT
+# Use 44100 Hz to match both microphone and speakers (both are at 44.1kHz now)
 echo "🎹 Starting scsynth (port 57110)..."
-scsynth -u 57110 -a 48000 -z 64 > /dev/null 2>&1 &
+scsynth -u 57110 -a 44100 -z 64 > /dev/null 2>&1 &
 SCSYNTH_PID=$!
 echo "   PID: $SCSYNTH_PID"
 sleep 3
