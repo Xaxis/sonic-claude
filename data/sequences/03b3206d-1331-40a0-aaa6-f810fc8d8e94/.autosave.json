@@ -98,7 +98,7 @@
       "is_muted": false,
       "is_solo": false,
       "is_armed": false,
-      "volume": 1.0,
+      "volume": 0.9440608762859234,
       "pan": -0.07,
       "instrument": null,
       "midi_channel": 0,
@@ -551,5 +551,5 @@
   "piano_roll_clip_id": "dc133baf-c03c-45f4-8a7c-46e7ab2a5e57",
   "sample_editor_clip_id": null,
   "created_at": "2026-02-13T14:49:01.328412",
-  "updated_at": "2026-02-18T07:27:26.110496"
+  "updated_at": "2026-02-18T14:21:18.535287"
 }
