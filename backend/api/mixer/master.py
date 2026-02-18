@@ -25,7 +25,7 @@ async def update_master(
 ):
     """Update master channel properties"""
     try:
-        return mixer_service.update_master(request)
+        return await mixer_service.update_master(request)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

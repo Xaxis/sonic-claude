@@ -36,39 +36,47 @@ export function MixerChannelStrip({ track, showMeters, meterMode }: MixerChannel
     const peakRight = trackMeter?.peakRight ?? -60;
 
     return (
-        <div className="flex w-32 flex-shrink-0 flex-col gap-2 rounded-lg border border-border bg-card p-3 shadow-sm">
-            {/* Track Name */}
-            <div className="flex items-center justify-center border-b border-border/50 pb-2">
+        <div className="flex w-36 flex-shrink-0 flex-col gap-3 rounded-lg border border-border/70 bg-gradient-to-b from-card to-card/60 p-3 shadow-lg hover:border-border transition-all">
+            {/* Track Header */}
+            <div className="flex flex-col gap-1.5 border-b border-border/30 pb-2.5">
+                {/* Track Name */}
                 <div
-                    className="truncate text-center text-xs font-bold uppercase tracking-wider"
+                    className="truncate text-center text-xs font-bold uppercase tracking-wider drop-shadow-sm"
                     style={{ color: track.color }}
                     title={track.name}
                 >
                     {track.name}
                 </div>
-            </div>
 
-            {/* Track Type Badge */}
-            <div className="flex justify-center">
-                <span className="rounded bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {track.type}
-                </span>
+                {/* Track Type Badge */}
+                <div className="flex justify-center">
+                    <span
+                        className="rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider shadow-sm"
+                        style={{
+                            backgroundColor: `${track.color}20`,
+                            color: track.color,
+                            border: `1px solid ${track.color}40`
+                        }}
+                    >
+                        {track.type}
+                    </span>
+                </div>
             </div>
 
             {/* Meter */}
             {showMeters && (
-                <div className="flex justify-center rounded-md bg-background/60 p-2 shadow-inner">
+                <div className="flex justify-center rounded-md bg-black/30 p-2.5 shadow-inner border border-white/5">
                     <Meter
                         peak={peakLeft}
                         peakRight={peakRight}
                         stereo={true}
-                        className="h-48"
+                        className="h-56"
                     />
                 </div>
             )}
 
             {/* Pan Knob */}
-            <div className="flex justify-center">
+            <div className="flex justify-center rounded-md bg-background/40 p-2 border border-border/30">
                 <Knob
                     value={track.pan}
                     onChange={(value) => handlePanChange(track.id, value)}
@@ -79,19 +87,23 @@ export function MixerChannelStrip({ track, showMeters, meterMode }: MixerChannel
                 />
             </div>
 
-            {/* Fader */}
-            <div className="flex flex-1 justify-center py-2">
-                <Fader
-                    value={faderValue}
-                    onChange={(db) => handleFaderChange(track.id, dbToVolume(db))}
-                    min={-60}
-                    max={12}
-                />
-            </div>
+            {/* Fader Section */}
+            <div className="flex flex-1 flex-col gap-2 rounded-md bg-background/40 p-2 border border-border/30">
+                {/* Volume Display */}
+                <div className="text-center text-[11px] font-mono font-bold text-cyan-400 tracking-tight">
+                    {formatDb(faderValue)}
+                </div>
 
-            {/* Volume Display */}
-            <div className="text-center text-xs font-mono font-semibold text-cyan-400">
-                {formatDb(faderValue)} dB
+                {/* Fader */}
+                <div className="flex flex-1 justify-center">
+                    <Fader
+                        value={faderValue}
+                        onChange={(db) => handleFaderChange(track.id, dbToVolume(db))}
+                        min={-60}
+                        max={12}
+                        className="flex-1"
+                    />
+                </div>
             </div>
 
             {/* Mute/Solo Buttons */}

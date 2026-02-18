@@ -52,7 +52,7 @@ class AudioAnalyzerService:
         engine_manager.on_waveform_data = self._handle_waveform_data
         engine_manager.on_spectrum_data = self._handle_spectrum_data
         engine_manager.on_meter_data = self._handle_meter_data
-    
+
     async def start_monitoring(self, waveform_buffer_id: int, spectrum_buffer_id: int) -> None:
         """
         Start audio monitoring
@@ -64,19 +64,19 @@ class AudioAnalyzerService:
         if self.is_monitoring:
             logger.warning("⚠️  Audio monitoring already started")
             return
-        
+
         try:
             logger.info("🎤 Starting audio monitoring...")
-            
+
             self.waveform_buffer_id = waveform_buffer_id
             self.spectrum_buffer_id = spectrum_buffer_id
-            
+
             # Create audioMonitor synth
             # Node ID: 1000 (reserved for system)
             # Target: 0 (root group)
             # Add action: 1 (addToTail - monitor after all other synths)
             self.monitor_synth_id = 1000
-            
+
             self.engine_manager.send_message(
                 "/s_new",
                 "audioMonitor",  # SynthDef name
@@ -88,32 +88,62 @@ class AudioAnalyzerService:
                 "spectrumBuf", spectrum_buffer_id,
                 "sendRate", 60  # 60 Hz update rate
             )
-            
+
             self.is_monitoring = True
             logger.info(f"✅ Audio monitoring started (synth ID: {self.monitor_synth_id})")
             logger.info(f"   Waveform buffer: {waveform_buffer_id}")
             logger.info(f"   Spectrum buffer: {spectrum_buffer_id}")
-            
+
         except Exception as e:
             logger.error(f"❌ Failed to start audio monitoring: {e}")
             raise
-    
+
+    async def update_master_volume(self, volume_db: float, mute: bool = False) -> None:
+        """
+        Update master volume and mute on the audioMonitor synth
+
+        Args:
+            volume_db: Master volume in dB (-60 to +12)
+            mute: Mute state
+        """
+        if not self.is_monitoring or self.monitor_synth_id is None:
+            logger.warning("⚠️ Cannot update master volume - monitoring not started")
+            return
+
+        try:
+            # Convert dB to linear amplitude
+            volume_linear = 10 ** (volume_db / 20)
+
+            # Send parameter updates to audioMonitor synth
+            self.engine_manager.send_message(
+                "/n_set",
+                self.monitor_synth_id,
+                "volume", volume_linear,
+                "mute", 1 if mute else 0
+            )
+
+            logger.debug(f"🔊 Updated master volume: {volume_db:.1f}dB (linear: {volume_linear:.3f}), mute: {mute}")
+
+        except Exception as e:
+            logger.error(f"❌ Failed to update master volume: {e}")
+
+
     async def stop_monitoring(self) -> None:
         """Stop audio monitoring"""
         if not self.is_monitoring:
             return
-        
+
         try:
             if self.monitor_synth_id:
                 self.engine_manager.send_message("/n_free", self.monitor_synth_id)
-            
+
             self.is_monitoring = False
             self.monitor_synth_id = None
             logger.info("🛑 Audio monitoring stopped")
-            
+
         except Exception as e:
             logger.error(f"❌ Failed to stop audio monitoring: {e}")
-    
+
     def _handle_waveform_data(self, samples: List[float]) -> None:
         """
         Handle waveform data from sclang
@@ -159,7 +189,7 @@ class AudioAnalyzerService:
 
         except Exception as e:
             logger.error(f"❌ Error processing waveform data: {e}")
-    
+
     def _handle_spectrum_data(self, samples: List[float]) -> None:
         """
         Handle spectrum data from sclang (NOT USED - we compute FFT from waveform)
@@ -178,14 +208,23 @@ class AudioAnalyzerService:
         """
         if not self.on_meter_update:
             return
-        
+
         try:
-            # Convert to dB
+            # Convert to dB (clamp minimum to -96 dB to match frontend expectations)
             peak_l_db = 20 * np.log10(max(meter_data["peakL"], 1e-10))
             peak_r_db = 20 * np.log10(max(meter_data["peakR"], 1e-10))
             rms_l_db = 20 * np.log10(max(meter_data["rmsL"], 1e-10))
             rms_r_db = 20 * np.log10(max(meter_data["rmsR"], 1e-10))
-            
+
+            # Clamp to -96 dB minimum (frontend expects -96 to 0 dB range)
+            peak_l_db = max(peak_l_db, -96.0)
+            peak_r_db = max(peak_r_db, -96.0)
+            rms_l_db = max(rms_l_db, -96.0)
+            rms_r_db = max(rms_r_db, -96.0)
+
+            # DEBUG: Log meter values to diagnose "red line" issue
+            logger.debug(f"🎚️ Master meters - Peak L: {peak_l_db:.1f} dB, Peak R: {peak_r_db:.1f} dB, RMS L: {rms_l_db:.1f} dB, RMS R: {rms_r_db:.1f} dB")
+
             # Send to frontend (async)
             # Frontend expects: {type: "meters", track_id: "master", peak_left, peak_right, rms_left, rms_right}
             asyncio.create_task(self.on_meter_update({
@@ -196,7 +235,7 @@ class AudioAnalyzerService:
                 "rms_left": rms_l_db,
                 "rms_right": rms_r_db
             }))
-            
+
         except Exception as e:
             logger.error(f"❌ Error processing meter data: {e}")
 

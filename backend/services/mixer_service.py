@@ -23,22 +23,23 @@ logger = logging.getLogger(__name__)
 
 class MixerService:
     """Service for managing mixer state and SuperCollider integration"""
-    
-    def __init__(self, engine_manager: AudioEngineManager, websocket_manager: WebSocketManager):
+
+    def __init__(self, engine_manager: AudioEngineManager, websocket_manager: WebSocketManager, audio_analyzer=None):
         self.engine_manager = engine_manager
         self.websocket_manager = websocket_manager
-        
+        self.audio_analyzer = audio_analyzer  # Optional, set later in dependencies.py
+
         # Mixer state
         self.state = MixerState()
-        
+
         # Storage
         self.storage_dir = Path("data/mixer")
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.state_file = self.storage_dir / "mixer_state.json"
-        
+
         # Load saved state
         self._load_state()
-        
+
         logger.info("✅ MixerService initialized")
     
     # ========================================================================
@@ -160,7 +161,7 @@ class MixerService:
         """Get master channel"""
         return self.state.master
 
-    def update_master(self, request: UpdateMasterRequest) -> MasterChannel:
+    async def update_master(self, request: UpdateMasterRequest) -> MasterChannel:
         """Update master channel properties"""
         master = self.state.master
 
@@ -174,6 +175,10 @@ class MixerService:
             master.limiter_threshold = max(-12.0, min(0.0, request.limiter_threshold))
 
         self._save_state()
+
+        # Update SuperCollider audioMonitor synth with new volume/mute
+        if self.audio_analyzer and (request.fader is not None or request.mute is not None):
+            await self.audio_analyzer.update_master_volume(master.fader, master.mute)
 
         logger.debug("🔄 Updated master channel")
         return master

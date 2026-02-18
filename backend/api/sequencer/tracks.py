@@ -104,7 +104,7 @@ async def update_track_mute(
     sequencer_service: SequencerService = Depends(get_sequencer_service)
 ):
     """Toggle track mute"""
-    track = sequencer_service.update_track_mute(track_id, request.is_muted)
+    track = await sequencer_service.update_track_mute(track_id, request.is_muted)
     if not track:
         raise TrackNotFoundError(track_id)
     return track
@@ -117,7 +117,7 @@ async def update_track_solo(
     sequencer_service: SequencerService = Depends(get_sequencer_service)
 ):
     """Toggle track solo"""
-    track = sequencer_service.update_track_solo(track_id, request.is_solo)
+    track = await sequencer_service.update_track_solo(track_id, request.is_solo)
     if not track:
         raise TrackNotFoundError(track_id)
     return track
@@ -147,7 +147,7 @@ async def update_track(
 
     # Update volume and/or pan using the service method (which also updates active synths)
     if request.volume is not None or request.pan is not None:
-        track = sequencer_service.update_track(
+        track = await sequencer_service.update_track(
             track_id,
             volume=request.volume,
             pan=request.pan

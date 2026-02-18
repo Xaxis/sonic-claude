@@ -33,6 +33,9 @@ from backend.services.sequencer_service import SequencerService
 from backend.services.websocket_manager import WebSocketManager
 from backend.services.buffer_manager import BufferManager
 from backend.services.mixer_service import MixerService
+from backend.services.track_meter_service import TrackMeterService
+from backend.services.audio_bus_manager import AudioBusManager
+from backend.services.mixer_channel_service import MixerChannelService
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +52,9 @@ _sequencer_service: Optional[SequencerService] = None
 _ws_manager: Optional[WebSocketManager] = None
 _buffer_manager: Optional[BufferManager] = None
 _mixer_service: Optional[MixerService] = None
+_track_meter_service: Optional[TrackMeterService] = None
+_audio_bus_manager: Optional[AudioBusManager] = None
+_mixer_channel_service: Optional[MixerChannelService] = None
 
 
 # ============================================================================
@@ -68,6 +74,7 @@ async def initialize_services(settings: Settings) -> None:
     """
     global _engine_manager, _audio_analyzer, _audio_input_service
     global _synthesis_service, _sequencer_service, _ws_manager, _buffer_manager, _mixer_service
+    global _track_meter_service, _audio_bus_manager, _mixer_channel_service
 
     logger.info("🚀 Initializing services...")
 
@@ -80,16 +87,22 @@ async def initialize_services(settings: Settings) -> None:
     _engine_manager = AudioEngineManager()
     await _engine_manager.connect()
 
-    # Step 3: Initialize services (depend on engine_manager)
+    # Step 3: Initialize per-track metering services
+    logger.info("🎚️ Initializing per-track metering...")
+    _audio_bus_manager = AudioBusManager()
+    _mixer_channel_service = MixerChannelService(_engine_manager, _audio_bus_manager)
+    _track_meter_service = TrackMeterService(_engine_manager, _mixer_channel_service)
+
+    # Step 4: Initialize audio services (depend on engine_manager and metering services)
     logger.info("🎵 Initializing audio services...")
     _audio_analyzer = AudioAnalyzerService(_engine_manager)
     _audio_input_service = AudioInputService(_engine_manager)
     _synthesis_service = SynthesisService(_engine_manager)
-    _sequencer_service = SequencerService(_engine_manager, _ws_manager)
+    _sequencer_service = SequencerService(_engine_manager, _ws_manager, _audio_bus_manager, _mixer_channel_service)
     _buffer_manager = BufferManager(_engine_manager)
-    _mixer_service = MixerService(_engine_manager, _ws_manager)
+    _mixer_service = MixerService(_engine_manager, _ws_manager, _audio_analyzer)
 
-    # Step 4: Wire up callbacks (Audio Analyzer → WebSocket Manager)
+    # Step 5: Wire up callbacks (Audio Analyzer → WebSocket Manager)
     logger.info("🔌 Wiring up audio pipeline...")
     _audio_analyzer.on_waveform_update = _ws_manager.broadcast_waveform
     _audio_analyzer.on_spectrum_update = _ws_manager.broadcast_spectrum
@@ -99,6 +112,9 @@ async def initialize_services(settings: Settings) -> None:
     _audio_input_service.on_waveform_update = _ws_manager.broadcast_waveform
     _audio_input_service.on_spectrum_update = _ws_manager.broadcast_spectrum
     _audio_input_service.on_meter_update = _ws_manager.broadcast_meters
+
+    # Wire up per-track meter pipeline
+    _track_meter_service.on_meter_update = _ws_manager.broadcast_meters
 
     logger.info("✅ Services initialized successfully")
 
@@ -112,6 +128,7 @@ async def shutdown_services() -> None:
     """
     global _engine_manager, _audio_analyzer, _audio_input_service
     global _synthesis_service, _sequencer_service, _ws_manager, _buffer_manager, _mixer_service
+    global _track_meter_service, _audio_bus_manager, _mixer_channel_service
 
     logger.info("🛑 Shutting down services...")
 
@@ -197,4 +214,25 @@ def get_mixer_service() -> MixerService:
     if _mixer_service is None:
         raise RuntimeError("MixerService not initialized")
     return _mixer_service
+
+
+def get_track_meter_service() -> TrackMeterService:
+    """Get TrackMeterService instance"""
+    if _track_meter_service is None:
+        raise RuntimeError("TrackMeterService not initialized")
+    return _track_meter_service
+
+
+def get_audio_bus_manager() -> AudioBusManager:
+    """Get AudioBusManager instance"""
+    if _audio_bus_manager is None:
+        raise RuntimeError("AudioBusManager not initialized")
+    return _audio_bus_manager
+
+
+def get_mixer_channel_service() -> MixerChannelService:
+    """Get MixerChannelService instance"""
+    if _mixer_channel_service is None:
+        raise RuntimeError("MixerChannelService not initialized")
+    return _mixer_channel_service
 

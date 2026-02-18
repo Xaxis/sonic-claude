@@ -23,6 +23,8 @@ from backend.services.sequence_storage import SequenceStorage
 from backend.services.buffer_manager import BufferManager
 from backend.core.engine_manager import AudioEngineManager
 from backend.services.websocket_manager import WebSocketManager
+from backend.services.audio_bus_manager import AudioBusManager
+from backend.services.mixer_channel_service import MixerChannelService
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,9 @@ class SequencerService:
     def __init__(
         self,
         engine_manager: Optional[AudioEngineManager] = None,
-        websocket_manager: Optional[WebSocketManager] = None
+        websocket_manager: Optional[WebSocketManager] = None,
+        audio_bus_manager: Optional[AudioBusManager] = None,
+        mixer_channel_service: Optional[MixerChannelService] = None
     ) -> None:
         """
         Initialize sequencer service
@@ -50,9 +54,13 @@ class SequencerService:
         Args:
             engine_manager: Audio engine manager for OSC communication
             websocket_manager: WebSocket manager for real-time updates
+            audio_bus_manager: Audio bus manager for track routing
+            mixer_channel_service: Mixer channel service for per-track metering
         """
         self.engine_manager = engine_manager
         self.websocket_manager = websocket_manager
+        self.audio_bus_manager = audio_bus_manager
+        self.mixer_channel_service = mixer_channel_service
 
         # Persistent storage
         self.storage = SequenceStorage()
@@ -355,6 +363,22 @@ class SequencerService:
                 # Allocate node ID for the synth
                 node_id = self.engine_manager.allocate_node_id()
 
+                # Get or allocate audio bus for this track
+                track_bus = 0  # Default to master bus
+                if self.audio_bus_manager and self.mixer_channel_service:
+                    track_bus = self.audio_bus_manager.get_track_bus(track.id)
+                    if track_bus is None:
+                        # Allocate bus and create mixer channel for this track
+                        track_bus = self.audio_bus_manager.allocate_track_bus(track.id)
+                        await self.mixer_channel_service.create_mixer_channel(
+                            track_id=track.id,
+                            volume=track.volume,
+                            pan=track.pan,
+                            mute=track.is_muted,
+                            solo=track.is_solo
+                        )
+                        logger.info(f"🎚️ Created mixer channel for track {track.id} on bus {track_bus}")
+
                 # Calculate playback parameters
                 # Add audio_offset to the start position (trim the sample)
                 start_pos = (offset + (clip.audio_offset or 0.0)) / clip.duration if clip.duration > 0 else 0.0
@@ -369,11 +393,12 @@ class SequencerService:
                     1,  # target (1 = default group)
                     "bufnum", buffer_num,
                     "rate", 1.0,
-                    "amp", 0.8 * clip.gain * track.volume,  # Apply clip gain and track volume
-                    "pan", track.pan,  # Apply track pan
+                    "amp", 0.8 * clip.gain,  # Apply clip gain only (track volume handled by mixer)
+                    "pan", 0.0,  # Pan handled by mixer channel
                     "startPos", start_pos,
                     "loop", loop_enabled,
-                    "gate", 1
+                    "gate", 1,
+                    "out", track_bus  # Route to track bus
                 )
 
                 # Track active synth
@@ -417,6 +442,22 @@ class SequencerService:
                 # Allocate node ID for the synth
                 node_id = self.engine_manager.allocate_node_id()
 
+                # Get or allocate audio bus for this track
+                track_bus = 0  # Default to master bus
+                if self.audio_bus_manager and self.mixer_channel_service:
+                    track_bus = self.audio_bus_manager.get_track_bus(track.id)
+                    if track_bus is None:
+                        # Allocate bus and create mixer channel for this track
+                        track_bus = self.audio_bus_manager.allocate_track_bus(track.id)
+                        await self.mixer_channel_service.create_mixer_channel(
+                            track_id=track.id,
+                            volume=track.volume,
+                            pan=track.pan,
+                            mute=track.is_muted,
+                            solo=track.is_solo
+                        )
+                        logger.info(f"🎚️ Created mixer channel for track {track.id} on bus {track_bus}")
+
                 # Calculate playback parameters
                 start_pos = (offset + (clip.audio_offset or 0.0)) / clip.duration if clip.duration > 0 else 0.0
                 loop_enabled = 1 if clip.is_looped else 0
@@ -430,11 +471,12 @@ class SequencerService:
                     1,  # target (1 = default group)
                     "bufnum", buffer_num,
                     "rate", 1.0,
-                    "amp", 0.8 * clip.gain * track.volume,  # Apply clip gain and track volume
-                    "pan", track.pan,  # Apply track pan
+                    "amp", 0.8 * clip.gain,  # Apply clip gain only (track volume handled by mixer)
+                    "pan", 0.0,  # Pan handled by mixer channel
                     "startPos", start_pos,
                     "loop", loop_enabled,
-                    "gate", 1
+                    "gate", 1,
+                    "out", track_bus  # Route to track bus
                 )
 
                 # Track active synth
@@ -456,6 +498,22 @@ class SequencerService:
                 synthdef = track.instrument or "sine"
                 logger.info(f"   Instrument: {synthdef}")
 
+                # Get or allocate audio bus for this track
+                track_bus = 0  # Default to master bus
+                if self.audio_bus_manager and self.mixer_channel_service:
+                    track_bus = self.audio_bus_manager.get_track_bus(track.id)
+                    if track_bus is None:
+                        # Allocate bus and create mixer channel for this track
+                        track_bus = self.audio_bus_manager.allocate_track_bus(track.id)
+                        await self.mixer_channel_service.create_mixer_channel(
+                            track_id=track.id,
+                            volume=track.volume,
+                            pan=track.pan,
+                            mute=track.is_muted,
+                            solo=track.is_solo
+                        )
+                        logger.info(f"🎚️ Created mixer channel for track {track.id} on bus {track_bus}")
+
                 # Trigger each MIDI note with scheduled start time
                 triggered_count = 0
                 for note in clip.midi_events:
@@ -474,14 +532,14 @@ class SequencerService:
                         # Convert MIDI note to frequency
                         freq = 440.0 * (2.0 ** ((note.note - 69) / 12.0))
 
-                        # Calculate amplitude (apply velocity, clip gain, track volume)
-                        amp = note.velocity / 127.0 * 0.8 * clip.gain * track.volume
+                        # Calculate amplitude (apply velocity and clip gain only - track volume handled by mixer)
+                        amp = note.velocity / 127.0 * 0.8 * clip.gain
 
                         triggered_count += 1
-                        logger.info(f"      ✅ SCHEDULED! node={node_id}, freq={freq:.2f}Hz, amp={amp:.2f}, delay={delay_seconds:.2f}s")
+                        logger.info(f"      ✅ SCHEDULED! node={node_id}, freq={freq:.2f}Hz, amp={amp:.2f}, delay={delay_seconds:.2f}s, bus={track_bus}")
 
                         # Schedule note start and release
-                        async def play_note(nid, freq_val, amp_val, synth, delay, dur_beats, note_pitch, clip_id_val):
+                        async def play_note(nid, freq_val, amp_val, synth, delay, dur_beats, note_pitch, clip_id_val, out_bus):
                             await asyncio.sleep(delay)
                             if self.engine_manager:
                                 # Start the note
@@ -493,7 +551,8 @@ class SequencerService:
                                     1,  # target
                                     "freq", freq_val,
                                     "amp", amp_val,
-                                    "gate", 1
+                                    "gate", 1,
+                                    "out", out_bus  # Route to track bus
                                 )
                                 # Track active note for visual feedback
                                 self.active_midi_notes[nid] = {
@@ -510,7 +569,7 @@ class SequencerService:
                                     del self.active_midi_notes[nid]
                                 logger.debug(f"🔇 Released MIDI note {nid}")
 
-                        asyncio.create_task(play_note(node_id, freq, amp, synthdef, delay_seconds, note.duration, note.note, clip.id))
+                        asyncio.create_task(play_note(node_id, freq, amp, synthdef, delay_seconds, note.duration, note.note, clip.id, track_bus))
                     else:
                         logger.info(f"      ❌ SKIPPED (note already passed: offset={offset:.2f}, note_start={note.start_time:.2f})")
 
@@ -821,7 +880,7 @@ class SequencerService:
         """Get track by ID"""
         return self.tracks.get(track_id)
 
-    def update_track_mute(self, track_id: str, is_muted: bool) -> Optional[SequencerTrack]:
+    async def update_track_mute(self, track_id: str, is_muted: bool) -> Optional[SequencerTrack]:
         """Toggle track mute"""
         track = self.tracks.get(track_id)
         if track:
@@ -831,10 +890,18 @@ class SequencerService:
                 if any(t.id == track_id for t in sequence.tracks):
                     self.storage.autosave_sequence(sequence)
                     break
+
+            # Update mixer channel synth
+            if self.mixer_channel_service:
+                await self.mixer_channel_service.update_mixer_channel(
+                    track_id=track_id,
+                    mute=is_muted
+                )
+
             logger.info(f"✅ Track {track_id} mute: {is_muted}")
         return track
 
-    def update_track_solo(self, track_id: str, is_solo: bool) -> Optional[SequencerTrack]:
+    async def update_track_solo(self, track_id: str, is_solo: bool) -> Optional[SequencerTrack]:
         """Toggle track solo"""
         track = self.tracks.get(track_id)
         if track:
@@ -844,10 +911,18 @@ class SequencerService:
                 if any(t.id == track_id for t in sequence.tracks):
                     self.storage.autosave_sequence(sequence)
                     break
+
+            # Update mixer channel synth
+            if self.mixer_channel_service:
+                await self.mixer_channel_service.update_mixer_channel(
+                    track_id=track_id,
+                    solo=is_solo
+                )
+
             logger.info(f"✅ Track {track_id} solo: {is_solo}")
         return track
 
-    def update_track(self, track_id: str, volume: Optional[float] = None, pan: Optional[float] = None) -> Optional[SequencerTrack]:
+    async def update_track(self, track_id: str, volume: Optional[float] = None, pan: Optional[float] = None) -> Optional[SequencerTrack]:
         """
         Update track volume and/or pan, and apply changes to currently playing synths.
 
@@ -874,6 +949,14 @@ class SequencerService:
             if any(t.id == track_id for t in sequence.tracks):
                 self.storage.autosave_sequence(sequence)
                 break
+
+        # Update mixer channel synth (if it exists)
+        if self.mixer_channel_service and (volume is not None or pan is not None):
+            await self.mixer_channel_service.update_mixer_channel(
+                track_id=track_id,
+                volume=volume,
+                pan=pan
+            )
 
         # Update all currently playing synths for this track
         if self.engine_manager and (volume is not None or pan is not None):

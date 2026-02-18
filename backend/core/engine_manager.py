@@ -41,6 +41,9 @@ class AudioEngineManager:
         self.on_input_waveform_data = None
         self.on_input_spectrum_data = None
         self.on_input_meter_data = None
+
+        # Callback for per-track meter data
+        self.on_track_meter_data = None
     
     async def connect(self):
         """Connect to SuperCollider scsynth"""
@@ -60,6 +63,8 @@ class AudioEngineManager:
             disp.map("/input_waveform", self._handle_input_waveform)
             disp.map("/input_spectrum", self._handle_input_spectrum)
             disp.map("/input_meter", self._handle_input_meter)
+            # Per-track metering
+            disp.map("/track_meter", self._handle_track_meter)
             
             self.osc_server = osc_server.AsyncIOOSCUDPServer(
                 ("127.0.0.1", 57121),
@@ -156,4 +161,19 @@ class AudioEngineManager:
                     "rmsR": args[3]
                 }
                 self.on_input_meter_data(meter_data)
+
+    def _handle_track_meter(self, address, *args):
+        """Handle per-track meter data from sclang"""
+        if self.on_track_meter_data:
+            # Format from sclang: [trackId, peakL, peakR, rmsL, rmsR]
+            if len(args) >= 5:
+                track_id = str(int(args[0]))  # Convert to string for consistency
+                meter_data = {
+                    "track_id": track_id,
+                    "peak_left": float(args[1]),
+                    "peak_right": float(args[2]),
+                    "rms_left": float(args[3]),
+                    "rms_right": float(args[4])
+                }
+                self.on_track_meter_data(meter_data)
 

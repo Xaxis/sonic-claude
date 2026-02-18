@@ -92,10 +92,10 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
                         Tracks
                     </span>
                 </div>
-                {/* Track list - Controlled scroll (no scrollbar) */}
+                {/* Track list - Controlled scroll (scrollbar hidden, synced with timeline) */}
                 <div
                     data-track-list
-                    className="flex-1 overflow-hidden"
+                    className="flex-1 overflow-y-auto scrollbar-hide"
                 >
                     <SequencerTracks
                         tracks={tracks}

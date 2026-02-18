@@ -149,17 +149,18 @@ class WebSocketManager:
         """
         if not self.waveform_clients:
             return
-        
+
         message = json.dumps(data)
         disconnected = set()
-        
-        for client in self.waveform_clients:
+
+        # Create a copy of the set to avoid "Set changed size during iteration" error
+        for client in list(self.waveform_clients):
             try:
                 await client.send_text(message)
             except Exception as e:
                 logger.error(f"❌ Error sending to waveform client: {e}")
                 disconnected.add(client)
-        
+
         for client in disconnected:
             self.disconnect_waveform(client)
     
@@ -172,17 +173,18 @@ class WebSocketManager:
         """
         if not self.meter_clients:
             return
-        
+
         message = json.dumps(data)
         disconnected = set()
-        
-        for client in self.meter_clients:
+
+        # Create a copy of the set to avoid "Set changed size during iteration" error
+        for client in list(self.meter_clients):
             try:
                 await client.send_text(message)
             except Exception as e:
                 logger.error(f"❌ Error sending to meters client: {e}")
                 disconnected.add(client)
-        
+
         for client in disconnected:
             self.disconnect_meters(client)
     
@@ -202,7 +204,8 @@ class WebSocketManager:
 
         logger.debug(f"📡 Broadcasting transport to {len(self.transport_clients)} clients: position={data.get('position_beats', 0):.2f}")
 
-        for client in self.transport_clients:
+        # Create a copy of the set to avoid "Set changed size during iteration" error
+        for client in list(self.transport_clients):
             try:
                 await client.send_text(message)
             except Exception as e:

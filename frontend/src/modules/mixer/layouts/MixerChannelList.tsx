@@ -14,15 +14,15 @@ export function MixerChannelList() {
     const { showMeters, meterMode } = state;
 
     return (
-        <div className="flex h-full gap-3 overflow-x-auto overflow-y-hidden bg-background p-4">
+        <div className="flex h-full gap-4 overflow-x-auto overflow-y-hidden bg-gradient-to-b from-background/50 to-background p-5">
             {/* Empty State Message (when no tracks) */}
             {tracks.length === 0 && (
                 <div className="flex flex-1 items-center justify-center">
-                    <div className="text-center space-y-2 max-w-xs">
-                        <div className="text-4xl opacity-20">🎚️</div>
-                        <p className="text-sm font-semibold text-foreground">No Tracks Yet</p>
-                        <p className="text-xs text-muted-foreground">
-                            Add tracks in the sequencer to see them as mixer channels
+                    <div className="text-center space-y-3 max-w-sm">
+                        <div className="text-6xl opacity-20">🎚️</div>
+                        <p className="text-base font-bold text-foreground">No Mixer Channels</p>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                            Add tracks in the sequencer to see them as mixer channels with faders, pan controls, and meters
                         </p>
                     </div>
                 </div>
@@ -39,7 +39,11 @@ export function MixerChannelList() {
             ))}
 
             {/* Separator before master (only if there are tracks) */}
-            {tracks.length > 0 && <div className="w-px bg-border/50" />}
+            {tracks.length > 0 && (
+                <div className="flex items-center">
+                    <div className="w-0.5 h-full bg-gradient-to-b from-transparent via-primary/40 to-transparent" />
+                </div>
+            )}
 
             {/* Master Section - ALWAYS VISIBLE */}
             <MixerMasterSection
