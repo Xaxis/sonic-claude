@@ -1,9 +1,10 @@
 /**
  * SequencerSampleEditorSection Component
- * 
+ *
  * Shared layout component for sample editor left panel + grid.
  * Matches the architecture of SequencerPianoRollSection.
- * 
+ * Uses SequencerContext for state management.
+ *
  * Architecture:
  * - Left panel: Fixed width (w-64), absolutely positioned, empty placeholder
  * - Right grid: Flexible width, single scrollbar controls both
@@ -15,6 +16,7 @@ import React from "react";
 import { SampleEditorRuler } from "../components/SampleEditor/SampleEditorRuler.tsx";
 import { WaveformDisplay } from "../components/Shared/WaveformDisplay.tsx";
 import { SequencerTimelineLoopRegion } from "../components/Timeline/SequencerTimelineLoopRegion.tsx";
+import { useSequencerContext } from "../contexts/SequencerContext.tsx";
 
 interface SequencerSampleEditorSectionProps {
     // Waveform data
@@ -25,23 +27,20 @@ interface SequencerSampleEditorSectionProps {
     clipDuration: number; // beats
     clipStartTime: number; // beats - position in sequence
     totalBeats: number;
-    
-    // Playback
+
+    // Playback (from WebSocket/AudioEngine, not from Context)
     currentPosition: number;
     isPlaying: boolean;
-    
-    // Display settings
-    zoom: number;
     pixelsPerBeat: number;
-    snapEnabled: boolean;
-    gridSize: number;
-    
+
     // Scroll
     sampleEditorScrollRef: React.RefObject<HTMLDivElement | null>;
     onSampleEditorScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-    
+
     // Handlers
     onSeek?: (position: number, triggerAudio?: boolean) => void;
+    onLoopStartChange: (start: number) => void;
+    onLoopEndChange: (end: number) => void;
 }
 
 export function SequencerSampleEditorSection({
@@ -52,14 +51,17 @@ export function SequencerSampleEditorSection({
     totalBeats,
     currentPosition,
     isPlaying,
-    zoom,
     pixelsPerBeat,
-    snapEnabled,
-    gridSize,
     sampleEditorScrollRef,
     onSampleEditorScroll,
     onSeek,
+    onLoopStartChange,
+    onLoopEndChange,
 }: SequencerSampleEditorSectionProps) {
+    // Get state from context
+    const { state } = useSequencerContext();
+    const { zoom, snapEnabled, gridSize, isLooping, loopStart, loopEnd } = state;
+
     const beatWidth = pixelsPerBeat * zoom;
     // Add extra width to ensure content extends beyond viewport for smooth scrolling
     const waveformWidth = totalBeats * beatWidth + 1000;
@@ -93,6 +95,8 @@ export function SequencerSampleEditorSection({
                             zoom={zoom}
                             pixelsPerBeat={pixelsPerBeat}
                             totalWidth={waveformWidth}
+                            snapEnabled={snapEnabled}
+                            gridSize={gridSize}
                             onSeek={onSeek}
                         />
                     </div>
@@ -155,6 +159,13 @@ export function SequencerSampleEditorSection({
                                     glowEffect={false}
                                 />
                             </div>
+
+                            {/* Loop Region - Overlaid on waveform */}
+                            <SequencerTimelineLoopRegion
+                                pixelsPerBeat={pixelsPerBeat}
+                                onLoopStartChange={onLoopStartChange}
+                                onLoopEndChange={onLoopEndChange}
+                            />
                         </div>
                 </div>
             </div>

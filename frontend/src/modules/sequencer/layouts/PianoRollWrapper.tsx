@@ -24,18 +24,12 @@ interface PianoRollWrapperProps {
     clipDragState?: { startTime: number; duration: number } | null;
 
     // State (shared with timeline - Ableton pattern)
-    zoom: number; // Timeline zoom (shared)
-    snapEnabled: boolean;
-    gridSize: number;
     totalBeats: number;
     activeNotes?: ActiveNote[];
 
     // Playback state
     currentPosition: number;
     isPlaying: boolean;
-    isLooping: boolean;
-    loopStart: number;
-    loopEnd: number;
 
     // Scroll refs
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
@@ -45,8 +39,6 @@ interface PianoRollWrapperProps {
     // Handlers
     onClose: () => void;
     onUpdateNotes: (clipId: string, notes: MIDIEvent[]) => Promise<void>;
-    onToggleSnap: () => void;
-    onSetGridSize: (size: number) => void;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
     onLoopStartChange: (start: number) => void;
     onLoopEndChange: (end: number) => void;
@@ -57,22 +49,14 @@ export function PianoRollWrapper(props: PianoRollWrapperProps) {
         clip,
         track,
         clipDragState,
-        zoom,
-        snapEnabled,
-        gridSize,
         totalBeats,
         currentPosition,
         isPlaying,
-        isLooping,
-        loopStart,
-        loopEnd,
         timelineScrollRef,
         pianoRollScrollRef,
         onPianoRollScroll,
         onClose,
         onUpdateNotes,
-        onToggleSnap,
-        onSetGridSize,
         onSeek,
         onLoopStartChange,
         onLoopEndChange,
@@ -124,23 +108,15 @@ export function PianoRollWrapper(props: PianoRollWrapperProps) {
             clipDuration={effectiveDuration}
             clipStartTime={effectiveStartTime}
             midiEvents={clip.midi_events || []}
-            snapEnabled={snapEnabled}
-            gridSize={gridSize}
-            zoom={zoom}
             totalBeats={totalBeats}
             instrument={track?.instrument}
             activeNotes={props.activeNotes}
             currentPosition={currentPosition}
             isPlaying={isPlaying}
-            isLooping={isLooping}
-            loopStart={loopStart}
-            loopEnd={loopEnd}
             pianoRollScrollRef={pianoRollScrollRef}
             onPianoRollScroll={onPianoRollScroll}
             onClose={onClose}
             onUpdateNotes={onUpdateNotes}
-            onToggleSnap={onToggleSnap}
-            onSetGridSize={onSetGridSize}
             onSeek={onSeek}
             onLoopStartChange={onLoopStartChange}
             onLoopEndChange={onLoopEndChange}

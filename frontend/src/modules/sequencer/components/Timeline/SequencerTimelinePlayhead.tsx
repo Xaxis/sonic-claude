@@ -6,37 +6,26 @@
  * - requestAnimationFrame for smooth 60fps interpolation
  * - Dead reckoning between WebSocket updates
  * - Instant snap on loop reset
+ * Uses SequencerContext for state management.
  */
 
 import { useEffect, useRef, useState } from "react";
+import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
 
 interface SequencerTimelinePlayheadProps {
-    currentPosition: number;
     pixelsPerBeat: number;
-    zoom: number;
-    snapEnabled: boolean;
-    gridSize: number;
-    isPlaying?: boolean;
-    tempo?: number;
-    loopEnabled?: boolean;
-    loopStart?: number;
-    loopEnd?: number;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
 }
 
 export function SequencerTimelinePlayhead({
-    currentPosition,
     pixelsPerBeat,
-    zoom,
-    snapEnabled,
-    gridSize,
-    isPlaying = false,
-    tempo = 120,
-    loopEnabled = false,
-    loopStart = 0,
-    loopEnd = 16,
     onSeek,
 }: SequencerTimelinePlayheadProps) {
+    // Get state from context
+    const { state, currentPosition, isPlaying, tempo } = useSequencerContext();
+    const { zoom, snapEnabled, gridSize, isLooping, loopStart, loopEnd } = state;
+
+    const loopEnabled = isLooping;  // Alias for compatibility
     const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
     const [draggedPlayheadPosition, setDraggedPlayheadPosition] = useState<number | null>(null);
     const dragStartXRef = useRef<number>(0);

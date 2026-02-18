@@ -1,7 +1,8 @@
 /**
  * SequencerClip - Individual clip component with waveform
- * 
+ *
  * Displays a clip with waveform visualization, handles selection and actions
+ * Uses SequencerContext for state management
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -11,17 +12,14 @@ import { Slider } from "@/components/ui/slider.tsx";
 import { cn } from "@/lib/utils.ts";
 import type { MIDIEvent, SequencerClip } from "../../types.ts";
 import { WaveformDisplay } from "../Shared/WaveformDisplay.tsx";
+import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
 
 interface SequencerClipProps {
     clip: SequencerClip;
     trackColor?: string; // Track color for clip background
-    isSelected: boolean;
     isEditingInPianoRoll?: boolean; // True if this clip is currently open in piano roll
     isEditingInSampleEditor?: boolean; // True if this clip is currently open in sample editor
-    zoom: number;
     pixelsPerBeat: number;
-    snapEnabled: boolean;
-    gridSize: number; // Grid size: 4 = 1/4 note, 8 = 1/8 note, etc.
     isTrackExpanded?: boolean; // Whether the parent track is in expanded mode
     onSelect: (clipId: string | null) => void; // Accept null to clear selection
     onDuplicate: (clipId: string) => void;
@@ -37,13 +35,9 @@ interface SequencerClipProps {
 export function SequencerClip({
     clip,
     trackColor = "#3b82f6",
-    isSelected,
     isEditingInPianoRoll = false,
     isEditingInSampleEditor = false,
-    zoom,
     pixelsPerBeat,
-    snapEnabled,
-    gridSize,
     isTrackExpanded = false,
     onSelect,
     onDuplicate,
@@ -55,6 +49,11 @@ export function SequencerClip({
     onOpenSampleEditor,
     onClipDragStateChange,
 }: SequencerClipProps) {
+    // Get state from context
+    const { state } = useSequencerContext();
+    const { zoom, snapEnabled, gridSize, selectedClip } = state;
+    const isSelected = selectedClip === clip.id;
+
     const [waveformData, setWaveformData] = useState<number[]>([]);
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null);

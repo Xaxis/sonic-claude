@@ -1,11 +1,11 @@
 /**
  * SampleEditorRuler - Timeline ruler for sample editor
- * 
+ *
  * Displays beat/measure markers and playhead position.
  * Follows the same pattern as SequencerTimelineRuler.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface RulerMarker {
     beat: number;
@@ -23,6 +23,8 @@ interface SampleEditorRulerProps {
     zoom: number;
     pixelsPerBeat: number;
     totalWidth: number;
+    snapEnabled: boolean;
+    gridSize: number;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
 }
 
@@ -35,9 +37,15 @@ export function SampleEditorRuler({
     zoom,
     pixelsPerBeat,
     totalWidth,
+    snapEnabled,
+    gridSize,
     onSeek,
 }: SampleEditorRulerProps) {
     const playheadRef = useRef<HTMLDivElement>(null);
+    const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
+    const [draggedPlayheadPosition, setDraggedPlayheadPosition] = useState<number | null>(null);
+    const dragStartXRef = useRef<number>(0);
+    const dragStartValueRef = useRef<number>(0);
     const beatsPerMeasure = 4;
     const beatWidth = pixelsPerBeat * zoom;
 
@@ -59,13 +67,14 @@ export function SampleEditorRuler({
     }
 
     // Calculate playhead position relative to clip
-    const relativePosition = currentPosition - clipStartTime;
+    const displayPosition = draggedPlayheadPosition !== null ? draggedPlayheadPosition : currentPosition;
+    const relativePosition = displayPosition - clipStartTime;
     const isPlayheadInClip = relativePosition >= 0 && relativePosition <= clipDuration;
     const playheadX = relativePosition * beatWidth;
 
     // Smooth playhead animation using requestAnimationFrame
     useEffect(() => {
-        if (!playheadRef.current || !isPlaying || !isPlayheadInClip) return;
+        if (!playheadRef.current || !isPlaying || !isPlayheadInClip || isDraggingPlayhead) return;
 
         let animationFrameId: number;
         const animate = () => {
@@ -82,10 +91,10 @@ export function SampleEditorRuler({
                 cancelAnimationFrame(animationFrameId);
             }
         };
-    }, [isPlaying, playheadX, isPlayheadInClip]);
+    }, [isPlaying, playheadX, isPlayheadInClip, isDraggingPlayhead]);
 
     const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!onSeek) return;
+        if (!onSeek || isDraggingPlayhead) return;
 
         const rect = e.currentTarget.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -95,6 +104,57 @@ export function SampleEditorRuler({
         const absolutePosition = clipStartTime + clickedBeat;
         onSeek(Math.max(0, absolutePosition), true);
     };
+
+    const handlePlayheadMouseDown = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+
+        setIsDraggingPlayhead(true);
+        dragStartValueRef.current = currentPosition;
+        dragStartXRef.current = e.clientX;
+    };
+
+    useEffect(() => {
+        if (!isDraggingPlayhead) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const deltaX = e.clientX - dragStartXRef.current;
+            const deltaBeat = deltaX / beatWidth;
+            const newValue = dragStartValueRef.current + deltaBeat;
+
+            // Update local state only during drag (no API calls)
+            setDraggedPlayheadPosition(Math.max(0, newValue));
+        };
+
+        const handleMouseUp = (e: MouseEvent) => {
+            const deltaX = e.clientX - dragStartXRef.current;
+            const deltaBeat = deltaX / beatWidth;
+            let newValue = dragStartValueRef.current + deltaBeat;
+
+            // Snap to grid if enabled
+            if (snapEnabled) {
+                newValue = Math.round(newValue * gridSize) / gridSize;
+            }
+
+            newValue = Math.max(0, newValue);
+
+            // Call seek API once on mouse up
+            if (onSeek) {
+                onSeek(newValue, true);
+            }
+
+            setIsDraggingPlayhead(false);
+            setDraggedPlayheadPosition(null);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDraggingPlayhead, currentPosition, beatWidth, snapEnabled, gridSize, onSeek]);
 
     return (
         <div
@@ -129,16 +189,18 @@ export function SampleEditorRuler({
             {isPlayheadInClip && (
                 <div
                     ref={playheadRef}
-                    className="absolute top-0 bottom-0 w-1 bg-red-500 z-50 pointer-events-none"
+                    className="absolute top-0 bottom-0 w-1 bg-red-500 z-50 cursor-ew-resize pointer-events-auto"
                     style={{
                         transform: `translateX(${playheadX}px)`,
                         boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)',
                         willChange: 'transform',
                     }}
+                    onMouseDown={handlePlayheadMouseDown}
+                    title="Drag to scrub"
                 >
                     {/* Playhead triangle at top */}
                     <div
-                        className="absolute -top-3 -left-2.5 w-0 h-0"
+                        className="absolute -top-3 -left-2.5 w-0 h-0 pointer-events-none"
                         style={{
                             borderLeft: '10px solid transparent',
                             borderRight: '10px solid transparent',

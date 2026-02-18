@@ -21,15 +21,9 @@ interface SampleEditorWrapperProps {
     clipDragState?: { startTime: number; duration: number } | null;
 
     // State (shared with timeline - Ableton pattern)
-    zoom: number; // Timeline zoom (shared)
-    snapEnabled: boolean;
-    gridSize: number;
     totalBeats: number;
     currentPosition: number; // Playback position
     isPlaying: boolean; // Playback state
-    isLooping: boolean;
-    loopStart: number;
-    loopEnd: number;
 
     // Scroll refs
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
@@ -39,8 +33,6 @@ interface SampleEditorWrapperProps {
     // Handlers
     onClose: () => void;
     onUpdateClip: (clipId: string, updates: { gain?: number; audio_offset?: number }) => Promise<void>;
-    onToggleSnap: () => void;
-    onSetGridSize: (size: number) => void;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
     onLoopStartChange: (start: number) => void;
     onLoopEndChange: (end: number) => void;
@@ -50,22 +42,14 @@ export function SampleEditorWrapper(props: SampleEditorWrapperProps) {
     const {
         clip,
         clipDragState,
-        zoom,
-        snapEnabled,
-        gridSize,
         totalBeats,
         currentPosition,
         isPlaying,
-        isLooping,
-        loopStart,
-        loopEnd,
         timelineScrollRef,
         sampleEditorScrollRef,
         onSampleEditorScroll,
         onClose,
         onUpdateClip,
-        onToggleSnap,
-        onSetGridSize,
         onSeek,
         onLoopStartChange,
         onLoopEndChange,
@@ -133,21 +117,13 @@ export function SampleEditorWrapper(props: SampleEditorWrapperProps) {
             audioFilePath={clip.audio_file_path}
             audioOffset={clip.audio_offset}
             gain={clip.gain}
-            snapEnabled={snapEnabled}
-            gridSize={gridSize}
-            zoom={zoom}
             totalBeats={totalBeats}
             currentPosition={currentPosition}
             isPlaying={isPlaying}
-            isLooping={isLooping}
-            loopStart={loopStart}
-            loopEnd={loopEnd}
             sampleEditorScrollRef={sampleEditorScrollRef}
             onSampleEditorScroll={onSampleEditorScroll}
             onClose={onClose}
             onUpdateClip={onUpdateClip}
-            onToggleSnap={onToggleSnap}
-            onSetGridSize={onSetGridSize}
             onSeek={onSeek}
             onLoopStartChange={onLoopStartChange}
             onLoopEndChange={onLoopEndChange}

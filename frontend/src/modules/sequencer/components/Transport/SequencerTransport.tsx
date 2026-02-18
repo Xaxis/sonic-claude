@@ -2,6 +2,7 @@
  * SequencerTransport - Transport controls for sequencer
  *
  * Handles play/pause/stop/record/loop controls and tempo
+ * Uses SequencerContext for state management
  */
 
 import { Play, Pause, SkipBack, Circle, Repeat, Music } from "lucide-react";
@@ -10,15 +11,12 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { cn } from "@/lib/utils.ts";
+import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
 
 interface SequencerTransportProps {
     isPlaying: boolean;
-    isPaused: boolean;
-    isRecording: boolean;
-    isLooping: boolean;
     metronomeEnabled: boolean;
     tempo: number;
-    tempoInput: string;
     hasTracksOrClips: boolean;
     onPlayPause: () => void;
     onStop: () => void;
@@ -32,11 +30,7 @@ interface SequencerTransportProps {
 
 export function SequencerTransport({
     isPlaying,
-    isPaused,
-    isRecording,
-    isLooping,
     metronomeEnabled,
-    tempoInput,
     hasTracksOrClips,
     onPlayPause,
     onStop,
@@ -47,6 +41,9 @@ export function SequencerTransport({
     onTempoBlur,
     onTempoKeyDown,
 }: SequencerTransportProps) {
+    // Get state from context
+    const { state } = useSequencerContext();
+    const { isPaused, isRecording, isLooping, tempoInput } = state;
     const canPlay = hasTracksOrClips;
     const playTooltip = canPlay
         ? (isPlaying ? "Pause" : isPaused ? "Resume" : "Play")

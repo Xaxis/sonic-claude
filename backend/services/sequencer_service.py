@@ -222,6 +222,7 @@ class SequencerService:
                         "loop_enabled": sequence.loop_enabled,
                         "loop_start": sequence.loop_start,
                         "loop_end": sequence.loop_end,
+                        "metronome_enabled": self.metronome_enabled,
                         "active_notes": active_notes_list,
                     }
                     if loop_count == 1:
@@ -846,6 +847,62 @@ class SequencerService:
             logger.info(f"✅ Track {track_id} solo: {is_solo}")
         return track
 
+    def update_track(self, track_id: str, volume: Optional[float] = None, pan: Optional[float] = None) -> Optional[SequencerTrack]:
+        """
+        Update track volume and/or pan, and apply changes to currently playing synths.
+
+        Args:
+            track_id: ID of the track to update
+            volume: New volume (0.0-2.0), or None to keep current
+            pan: New pan (-1.0 to 1.0), or None to keep current
+
+        Returns:
+            Updated track, or None if track not found
+        """
+        track = self.tracks.get(track_id)
+        if not track:
+            return None
+
+        # Update track properties
+        if volume is not None:
+            track.volume = volume
+        if pan is not None:
+            track.pan = pan
+
+        # Find and auto-save the sequence containing this track
+        for sequence in self.sequences.values():
+            if any(t.id == track_id for t in sequence.tracks):
+                self.storage.autosave_sequence(sequence)
+                break
+
+        # Update all currently playing synths for this track
+        if self.engine_manager and (volume is not None or pan is not None):
+            # Find all clips belonging to this track that are currently playing
+            for clip_id, node_id in self.active_synths.items():
+                # Find the clip
+                clip = None
+                for seq in self.sequences.values():
+                    clip = next((c for c in seq.clips if c.id == clip_id), None)
+                    if clip:
+                        break
+
+                # Check if this clip belongs to the track we're updating
+                if clip and clip.track_id == track_id:
+                    # Update volume (amp) if changed
+                    if volume is not None:
+                        # Calculate final amplitude (same formula as when creating synth)
+                        final_amp = 0.8 * clip.gain * track.volume
+                        self.engine_manager.send_message("/n_set", node_id, "amp", final_amp)
+                        logger.info(f"🔊 Updated synth {node_id} volume: {final_amp:.2f}")
+
+                    # Update pan if changed
+                    if pan is not None:
+                        self.engine_manager.send_message("/n_set", node_id, "pan", track.pan)
+                        logger.info(f"🎚️  Updated synth {node_id} pan: {track.pan:.2f}")
+
+        logger.info(f"✅ Track {track_id} updated - volume: {track.volume:.2f}, pan: {track.pan:.2f}")
+        return track
+
     def delete_track(self, track_id: str) -> bool:
         """Delete a track from its sequence"""
         track = self.tracks.get(track_id)
@@ -986,15 +1043,32 @@ class SequencerService:
 
             logger.info("▶️  Resumed playback")
 
-    def set_tempo(self, tempo: float):
-        """Set global tempo"""
+    async def set_tempo(self, tempo: float):
+        """
+        Set global tempo and restart playback loop if playing.
+
+        The playback loop calculates beat_duration from tempo at startup,
+        so we need to restart it to apply the new tempo immediately.
+        """
+        old_tempo = self.tempo
         self.tempo = tempo
+
         if self.current_sequence_id:
             sequence = self.sequences.get(self.current_sequence_id)
             if sequence:
                 sequence.tempo = tempo
-        logger.info(f"🎵 Set tempo: {tempo} BPM")
-        # TODO: Send OSC to SuperCollider to update tempo
+                # Save the sequence with new tempo
+                self.storage.autosave_sequence(sequence)
+
+        logger.info(f"🎵 Set tempo: {old_tempo} → {tempo} BPM")
+
+        # If currently playing, restart the playback loop to apply new tempo
+        if self.is_playing and not self.is_paused:
+            logger.info("   Restarting playback loop to apply new tempo...")
+            if self.playback_task:
+                self.playback_task.cancel()
+            self.playback_task = asyncio.create_task(self._playback_loop())
+            logger.info("✅ Tempo applied to playback")
 
     async def seek(self, position: float, trigger_audio: bool = True):
         """

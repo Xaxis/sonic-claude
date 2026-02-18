@@ -1,13 +1,15 @@
 /**
  * SequencerTimelineTrackRow - Individual track row with clips
- * 
+ *
  * Displays a single track row in the timeline with its clips.
  * Supports click-to-add-clip functionality.
+ * Uses SequencerContext for state management.
  */
 
 import { useRef } from "react";
 import { SequencerClip } from "../Clips/SequencerClip.tsx";
 import { cn } from "@/lib/utils.ts";
+import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
 
 interface Clip {
     id: string;
@@ -30,13 +32,7 @@ interface Track {
 interface SequencerTimelineTrackRowProps {
     track: Track;
     clips: Clip[];
-    selectedClip: string | null;
-    pianoRollClipId?: string | null;
-    sampleEditorClipId?: string | null;
-    zoom: number;
     pixelsPerBeat: number;
-    snapEnabled: boolean;
-    gridSize: number;
     isExpanded?: boolean; // Track header expansion state
     onSelectClip: (clipId: string) => void;
     onDuplicateClip: (clipId: string) => void;
@@ -53,13 +49,7 @@ interface SequencerTimelineTrackRowProps {
 export function SequencerTimelineTrackRow({
     track,
     clips,
-    selectedClip,
-    pianoRollClipId,
-    sampleEditorClipId,
-    zoom,
     pixelsPerBeat,
-    snapEnabled,
-    gridSize,
     isExpanded = false,
     onSelectClip,
     onDuplicateClip,
@@ -72,6 +62,10 @@ export function SequencerTimelineTrackRow({
     onOpenSampleEditor,
     onClipDragStateChange,
 }: SequencerTimelineTrackRowProps) {
+    // Get state from context
+    const { state } = useSequencerContext();
+    const { zoom, snapEnabled, gridSize, selectedClip, pianoRollClipId, sampleEditorClipId } = state;
+
     const mouseDownPosRef = useRef<{ x: number; y: number; target: EventTarget | null } | null>(null);
 
     const handleTrackMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -126,13 +120,9 @@ export function SequencerTimelineTrackRow({
                         key={clip.id}
                         clip={clip}
                         trackColor={track.color}
-                        isSelected={selectedClip === clip.id}
                         isEditingInPianoRoll={pianoRollClipId === clip.id}
                         isEditingInSampleEditor={sampleEditorClipId === clip.id}
-                        zoom={zoom}
                         pixelsPerBeat={pixelsPerBeat}
-                        snapEnabled={snapEnabled}
-                        gridSize={gridSize}
                         isTrackExpanded={isExpanded}
                         onSelect={onSelectClip}
                         onDuplicate={onDuplicateClip}

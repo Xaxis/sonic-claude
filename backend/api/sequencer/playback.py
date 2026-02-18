@@ -78,7 +78,7 @@ async def set_tempo(
     sequencer_service: SequencerService = Depends(get_sequencer_service)
 ):
     """Set global tempo"""
-    sequencer_service.set_tempo(request.tempo)
+    await sequencer_service.set_tempo(request.tempo)
     return {"status": "ok", "tempo": request.tempo}
 
 

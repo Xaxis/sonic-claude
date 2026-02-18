@@ -1,9 +1,10 @@
 /**
  * SequencerTimelineSection Component
- * 
+ *
  * Shared layout component for timeline + track list.
  * Used by both timeline-only and split-view modes.
- * 
+ * Uses SequencerContext for state management.
+ *
  * Architecture:
  * - Track list (left): Fixed width, absolutely positioned, no scrollbar
  * - Timeline (right): Flexible width, single scrollbar controls both
@@ -12,38 +13,21 @@
 import React, { useState } from "react";
 import { SequencerTracks } from "../components/Tracks/SequencerTracks.tsx";
 import { SequencerTimeline } from "../components/Timeline/SequencerTimeline.tsx";
+import { useSequencerContext } from "../contexts/SequencerContext.tsx";
 import type { SequencerTrack, Clip } from "@/types/sequencer";
 
 interface SequencerTimelineSectionProps {
-    // Data
-    tracks: SequencerTrack[];
-    clips: Clip[];
-
-    // State
-    zoom: number;
-    currentPosition: number;
-    isPlaying?: boolean;
-    tempo?: number;
-    isLooping: boolean;
-    loopStart: number;
-    loopEnd: number;
-    snapEnabled: boolean;
-    gridSize: number;
-    selectedClip: string | null;
-    pianoRollClipId: string | null;
-    sampleEditorClipId?: string | null;
-
     // Scroll
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
     onTimelineScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-    
+
     // Track handlers
     onToggleMute: (trackId: string) => Promise<void>;
     onToggleSolo: (trackId: string) => Promise<void>;
     onDeleteTrack: (trackId: string) => Promise<void>;
     onRenameTrack: (trackId: string, name: string) => Promise<void>;
     onUpdateTrack: (trackId: string, updates: { volume?: number; pan?: number }) => Promise<void>;
-    
+
     // Clip handlers
     onSelectClip: (clipId: string | null) => void;
     onDuplicateClip: (clipId: string) => Promise<void>;
@@ -66,20 +50,6 @@ interface SequencerTimelineSectionProps {
 
 export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
     const {
-        tracks,
-        clips,
-        zoom,
-        currentPosition,
-        isPlaying = false,
-        tempo = 120,
-        isLooping,
-        loopStart,
-        loopEnd,
-        snapEnabled,
-        gridSize,
-        selectedClip,
-        pianoRollClipId,
-        sampleEditorClipId,
         timelineScrollRef,
         onTimelineScroll,
         onToggleMute,
@@ -101,6 +71,13 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
         onSeek,
         onClipDragStateChange,
     } = props;
+
+    // Get state from context
+    const { tracks, clips } = useSequencerContext();
+
+    // Get state from context
+    const { state } = useSequencerContext();
+    const { zoom, snapEnabled, gridSize, isLooping, loopStart, loopEnd, selectedClip, pianoRollClipId, sampleEditorClipId } = state;
 
     // Manage expanded tracks state
     const [expandedTracks, setExpandedTracks] = useState<Set<string>>(new Set());
@@ -141,20 +118,6 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
                 onScroll={onTimelineScroll}
             >
                 <SequencerTimeline
-                    tracks={tracks}
-                    clips={clips}
-                    zoom={zoom}
-                    currentPosition={currentPosition}
-                    isPlaying={isPlaying}
-                    tempo={tempo}
-                    isLooping={isLooping}
-                    loopStart={loopStart}
-                    loopEnd={loopEnd}
-                    snapEnabled={snapEnabled}
-                    gridSize={gridSize}
-                    selectedClip={selectedClip}
-                    pianoRollClipId={pianoRollClipId}
-                    sampleEditorClipId={sampleEditorClipId}
                     expandedTracks={expandedTracks}
                     onSelectClip={onSelectClip}
                     onDuplicateClip={onDuplicateClip}

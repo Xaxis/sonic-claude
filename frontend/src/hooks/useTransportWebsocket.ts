@@ -23,6 +23,7 @@ export interface TransportData {
     loop_enabled?: boolean;
     loop_start?: number;
     loop_end?: number;
+    metronome_enabled?: boolean;
     active_notes?: ActiveNote[];
 }
 

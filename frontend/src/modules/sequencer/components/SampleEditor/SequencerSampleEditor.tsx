@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { SequencerSampleEditorSection } from "../../layouts/SequencerSampleEditorSection.tsx";
+import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
 
 interface SequencerSampleEditorProps {
     clipId: string;
@@ -21,21 +22,13 @@ interface SequencerSampleEditorProps {
     audioFilePath: string;
     audioOffset?: number; // seconds
     gain: number; // 0.0-2.0
-    snapEnabled: boolean; // Controlled from parent
-    gridSize: number; // Controlled from parent
-    zoom: number; // SHARED with timeline (Ableton pattern)
     totalBeats: number; // Total composition length in beats
     currentPosition: number; // Playback position
     isPlaying: boolean; // Playback state
-    isLooping: boolean;
-    loopStart: number;
-    loopEnd: number;
     sampleEditorScrollRef: React.RefObject<HTMLDivElement | null>;
     onSampleEditorScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     onClose: () => void;
     onUpdateClip: (clipId: string, updates: { gain?: number; audio_offset?: number }) => Promise<void>;
-    onToggleSnap: () => void;
-    onSetGridSize: (size: number) => void;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
     onLoopStartChange: (start: number) => void;
     onLoopEndChange: (end: number) => void;
@@ -49,25 +42,22 @@ export function SequencerSampleEditor({
     audioFilePath,
     audioOffset = 0,
     gain,
-    snapEnabled,
-    gridSize,
-    zoom,
     totalBeats,
     currentPosition,
     isPlaying,
-    isLooping,
-    loopStart,
-    loopEnd,
     sampleEditorScrollRef,
     onSampleEditorScroll,
     onClose,
     onUpdateClip,
-    onToggleSnap,
-    onSetGridSize,
     onSeek,
     onLoopStartChange,
     onLoopEndChange,
 }: SequencerSampleEditorProps) {
+    // Get state from context
+    const { state, actions } = useSequencerContext();
+    const { snapEnabled, gridSize, zoom, isLooping, loopStart, loopEnd } = state;
+    const { toggleSnap, setGridSize } = actions;
+
     // Local UI state
     const [localGain, setLocalGain] = useState(gain);
     const [waveformData, setWaveformData] = useState<number[]>([]);
@@ -186,41 +176,6 @@ export function SequencerSampleEditor({
                             • Bar {Math.floor(clipStartTime / 4) + 1} • {clipDuration} beats
                         </span>
 
-                        {/* Snap Toggle */}
-                        <button
-                            onClick={onToggleSnap}
-                            className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors ${
-                                snapEnabled
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                            }`}
-                        >
-                            <Grid3x3 size={14} />
-                            Snap
-                        </button>
-
-                        {/* Grid Size Selector */}
-                        <div className="flex items-center gap-2">
-                            <Label htmlFor="grid-size" className="text-xs text-muted-foreground">
-                                Grid
-                            </Label>
-                            <Select
-                                value={gridSize.toString()}
-                                onValueChange={(value) => onSetGridSize(parseInt(value))}
-                            >
-                                <SelectTrigger id="grid-size" className="w-20 h-7 text-xs">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {gridSizeOptions.map((option) => (
-                                        <SelectItem key={option.value} value={option.value.toString()}>
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
                         {/* Gain Control */}
                         <div className="flex items-center gap-2">
                             <Label className="text-xs text-muted-foreground">Gain</Label>
@@ -259,13 +214,7 @@ export function SequencerSampleEditor({
                     totalBeats={totalBeats}
                     currentPosition={currentPosition}
                     isPlaying={isPlaying}
-                    isLooping={isLooping}
-                    loopStart={loopStart}
-                    loopEnd={loopEnd}
-                    zoom={zoom}
                     pixelsPerBeat={pixelsPerBeat}
-                    snapEnabled={snapEnabled}
-                    gridSize={gridSize}
                     sampleEditorScrollRef={sampleEditorScrollRef}
                     onSampleEditorScroll={onSampleEditorScroll}
                     onSeek={onSeek}

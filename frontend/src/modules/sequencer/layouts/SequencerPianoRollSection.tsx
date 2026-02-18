@@ -1,9 +1,10 @@
 /**
  * SequencerPianoRollSection Component
- * 
+ *
  * Shared layout component for piano roll keyboard + grid.
  * Matches the architecture of SequencerTimelineSection.
- * 
+ * Uses SequencerContext for state management.
+ *
  * Architecture:
  * - Piano keyboard (left): Fixed width, absolutely positioned, no scrollbar
  * - Piano grid (right): Flexible width, single scrollbar controls both
@@ -15,6 +16,7 @@ import { SequencerPianoRollKeyboard } from "../components/PianoRoll/SequencerPia
 import { SequencerPianoRollGrid } from "../components/PianoRoll/SequencerPianoRollGrid.tsx";
 import { SequencerPianoRollRuler } from "../components/PianoRoll/SequencerPianoRollRuler.tsx";
 import { SequencerTimelineLoopRegion } from "../components/Timeline/SequencerTimelineLoopRegion.tsx";
+import { useSequencerContext } from "../contexts/SequencerContext.tsx";
 import type { MIDIEvent } from "../types.ts";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
@@ -31,19 +33,13 @@ interface SequencerPianoRollSectionProps {
     clipDuration: number;
     totalBeats: number;
     beatWidth: number;
-    snapEnabled: boolean;
-    gridSize: number;
     instrument?: string; // Instrument/synthdef for note preview
     clipId: string; // Clip ID for matching active notes
     activeNotes?: ActiveNote[]; // Currently playing notes for visual feedback
 
-    // Playback state (for ruler)
+    // Playback state (for ruler) - from WebSocket/AudioEngine, not from Context
     currentPosition: number;
     isPlaying: boolean;
-    isLooping: boolean;
-    loopStart: number;
-    loopEnd: number;
-    zoom: number;
     pixelsPerBeat: number;
 
     // Scroll
@@ -74,17 +70,11 @@ export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps)
         clipDuration,
         totalBeats,
         beatWidth,
-        snapEnabled,
-        gridSize,
         instrument,
         clipId,
         activeNotes,
         currentPosition,
         isPlaying,
-        isLooping,
-        loopStart,
-        loopEnd,
-        zoom,
         pixelsPerBeat,
         pianoRollScrollRef,
         onPianoRollScroll,
@@ -99,6 +89,10 @@ export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps)
         onLoopStartChange,
         onLoopEndChange,
     } = props;
+
+    // Get state from context
+    const { state } = useSequencerContext();
+    const { snapEnabled, gridSize, isLooping, loopStart, loopEnd, zoom } = state;
 
     // Calculate total width for ruler
     // Add extra width to ensure content extends beyond viewport for smooth scrolling
@@ -184,13 +178,7 @@ export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps)
 
                         {/* Loop Region - Overlaid on grid */}
                         <SequencerTimelineLoopRegion
-                            isLooping={isLooping}
-                            loopStart={loopStart}
-                            loopEnd={loopEnd}
                             pixelsPerBeat={pixelsPerBeat}
-                            zoom={zoom}
-                            snapEnabled={snapEnabled}
-                            gridSize={gridSize}
                             onLoopStartChange={onLoopStartChange}
                             onLoopEndChange={onLoopEndChange}
                         />

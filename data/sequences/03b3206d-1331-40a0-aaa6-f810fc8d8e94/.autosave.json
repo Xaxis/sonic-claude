@@ -1,7 +1,7 @@
 {
   "id": "03b3206d-1331-40a0-aaa6-f810fc8d8e94",
   "name": "Test Sequence 1",
-  "tempo": 120.0,
+  "tempo": 190.0,
   "time_signature": "4/4",
   "tracks": [
     {
@@ -15,7 +15,7 @@
       "is_armed": false,
       "volume": 2.0,
       "pan": 0.0,
-      "instrument": "bell",
+      "instrument": "lead",
       "midi_channel": 0,
       "sample_id": null,
       "sample_name": null,
@@ -32,7 +32,7 @@
       "is_armed": false,
       "volume": 0.0,
       "pan": 0.0,
-      "instrument": "organ",
+      "instrument": "pad",
       "midi_channel": 0,
       "sample_id": null,
       "sample_name": null,
@@ -68,54 +68,6 @@
       "is_looped": false,
       "gain": 1.0,
       "midi_events": [
-        {
-          "note": 106,
-          "note_name": "A#7",
-          "start_time": 2.0,
-          "duration": 1.0,
-          "velocity": 100,
-          "channel": 0
-        },
-        {
-          "note": 104,
-          "note_name": "G#7",
-          "start_time": 1.0,
-          "duration": 1.0,
-          "velocity": 100,
-          "channel": 0
-        },
-        {
-          "note": 102,
-          "note_name": "F#7",
-          "start_time": 1.0,
-          "duration": 1.0,
-          "velocity": 100,
-          "channel": 0
-        },
-        {
-          "note": 102,
-          "note_name": "F#7",
-          "start_time": 0.0,
-          "duration": 1.0,
-          "velocity": 100,
-          "channel": 0
-        },
-        {
-          "note": 103,
-          "note_name": "G7",
-          "start_time": 5.0,
-          "duration": 1.0,
-          "velocity": 100,
-          "channel": 0
-        },
-        {
-          "note": 106,
-          "note_name": "A#7",
-          "start_time": 6.0,
-          "duration": 1.0,
-          "velocity": 100,
-          "channel": 0
-        },
         {
           "note": 100,
           "note_name": "E7",
@@ -185,6 +137,94 @@
           "note_name": "E5",
           "start_time": 11.0,
           "duration": 1.0,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 104,
+          "note_name": "G#7",
+          "start_time": 2.625,
+          "duration": 0.125,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 104,
+          "note_name": "G#7",
+          "start_time": 2.875,
+          "duration": 0.125,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 104,
+          "note_name": "G#7",
+          "start_time": 2.75,
+          "duration": 0.125,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 104,
+          "note_name": "G#7",
+          "start_time": 2.75,
+          "duration": 0.125,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 104,
+          "note_name": "G#7",
+          "start_time": 3.0,
+          "duration": 0.125,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 104,
+          "note_name": "G#7",
+          "start_time": 3.25,
+          "duration": 0.875,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 104,
+          "note_name": "G#7",
+          "start_time": 4.625,
+          "duration": 0.125,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 104,
+          "note_name": "G#7",
+          "start_time": 3.875,
+          "duration": 0.125,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 105,
+          "note_name": "A7",
+          "start_time": 1.5,
+          "duration": 0.125,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 106,
+          "note_name": "A#7",
+          "start_time": 1.625,
+          "duration": 0.125,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 103,
+          "note_name": "G7",
+          "start_time": 6.125,
+          "duration": 0.125,
           "velocity": 100,
           "channel": 0
         }
@@ -278,6 +318,30 @@
           "duration": 1.0,
           "velocity": 100,
           "channel": 0
+        },
+        {
+          "note": 103,
+          "note_name": "G7",
+          "start_time": 3.375,
+          "duration": 0.125,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 105,
+          "note_name": "A7",
+          "start_time": 3.75,
+          "duration": 0.125,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 105,
+          "note_name": "A7",
+          "start_time": 3.75,
+          "duration": 0.125,
+          "velocity": 100,
+          "channel": 0
         }
       ],
       "audio_file_path": null,
@@ -288,7 +352,7 @@
       "name": "Clip 5",
       "type": "audio",
       "track_id": "d50297b9-3fd8-4c42-ab8b-75429936dd4d",
-      "start_time": 1.0,
+      "start_time": 0.375,
       "duration": 4.0,
       "is_muted": false,
       "is_looped": false,
@@ -338,16 +402,58 @@
       "midi_events": [],
       "audio_file_path": null,
       "audio_offset": null
+    },
+    {
+      "id": "ef7ac939-ed94-49e0-bbb5-83d2151f0f9a",
+      "name": "Clip 9",
+      "type": "audio",
+      "track_id": "d50297b9-3fd8-4c42-ab8b-75429936dd4d",
+      "start_time": 14.125,
+      "duration": 4.0,
+      "is_muted": false,
+      "is_looped": false,
+      "gain": 1.0,
+      "midi_events": null,
+      "audio_file_path": "fbf4277f-4941-4257-a0e5-9121b5deef75",
+      "audio_offset": null
+    },
+    {
+      "id": "814bf132-ef43-4c12-bb2b-9ab224b68718",
+      "name": "Clip 5 (copy)",
+      "type": "audio",
+      "track_id": "d50297b9-3fd8-4c42-ab8b-75429936dd4d",
+      "start_time": 5.0,
+      "duration": 4.0,
+      "is_muted": false,
+      "is_looped": false,
+      "gain": 1.0,
+      "midi_events": null,
+      "audio_file_path": "fbf4277f-4941-4257-a0e5-9121b5deef75",
+      "audio_offset": null
+    },
+    {
+      "id": "5d686ea2-1265-46e8-8738-7d7774ce44ec",
+      "name": "Clip 5 (copy)",
+      "type": "audio",
+      "track_id": "d50297b9-3fd8-4c42-ab8b-75429936dd4d",
+      "start_time": 5.0,
+      "duration": 4.0,
+      "is_muted": false,
+      "is_looped": false,
+      "gain": 1.0,
+      "midi_events": null,
+      "audio_file_path": "fbf4277f-4941-4257-a0e5-9121b5deef75",
+      "audio_offset": null
     }
   ],
   "is_playing": true,
-  "current_position": 9.481754302978516,
+  "current_position": 15.823123494784037,
   "loop_enabled": true,
-  "loop_start": 6.0,
+  "loop_start": 0.375,
   "loop_end": 22.0,
-  "zoom": 1.339591906721537,
+  "zoom": 4.0,
   "snap_enabled": true,
   "grid_size": 8,
   "created_at": "2026-02-13T14:49:01.328412",
-  "updated_at": "2026-02-17T17:11:43.740911"
+  "updated_at": "2026-02-17T19:22:13.154829"
 }

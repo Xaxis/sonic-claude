@@ -134,23 +134,30 @@ async def update_track(
     if not track:
         raise TrackNotFoundError(track_id)
 
-    # Update fields
+    # Update name if provided
     if request.name is not None:
         track.name = request.name
-    if request.volume is not None:
-        track.volume = request.volume
-    if request.pan is not None:
-        track.pan = request.pan
+
+    # Update instrument if provided (MIDI tracks only)
     if request.instrument is not None:
         if track.type != "midi":
             raise InvalidTrackTypeError("Set instrument", "MIDI")
         track.instrument = request.instrument
         logger.info(f"✅ Track {track_id} instrument set to: {request.instrument}")
 
-    # Save the sequence containing this track
-    sequence = sequencer_service.get_sequence(track.sequence_id)
-    if sequence:
-        sequencer_service.storage.save_sequence(sequence)
+    # Update volume and/or pan using the service method (which also updates active synths)
+    if request.volume is not None or request.pan is not None:
+        track = sequencer_service.update_track(
+            track_id,
+            volume=request.volume,
+            pan=request.pan
+        )
+
+    # Save the sequence containing this track (if not already saved by update_track)
+    if request.name is not None or request.instrument is not None:
+        sequence = sequencer_service.get_sequence(track.sequence_id)
+        if sequence:
+            sequencer_service.storage.save_sequence(sequence)
 
     return track
 

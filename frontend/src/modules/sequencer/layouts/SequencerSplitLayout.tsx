@@ -3,53 +3,33 @@
  *
  * Layout for when piano roll or sample editor is open.
  * Features drag-resizable split between timeline (top) and editor (bottom).
+ * Uses SequencerContext for state management.
  */
 
 import React, { useState, useCallback, useEffect } from "react";
 import { SequencerTimelineSection } from "./SequencerTimelineSection.tsx";
 import { PianoRollWrapper } from "./PianoRollWrapper.tsx";
 import { SampleEditorWrapper } from "./SampleEditorWrapper.tsx";
-import type { SequencerTrack, Clip } from "@/types/sequencer";
+import { useSequencerContext } from "../contexts/SequencerContext.tsx";
 import type { MIDIEvent } from "../types.ts";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
 interface SequencerSplitLayoutProps {
-    // Data
-    tracks: SequencerTrack[];
-    clips: Clip[];
-    pianoRollClipId: string | null;
-    sampleEditorClipId: string | null;
-
-    // State
-    zoom: number;
-    currentPosition: number;
-    isPlaying?: boolean;
-    tempo?: number;
-    isLooping: boolean;
-    loopStart: number;
-    loopEnd: number;
-    snapEnabled: boolean;
-    gridSize: number;
-    selectedClip: string | null;
-    showPianoRoll: boolean;
-    showSampleEditor: boolean;
-    activeNotes?: ActiveNote[];
-
-    // Scroll
+    // Scroll refs
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
     sampleEditorScrollRef: React.RefObject<HTMLDivElement | null>;
     onTimelineScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     onPianoRollScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     onSampleEditorScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-    
+
     // Track handlers
     onToggleMute: (trackId: string) => Promise<void>;
     onToggleSolo: (trackId: string) => Promise<void>;
     onDeleteTrack: (trackId: string) => Promise<void>;
     onRenameTrack: (trackId: string, name: string) => Promise<void>;
     onUpdateTrack: (trackId: string, updates: { volume?: number; pan?: number }) => Promise<void>;
-    
+
     // Clip handlers
     onSelectClip: (clipId: string | null) => void;
     onDuplicateClip: (clipId: string) => Promise<void>;
@@ -66,30 +46,19 @@ interface SequencerSplitLayoutProps {
     onLoopEndChange: (end: number) => void;
     onSeek: (position: number, triggerAudio?: boolean) => Promise<void>;
 
-    // Timeline controls (shared with piano roll)
-    onToggleSnap: () => void;
-    onSetGridSize: (size: number) => void;
-
     // Piano roll handlers
     onClosePianoRoll: () => void;
     onUpdateMIDINotes: (clipId: string, notes: MIDIEvent[]) => Promise<void>;
 
     // Sample editor handlers
     onCloseSampleEditor: () => void;
+
+    // Active notes for visual feedback
+    activeNotes?: ActiveNote[];
 }
 
 export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
     const {
-        clips,
-        pianoRollClipId,
-        sampleEditorClipId,
-        showPianoRoll,
-        showSampleEditor,
-        zoom,
-        snapEnabled,
-        gridSize,
-        currentPosition,
-        isPlaying,
         pianoRollScrollRef,
         sampleEditorScrollRef,
         onPianoRollScroll,
@@ -98,12 +67,16 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
         onCloseSampleEditor,
         onUpdateMIDINotes,
         onUpdateClip,
-        onToggleSnap,
-        onSetGridSize,
         onSeek,
         timelineScrollRef,
         ...timelineSectionProps
     } = props;
+
+    // Get state from context
+    const { state, tracks, clips, currentPosition, isPlaying } = useSequencerContext();
+    const { zoom, snapEnabled, gridSize, pianoRollClipId, sampleEditorClipId } = state;
+    const showPianoRoll = pianoRollClipId !== null;
+    const showSampleEditor = sampleEditorClipId !== null;
 
     // Resizable split state - percentage of height for timeline (0-100)
     const [timelineHeightPercent, setTimelineHeightPercent] = useState(() => {
@@ -178,7 +151,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
     const pianoRollClip = clips.find(c => c.id === pianoRollClipId);
 
     // Find the track for the clip (to get instrument)
-    const pianoRollTrack = pianoRollClip ? props.tracks.find(t => t.id === pianoRollClip.track_id) : undefined;
+    const pianoRollTrack = pianoRollClip ? tracks.find(t => t.id === pianoRollClip.track_id) : undefined;
 
     // Find the clip for sample editor
     const sampleEditorClip = clips.find(c => c.id === sampleEditorClipId);
@@ -203,15 +176,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
             >
                 <SequencerTimelineSection
                     {...timelineSectionProps}
-                    clips={clips}
-                    zoom={zoom}
-                    snapEnabled={snapEnabled}
-                    gridSize={gridSize}
-                    pianoRollClipId={pianoRollClipId}
-                    sampleEditorClipId={sampleEditorClipId}
                     timelineScrollRef={timelineScrollRef}
-                    isPlaying={props.isPlaying}
-                    tempo={props.tempo}
                     onClipDragStateChange={handleClipDragStateChange}
                 />
             </div>
@@ -237,23 +202,15 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                             clip={pianoRollClip}
                             track={pianoRollTrack}
                             clipDragState={pianoRollClipDragState}
-                            zoom={zoom}
-                            snapEnabled={snapEnabled}
-                            gridSize={gridSize}
                             totalBeats={totalBeats}
                             activeNotes={props.activeNotes}
                             currentPosition={currentPosition}
                             isPlaying={isPlaying ?? false}
-                            isLooping={props.isLooping}
-                            loopStart={props.loopStart}
-                            loopEnd={props.loopEnd}
                             timelineScrollRef={timelineScrollRef}
                             pianoRollScrollRef={pianoRollScrollRef}
                             onPianoRollScroll={onPianoRollScroll}
                             onClose={onClosePianoRoll}
                             onUpdateNotes={onUpdateMIDINotes}
-                            onToggleSnap={onToggleSnap}
-                            onSetGridSize={onSetGridSize}
                             onSeek={onSeek}
                             onLoopStartChange={props.onLoopStartChange}
                             onLoopEndChange={props.onLoopEndChange}
@@ -263,22 +220,14 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                         <SampleEditorWrapper
                             clip={sampleEditorClip}
                             clipDragState={sampleEditorClipDragState}
-                            zoom={zoom}
-                            snapEnabled={snapEnabled}
-                            gridSize={gridSize}
                             totalBeats={totalBeats}
                             currentPosition={currentPosition}
                             isPlaying={isPlaying ?? false}
-                            isLooping={props.isLooping}
-                            loopStart={props.loopStart}
-                            loopEnd={props.loopEnd}
                             timelineScrollRef={timelineScrollRef}
                             sampleEditorScrollRef={sampleEditorScrollRef}
                             onSampleEditorScroll={onSampleEditorScroll}
                             onClose={onCloseSampleEditor}
                             onUpdateClip={onUpdateClip}
-                            onToggleSnap={onToggleSnap}
-                            onSetGridSize={onSetGridSize}
                             onSeek={onSeek}
                             onLoopStartChange={props.onLoopStartChange}
                             onLoopEndChange={props.onLoopEndChange}

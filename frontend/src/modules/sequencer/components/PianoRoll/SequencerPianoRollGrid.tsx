@@ -62,6 +62,7 @@ export function SequencerPianoRollGrid({
     const [dragStartTime, setDragStartTime] = useState(0);
     const [dragStartPitch, setDragStartPitch] = useState(0);
     const [dragStartDuration, setDragStartDuration] = useState(0);
+    const [hasDragged, setHasDragged] = useState(false); // Track if mouse moved during mousedown
 
     // Grid spans the full composition width (like timeline) - allows scrolling freely
     // Clip region is visually highlighted so user knows the clip boundaries
@@ -87,6 +88,7 @@ export function SequencerPianoRollGrid({
     };
 
     const handleGridClick = (e: React.MouseEvent) => {
+        // Don't add notes if we just finished dragging/resizing
         if (isDragging !== null || isResizing !== null) return;
 
         const rect = gridRef.current?.getBoundingClientRect();
@@ -103,7 +105,33 @@ export function SequencerPianoRollGrid({
         // Convert to clip-relative time
         const clipRelativeTime = absoluteTime - clipStartTime;
 
-        onAddNote(pitch, clipRelativeTime);
+        // Check if there's already a note at this position
+        const clickedNoteIndex = findNoteAtPosition(pitch, clipRelativeTime);
+
+        if (clickedNoteIndex !== -1) {
+            // Note exists - delete it (toggle behavior like FL Studio/Ableton)
+            onDeleteNote(clickedNoteIndex);
+        } else {
+            // No note - add one
+            onAddNote(pitch, clipRelativeTime);
+        }
+    };
+
+    // Helper function to find if a note exists at a given position
+    const findNoteAtPosition = (pitch: number, time: number): number => {
+        // Calculate tolerance based on grid size for click detection
+        const timeTolerance = snapEnabled ? (1 / gridSize) * 0.5 : 0.1;
+
+        return notes.findIndex(note => {
+            const noteAbsoluteTime = note.start_time;
+            const noteEndTime = noteAbsoluteTime + note.duration;
+
+            return (
+                note.note === pitch &&
+                time >= noteAbsoluteTime - timeTolerance &&
+                time <= noteEndTime + timeTolerance
+            );
+        });
     };
 
     const handleNoteMouseDown = (e: React.MouseEvent, index: number, action: "move" | "resize") => {
@@ -115,6 +143,7 @@ export function SequencerPianoRollGrid({
         setDragStartTime(note.start_time);
         setDragStartPitch(note.note);
         setDragStartDuration(note.duration);
+        setHasDragged(false); // Reset drag flag
 
         if (action === "move") {
             setIsDragging(index);
@@ -139,6 +168,12 @@ export function SequencerPianoRollGrid({
             const deltaX = e.clientX - dragStartX;
             const deltaY = e.clientY - dragStartY;
 
+            // Detect if mouse has moved significantly (more than 3 pixels)
+            const dragThreshold = 3;
+            if (Math.abs(deltaX) > dragThreshold || Math.abs(deltaY) > dragThreshold) {
+                setHasDragged(true);
+            }
+
             if (isDragging !== null) {
                 const deltaBeats = deltaX / beatWidth;
                 const deltaPitch = -Math.round(deltaY / noteHeight);
@@ -156,8 +191,15 @@ export function SequencerPianoRollGrid({
         };
 
         const handleMouseUp = () => {
+            // Click-to-delete: Only delete if we clicked a note (isDragging) without moving the mouse
+            // Don't delete if we were resizing (isResizing) - resizing always involves dragging
+            if (!hasDragged && isDragging !== null && isResizing === null) {
+                onDeleteNote(isDragging);
+            }
+
             setIsDragging(null);
             setIsResizing(null);
+            setHasDragged(false);
         };
 
         document.addEventListener("mousemove", handleMouseMove);
@@ -167,7 +209,7 @@ export function SequencerPianoRollGrid({
             document.removeEventListener("mousemove", handleMouseMove);
             document.removeEventListener("mouseup", handleMouseUp);
         };
-    }, [isDragging, isResizing, dragStartX, dragStartY, dragStartTime, dragStartPitch, dragStartDuration, beatWidth, noteHeight, minPitch, maxPitch]);
+    }, [isDragging, isResizing, dragStartX, dragStartY, dragStartTime, dragStartPitch, dragStartDuration, beatWidth, noteHeight, minPitch, maxPitch, hasDragged, onDeleteNote, onMoveNote, onResizeNote]);
 
     // Keyboard shortcuts
     useEffect(() => {

@@ -89,11 +89,11 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
         if (!editingSampleId) return;
 
         try {
-            await sampleApi.updateSample(editingSampleId, {
+            await api.samples.updateSample(editingSampleId, {
                 name: editName,
                 category: editCategory,
             });
-            
+
             toast.success("Sample updated successfully");
             setEditingSampleId(null);
             await loadSamples();

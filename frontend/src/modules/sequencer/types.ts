@@ -58,6 +58,9 @@ export interface Sequence {
     zoom: number; // Timeline zoom level
     snap_enabled: boolean; // Grid snapping enabled
     grid_size: number; // Grid size (1/16 note = 16)
+    selected_clip_id?: string | null; // Currently selected clip ID
+    piano_roll_clip_id?: string | null; // Clip ID with piano roll open
+    sample_editor_clip_id?: string | null; // Clip ID with sample editor open
 
     created_at: string; // ISO datetime string
     updated_at: string; // ISO datetime string

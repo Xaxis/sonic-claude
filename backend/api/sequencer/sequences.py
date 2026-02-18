@@ -83,6 +83,12 @@ async def update_sequence(
         sequence.snap_enabled = request["snap_enabled"]
     if "grid_size" in request:
         sequence.grid_size = request["grid_size"]
+    if "selected_clip_id" in request:
+        sequence.selected_clip_id = request["selected_clip_id"]
+    if "piano_roll_clip_id" in request:
+        sequence.piano_roll_clip_id = request["piano_roll_clip_id"]
+    if "sample_editor_clip_id" in request:
+        sequence.sample_editor_clip_id = request["sample_editor_clip_id"]
 
     # Save to disk
     sequencer_service.storage.save_sequence(sequence)

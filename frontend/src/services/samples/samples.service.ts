@@ -82,6 +82,21 @@ export class SampleService extends BaseAPIClient {
     }
 
     /**
+     * Update sample metadata (name, category)
+     */
+    async updateSample(sampleId: string, updates: { name?: string; category?: string }): Promise<SampleMetadata> {
+        const params = new URLSearchParams();
+        if (updates.name !== undefined) params.append('name', updates.name);
+        if (updates.category !== undefined) params.append('category', updates.category);
+
+        const response = await this.patch<SampleResponse>(`/api/samples/${sampleId}?${params.toString()}`);
+        if (!response.success || !response.sample) {
+            throw new Error(response.message || "Failed to update sample");
+        }
+        return response.sample;
+    }
+
+    /**
      * Update sample duration
      */
     async updateDuration(sampleId: string, duration: number): Promise<void> {

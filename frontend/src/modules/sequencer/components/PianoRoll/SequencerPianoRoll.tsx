@@ -6,12 +6,11 @@
  */
 
 import { useState, useEffect } from "react";
-import { X, Trash2, Grid3x3 } from "lucide-react";
+import { X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { IconButton } from "@/components/ui/icon-button.tsx";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import { SequencerPianoRollSection } from "../../layouts/SequencerPianoRollSection.tsx";
+import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
 import type { MIDIEvent } from "../../types.ts";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 import { api } from "@/services/api";
@@ -22,23 +21,15 @@ interface SequencerPianoRollProps {
     clipDuration: number; // beats
     clipStartTime: number; // beats - position in sequence
     midiEvents: MIDIEvent[];
-    snapEnabled: boolean; // Controlled from parent
-    gridSize: number; // Controlled from parent
-    zoom: number; // SHARED with timeline (Ableton pattern)
     totalBeats: number; // Total composition length in beats
     instrument?: string; // Instrument/synthdef for note preview
     activeNotes?: ActiveNote[]; // Currently playing notes for visual feedback
     currentPosition: number; // Playback position
     isPlaying: boolean; // Playback state
-    isLooping: boolean;
-    loopStart: number;
-    loopEnd: number;
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
     onPianoRollScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     onClose: () => void;
     onUpdateNotes: (clipId: string, notes: MIDIEvent[]) => Promise<void>;
-    onToggleSnap: () => void;
-    onSetGridSize: (size: number) => void;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
     onLoopStartChange: (start: number) => void;
     onLoopEndChange: (end: number) => void;
@@ -52,27 +43,23 @@ export function SequencerPianoRoll({
     clipDuration,
     clipStartTime,
     midiEvents,
-    snapEnabled,
-    gridSize,
-    zoom,
     totalBeats,
     instrument,
     activeNotes,
     currentPosition,
     isPlaying,
-    isLooping,
-    loopStart,
-    loopEnd,
     pianoRollScrollRef,
     onPianoRollScroll,
     onClose,
     onUpdateNotes,
-    onToggleSnap,
-    onSetGridSize,
     onSeek,
     onLoopStartChange,
     onLoopEndChange,
 }: SequencerPianoRollProps) {
+    // Get state from context
+    const { state, actions } = useSequencerContext();
+    const { snapEnabled, gridSize, zoom, isLooping, loopStart, loopEnd } = state;
+
     // Local UI state only (not persisted)
     const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
     const [copiedNotes, setCopiedNotes] = useState<MIDIEvent[]>([]);
@@ -222,37 +209,6 @@ export function SequencerPianoRoll({
                         </span>
                     </div>
                     <div className="flex items-center gap-2">
-                        {/* Grid controls */}
-                        <IconButton
-                            icon={Grid3x3}
-                            tooltip={snapEnabled ? "Snap: ON" : "Snap: OFF"}
-                            onClick={onToggleSnap}
-                            variant={snapEnabled ? "default" : "ghost"}
-                            size="icon-sm"
-                        />
-                        <div className="flex items-center gap-1">
-                            <Label htmlFor="piano-roll-grid-size" className="text-xs text-muted-foreground">
-                                Grid
-                            </Label>
-                            <Select
-                                value={gridSize.toString()}
-                                onValueChange={(value) => onSetGridSize(parseInt(value))}
-                                disabled={!snapEnabled}
-                            >
-                                <SelectTrigger id="piano-roll-grid-size" className="w-20 h-7 text-sm">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="1">1/1</SelectItem>
-                                    <SelectItem value="2">1/2</SelectItem>
-                                    <SelectItem value="4">1/4</SelectItem>
-                                    <SelectItem value="8">1/8</SelectItem>
-                                    <SelectItem value="16">1/16</SelectItem>
-                                    <SelectItem value="32">1/32</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
                         {/* Delete selected */}
                         <Button onClick={handleDeleteSelected} size="sm" variant="ghost" disabled={selectedNotes.size === 0}>
                             <Trash2 size={14} className="mr-1" />
@@ -282,17 +238,11 @@ export function SequencerPianoRoll({
                 clipDuration={clipDuration}
                 totalBeats={totalBeats}
                 beatWidth={beatWidth}
-                snapEnabled={snapEnabled}
-                gridSize={gridSize}
                 instrument={instrument}
                 clipId={clipId}
                 activeNotes={activeNotes}
                 currentPosition={currentPosition}
                 isPlaying={isPlaying}
-                isLooping={isLooping}
-                loopStart={loopStart}
-                loopEnd={loopEnd}
-                zoom={zoom}
                 pixelsPerBeat={pixelsPerBeat}
                 pianoRollScrollRef={pianoRollScrollRef}
                 onPianoRollScroll={onPianoRollScroll}

@@ -7,6 +7,7 @@
  * - SequencerTimelineLoopRegion: Loop region markers
  * - SequencerTimelinePlayhead: Playhead indicator with drag support
  * - SequencerTimelineTrackRow: Individual track rows with clips
+ * Uses SequencerContext for state management.
  */
 
 import { useRef, useEffect } from "react";
@@ -15,23 +16,9 @@ import { SequencerTimelineGrid } from "./SequencerTimelineGrid.tsx";
 import { SequencerTimelineLoopRegion } from "./SequencerTimelineLoopRegion.tsx";
 import { SequencerTimelinePlayhead } from "./SequencerTimelinePlayhead.tsx";
 import { SequencerTimelineTrackRow } from "./SequencerTimelineTrackRow.tsx";
-import type { SequencerClip, SequencerTrack } from "../../types.ts";
+import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
 
 interface SequencerTimelineProps {
-    tracks: SequencerTrack[];
-    clips: SequencerClip[];
-    zoom: number;
-    currentPosition: number;
-    isPlaying?: boolean;
-    tempo?: number;
-    isLooping: boolean;
-    loopStart: number;
-    loopEnd: number;
-    snapEnabled: boolean;
-    gridSize: number;
-    selectedClip: string | null;
-    pianoRollClipId?: string | null; // ID of clip currently open in piano roll
-    sampleEditorClipId?: string | null; // ID of clip currently open in sample editor
     expandedTracks?: Set<string>; // Track header expansion state
     onSelectClip: (clipId: string) => void;
     onDuplicateClip: (clipId: string) => void;
@@ -49,20 +36,6 @@ interface SequencerTimelineProps {
 }
 
 export function SequencerTimeline({
-    tracks,
-    clips,
-    zoom,
-    currentPosition,
-    isPlaying = false,
-    tempo = 120,
-    isLooping,
-    loopStart,
-    loopEnd,
-    snapEnabled,
-    gridSize,
-    selectedClip,
-    pianoRollClipId,
-    sampleEditorClipId,
     expandedTracks,
     onSelectClip,
     onDuplicateClip,
@@ -78,6 +51,9 @@ export function SequencerTimeline({
     onSeek,
     onClipDragStateChange,
 }: SequencerTimelineProps) {
+    // Get state from context
+    const { state, tracks, clips, currentPosition } = useSequencerContext();
+    const { zoom, snapEnabled, gridSize } = state;
     const pixelsPerBeat = 40;
     const beatsPerMeasure = 4;
 
@@ -174,13 +150,7 @@ export function SequencerTimeline({
 
                         {/* Loop Region */}
                         <SequencerTimelineLoopRegion
-                            isLooping={isLooping}
-                            loopStart={loopStart}
-                            loopEnd={loopEnd}
                             pixelsPerBeat={pixelsPerBeat}
-                            zoom={zoom}
-                            snapEnabled={snapEnabled}
-                            gridSize={gridSize}
                             onLoopStartChange={onLoopStartChange}
                             onLoopEndChange={onLoopEndChange}
                         />
@@ -191,13 +161,7 @@ export function SequencerTimeline({
                                 key={track.id}
                                 track={track}
                                 clips={clips}
-                                selectedClip={selectedClip}
-                                pianoRollClipId={pianoRollClipId}
-                                sampleEditorClipId={sampleEditorClipId}
-                                zoom={zoom}
                                 pixelsPerBeat={pixelsPerBeat}
-                                snapEnabled={snapEnabled}
-                                gridSize={gridSize}
                                 isExpanded={expandedTracks?.has(track.id)}
                                 onSelectClip={onSelectClip}
                                 onDuplicateClip={onDuplicateClip}
@@ -214,16 +178,7 @@ export function SequencerTimeline({
 
                         {/* Playhead - Rendered AFTER tracks so it appears on top */}
                         <SequencerTimelinePlayhead
-                            currentPosition={currentPosition}
                             pixelsPerBeat={pixelsPerBeat}
-                            zoom={zoom}
-                            snapEnabled={snapEnabled}
-                            gridSize={gridSize}
-                            isPlaying={isPlaying}
-                            tempo={tempo}
-                            loopEnabled={isLooping}
-                            loopStart={loopStart}
-                            loopEnd={loopEnd}
                             onSeek={onSeek}
                         />
                     </div>

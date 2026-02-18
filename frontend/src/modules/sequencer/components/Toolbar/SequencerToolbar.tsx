@@ -1,7 +1,8 @@
 /**
- * SequencerPanelToolbar - Toolbar for sequencer operations
+ * SequencerToolbar - Toolbar for sequencer operations
  *
  * Handles sequence selection, track management, and zoom controls
+ * Uses SequencerContext for state management
  */
 
 import { Plus, ZoomIn, ZoomOut, Grid3x3, FolderOpen, Settings } from "lucide-react";
@@ -15,41 +16,33 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select.tsx";
+import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
 import type { Sequence } from "../../types.ts";
 
-interface SequencerPanelToolbarProps {
+interface SequencerToolbarProps {
     sequences: Sequence[];
     activeSequenceId: string | null;
-    zoom: number;
-    snapEnabled: boolean;
-    gridSize: number;
     onSequenceChange: (sequenceId: string) => void;
     onAddSequence: () => void;
     onManageSequences: () => void; // Open sequence manager modal
     onSequenceSettings: () => void; // Open sequence settings dialog
     onAddTrack: () => void;
-    onZoomIn: () => void;
-    onZoomOut: () => void;
-    onSnapToggle: () => void;
-    onGridSizeChange: (gridSize: number) => void;
 }
 
-export function SequencerPanelToolbar({
+export function SequencerToolbar({
     sequences,
     activeSequenceId,
-    zoom,
-    snapEnabled,
-    gridSize,
     onSequenceChange,
     onAddSequence,
     onManageSequences,
     onSequenceSettings,
     onAddTrack,
-    onZoomIn,
-    onZoomOut,
-    onSnapToggle,
-    onGridSizeChange,
-}: SequencerPanelToolbarProps) {
+}: SequencerToolbarProps) {
+    // Get state and actions from context
+    const { state, actions } = useSequencerContext();
+    const { zoom, snapEnabled, gridSize } = state;
+    const { zoomIn, zoomOut, toggleSnap, setGridSize } = actions;
+
     return (
         <div className="flex items-center justify-between gap-4">
             {/* Left: Sequence Selector */}
@@ -103,7 +96,7 @@ export function SequencerPanelToolbar({
                     <IconButton
                         icon={ZoomOut}
                         tooltip="Zoom out timeline"
-                        onClick={onZoomOut}
+                        onClick={zoomOut}
                         variant="ghost"
                         size="icon-sm"
                         disabled={zoom <= 0.25}
@@ -114,7 +107,7 @@ export function SequencerPanelToolbar({
                     <IconButton
                         icon={ZoomIn}
                         tooltip="Zoom in timeline"
-                        onClick={onZoomIn}
+                        onClick={zoomIn}
                         variant="ghost"
                         size="icon-sm"
                         disabled={zoom >= 4}
@@ -123,7 +116,7 @@ export function SequencerPanelToolbar({
                 <IconButton
                     icon={Grid3x3}
                     tooltip={snapEnabled ? "Snap to grid: ON" : "Snap to grid: OFF"}
-                    onClick={onSnapToggle}
+                    onClick={toggleSnap}
                     variant={snapEnabled ? "default" : "ghost"}
                     size="icon-sm"
                     className={snapEnabled ? "bg-primary/20 text-primary" : ""}
@@ -134,7 +127,7 @@ export function SequencerPanelToolbar({
                     </Label>
                     <Select
                         value={gridSize.toString()}
-                        onValueChange={(value) => onGridSizeChange(parseInt(value))}
+                        onValueChange={(value) => setGridSize(parseInt(value))}
                         disabled={!snapEnabled}
                     >
                         <SelectTrigger id="grid-size-select" className="w-20 h-7 text-sm">

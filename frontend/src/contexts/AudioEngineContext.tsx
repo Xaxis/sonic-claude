@@ -34,6 +34,7 @@ interface TransportWebSocketData {
     loop_enabled?: boolean;
     loop_start?: number;
     loop_end?: number;
+    metronome_enabled?: boolean;
 }
 
 interface AudioEngineState {
@@ -255,6 +256,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                                 isPlaying: message.is_playing,
                                 currentPosition: message.position_beats,
                                 tempo: message.tempo,
+                                metronomeEnabled: message.metronome_enabled ?? prev.metronomeEnabled,
                             }));
                         }
                     } catch (error) {

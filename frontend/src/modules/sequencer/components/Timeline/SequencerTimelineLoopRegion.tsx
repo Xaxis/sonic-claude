@@ -1,34 +1,27 @@
 /**
  * SequencerTimelineLoopRegion - Loop region markers and background
- * 
+ *
  * Displays loop region with draggable start/end markers.
+ * Uses SequencerContext for state management.
  */
 
 import { useEffect, useRef, useState } from "react";
+import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
 
 interface SequencerTimelineLoopRegionProps {
-    isLooping: boolean;
-    loopStart: number;
-    loopEnd: number;
     pixelsPerBeat: number;
-    zoom: number;
-    snapEnabled: boolean;
-    gridSize: number;
     onLoopStartChange?: (newLoopStart: number) => void;
     onLoopEndChange?: (newLoopEnd: number) => void;
 }
 
 export function SequencerTimelineLoopRegion({
-    isLooping,
-    loopStart,
-    loopEnd,
     pixelsPerBeat,
-    zoom,
-    snapEnabled,
-    gridSize,
     onLoopStartChange,
     onLoopEndChange,
 }: SequencerTimelineLoopRegionProps) {
+    // Get state from context
+    const { state } = useSequencerContext();
+    const { isLooping, loopStart, loopEnd, zoom, snapEnabled, gridSize } = state;
     const [isDraggingLoopStart, setIsDraggingLoopStart] = useState(false);
     const [isDraggingLoopEnd, setIsDraggingLoopEnd] = useState(false);
     const dragStartXRef = useRef<number>(0);
