@@ -36,6 +36,7 @@ from backend.services.mixer_service import MixerService
 from backend.services.track_meter_service import TrackMeterService
 from backend.services.audio_bus_manager import AudioBusManager
 from backend.services.mixer_channel_service import MixerChannelService
+from backend.services.track_effects_service import TrackEffectsService
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ _mixer_service: Optional[MixerService] = None
 _track_meter_service: Optional[TrackMeterService] = None
 _audio_bus_manager: Optional[AudioBusManager] = None
 _mixer_channel_service: Optional[MixerChannelService] = None
+_track_effects_service: Optional[TrackEffectsService] = None
 
 
 # ============================================================================
@@ -74,7 +76,7 @@ async def initialize_services(settings: Settings) -> None:
     """
     global _engine_manager, _audio_analyzer, _audio_input_service
     global _synthesis_service, _sequencer_service, _ws_manager, _buffer_manager, _mixer_service
-    global _track_meter_service, _audio_bus_manager, _mixer_channel_service
+    global _track_meter_service, _audio_bus_manager, _mixer_channel_service, _track_effects_service
 
     logger.info("🚀 Initializing services...")
 
@@ -87,11 +89,12 @@ async def initialize_services(settings: Settings) -> None:
     _engine_manager = AudioEngineManager()
     await _engine_manager.connect()
 
-    # Step 3: Initialize per-track metering services
-    logger.info("🎚️ Initializing per-track metering...")
+    # Step 3: Initialize per-track metering and effects services
+    logger.info("🎚️ Initializing per-track metering and effects...")
     _audio_bus_manager = AudioBusManager()
     _mixer_channel_service = MixerChannelService(_engine_manager, _audio_bus_manager)
     _track_meter_service = TrackMeterService(_engine_manager, _mixer_channel_service)
+    _track_effects_service = TrackEffectsService(_engine_manager, _audio_bus_manager, _mixer_channel_service)
 
     # Step 4: Initialize audio services (depend on engine_manager and metering services)
     logger.info("🎵 Initializing audio services...")
@@ -236,3 +239,9 @@ def get_mixer_channel_service() -> MixerChannelService:
         raise RuntimeError("MixerChannelService not initialized")
     return _mixer_channel_service
 
+
+def get_track_effects_service() -> TrackEffectsService:
+    """Get TrackEffectsService instance"""
+    if _track_effects_service is None:
+        raise RuntimeError("TrackEffectsService not initialized")
+    return _track_effects_service

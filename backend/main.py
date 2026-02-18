@@ -31,6 +31,7 @@ from backend.api import websocket_routes, sample_routes
 from backend.api.audio import router as audio_router
 from backend.api.sequencer import router as sequencer_router
 from backend.api.mixer import router as mixer_router
+from backend.api.effects import router as effects_router
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +203,7 @@ async def sonic_claude_exception_handler(request: Request, exc: SonicClaudeExcep
 app.include_router(audio_router, prefix="/audio-engine/audio")
 app.include_router(sequencer_router, prefix="/audio-engine/audio/sequencer")
 app.include_router(mixer_router, prefix="/audio-engine/audio/mixer")
+app.include_router(effects_router, prefix="/audio-engine/audio")
 app.include_router(websocket_routes.router, prefix="/audio-engine/ws", tags=["websocket"])
 app.include_router(sample_routes.router, prefix="/api/samples", tags=["samples"])
 

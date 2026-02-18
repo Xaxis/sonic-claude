@@ -50,6 +50,7 @@ import { InputPanel } from "@/modules/input";
 import { LoopVisualizerPanel } from "@/modules/loop-visualizer";
 import { SequencerPanel } from "@/modules/sequencer";
 import { MixerPanel } from "@/modules/mixer";
+import { EffectsPanel } from "@/modules/effects";
 
 /**
  * Grid Layout Settings
@@ -108,6 +109,14 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         getSubtitle: () => "0 channels • Master: 0.0 dB",
         defaultLayout: { x: 0, y: 10, w: 12, h: 14 },
     },
+    {
+        id: "effects",
+        title: "EFFECTS",
+        component: createElement(EffectsPanel),
+        closeable: false,
+        getSubtitle: () => "Track FX • 0 effects",
+        defaultLayout: { x: 0, y: 24, w: 4, h: 12 },
+    },
 
 ];
 
@@ -125,6 +134,7 @@ export const DEFAULT_TABS = [
             "loop-visualizer",
             "sequencer",
             "mixer",
+            "effects",
         ],
     },
 ];
