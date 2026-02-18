@@ -32,6 +32,7 @@ from backend.services.synthesis_service import SynthesisService
 from backend.services.sequencer_service import SequencerService
 from backend.services.websocket_manager import WebSocketManager
 from backend.services.buffer_manager import BufferManager
+from backend.services.mixer_service import MixerService
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,7 @@ _synthesis_service: Optional[SynthesisService] = None
 _sequencer_service: Optional[SequencerService] = None
 _ws_manager: Optional[WebSocketManager] = None
 _buffer_manager: Optional[BufferManager] = None
+_mixer_service: Optional[MixerService] = None
 
 
 # ============================================================================
@@ -65,7 +67,7 @@ async def initialize_services(settings: Settings) -> None:
         settings: Application settings
     """
     global _engine_manager, _audio_analyzer, _audio_input_service
-    global _synthesis_service, _sequencer_service, _ws_manager, _buffer_manager
+    global _synthesis_service, _sequencer_service, _ws_manager, _buffer_manager, _mixer_service
 
     logger.info("🚀 Initializing services...")
 
@@ -85,6 +87,7 @@ async def initialize_services(settings: Settings) -> None:
     _synthesis_service = SynthesisService(_engine_manager)
     _sequencer_service = SequencerService(_engine_manager, _ws_manager)
     _buffer_manager = BufferManager(_engine_manager)
+    _mixer_service = MixerService(_engine_manager, _ws_manager)
 
     # Step 4: Wire up callbacks (Audio Analyzer → WebSocket Manager)
     logger.info("🔌 Wiring up audio pipeline...")
@@ -108,7 +111,7 @@ async def shutdown_services() -> None:
     It ensures proper cleanup of resources.
     """
     global _engine_manager, _audio_analyzer, _audio_input_service
-    global _synthesis_service, _sequencer_service, _ws_manager, _buffer_manager
+    global _synthesis_service, _sequencer_service, _ws_manager, _buffer_manager, _mixer_service
 
     logger.info("🛑 Shutting down services...")
 
@@ -187,4 +190,11 @@ def get_buffer_manager() -> BufferManager:
     if _buffer_manager is None:
         raise RuntimeError("BufferManager not initialized")
     return _buffer_manager
+
+
+def get_mixer_service() -> MixerService:
+    """Get MixerService instance"""
+    if _mixer_service is None:
+        raise RuntimeError("MixerService not initialized")
+    return _mixer_service
 

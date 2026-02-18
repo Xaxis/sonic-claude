@@ -49,17 +49,7 @@ import type { PanelConfig } from "@/components/layout";
 import { InputPanel } from "@/modules/input";
 import { LoopVisualizerPanel } from "@/modules/loop-visualizer";
 import { SequencerPanel } from "@/modules/sequencer";
-// TransportPanel removed - now integrated into SequencerPanel
-// Commented out unused panel imports - uncomment when adding panels to DEFAULT_PANELS
-// import { SynthesisPanel } from "@/components/features/synthesis";
-// import { EffectsPanel } from "@/components/features/effects";
-// import { MixerPanel } from "@/components/features/mixer";
-// import { MeteringPanel } from "@/components/features/metering";
-// import { PianoRollPanel } from "@/components/features/piano-roll";
-// import { AIChatPanel } from "@/components/features/ai-chat";
-// import { TranscriptionPanel } from "@/components/features/transcription";
-// import { SpectralPanel } from "@/components/features/spectral";
-// import { TimelinePanel } from "@/components/features/timeline";
+import { MixerPanel } from "@/modules/mixer";
 
 /**
  * Grid Layout Settings
@@ -110,6 +100,14 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         getSubtitle: () => "Active • 120 BPM • 4/4 • Position: 8.2 beats",
         defaultLayout: { x: 9, y: 0, w: 3, h: 10 },
     },
+    {
+        id: "mixer",
+        title: "MIXER",
+        component: createElement(MixerPanel),
+        closeable: false,
+        getSubtitle: () => "0 channels • Master: 0.0 dB",
+        defaultLayout: { x: 0, y: 10, w: 12, h: 14 },
+    },
 
 ];
 
@@ -117,9 +115,6 @@ export const DEFAULT_PANELS: PanelConfig[] = [
  * Default Tab Structure
  *
  * Initial tab configuration on first load.
- *
- * LOOP - The feedback loop workspace (composition + performance unified)
- * ANALYZE - Audio analysis & transcription
  */
 export const DEFAULT_TABS = [
     {
@@ -129,6 +124,7 @@ export const DEFAULT_TABS = [
             "input",
             "loop-visualizer",
             "sequencer",
+            "mixer",
         ],
     },
 ];
@@ -137,7 +133,7 @@ export const DEFAULT_TABS = [
  * Storage Keys
  */
 export const STORAGE_KEYS = {
-    LAYOUT: "sonic-claude-layout-v2", // v2: Added unified Sequencer Panel with integrated Transport
+    LAYOUT: "sonic-claude-layout-v2",
     WINDOW_STATE: "sonic-claude-window-state",
 } as const;
 

@@ -52,6 +52,7 @@ export function Knob({
     const handlePointerMove = (e: React.PointerEvent) => {
         if (!isDragging || disabled) return;
 
+        // Drag UP to increase, drag DOWN to decrease (standard DAW knob behavior)
         const deltaY = startYRef.current - e.clientY;
         const sensitivity = 0.005;
         const delta = deltaY * sensitivity * (max - min);
@@ -88,9 +89,22 @@ export function Knob({
         <div className={cn("flex flex-col items-center gap-2", className)}>
             {/* Knob */}
             <div className="relative h-12 w-12">
-                {/* Background circle */}
-                <svg className="h-full w-full" viewBox="0 0 48 48">
-                    {/* Track arc */}
+                <svg
+                    className="h-full w-full cursor-pointer select-none"
+                    viewBox="0 0 48 48"
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
+                >
+                    <defs>
+                        <linearGradient id="knobGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="rgb(6, 182, 212)" />
+                            <stop offset="100%" stopColor="rgb(168, 85, 247)" />
+                        </linearGradient>
+                    </defs>
+
+                    {/* Track arc (background) */}
                     <circle
                         cx="24"
                         cy="24"
@@ -102,7 +116,8 @@ export function Knob({
                         strokeDashoffset="15.7"
                         transform="rotate(-135 24 24)"
                     />
-                    {/* Value arc */}
+
+                    {/* Value arc (filled portion) */}
                     <circle
                         cx="24"
                         cy="24"
@@ -115,34 +130,37 @@ export function Knob({
                         transform="rotate(-135 24 24)"
                         strokeLinecap="round"
                     />
+
+                    {/* Knob body circle */}
+                    <circle
+                        cx="24"
+                        cy="24"
+                        r="18"
+                        fill="url(#knobBodyGradient)"
+                        stroke={isDragging ? "rgb(6, 182, 212)" : "rgb(75, 85, 99)"}
+                        strokeWidth="2"
+                        className="transition-all"
+                    />
+
+                    {/* Indicator line - rotates around center (24, 24) */}
+                    <line
+                        x1="24"
+                        y1="8"
+                        x2="24"
+                        y2="16"
+                        stroke="rgb(6, 182, 212)"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        transform={`rotate(${angle} 24 24)`}
+                    />
+
                     <defs>
-                        <linearGradient id="knobGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stopColor="rgb(6, 182, 212)" />
-                            <stop offset="100%" stopColor="rgb(168, 85, 247)" />
+                        <linearGradient id="knobBodyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="rgb(55, 65, 81)" />
+                            <stop offset="100%" stopColor="rgb(17, 24, 39)" />
                         </linearGradient>
                     </defs>
                 </svg>
-
-                {/* Knob body */}
-                <div
-                    className={cn(
-                        "absolute inset-2 cursor-pointer rounded-full border-2 bg-gradient-to-br from-gray-700 to-gray-900 select-none",
-                        isDragging ? "border-cyan-400" : "border-gray-600 hover:border-gray-500"
-                    )}
-                    onPointerDown={handlePointerDown}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                    onPointerCancel={handlePointerUp}
-                >
-                    {/* Indicator line */}
-                    <div
-                        className="absolute top-1 left-1/2 h-3 w-0.5 rounded-full bg-cyan-400"
-                        style={{
-                            transform: `translateX(-50%) rotate(${angle}deg)`,
-                            transformOrigin: "50% 16px",
-                        }}
-                    />
-                </div>
             </div>
 
             {/* Value display */}

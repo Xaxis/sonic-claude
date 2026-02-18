@@ -118,7 +118,7 @@ class Sequence(BaseModel):
     loop_end: float = Field(default=16.0, gt=0)
 
     # UI settings (per-sequence)
-    zoom: float = Field(default=0.5, gt=0, le=2.0, description="Timeline zoom level")
+    zoom: float = Field(default=0.5, gt=0, le=4.0, description="Timeline zoom level")
     snap_enabled: bool = Field(default=True, description="Grid snapping enabled")
     grid_size: int = Field(default=16, gt=0, description="Grid size (1/16 note = 16)")
     selected_clip_id: Optional[str] = Field(default=None, description="Currently selected clip ID")

@@ -1,0 +1,135 @@
+{
+  "id": "7496a0f5-5bc3-49b3-918d-269ca5ddf652",
+  "name": "Sequence 1",
+  "tempo": 120.0,
+  "time_signature": "4/4",
+  "tracks": [
+    {
+      "id": "68444c90-ec2a-42f1-876f-b59c06da75d9",
+      "name": "MIDI 1",
+      "sequence_id": "7496a0f5-5bc3-49b3-918d-269ca5ddf652",
+      "type": "midi",
+      "color": "#ef4444",
+      "is_muted": false,
+      "is_solo": false,
+      "is_armed": false,
+      "volume": 1.0,
+      "pan": 0.0,
+      "instrument": "organ",
+      "midi_channel": 0,
+      "sample_id": null,
+      "sample_name": null,
+      "sample_file_path": null
+    }
+  ],
+  "clips": [
+    {
+      "id": "5698ce6f-5734-4ee6-88d0-691508d98025",
+      "name": "Clip 1",
+      "type": "midi",
+      "track_id": "68444c90-ec2a-42f1-876f-b59c06da75d9",
+      "start_time": 0.1875,
+      "duration": 22.0,
+      "is_muted": false,
+      "is_looped": false,
+      "gain": 1.0,
+      "midi_events": [
+        {
+          "note": 105,
+          "note_name": "A7",
+          "start_time": 0.375,
+          "duration": 0.0625,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 105,
+          "note_name": "A7",
+          "start_time": 1.9375,
+          "duration": 0.0625,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 106,
+          "note_name": "A#7",
+          "start_time": 4.0,
+          "duration": 1.0,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 106,
+          "note_name": "A#7",
+          "start_time": 7.0,
+          "duration": 1.0,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 105,
+          "note_name": "A7",
+          "start_time": 8.0,
+          "duration": 1.0,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 104,
+          "note_name": "G#7",
+          "start_time": 5.0,
+          "duration": 1.0,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 106,
+          "note_name": "A#7",
+          "start_time": 2.0,
+          "duration": 1.0,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 107,
+          "note_name": "B7",
+          "start_time": 1.0,
+          "duration": 1.0,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 107,
+          "note_name": "B7",
+          "start_time": 3.0,
+          "duration": 1.0,
+          "velocity": 100,
+          "channel": 0
+        },
+        {
+          "note": 107,
+          "note_name": "B7",
+          "start_time": 6.0,
+          "duration": 1.0,
+          "velocity": 100,
+          "channel": 0
+        }
+      ],
+      "audio_file_path": null,
+      "audio_offset": null
+    }
+  ],
+  "is_playing": false,
+  "current_position": 0.0,
+  "loop_enabled": false,
+  "loop_start": 0.0,
+  "loop_end": 16.0,
+  "zoom": 0.5,
+  "snap_enabled": true,
+  "grid_size": 1,
+  "selected_clip_id": "5698ce6f-5734-4ee6-88d0-691508d98025",
+  "piano_roll_clip_id": "5698ce6f-5734-4ee6-88d0-691508d98025",
+  "sample_editor_clip_id": null,
+  "created_at": "2026-02-17T19:54:36.821983",
+  "updated_at": "2026-02-17T19:55:15.808025"
+}
