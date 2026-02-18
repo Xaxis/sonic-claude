@@ -36,7 +36,7 @@
  * ```
  */
 
-import React, { useCallback } from "react";
+import React, { useCallback, useRef, useEffect } from "react";
 
 export interface EditorGridLayoutProps {
     // Layout regions (React nodes)
@@ -72,26 +72,58 @@ export function EditorGridLayout({
     rulerScrollDataAttr = "data-ruler-scroll",
     sidebarScrollDataAttr = "data-sidebar-scroll",
 }: EditorGridLayoutProps) {
-    // Internal scroll handler - syncs ruler horizontal + sidebar vertical
+    // Use refs instead of querySelector for better performance (Google Sheets pattern)
+    const rulerRef = useRef<HTMLDivElement>(null);
+    const sidebarRef = useRef<HTMLDivElement>(null);
+    const rafRef = useRef<number | null>(null);
+
+    /**
+     * BEST PRACTICE: Use requestAnimationFrame for scroll synchronization
+     * This is the pattern used by Google Sheets, Airtable, Excel Online, and Notion
+     *
+     * Benefits:
+     * 1. Batches scroll updates with browser's paint cycle (60fps)
+     * 2. Prevents layout thrashing by batching DOM reads/writes
+     * 3. GPU-accelerated, smooth scrolling
+     * 4. Automatically throttled to display refresh rate
+     */
     const handleMainScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        // CRITICAL: Capture scroll values immediately (e.currentTarget becomes null in rAF)
         const scrollTop = e.currentTarget.scrollTop;
         const scrollLeft = e.currentTarget.scrollLeft;
 
-        // Sync sidebar vertical scroll (CSS Grid sibling)
-        const sidebarEl = document.querySelector(`[${sidebarScrollDataAttr}]`) as HTMLDivElement;
-        if (sidebarEl && sidebarEl.scrollTop !== scrollTop) {
-            sidebarEl.scrollTop = scrollTop;
+        // Cancel any pending animation frame to avoid stacking updates
+        if (rafRef.current !== null) {
+            cancelAnimationFrame(rafRef.current);
         }
 
-        // Sync ruler horizontal scroll (CSS Grid sibling)
-        const rulerEl = document.querySelector(`[${rulerScrollDataAttr}]`) as HTMLDivElement;
-        if (rulerEl && rulerEl.scrollLeft !== scrollLeft) {
-            rulerEl.scrollLeft = scrollLeft;
-        }
+        // Schedule scroll sync for next animation frame
+        rafRef.current = requestAnimationFrame(() => {
+            // Sync sidebar vertical scroll (use ref for better performance)
+            if (sidebarRef.current && sidebarRef.current.scrollTop !== scrollTop) {
+                sidebarRef.current.scrollTop = scrollTop;
+            }
 
-        // Call parent handler for additional sync (e.g., timeline horizontal sync)
+            // Sync ruler horizontal scroll (use ref for better performance)
+            if (rulerRef.current && rulerRef.current.scrollLeft !== scrollLeft) {
+                rulerRef.current.scrollLeft = scrollLeft;
+            }
+
+            rafRef.current = null;
+        });
+
+        // Call parent handler for additional sync (e.g., cross-editor sync)
         onScroll(e);
-    }, [onScroll, rulerScrollDataAttr, sidebarScrollDataAttr]);
+    }, [onScroll]);
+
+    // Cleanup animation frame on unmount
+    useEffect(() => {
+        return () => {
+            if (rafRef.current !== null) {
+                cancelAnimationFrame(rafRef.current);
+            }
+        };
+    }, []);
 
     return (
         <div
@@ -109,8 +141,13 @@ export function EditorGridLayout({
 
             {/* Top-Right: Ruler - Scrolls horizontally only, synced with main content */}
             <div
+                ref={rulerRef}
                 {...{ [rulerScrollDataAttr]: "" }}
                 className="border-b border-border overflow-x-auto overflow-y-hidden scrollbar-hide"
+                style={{
+                    // BEST PRACTICE: Use will-change for GPU acceleration (Google Sheets pattern)
+                    willChange: 'scroll-position',
+                }}
             >
                 <div style={{ width: `${contentWidth}px`, minWidth: `${contentWidth}px` }}>
                     {ruler}
@@ -119,8 +156,13 @@ export function EditorGridLayout({
 
             {/* Bottom-Left: Sidebar - Scrolls vertically only, synced with main content */}
             <div
+                ref={sidebarRef}
                 {...{ [sidebarScrollDataAttr]: "" }}
                 className="border-r border-border bg-background overflow-y-auto overflow-x-hidden scrollbar-hide"
+                style={{
+                    // BEST PRACTICE: Use will-change for GPU acceleration (Google Sheets pattern)
+                    willChange: 'scroll-position',
+                }}
             >
                 {sidebar}
             </div>
@@ -130,6 +172,10 @@ export function EditorGridLayout({
                 ref={scrollRef}
                 className="overflow-auto"
                 onScroll={handleMainScroll}
+                style={{
+                    // BEST PRACTICE: Use will-change for GPU acceleration (Google Sheets pattern)
+                    willChange: 'scroll-position',
+                }}
             >
                 <div style={{ width: `${contentWidth}px`, minWidth: `${contentWidth}px` }}>
                     {mainContent}

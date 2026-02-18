@@ -54,6 +54,12 @@ Routine({
     (thisProcess.nowExecutingPath.dirname +/+ "synthdefs/instruments.scd").load;
     s.sync;
 
+    (thisProcess.nowExecutingPath.dirname +/+ "synthdefs/drums.scd").load;
+    s.sync;
+
+    (thisProcess.nowExecutingPath.dirname +/+ "synthdefs/melodic.scd").load;
+    s.sync;
+
     (thisProcess.nowExecutingPath.dirname +/+ "synthdefs/playback.scd").load;
     s.sync;
 
