@@ -108,6 +108,13 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         closeable: false,
         getSubtitle: () => "0 channels • Master: 0.0 dB",
         defaultLayout: { x: 0, y: 10, w: 12, h: 14 },
+        snapTargets: [
+            {
+                panelId: "effects",
+                edges: ["top"],
+                snapDistance: 20,
+            },
+        ],
     },
     {
         id: "effects",
@@ -115,7 +122,14 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         component: createElement(EffectsPanel),
         closeable: false,
         getSubtitle: () => "Track FX • 0 effects",
-        defaultLayout: { x: 0, y: 24, w: 4, h: 12 },
+        defaultLayout: { x: 0, y: 24, w: 12, h: 12 },
+        snapTargets: [
+            {
+                panelId: "mixer",
+                edges: ["bottom"],
+                snapDistance: 20,
+            },
+        ],
     },
 
 ];

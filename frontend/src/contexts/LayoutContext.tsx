@@ -12,7 +12,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { windowManager } from "@/services/window-manager";
 import { DEFAULT_LAYOUT_STATE, STORAGE_KEYS, BROADCAST_KEYS } from "@/config/layout.config";
-import type { GridLayoutItem } from "@/types/grid-layout";
+import type { GridLayoutItem, PanelAttachment } from "@/types/grid-layout";
 
 export interface TabConfig {
     id: string;
@@ -44,6 +44,7 @@ interface LayoutState {
     poppedOutTabs: Set<string>;
     layouts: TabLayouts;
     maximizedPanel: string | null; // Panel ID that is currently maximized
+    attachments: Record<string, PanelAttachment>; // Panel ID -> attachment state
 }
 
 interface LayoutContextValue extends LayoutState {
@@ -61,6 +62,10 @@ interface LayoutContextValue extends LayoutState {
     // Panel maximize/minimize
     maximizePanel: (panelId: string) => void;
     minimizePanel: () => void;
+
+    // Panel attachment system
+    attachPanel: (panelId: string, attachment: PanelAttachment) => void;
+    detachPanel: (panelId: string) => void;
 
     // Window management
     popoutTab: (tabId: string, openWindow?: boolean) => void;
@@ -98,6 +103,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
             ...DEFAULT_LAYOUT_STATE,
             poppedOutTabs: new Set(), // Always start with no popouts
             maximizedPanel: null, // No panel maximized by default
+            attachments: {}, // No attachments by default
         };
     });
 
@@ -325,6 +331,38 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         });
     }, [broadcastState]);
 
+    const attachPanel = useCallback(
+        (panelId: string, attachment: PanelAttachment) => {
+            setState((prev) => {
+                const newState = {
+                    ...prev,
+                    attachments: {
+                        ...prev.attachments,
+                        [panelId]: attachment,
+                    },
+                };
+                broadcastState(newState);
+                return newState;
+            });
+        },
+        [broadcastState]
+    );
+
+    const detachPanel = useCallback(
+        (panelId: string) => {
+            setState((prev) => {
+                const { [panelId]: removed, ...remainingAttachments } = prev.attachments;
+                const newState = {
+                    ...prev,
+                    attachments: remainingAttachments,
+                };
+                broadcastState(newState);
+                return newState;
+            });
+        },
+        [broadcastState]
+    );
+
     const value: LayoutContextValue = {
         ...state,
         setActiveTab,
@@ -336,6 +374,8 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         updateTabLayout,
         maximizePanel,
         minimizePanel,
+        attachPanel,
+        detachPanel,
         popoutTab,
         closePopout,
     };

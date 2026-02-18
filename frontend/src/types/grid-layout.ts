@@ -23,3 +23,35 @@ export interface GridLayoutItem {
 
 // Array of layout items (what react-grid-layout calls "Layout")
 export type GridLayout = GridLayoutItem[];
+
+/**
+ * Panel Attachment System Types
+ *
+ * Enables panels to "snap" to edges of other panels with user-controlled
+ * attachment/detachment behavior (like magnetic window snapping in modern OSes).
+ */
+
+// Edge of a panel that can be snapped to
+export type PanelEdge = "top" | "bottom" | "left" | "right";
+
+// Snap target configuration - defines which panels this panel can snap to
+export interface PanelSnapTarget {
+    panelId: string; // ID of panel to snap to (e.g., "mixer")
+    edges: PanelEdge[]; // Which edges can be snapped to (e.g., ["bottom"])
+    snapDistance?: number; // Pixels to trigger snap zone (default: 20)
+}
+
+// Current attachment state for a panel
+export interface PanelAttachment {
+    attachedTo: string; // Panel ID this panel is attached to
+    edge: PanelEdge; // Which edge it's attached to
+    offset?: { x: number; y: number }; // Optional offset from edge
+}
+
+// Snap zone detection result
+export interface SnapZone {
+    targetPanelId: string; // Panel being snapped to
+    edge: PanelEdge; // Edge being snapped to
+    snapPosition: { x: number; y: number }; // Calculated snap position
+    distance: number; // Distance from snap zone
+}

@@ -547,9 +547,9 @@
   "zoom": 4.0,
   "snap_enabled": true,
   "grid_size": 16,
-  "selected_clip_id": "f62c6374-1ef8-4383-8801-40be9f172249",
+  "selected_clip_id": null,
   "piano_roll_clip_id": "dc133baf-c03c-45f4-8a7c-46e7ab2a5e57",
   "sample_editor_clip_id": null,
   "created_at": "2026-02-13T14:49:01.328412",
-  "updated_at": "2026-02-18T11:25:37.615821"
+  "updated_at": "2026-02-18T12:24:50.346103"
 }
