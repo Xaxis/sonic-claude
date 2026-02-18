@@ -11,12 +11,12 @@
  */
 
 import { useRef, useEffect } from "react";
-import { SequencerTimelineRuler } from "./SequencerTimelineRuler.tsx";
 import { SequencerTimelineGrid } from "./SequencerTimelineGrid.tsx";
 import { SequencerTimelineLoopRegion } from "./SequencerTimelineLoopRegion.tsx";
 import { SequencerTimelinePlayhead } from "./SequencerTimelinePlayhead.tsx";
 import { SequencerTimelineTrackRow } from "./SequencerTimelineTrackRow.tsx";
 import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
+import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
 
 interface SequencerTimelineProps {
     expandedTracks?: Set<string>; // Track header expansion state
@@ -53,41 +53,13 @@ export function SequencerTimeline({
 }: SequencerTimelineProps) {
     // Get state from context
     const { state, tracks, clips, currentPosition } = useSequencerContext();
-    const { zoom, snapEnabled, gridSize } = state;
-    const pixelsPerBeat = 40;
-    const beatsPerMeasure = 4;
+    const { snapEnabled, gridSize } = state;
 
-    // Calculate timeline width dynamically based on clips
-    const minBeats = 64; // Minimum 16 measures
-    const maxClipEnd = clips.length > 0
-        ? Math.max(...clips.map(c => c.start_time + c.duration))
-        : 0;
-    const totalBeats = Math.max(minBeats, Math.ceil(maxClipEnd) + 128); // Always add 128 beats (32 measures) padding after last clip
-    // Add extra width to ensure content extends beyond viewport for smooth scrolling
-    const totalWidth = totalBeats * pixelsPerBeat * zoom + 1000;
+    // Get timeline calculations from shared hook
+    const { pixelsPerBeat, totalWidth, rulerMarkers, zoom } = useTimelineCalculations();
 
     // Ref for timeline container to enable auto-scroll
     const timelineContainerRef = useRef<HTMLDivElement>(null);
-
-    // Generate ruler markers - always show beats, not grid subdivisions
-    // Grid subdivisions are too cluttered in the ruler/grid
-    // The gridSize only affects snapping behavior, not visual grid
-    const rulerMarkers = [];
-
-    for (let beat = 0; beat <= totalBeats; beat++) {
-        const x = beat * pixelsPerBeat * zoom;
-        const isMeasure = beat % beatsPerMeasure === 0;
-        const isBeat = true; // All markers are beat markers
-        const measure = Math.floor(beat / beatsPerMeasure) + 1;
-
-        rulerMarkers.push({
-            beat,
-            x,
-            isMeasure,
-            isBeat,
-            label: isMeasure ? `${measure}` : "",
-        });
-    }
 
     const playheadX = currentPosition * pixelsPerBeat * zoom;
 
@@ -123,21 +95,8 @@ export function SequencerTimeline({
     }, [playheadX]);
 
     return (
-        <div ref={timelineContainerRef} className="flex flex-col flex-shrink-0" style={{ width: `${totalWidth}px`, minWidth: `${totalWidth}px` }}>
-            {/* Ruler - Sticky header */}
-            <div className="flex-shrink-0">
-                <SequencerTimelineRuler
-                    rulerMarkers={rulerMarkers}
-                    totalWidth={totalWidth}
-                    onSeek={onSeek}
-                    pixelsPerBeat={pixelsPerBeat}
-                    zoom={zoom}
-                    snapEnabled={snapEnabled}
-                    gridSize={gridSize}
-                />
-            </div>
-
-            {/* Tracks and Clips - Grows vertically */}
+        <div ref={timelineContainerRef} className="flex-shrink-0" style={{ width: `${totalWidth}px`, minWidth: `${totalWidth}px` }}>
+            {/* Tracks and Clips - Ruler is now rendered in fixed header above */}
             {tracks.length === 0 ? (
                 <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
                     No tracks. Add a track to start sequencing.

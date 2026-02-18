@@ -13,7 +13,9 @@
 import React, { useState } from "react";
 import { SequencerTracks } from "../components/Tracks/SequencerTracks.tsx";
 import { SequencerTimeline } from "../components/Timeline/SequencerTimeline.tsx";
+import { SequencerTimelineRuler } from "../components/Timeline/SequencerTimelineRuler.tsx";
 import { useSequencerContext } from "../contexts/SequencerContext.tsx";
+import { useTimelineCalculations } from "../hooks/useTimelineCalculations.ts";
 import type { SequencerTrack, Clip } from "@/types/sequencer";
 
 interface SequencerTimelineSectionProps {
@@ -82,39 +84,64 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
     // Manage expanded tracks state
     const [expandedTracks, setExpandedTracks] = useState<Set<string>>(new Set());
 
+    // Get timeline calculations for ruler rendering
+    const { totalWidth, rulerMarkers, pixelsPerBeat } = useTimelineCalculations();
+
     return (
-        <div className="flex flex-1 min-h-0 relative">
-            {/* Track List (Left) - Fixed width, NO scrollbar */}
-            <div className="w-64 border-r border-border flex flex-col flex-shrink-0 bg-background absolute left-0 top-0 bottom-0 z-[60]">
-                {/* Header - Fixed */}
-                <div className="h-8 border-b border-border bg-muted/30 flex items-center px-3 flex-shrink-0">
-                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
-                        Tracks
-                    </span>
-                </div>
-                {/* Track list - Controlled scroll (scrollbar hidden, synced with timeline) */}
-                <div
-                    data-track-list
-                    className="flex-1 overflow-y-auto scrollbar-hide"
-                >
-                    <SequencerTracks
-                        tracks={tracks}
-                        onToggleMute={onToggleMute}
-                        onToggleSolo={onToggleSolo}
-                        onDeleteTrack={onDeleteTrack}
-                        onRenameTrack={onRenameTrack}
-                        onUpdateTrack={onUpdateTrack}
-                        expandedTracks={expandedTracks}
-                        onExpandedTracksChange={setExpandedTracks}
+        <div
+            className="flex-1 min-h-0"
+            style={{
+                display: 'grid',
+                gridTemplateColumns: '256px 1fr',
+                gridTemplateRows: '32px 1fr',
+            }}
+        >
+            {/* Top-Left: Track List Header - Fixed, no scroll */}
+            <div className="border-r border-b border-border bg-muted/30 flex items-center px-3">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+                    Tracks
+                </span>
+            </div>
+
+            {/* Top-Right: Ruler - Scrolls horizontally only, synced with timeline */}
+            <div
+                data-ruler-scroll
+                className="border-b border-border overflow-x-auto overflow-y-hidden scrollbar-hide"
+            >
+                <div style={{ width: `${totalWidth}px`, minWidth: `${totalWidth}px` }}>
+                    <SequencerTimelineRuler
+                        rulerMarkers={rulerMarkers}
+                        totalWidth={totalWidth}
+                        onSeek={onSeek}
+                        pixelsPerBeat={pixelsPerBeat}
+                        zoom={zoom}
+                        snapEnabled={snapEnabled}
+                        gridSize={gridSize}
                     />
                 </div>
             </div>
 
-            {/* Timeline (Right) - ONLY scrollbar, controls everything */}
+            {/* Bottom-Left: Track Headers - Scrolls vertically only, synced with timeline */}
+            <div
+                data-track-list
+                className="border-r border-border bg-background overflow-y-auto overflow-x-hidden scrollbar-hide"
+            >
+                <SequencerTracks
+                    tracks={tracks}
+                    onToggleMute={onToggleMute}
+                    onToggleSolo={onToggleSolo}
+                    onDeleteTrack={onDeleteTrack}
+                    onRenameTrack={onRenameTrack}
+                    onUpdateTrack={onUpdateTrack}
+                    expandedTracks={expandedTracks}
+                    onExpandedTracksChange={setExpandedTracks}
+                />
+            </div>
+
+            {/* Bottom-Right: Timeline - Scrolls both directions, has scrollbar */}
             <div
                 ref={timelineScrollRef}
-                className="min-w-0 min-h-0 overflow-auto pl-64"
-                style={{ flex: '1 1 0', width: 0 }}
+                className="overflow-auto"
                 onScroll={onTimelineScroll}
             >
                 <SequencerTimeline

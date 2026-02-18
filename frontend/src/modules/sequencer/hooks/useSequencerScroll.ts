@@ -2,13 +2,12 @@
  * useSequencerScroll Hook
  *
  * Handles scroll synchronization between:
- * 1. Timeline and track list (vertical scroll)
- * 2. Timeline and piano roll (horizontal scroll)
- * 3. Timeline and sample editor (horizontal scroll)
+ * 1. Timeline and piano roll (horizontal scroll)
+ * 2. Timeline and sample editor (horizontal scroll)
  *
  * Architecture:
  * - Timeline has single scrollbar controlling both axes
- * - Track list vertical scroll is synced (no scrollbar)
+ * - Track list uses CSS position:sticky for native browser sync (no JS needed)
  * - Piano roll horizontal scroll is synced bidirectionally
  * - Piano roll vertical scroll is independent (different axis - pitches vs tracks)
  * - Sample editor horizontal scroll is synced bidirectionally
@@ -25,7 +24,8 @@ export function useSequencerScroll() {
     // Flag to prevent infinite scroll loops
     const isScrollingRef = useRef(false);
 
-    // Timeline scroll handler - syncs track list vertical + piano roll horizontal
+    // Timeline scroll handler - syncs track list vertical + ruler horizontal + piano roll horizontal + sample editor horizontal
+    // Uses CSS Grid layout with synchronized scroll containers for perfect performance
     const handleTimelineScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
         // Prevent infinite loop
         if (isScrollingRef.current) {
@@ -33,22 +33,31 @@ export function useSequencerScroll() {
             return;
         }
 
-        // Sync track list vertical scroll
-        const trackListEl = e.currentTarget.querySelector('[data-track-list]') as HTMLDivElement;
-        if (trackListEl) {
-            trackListEl.scrollTop = e.currentTarget.scrollTop;
+        const scrollTop = e.currentTarget.scrollTop;
+        const scrollLeft = e.currentTarget.scrollLeft;
+
+        // Sync track list vertical scroll (CSS Grid sibling - vertical only)
+        const trackListEl = document.querySelector('[data-track-list]') as HTMLDivElement;
+        if (trackListEl && trackListEl.scrollTop !== scrollTop) {
+            trackListEl.scrollTop = scrollTop;
+        }
+
+        // Sync ruler horizontal scroll (CSS Grid sibling - horizontal only)
+        const rulerScrollEl = document.querySelector('[data-ruler-scroll]') as HTMLDivElement;
+        if (rulerScrollEl && rulerScrollEl.scrollLeft !== scrollLeft) {
+            rulerScrollEl.scrollLeft = scrollLeft;
         }
 
         // Sync piano roll horizontal scroll
         if (pianoRollScrollRef.current) {
             isScrollingRef.current = true;
-            pianoRollScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+            pianoRollScrollRef.current.scrollLeft = scrollLeft;
         }
 
         // Sync sample editor horizontal scroll
         if (sampleEditorScrollRef.current) {
             isScrollingRef.current = true;
-            sampleEditorScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+            sampleEditorScrollRef.current.scrollLeft = scrollLeft;
         }
     }, []);
 
