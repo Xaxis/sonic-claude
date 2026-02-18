@@ -1,5 +1,5 @@
 /**
- * SequencerPanelTimelineRuler - Time ruler with measure markers
+ * SequencerTimelineRuler - Time ruler with measure markers
  * 
  * Displays measure numbers and beat markers at the top of the timeline.
  * Supports click-to-seek functionality.
@@ -13,7 +13,7 @@ interface RulerMarker {
     label: string;
 }
 
-interface SequencerPanelTimelineRulerProps {
+interface SequencerTimelineRulerProps {
     rulerMarkers: RulerMarker[];
     totalWidth: number;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
@@ -23,7 +23,7 @@ interface SequencerPanelTimelineRulerProps {
     gridSize: number;
 }
 
-export function SequencerPanelTimelineRuler({
+export function SequencerTimelineRuler({
     rulerMarkers,
     totalWidth,
     onSeek,
@@ -31,7 +31,7 @@ export function SequencerPanelTimelineRuler({
     zoom,
     snapEnabled,
     gridSize,
-}: SequencerPanelTimelineRulerProps) {
+}: SequencerTimelineRulerProps) {
     const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (!onSeek) return;
 

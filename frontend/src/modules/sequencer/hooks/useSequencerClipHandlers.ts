@@ -32,6 +32,7 @@ interface UseSequencerClipHandlersProps {
     };
     actions: {
         openPianoRoll: (clipId: string) => void;
+        openSampleEditor: (clipId: string) => void;
     };
 }
 
@@ -167,6 +168,10 @@ export function useSequencerClipHandlers(props: UseSequencerClipHandlersProps) {
         actions.openPianoRoll(clipId);
     }, [actions]);
 
+    const handleOpenSampleEditor = useCallback((clipId: string) => {
+        actions.openSampleEditor(clipId);
+    }, [actions]);
+
     const handleUpdateMIDINotes = useCallback(async (clipId: string, notes: MIDIEvent[]) => {
         if (!activeSequenceId) return;
 
@@ -219,6 +224,7 @@ export function useSequencerClipHandlers(props: UseSequencerClipHandlersProps) {
         handleDuplicateClip,
         handlePasteClip,
         handleOpenPianoRoll,
+        handleOpenSampleEditor,
         handleUpdateMIDINotes,
         handleDeleteClip,
         handleMoveClip,

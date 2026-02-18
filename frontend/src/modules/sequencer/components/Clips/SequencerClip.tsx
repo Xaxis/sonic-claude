@@ -1,5 +1,5 @@
 /**
- * SequencerPanelClip - Individual clip component with waveform
+ * SequencerClip - Individual clip component with waveform
  * 
  * Displays a clip with waveform visualization, handles selection and actions
  */
@@ -12,31 +12,34 @@ import { cn } from "@/lib/utils.ts";
 import type { MIDIEvent, SequencerClip } from "../../types.ts";
 import { WaveformDisplay } from "../Shared/WaveformDisplay.tsx";
 
-interface SequencerPanelClipProps {
+interface SequencerClipProps {
     clip: SequencerClip;
     trackColor?: string; // Track color for clip background
     isSelected: boolean;
     isEditingInPianoRoll?: boolean; // True if this clip is currently open in piano roll
+    isEditingInSampleEditor?: boolean; // True if this clip is currently open in sample editor
     zoom: number;
     pixelsPerBeat: number;
     snapEnabled: boolean;
     gridSize: number; // Grid size: 4 = 1/4 note, 8 = 1/8 note, etc.
     isTrackExpanded?: boolean; // Whether the parent track is in expanded mode
-    onSelect: (clipId: string) => void;
+    onSelect: (clipId: string | null) => void; // Accept null to clear selection
     onDuplicate: (clipId: string) => void;
     onDelete: (clipId: string) => void;
     onMove?: (clipId: string, newStartTime: number) => void; // Drag to move
     onResize?: (clipId: string, newDuration: number) => void; // Resize duration
     onUpdateClip?: (clipId: string, updates: { gain?: number; audio_offset?: number; midi_events?: MIDIEvent[] }) => void; // Update clip properties
     onOpenPianoRoll?: (clipId: string) => void; // Open piano roll for MIDI clips
+    onOpenSampleEditor?: (clipId: string) => void; // Open sample editor for audio clips
     onClipDragStateChange?: (clipId: string, dragState: { startTime: number; duration: number } | null) => void; // Report live drag state for piano roll sync
 }
 
-export function SequencerPanelClip({
+export function SequencerClip({
     clip,
     trackColor = "#3b82f6",
     isSelected,
     isEditingInPianoRoll = false,
+    isEditingInSampleEditor = false,
     zoom,
     pixelsPerBeat,
     snapEnabled,
@@ -49,8 +52,9 @@ export function SequencerPanelClip({
     onResize,
     onUpdateClip,
     onOpenPianoRoll,
+    onOpenSampleEditor,
     onClipDragStateChange,
-}: SequencerPanelClipProps) {
+}: SequencerClipProps) {
     const [waveformData, setWaveformData] = useState<number[]>([]);
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null);
@@ -232,13 +236,21 @@ export function SequencerPanelClip({
         const timeSinceLastClick = now - lastClickTime;
 
         // Double-click detection (within 300ms)
-        if (timeSinceLastClick < 300 && clip.type === "midi" && onOpenPianoRoll) {
-            onOpenPianoRoll(clip.id);
+        if (timeSinceLastClick < 300) {
+            // Double-click: clear selection first, then open editor
+            onSelect(null);
+            if (clip.type === "midi" && onOpenPianoRoll) {
+                onOpenPianoRoll(clip.id);
+            } else if (clip.type === "audio" && onOpenSampleEditor) {
+                onOpenSampleEditor(clip.id);
+            }
+            // Reset click time to prevent triple-click issues
+            setLastClickTime(0);
         } else {
+            // Single-click: select clip
             onSelect(clip.id);
+            setLastClickTime(now);
         }
-
-        setLastClickTime(now);
     };
 
     return (
@@ -256,7 +268,7 @@ export function SequencerPanelClip({
             <div
                 className={cn(
                     "absolute top-1 bottom-1 rounded border-2 cursor-move overflow-hidden transition-all",
-                    isEditingInPianoRoll
+                    isEditingInPianoRoll || isEditingInSampleEditor
                         ? "border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.6)] ring-2 ring-cyan-400/50"
                         : isSelected
                             ? "border-white shadow-lg"
@@ -267,10 +279,10 @@ export function SequencerPanelClip({
                 style={{
                     left: `${left}px`,
                     width: `${width}px`,
-                    backgroundColor: isEditingInPianoRoll
+                    backgroundColor: (isEditingInPianoRoll || isEditingInSampleEditor)
                         ? `${trackColor}60` // Brighter when editing
                         : `${trackColor}40`, // Track color with 25% opacity
-                    borderColor: isEditingInPianoRoll ? "#22d3ee" : trackColor,
+                    borderColor: (isEditingInPianoRoll || isEditingInSampleEditor) ? "#22d3ee" : trackColor,
                 }}
             onClick={handleClick}
             onMouseDown={(e) => handleMouseDown(e, "move")}

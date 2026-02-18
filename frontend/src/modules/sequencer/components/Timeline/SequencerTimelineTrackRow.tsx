@@ -1,12 +1,12 @@
 /**
- * SequencerPanelTimelineTrackRow - Individual track row with clips
+ * SequencerTimelineTrackRow - Individual track row with clips
  * 
  * Displays a single track row in the timeline with its clips.
  * Supports click-to-add-clip functionality.
  */
 
 import { useRef } from "react";
-import { SequencerPanelClip } from "../Clips/SequencerPanelClip.tsx";
+import { SequencerClip } from "../Clips/SequencerClip.tsx";
 import { cn } from "@/lib/utils.ts";
 
 interface Clip {
@@ -27,11 +27,12 @@ interface Track {
     color?: string;
 }
 
-interface SequencerPanelTimelineTrackRowProps {
+interface SequencerTimelineTrackRowProps {
     track: Track;
     clips: Clip[];
     selectedClip: string | null;
     pianoRollClipId?: string | null;
+    sampleEditorClipId?: string | null;
     zoom: number;
     pixelsPerBeat: number;
     snapEnabled: boolean;
@@ -45,14 +46,16 @@ interface SequencerPanelTimelineTrackRowProps {
     onResizeClip?: (clipId: string, newDuration: number) => void;
     onUpdateClip?: (clipId: string, updates: { gain?: number; audio_offset?: number }) => void;
     onOpenPianoRoll?: (clipId: string) => void;
+    onOpenSampleEditor?: (clipId: string) => void;
     onClipDragStateChange?: (clipId: string, dragState: { startTime: number; duration: number } | null) => void;
 }
 
-export function SequencerPanelTimelineTrackRow({
+export function SequencerTimelineTrackRow({
     track,
     clips,
     selectedClip,
     pianoRollClipId,
+    sampleEditorClipId,
     zoom,
     pixelsPerBeat,
     snapEnabled,
@@ -66,8 +69,9 @@ export function SequencerPanelTimelineTrackRow({
     onResizeClip,
     onUpdateClip,
     onOpenPianoRoll,
+    onOpenSampleEditor,
     onClipDragStateChange,
-}: SequencerPanelTimelineTrackRowProps) {
+}: SequencerTimelineTrackRowProps) {
     const mouseDownPosRef = useRef<{ x: number; y: number; target: EventTarget | null } | null>(null);
 
     const handleTrackMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -118,12 +122,13 @@ export function SequencerPanelTimelineTrackRow({
             {clips
                 .filter((clip) => clip.track_id === track.id)
                 .map((clip) => (
-                    <SequencerPanelClip
+                    <SequencerClip
                         key={clip.id}
                         clip={clip}
                         trackColor={track.color}
                         isSelected={selectedClip === clip.id}
                         isEditingInPianoRoll={pianoRollClipId === clip.id}
+                        isEditingInSampleEditor={sampleEditorClipId === clip.id}
                         zoom={zoom}
                         pixelsPerBeat={pixelsPerBeat}
                         snapEnabled={snapEnabled}
@@ -136,6 +141,7 @@ export function SequencerPanelTimelineTrackRow({
                         onResize={onResizeClip}
                         onUpdateClip={onUpdateClip}
                         onOpenPianoRoll={onOpenPianoRoll}
+                        onOpenSampleEditor={onOpenSampleEditor}
                         onClipDragStateChange={onClipDragStateChange}
                     />
                 ))}

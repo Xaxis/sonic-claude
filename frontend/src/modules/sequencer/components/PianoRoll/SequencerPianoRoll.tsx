@@ -1,5 +1,5 @@
 /**
- * SequencerPanelPianoRoll - Piano roll MIDI editor (bottom panel)
+ * SequencerPianoRoll - Piano roll MIDI editor (bottom panel)
  *
  * Shows when a MIDI clip is selected. Allows visual editing of MIDI notes.
  * Displays as a bottom panel in the sequencer (like Ableton's clip view).
@@ -16,7 +16,7 @@ import type { MIDIEvent } from "../../types.ts";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 import { api } from "@/services/api";
 
-interface SequencerPanelPianoRollProps {
+interface SequencerPianoRollProps {
     clipId: string;
     clipName: string;
     clipDuration: number; // beats
@@ -28,17 +28,25 @@ interface SequencerPanelPianoRollProps {
     totalBeats: number; // Total composition length in beats
     instrument?: string; // Instrument/synthdef for note preview
     activeNotes?: ActiveNote[]; // Currently playing notes for visual feedback
+    currentPosition: number; // Playback position
+    isPlaying: boolean; // Playback state
+    isLooping: boolean;
+    loopStart: number;
+    loopEnd: number;
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
     onPianoRollScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     onClose: () => void;
     onUpdateNotes: (clipId: string, notes: MIDIEvent[]) => Promise<void>;
     onToggleSnap: () => void;
     onSetGridSize: (size: number) => void;
+    onSeek?: (position: number, triggerAudio?: boolean) => void;
+    onLoopStartChange: (start: number) => void;
+    onLoopEndChange: (end: number) => void;
 }
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-export function SequencerPanelPianoRoll({
+export function SequencerPianoRoll({
     clipId,
     clipName,
     clipDuration,
@@ -50,13 +58,21 @@ export function SequencerPanelPianoRoll({
     totalBeats,
     instrument,
     activeNotes,
+    currentPosition,
+    isPlaying,
+    isLooping,
+    loopStart,
+    loopEnd,
     pianoRollScrollRef,
     onPianoRollScroll,
     onClose,
     onUpdateNotes,
     onToggleSnap,
     onSetGridSize,
-}: SequencerPanelPianoRollProps) {
+    onSeek,
+    onLoopStartChange,
+    onLoopEndChange,
+}: SequencerPianoRollProps) {
     // Local UI state only (not persisted)
     const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
     const [copiedNotes, setCopiedNotes] = useState<MIDIEvent[]>([]);
@@ -271,6 +287,13 @@ export function SequencerPanelPianoRoll({
                 instrument={instrument}
                 clipId={clipId}
                 activeNotes={activeNotes}
+                currentPosition={currentPosition}
+                isPlaying={isPlaying}
+                isLooping={isLooping}
+                loopStart={loopStart}
+                loopEnd={loopEnd}
+                zoom={zoom}
+                pixelsPerBeat={pixelsPerBeat}
                 pianoRollScrollRef={pianoRollScrollRef}
                 onPianoRollScroll={onPianoRollScroll}
                 onAddNote={handleAddNote}
@@ -288,6 +311,9 @@ export function SequencerPanelPianoRoll({
                     }
                     setSelectedNotes(newSelected);
                 }}
+                onSeek={onSeek}
+                onLoopStartChange={onLoopStartChange}
+                onLoopEndChange={onLoopEndChange}
             />
         </div>
     );

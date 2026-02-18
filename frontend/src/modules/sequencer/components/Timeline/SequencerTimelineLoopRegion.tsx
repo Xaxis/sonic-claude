@@ -1,12 +1,12 @@
 /**
- * SequencerPanelTimelineLoopRegion - Loop region markers and background
+ * SequencerTimelineLoopRegion - Loop region markers and background
  * 
  * Displays loop region with draggable start/end markers.
  */
 
 import { useEffect, useRef, useState } from "react";
 
-interface SequencerPanelTimelineLoopRegionProps {
+interface SequencerTimelineLoopRegionProps {
     isLooping: boolean;
     loopStart: number;
     loopEnd: number;
@@ -18,7 +18,7 @@ interface SequencerPanelTimelineLoopRegionProps {
     onLoopEndChange?: (newLoopEnd: number) => void;
 }
 
-export function SequencerPanelTimelineLoopRegion({
+export function SequencerTimelineLoopRegion({
     isLooping,
     loopStart,
     loopEnd,
@@ -28,7 +28,7 @@ export function SequencerPanelTimelineLoopRegion({
     gridSize,
     onLoopStartChange,
     onLoopEndChange,
-}: SequencerPanelTimelineLoopRegionProps) {
+}: SequencerTimelineLoopRegionProps) {
     const [isDraggingLoopStart, setIsDraggingLoopStart] = useState(false);
     const [isDraggingLoopEnd, setIsDraggingLoopEnd] = useState(false);
     const dragStartXRef = useRef<number>(0);

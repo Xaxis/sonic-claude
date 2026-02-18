@@ -1,5 +1,5 @@
 /**
- * SequencerPanelTransport - Transport controls for sequencer
+ * SequencerTransport - Transport controls for sequencer
  *
  * Handles play/pause/stop/record/loop controls and tempo
  */
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { cn } from "@/lib/utils.ts";
 
-interface SequencerPanelTransportProps {
+interface SequencerTransportProps {
     isPlaying: boolean;
     isPaused: boolean;
     isRecording: boolean;
@@ -30,7 +30,7 @@ interface SequencerPanelTransportProps {
     onTempoKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
-export function SequencerPanelTransport({
+export function SequencerTransport({
     isPlaying,
     isPaused,
     isRecording,
@@ -46,7 +46,7 @@ export function SequencerPanelTransport({
     onTempoChange,
     onTempoBlur,
     onTempoKeyDown,
-}: SequencerPanelTransportProps) {
+}: SequencerTransportProps) {
     const canPlay = hasTracksOrClips;
     const playTooltip = canPlay
         ? (isPlaying ? "Pause" : isPaused ? "Resume" : "Play")

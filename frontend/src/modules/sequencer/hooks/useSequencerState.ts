@@ -42,6 +42,10 @@ export interface SequencerState {
     showPianoRoll: boolean;
     pianoRollClipId: string | null;
 
+    // Sample Editor
+    showSampleEditor: boolean;
+    sampleEditorClipId: string | null;
+
     // Tempo input (local state for input field)
     tempoInput: string;
 }
@@ -73,6 +77,10 @@ export interface SequencerActions {
     openPianoRoll: (clipId: string) => void;
     closePianoRoll: () => void;
 
+    // Sample Editor
+    openSampleEditor: (clipId: string) => void;
+    closeSampleEditor: () => void;
+
     // Tempo input
     setTempoInput: (tempo: string) => void;
 
@@ -96,7 +104,7 @@ export function useSequencerState(initialTempo: number = 120) {
     const [loopStart, setLoopStart] = useState(0);
     const [loopEnd, setLoopEnd] = useState(16); // 4 bars
 
-    // Selection & clipboard
+    // Selection & clipboard - don't persist selection
     const [selectedClip, setSelectedClip] = useState<string | null>(null);
     const [clipboardClip, setClipboardClip] = useState<SequencerClip | null>(null);
 
@@ -109,6 +117,10 @@ export function useSequencerState(initialTempo: number = 120) {
     // Piano Roll
     const [showPianoRoll, setShowPianoRoll] = useState(false);
     const [pianoRollClipId, setPianoRollClipId] = useState<string | null>(null);
+
+    // Sample Editor
+    const [showSampleEditor, setShowSampleEditor] = useState(false);
+    const [sampleEditorClipId, setSampleEditorClipId] = useState<string | null>(null);
 
     // Tempo input
     const [tempoInput, setTempoInput] = useState(initialTempo.toString());
@@ -131,13 +143,35 @@ export function useSequencerState(initialTempo: number = 120) {
     }, []);
 
     const openPianoRoll = useCallback((clipId: string) => {
+        // Close sample editor if open (only one editor at a time)
+        setShowSampleEditor(false);
+        setSampleEditorClipId(null);
+
+        // Open piano roll
         setPianoRollClipId(clipId);
         setShowPianoRoll(true);
+        setSelectedClip(null); // Clear selection when opening editor
     }, []);
 
     const closePianoRoll = useCallback(() => {
         setShowPianoRoll(false);
         setPianoRollClipId(null);
+    }, []);
+
+    const openSampleEditor = useCallback((clipId: string) => {
+        // Close piano roll if open (only one editor at a time)
+        setShowPianoRoll(false);
+        setPianoRollClipId(null);
+
+        // Open sample editor
+        setSampleEditorClipId(clipId);
+        setShowSampleEditor(true);
+        setSelectedClip(null); // Clear selection when opening editor
+    }, []);
+
+    const closeSampleEditor = useCallback(() => {
+        setShowSampleEditor(false);
+        setSampleEditorClipId(null);
     }, []);
 
     const state: SequencerState = {
@@ -157,6 +191,8 @@ export function useSequencerState(initialTempo: number = 120) {
         showTrackTypeDialog,
         showPianoRoll,
         pianoRollClipId,
+        showSampleEditor,
+        sampleEditorClipId,
         tempoInput,
     };
 
@@ -177,6 +213,8 @@ export function useSequencerState(initialTempo: number = 120) {
         setShowTrackTypeDialog,
         openPianoRoll,
         closePianoRoll,
+        openSampleEditor,
+        closeSampleEditor,
         setTempoInput,
         zoomIn,
         zoomOut,

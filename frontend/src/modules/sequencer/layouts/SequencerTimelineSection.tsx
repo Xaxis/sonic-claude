@@ -10,8 +10,8 @@
  */
 
 import React, { useState } from "react";
-import { SequencerPanelTracks } from "../components/Tracks/SequencerPanelTracks.tsx";
-import { SequencerPanelTimeline } from "../components/Timeline/SequencerPanelTimeline.tsx";
+import { SequencerTracks } from "../components/Tracks/SequencerTracks.tsx";
+import { SequencerTimeline } from "../components/Timeline/SequencerTimeline.tsx";
 import type { SequencerTrack, Clip } from "@/types/sequencer";
 
 interface SequencerTimelineSectionProps {
@@ -31,7 +31,8 @@ interface SequencerTimelineSectionProps {
     gridSize: number;
     selectedClip: string | null;
     pianoRollClipId: string | null;
-    
+    sampleEditorClipId?: string | null;
+
     // Scroll
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
     onTimelineScroll: (e: React.UIEvent<HTMLDivElement>) => void;
@@ -52,7 +53,8 @@ interface SequencerTimelineSectionProps {
     onResizeClip: (clipId: string, newDuration: number) => Promise<void>;
     onUpdateClip: (clipId: string, updates: { gain?: number; audio_offset?: number }) => Promise<void>;
     onOpenPianoRoll: (clipId: string) => void;
-    
+    onOpenSampleEditor?: (clipId: string) => void;
+
     // Loop handlers
     onLoopStartChange: (start: number) => void;
     onLoopEndChange: (end: number) => void;
@@ -77,6 +79,7 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
         gridSize,
         selectedClip,
         pianoRollClipId,
+        sampleEditorClipId,
         timelineScrollRef,
         onTimelineScroll,
         onToggleMute,
@@ -92,6 +95,7 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
         onResizeClip,
         onUpdateClip,
         onOpenPianoRoll,
+        onOpenSampleEditor,
         onLoopStartChange,
         onLoopEndChange,
         onSeek,
@@ -116,7 +120,7 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
                     data-track-list
                     className="flex-1 overflow-hidden"
                 >
-                    <SequencerPanelTracks
+                    <SequencerTracks
                         tracks={tracks}
                         onToggleMute={onToggleMute}
                         onToggleSolo={onToggleSolo}
@@ -136,7 +140,7 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
                 style={{ flex: '1 1 0', width: 0 }}
                 onScroll={onTimelineScroll}
             >
-                <SequencerPanelTimeline
+                <SequencerTimeline
                     tracks={tracks}
                     clips={clips}
                     zoom={zoom}
@@ -150,6 +154,7 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
                     gridSize={gridSize}
                     selectedClip={selectedClip}
                     pianoRollClipId={pianoRollClipId}
+                    sampleEditorClipId={sampleEditorClipId}
                     expandedTracks={expandedTracks}
                     onSelectClip={onSelectClip}
                     onDuplicateClip={onDuplicateClip}
@@ -159,6 +164,7 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
                     onResizeClip={onResizeClip}
                     onUpdateClip={onUpdateClip}
                     onOpenPianoRoll={onOpenPianoRoll}
+                    onOpenSampleEditor={onOpenSampleEditor}
                     onLoopStartChange={onLoopStartChange}
                     onLoopEndChange={onLoopEndChange}
                     onSeek={onSeek}

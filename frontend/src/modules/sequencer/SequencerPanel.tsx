@@ -14,12 +14,12 @@ import { useSequencerClipHandlers } from "./hooks/useSequencerClipHandlers.ts";
 import { useSequencerKeyboard } from "./hooks/useSequencerKeyboard.ts";
 import { useSequencerScroll } from "./hooks/useSequencerScroll.ts";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
-import { SequencerPanelSampleBrowser } from "./components/Dialogs/SequencerPanelSampleBrowser.tsx";
-import { SequencerPanelSequenceManager } from "./components/Dialogs/SequencerPanelSequenceManager.tsx";
-import { SequencerPanelSettingsDialog } from "./components/Dialogs/SequencerPanelSettingsDialog.tsx";
-import { SequencerPanelTrackTypeDialog } from "./components/Dialogs/SequencerPanelTrackTypeDialog.tsx";
+import { SequencerSampleBrowser } from "./components/Dialogs/SequencerSampleBrowser.tsx";
+import { SequencerSequenceManager } from "./components/Dialogs/SequencerSequenceManager.tsx";
+import { SequencerSettingsDialog } from "./components/Dialogs/SequencerSettingsDialog.tsx";
+import { SequencerTrackTypeDialog } from "./components/Dialogs/SequencerTrackTypeDialog.tsx";
 import { SequencerEmptyState } from "./components/States/SequencerEmptyState.tsx";
-import { SequencerPanelTransport } from "./components/Transport/SequencerPanelTransport.tsx";
+import { SequencerTransport } from "./components/Transport/SequencerTransport.tsx";
 import { SequencerPanelToolbar } from "./components/Toolbar/SequencerPanelToolbar.tsx";
 import { SequencerTimelineSection } from "./layouts/SequencerTimelineSection.tsx";
 import { SequencerSplitLayout } from "./layouts/SequencerSplitLayout.tsx";
@@ -71,8 +71,8 @@ export function SequencerPanel() {
     const wsLoopEnd = transport.loop_end ?? state.loopEnd;
     const activeNotes = transport.active_notes ?? [];
 
-    // Scroll synchronization (timeline + piano roll)
-    const { timelineScrollRef, pianoRollScrollRef, handleTimelineScroll, handlePianoRollScroll } = useSequencerScroll();
+    // Scroll synchronization (timeline + piano roll + sample editor)
+    const { timelineScrollRef, pianoRollScrollRef, sampleEditorScrollRef, handleTimelineScroll, handlePianoRollScroll, handleSampleEditorScroll } = useSequencerScroll();
 
     // Event handlers - Transport, Sequences, Tracks
     const {
@@ -185,6 +185,7 @@ export function SequencerPanel() {
         handleDuplicateClip,
         handlePasteClip,
         handleOpenPianoRoll,
+        handleOpenSampleEditor,
         handleUpdateMIDINotes,
         handleDeleteClip,
         handleMoveClip,
@@ -204,6 +205,7 @@ export function SequencerPanel() {
         },
         actions: {
             openPianoRoll: actions.openPianoRoll,
+            openSampleEditor: actions.openSampleEditor,
         },
     });
 
@@ -230,7 +232,7 @@ export function SequencerPanel() {
             <div className="flex-shrink-0">
                 <SubPanel title="TRANSPORT" showHeader={false}>
                     <div className="px-4 py-3 bg-gradient-to-r from-muted/20 to-muted/10">
-                        <SequencerPanelTransport
+                        <SequencerTransport
                             isPlaying={isPlaying}
                             isPaused={state.isPaused}
                             isRecording={state.isRecording}
@@ -288,6 +290,7 @@ export function SequencerPanel() {
                             tracks={tracks}
                             clips={clips}
                             pianoRollClipId={state.pianoRollClipId}
+                            sampleEditorClipId={state.sampleEditorClipId}
                             zoom={state.zoom}
                             currentPosition={currentPosition}
                             isPlaying={isPlaying}
@@ -299,11 +302,14 @@ export function SequencerPanel() {
                             gridSize={state.gridSize}
                             selectedClip={state.selectedClip}
                             showPianoRoll={state.showPianoRoll}
+                            showSampleEditor={state.showSampleEditor}
                             activeNotes={activeNotes}
                             timelineScrollRef={timelineScrollRef}
                             pianoRollScrollRef={pianoRollScrollRef}
+                            sampleEditorScrollRef={sampleEditorScrollRef}
                             onTimelineScroll={handleTimelineScroll}
                             onPianoRollScroll={handlePianoRollScroll}
+                            onSampleEditorScroll={handleSampleEditorScroll}
                             onToggleMute={handleToggleMute}
                             onToggleSolo={handleToggleSolo}
                             onDeleteTrack={deleteSequencerTrack}
@@ -317,12 +323,14 @@ export function SequencerPanel() {
                             onResizeClip={handleResizeClip}
                             onUpdateClip={handleUpdateClip}
                             onOpenPianoRoll={handleOpenPianoRoll}
+                            onOpenSampleEditor={handleOpenSampleEditor}
                             onLoopStartChange={actions.setLoopStart}
                             onLoopEndChange={actions.setLoopEnd}
                             onSeek={handleSeek}
                             onToggleSnap={actions.toggleSnap}
                             onSetGridSize={actions.setGridSize}
                             onClosePianoRoll={actions.closePianoRoll}
+                            onCloseSampleEditor={actions.closeSampleEditor}
                             onUpdateMIDINotes={handleUpdateMIDINotes}
                         />
                         </div>
@@ -331,14 +339,14 @@ export function SequencerPanel() {
             </div>
 
             {/* Sample Browser */}
-            <SequencerPanelSampleBrowser
+            <SequencerSampleBrowser
                 isOpen={state.showSampleBrowser}
                 onClose={() => actions.setShowSampleBrowser(false)}
                 onSelectSample={handleSampleSelected}
             />
 
             {/* Sequence Manager */}
-            <SequencerPanelSequenceManager
+            <SequencerSequenceManager
                 isOpen={state.showSequenceManager}
                 onClose={() => actions.setShowSequenceManager(false)}
                 currentSequenceId={activeSequenceId}
@@ -348,7 +356,7 @@ export function SequencerPanel() {
 
             {/* Sequence Settings Dialog */}
             {activeSequence && (
-                <SequencerPanelSettingsDialog
+                <SequencerSettingsDialog
                     isOpen={state.showSequenceSettings}
                     onClose={() => actions.setShowSequenceSettings(false)}
                     sequence={activeSequence}
@@ -382,7 +390,7 @@ export function SequencerPanel() {
             )}
 
             {/* Track Type Selection Dialog */}
-            <SequencerPanelTrackTypeDialog
+            <SequencerTrackTypeDialog
                 isOpen={state.showTrackTypeDialog}
                 onClose={() => actions.setShowTrackTypeDialog(false)}
                 onSelectMIDI={handleAddMIDITrack}

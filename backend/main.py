@@ -27,7 +27,9 @@ from backend.core.exceptions import (
     ValidationError,
     ServiceError,
 )
-from backend.api import audio_routes, websocket_routes, sequencer_routes, sample_routes
+from backend.api import websocket_routes, sample_routes
+from backend.api.audio import router as audio_router
+from backend.api.sequencer import router as sequencer_router
 
 logger = logging.getLogger(__name__)
 
@@ -196,8 +198,8 @@ async def sonic_claude_exception_handler(request: Request, exc: SonicClaudeExcep
 # ============================================================================
 
 # Include routers
-app.include_router(audio_routes.router, prefix="/audio-engine/audio", tags=["audio"])
-app.include_router(sequencer_routes.router, prefix="/audio-engine/audio/sequencer", tags=["sequencer"])
+app.include_router(audio_router, prefix="/audio-engine/audio")
+app.include_router(sequencer_router, prefix="/audio-engine/audio/sequencer")
 app.include_router(websocket_routes.router, prefix="/audio-engine/ws", tags=["websocket"])
 app.include_router(sample_routes.router, prefix="/api/samples", tags=["samples"])
 

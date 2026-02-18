@@ -1,13 +1,14 @@
 /**
  * SequencerSplitLayout Component
  *
- * Layout for when piano roll is open.
- * Features drag-resizable split between timeline (top) and piano roll (bottom).
+ * Layout for when piano roll or sample editor is open.
+ * Features drag-resizable split between timeline (top) and editor (bottom).
  */
 
 import React, { useState, useCallback, useEffect } from "react";
 import { SequencerTimelineSection } from "./SequencerTimelineSection.tsx";
 import { PianoRollWrapper } from "./PianoRollWrapper.tsx";
+import { SampleEditorWrapper } from "./SampleEditorWrapper.tsx";
 import type { SequencerTrack, Clip } from "@/types/sequencer";
 import type { MIDIEvent } from "../types.ts";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
@@ -17,6 +18,7 @@ interface SequencerSplitLayoutProps {
     tracks: SequencerTrack[];
     clips: Clip[];
     pianoRollClipId: string | null;
+    sampleEditorClipId: string | null;
 
     // State
     zoom: number;
@@ -30,13 +32,16 @@ interface SequencerSplitLayoutProps {
     gridSize: number;
     selectedClip: string | null;
     showPianoRoll: boolean;
+    showSampleEditor: boolean;
     activeNotes?: ActiveNote[];
 
     // Scroll
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
+    sampleEditorScrollRef: React.RefObject<HTMLDivElement | null>;
     onTimelineScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     onPianoRollScroll: (e: React.UIEvent<HTMLDivElement>) => void;
+    onSampleEditorScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     
     // Track handlers
     onToggleMute: (trackId: string) => Promise<void>;
@@ -54,7 +59,8 @@ interface SequencerSplitLayoutProps {
     onResizeClip: (clipId: string, newDuration: number) => Promise<void>;
     onUpdateClip: (clipId: string, updates: { gain?: number; audio_offset?: number }) => Promise<void>;
     onOpenPianoRoll: (clipId: string) => void;
-    
+    onOpenSampleEditor: (clipId: string) => void;
+
     // Loop handlers
     onLoopStartChange: (start: number) => void;
     onLoopEndChange: (end: number) => void;
@@ -67,22 +73,34 @@ interface SequencerSplitLayoutProps {
     // Piano roll handlers
     onClosePianoRoll: () => void;
     onUpdateMIDINotes: (clipId: string, notes: MIDIEvent[]) => Promise<void>;
+
+    // Sample editor handlers
+    onCloseSampleEditor: () => void;
 }
 
 export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
     const {
         clips,
         pianoRollClipId,
+        sampleEditorClipId,
         showPianoRoll,
+        showSampleEditor,
         zoom,
         snapEnabled,
         gridSize,
+        currentPosition,
+        isPlaying,
         pianoRollScrollRef,
+        sampleEditorScrollRef,
         onPianoRollScroll,
+        onSampleEditorScroll,
         onClosePianoRoll,
+        onCloseSampleEditor,
         onUpdateMIDINotes,
+        onUpdateClip,
         onToggleSnap,
         onSetGridSize,
+        onSeek,
         timelineScrollRef,
         ...timelineSectionProps
     } = props;
@@ -157,13 +175,17 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
     }, []);
 
     // Find the clip for piano roll
-    const clip = clips.find(c => c.id === pianoRollClipId);
+    const pianoRollClip = clips.find(c => c.id === pianoRollClipId);
 
     // Find the track for the clip (to get instrument)
-    const track = clip ? props.tracks.find(t => t.id === clip.track_id) : undefined;
+    const pianoRollTrack = pianoRollClip ? props.tracks.find(t => t.id === pianoRollClip.track_id) : undefined;
 
-    // Get drag state for piano roll clip (if being dragged)
+    // Find the clip for sample editor
+    const sampleEditorClip = clips.find(c => c.id === sampleEditorClipId);
+
+    // Get drag state for active editor clips (if being dragged)
     const pianoRollClipDragState = pianoRollClipId ? clipDragStates.get(pianoRollClipId) : null;
+    const sampleEditorClipDragState = sampleEditorClipId ? clipDragStates.get(sampleEditorClipId) : null;
 
     // Calculate totalBeats (same as timeline)
     const minBeats = 64; // Minimum 16 measures
@@ -186,6 +208,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                     snapEnabled={snapEnabled}
                     gridSize={gridSize}
                     pianoRollClipId={pianoRollClipId}
+                    sampleEditorClipId={sampleEditorClipId}
                     timelineScrollRef={timelineScrollRef}
                     isPlaying={props.isPlaying}
                     tempo={props.tempo}
@@ -203,29 +226,64 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                 <div className="w-12 h-0.5 bg-border group-hover:bg-foreground/50 rounded-full" />
             </div>
 
-            {/* Piano Roll Section - Bottom (resizable) */}
+            {/* Editor Section - Bottom (resizable) - Piano Roll or Sample Editor */}
             <div
                 className="min-h-0 overflow-hidden"
                 style={{ height: `${100 - timelineHeightPercent}%` }}
             >
                 <div className="h-full flex flex-col overflow-hidden">
-                    <PianoRollWrapper
-                        clip={clip}
-                        track={track}
-                        clipDragState={pianoRollClipDragState}
-                        zoom={zoom}
-                        snapEnabled={snapEnabled}
-                        gridSize={gridSize}
-                        totalBeats={totalBeats}
-                        activeNotes={props.activeNotes}
-                        timelineScrollRef={timelineScrollRef}
-                        pianoRollScrollRef={pianoRollScrollRef}
-                        onPianoRollScroll={onPianoRollScroll}
-                        onClose={onClosePianoRoll}
-                        onUpdateNotes={onUpdateMIDINotes}
-                        onToggleSnap={onToggleSnap}
-                        onSetGridSize={onSetGridSize}
-                    />
+                    {showPianoRoll && (
+                        <PianoRollWrapper
+                            clip={pianoRollClip}
+                            track={pianoRollTrack}
+                            clipDragState={pianoRollClipDragState}
+                            zoom={zoom}
+                            snapEnabled={snapEnabled}
+                            gridSize={gridSize}
+                            totalBeats={totalBeats}
+                            activeNotes={props.activeNotes}
+                            currentPosition={currentPosition}
+                            isPlaying={isPlaying ?? false}
+                            isLooping={props.isLooping}
+                            loopStart={props.loopStart}
+                            loopEnd={props.loopEnd}
+                            timelineScrollRef={timelineScrollRef}
+                            pianoRollScrollRef={pianoRollScrollRef}
+                            onPianoRollScroll={onPianoRollScroll}
+                            onClose={onClosePianoRoll}
+                            onUpdateNotes={onUpdateMIDINotes}
+                            onToggleSnap={onToggleSnap}
+                            onSetGridSize={onSetGridSize}
+                            onSeek={onSeek}
+                            onLoopStartChange={props.onLoopStartChange}
+                            onLoopEndChange={props.onLoopEndChange}
+                        />
+                    )}
+                    {showSampleEditor && (
+                        <SampleEditorWrapper
+                            clip={sampleEditorClip}
+                            clipDragState={sampleEditorClipDragState}
+                            zoom={zoom}
+                            snapEnabled={snapEnabled}
+                            gridSize={gridSize}
+                            totalBeats={totalBeats}
+                            currentPosition={currentPosition}
+                            isPlaying={isPlaying ?? false}
+                            isLooping={props.isLooping}
+                            loopStart={props.loopStart}
+                            loopEnd={props.loopEnd}
+                            timelineScrollRef={timelineScrollRef}
+                            sampleEditorScrollRef={sampleEditorScrollRef}
+                            onSampleEditorScroll={onSampleEditorScroll}
+                            onClose={onCloseSampleEditor}
+                            onUpdateClip={onUpdateClip}
+                            onToggleSnap={onToggleSnap}
+                            onSetGridSize={onSetGridSize}
+                            onSeek={onSeek}
+                            onLoopStartChange={props.onLoopStartChange}
+                            onLoopEndChange={props.onLoopEndChange}
+                        />
+                    )}
                 </div>
             </div>
         </div>

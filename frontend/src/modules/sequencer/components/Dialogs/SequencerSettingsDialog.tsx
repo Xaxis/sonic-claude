@@ -1,5 +1,5 @@
 /**
- * SequencerPanelSettingsDialog - Modal for editing sequence settings
+ * SequencerSettingsDialog - Modal for editing sequence settings
  *
  * Provides UI for editing per-sequence settings:
  * - Name
@@ -41,7 +41,7 @@ export interface SequenceSettings {
     loop_end: number;
 }
 
-export function SequencerPanelSettingsDialog({
+export function SequencerSettingsDialog({
     isOpen,
     onClose,
     sequence,

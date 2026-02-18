@@ -13,13 +13,13 @@ import { cn } from "@/lib/utils.ts";
 import { api } from "@/services/api";
 import type { SampleMetadata } from "@/services/samples";
 
-interface SequencerPanelSampleBrowserProps {
+interface SequencerSampleBrowserProps {
     isOpen: boolean;
     onClose: () => void;
     onSelectSample: (sample: SampleMetadata) => void;
 }
 
-export function SequencerPanelSampleBrowser({ isOpen, onClose, onSelectSample }: SequencerPanelSampleBrowserProps) {
+export function SequencerSampleBrowser({ isOpen, onClose, onSelectSample }: SequencerSampleBrowserProps) {
     const [samples, setSamples] = useState<SampleMetadata[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedSample, setSelectedSample] = useState<SampleMetadata | null>(null);

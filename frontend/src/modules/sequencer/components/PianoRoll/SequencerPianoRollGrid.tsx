@@ -1,5 +1,5 @@
 /**
- * SequencerPanelPianoRollGrid - Piano roll note grid with editing capabilities
+ * SequencerPianoRollGrid - Piano roll note grid with editing capabilities
  * 
  * Displays MIDI notes on a grid, handles note creation, movement, resizing, and deletion.
  */
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils.ts";
 import type { MIDIEvent } from "../types.ts";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
-interface SequencerPanelPianoRollGridProps {
+interface SequencerPianoRollGridProps {
     notes: MIDIEvent[];
     selectedNotes: Set<number>;
     minPitch: number;
@@ -32,7 +32,7 @@ interface SequencerPanelPianoRollGridProps {
     onToggleSelectNote: (index: number) => void;
 }
 
-export function SequencerPanelPianoRollGrid({
+export function SequencerPianoRollGrid({
     notes,
     selectedNotes,
     minPitch,
@@ -53,7 +53,7 @@ export function SequencerPanelPianoRollGrid({
     onDeleteNote,
     onSelectNote,
     onToggleSelectNote,
-}: SequencerPanelPianoRollGridProps) {
+}: SequencerPianoRollGridProps) {
     const gridRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState<number | null>(null);
     const [isResizing, setIsResizing] = useState<number | null>(null);

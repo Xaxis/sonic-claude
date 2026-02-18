@@ -4,12 +4,14 @@
  * Handles scroll synchronization between:
  * 1. Timeline and track list (vertical scroll)
  * 2. Timeline and piano roll (horizontal scroll)
+ * 3. Timeline and sample editor (horizontal scroll)
  *
  * Architecture:
  * - Timeline has single scrollbar controlling both axes
  * - Track list vertical scroll is synced (no scrollbar)
  * - Piano roll horizontal scroll is synced bidirectionally
  * - Piano roll vertical scroll is independent (different axis - pitches vs tracks)
+ * - Sample editor horizontal scroll is synced bidirectionally
  */
 
 import { useRef, useCallback } from "react";
@@ -18,6 +20,7 @@ export function useSequencerScroll() {
     // Refs for scroll containers
     const timelineScrollRef = useRef<HTMLDivElement>(null);
     const pianoRollScrollRef = useRef<HTMLDivElement>(null);
+    const sampleEditorScrollRef = useRef<HTMLDivElement>(null);
 
     // Flag to prevent infinite scroll loops
     const isScrollingRef = useRef(false);
@@ -41,6 +44,12 @@ export function useSequencerScroll() {
             isScrollingRef.current = true;
             pianoRollScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
         }
+
+        // Sync sample editor horizontal scroll
+        if (sampleEditorScrollRef.current) {
+            isScrollingRef.current = true;
+            sampleEditorScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+        }
     }, []);
 
     // Piano roll scroll handler - syncs timeline horizontal only
@@ -58,11 +67,28 @@ export function useSequencerScroll() {
         }
     }, []);
 
+    // Sample editor scroll handler - syncs timeline horizontal only
+    const handleSampleEditorScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        // Prevent infinite loop
+        if (isScrollingRef.current) {
+            isScrollingRef.current = false;
+            return;
+        }
+
+        // Sync timeline horizontal scroll
+        if (timelineScrollRef.current) {
+            isScrollingRef.current = true;
+            timelineScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+        }
+    }, []);
+
     return {
         timelineScrollRef,
         pianoRollScrollRef,
+        sampleEditorScrollRef,
         handleTimelineScroll,
         handlePianoRollScroll,
+        handleSampleEditorScroll,
     };
 }
 

@@ -1,23 +1,23 @@
 /**
- * SequencerPanelTimeline - Timeline container component
+ * SequencerTimeline - Timeline container component
  *
  * Composes timeline subcomponents into a cohesive timeline view:
- * - SequencerPanelTimelineRuler: Time ruler with measure markers
- * - SequencerPanelTimelineGrid: Grid lines background
- * - SequencerPanelTimelineLoopRegion: Loop region markers
- * - SequencerPanelTimelinePlayhead: Playhead indicator with drag support
- * - SequencerPanelTimelineTrackRow: Individual track rows with clips
+ * - SequencerTimelineRuler: Time ruler with measure markers
+ * - SequencerTimelineGrid: Grid lines background
+ * - SequencerTimelineLoopRegion: Loop region markers
+ * - SequencerTimelinePlayhead: Playhead indicator with drag support
+ * - SequencerTimelineTrackRow: Individual track rows with clips
  */
 
 import { useRef, useEffect } from "react";
-import { SequencerPanelTimelineRuler } from "./SequencerPanelTimelineRuler.tsx";
-import { SequencerPanelTimelineGrid } from "./SequencerPanelTimelineGrid.tsx";
-import { SequencerPanelTimelineLoopRegion } from "./SequencerPanelTimelineLoopRegion.tsx";
-import { SequencerPanelTimelinePlayhead } from "./SequencerPanelTimelinePlayhead.tsx";
-import { SequencerPanelTimelineTrackRow } from "./SequencerPanelTimelineTrackRow.tsx";
+import { SequencerTimelineRuler } from "./SequencerTimelineRuler.tsx";
+import { SequencerTimelineGrid } from "./SequencerTimelineGrid.tsx";
+import { SequencerTimelineLoopRegion } from "./SequencerTimelineLoopRegion.tsx";
+import { SequencerTimelinePlayhead } from "./SequencerTimelinePlayhead.tsx";
+import { SequencerTimelineTrackRow } from "./SequencerTimelineTrackRow.tsx";
 import type { SequencerClip, SequencerTrack } from "../../types.ts";
 
-interface SequencerPanelTimelineProps {
+interface SequencerTimelineProps {
     tracks: SequencerTrack[];
     clips: SequencerClip[];
     zoom: number;
@@ -31,6 +31,7 @@ interface SequencerPanelTimelineProps {
     gridSize: number;
     selectedClip: string | null;
     pianoRollClipId?: string | null; // ID of clip currently open in piano roll
+    sampleEditorClipId?: string | null; // ID of clip currently open in sample editor
     expandedTracks?: Set<string>; // Track header expansion state
     onSelectClip: (clipId: string) => void;
     onDuplicateClip: (clipId: string) => void;
@@ -40,13 +41,14 @@ interface SequencerPanelTimelineProps {
     onResizeClip?: (clipId: string, newDuration: number) => void;
     onUpdateClip?: (clipId: string, updates: { gain?: number; audio_offset?: number }) => void;
     onOpenPianoRoll?: (clipId: string) => void;
+    onOpenSampleEditor?: (clipId: string) => void;
     onLoopStartChange?: (newLoopStart: number) => void;
     onLoopEndChange?: (newLoopEnd: number) => void;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
     onClipDragStateChange?: (clipId: string, dragState: { startTime: number; duration: number } | null) => void;
 }
 
-export function SequencerPanelTimeline({
+export function SequencerTimeline({
     tracks,
     clips,
     zoom,
@@ -60,6 +62,7 @@ export function SequencerPanelTimeline({
     gridSize,
     selectedClip,
     pianoRollClipId,
+    sampleEditorClipId,
     expandedTracks,
     onSelectClip,
     onDuplicateClip,
@@ -69,11 +72,12 @@ export function SequencerPanelTimeline({
     onResizeClip,
     onUpdateClip,
     onOpenPianoRoll,
+    onOpenSampleEditor,
     onLoopStartChange,
     onLoopEndChange,
     onSeek,
     onClipDragStateChange,
-}: SequencerPanelTimelineProps) {
+}: SequencerTimelineProps) {
     const pixelsPerBeat = 40;
     const beatsPerMeasure = 4;
 
@@ -83,7 +87,8 @@ export function SequencerPanelTimeline({
         ? Math.max(...clips.map(c => c.start_time + c.duration))
         : 0;
     const totalBeats = Math.max(minBeats, Math.ceil(maxClipEnd) + 128); // Always add 128 beats (32 measures) padding after last clip
-    const totalWidth = totalBeats * pixelsPerBeat * zoom;
+    // Add extra width to ensure content extends beyond viewport for smooth scrolling
+    const totalWidth = totalBeats * pixelsPerBeat * zoom + 1000;
 
     // Ref for timeline container to enable auto-scroll
     const timelineContainerRef = useRef<HTMLDivElement>(null);
@@ -145,7 +150,7 @@ export function SequencerPanelTimeline({
         <div ref={timelineContainerRef} className="flex flex-col flex-shrink-0" style={{ width: `${totalWidth}px`, minWidth: `${totalWidth}px` }}>
             {/* Ruler - Sticky header */}
             <div className="flex-shrink-0">
-                <SequencerPanelTimelineRuler
+                <SequencerTimelineRuler
                     rulerMarkers={rulerMarkers}
                     totalWidth={totalWidth}
                     onSeek={onSeek}
@@ -165,10 +170,10 @@ export function SequencerPanelTimeline({
                 <div className="flex-shrink-0" style={{ width: `${totalWidth}px` }}>
                     <div className="relative" style={{ width: `${totalWidth}px` }}>
                         {/* Grid Lines */}
-                        <SequencerPanelTimelineGrid rulerMarkers={rulerMarkers} />
+                        <SequencerTimelineGrid rulerMarkers={rulerMarkers} />
 
                         {/* Loop Region */}
-                        <SequencerPanelTimelineLoopRegion
+                        <SequencerTimelineLoopRegion
                             isLooping={isLooping}
                             loopStart={loopStart}
                             loopEnd={loopEnd}
@@ -182,12 +187,13 @@ export function SequencerPanelTimeline({
 
                         {/* Track Rows */}
                         {tracks.map((track) => (
-                            <SequencerPanelTimelineTrackRow
+                            <SequencerTimelineTrackRow
                                 key={track.id}
                                 track={track}
                                 clips={clips}
                                 selectedClip={selectedClip}
                                 pianoRollClipId={pianoRollClipId}
+                                sampleEditorClipId={sampleEditorClipId}
                                 zoom={zoom}
                                 pixelsPerBeat={pixelsPerBeat}
                                 snapEnabled={snapEnabled}
@@ -201,12 +207,13 @@ export function SequencerPanelTimeline({
                                 onResizeClip={onResizeClip}
                                 onUpdateClip={onUpdateClip}
                                 onOpenPianoRoll={onOpenPianoRoll}
+                                onOpenSampleEditor={onOpenSampleEditor}
                                 onClipDragStateChange={onClipDragStateChange}
                             />
                         ))}
 
                         {/* Playhead - Rendered AFTER tracks so it appears on top */}
-                        <SequencerPanelTimelinePlayhead
+                        <SequencerTimelinePlayhead
                             currentPosition={currentPosition}
                             pixelsPerBeat={pixelsPerBeat}
                             zoom={zoom}

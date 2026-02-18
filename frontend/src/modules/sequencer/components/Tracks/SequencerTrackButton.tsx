@@ -1,19 +1,19 @@
 /**
- * TrackButton Component
+ * SequencerTrackButton Component
  *
  * Specialized button for track controls (Mute, Solo, Record/Arm).
  * Provides consistent styling and behavior for track header buttons.
  *
  * Usage:
  * ```tsx
- * <TrackButton
+ * <SequencerTrackButton
  *   variant="mute"
  *   active={track.is_muted}
  *   onClick={() => onToggleMute(track.id)}
  *   size="sm"
  * >
  *   M
- * </TrackButton>
+ * </SequencerTrackButton>
  * ```
  */
 
@@ -21,7 +21,7 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const trackButtonVariants = cva(
+const sequencerTrackButtonVariants = cva(
     "inline-flex items-center justify-center rounded font-bold uppercase tracking-wide transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
     {
         variants: {
@@ -65,16 +65,16 @@ const trackButtonVariants = cva(
     }
 );
 
-export interface TrackButtonProps
+export interface SequencerTrackButtonProps
     extends Omit<React.ComponentProps<"button">, "children">,
-        VariantProps<typeof trackButtonVariants> {
+        VariantProps<typeof sequencerTrackButtonVariants> {
     /** Whether the button is in active state */
     active?: boolean;
     /** Button label (typically single letter: M, S, R) */
     children: React.ReactNode;
 }
 
-export const TrackButton = React.forwardRef<HTMLButtonElement, TrackButtonProps>(
+export const SequencerTrackButton = React.forwardRef<HTMLButtonElement, SequencerTrackButtonProps>(
     ({ active = false, variant = "mute", size = "default", bordered = false, className, children, ...props }, ref) => {
         return (
             <button
@@ -83,7 +83,7 @@ export const TrackButton = React.forwardRef<HTMLButtonElement, TrackButtonProps>
                 data-active={active}
                 data-variant={variant}
                 data-size={size}
-                className={cn(trackButtonVariants({ variant, size, bordered, className }))}
+                className={cn(sequencerTrackButtonVariants({ variant, size, bordered, className }))}
                 title={
                     variant === "mute"
                         ? active
@@ -105,5 +105,5 @@ export const TrackButton = React.forwardRef<HTMLButtonElement, TrackButtonProps>
     }
 );
 
-TrackButton.displayName = "TrackButton";
+SequencerTrackButton.displayName = "SequencerTrackButton";
 

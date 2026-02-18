@@ -1,24 +1,21 @@
 /**
- * PianoRollWrapper Component
+ * SampleEditorWrapper Component
  * 
- * Smart container for piano roll that handles:
- * 1. Auto-scroll to clip when piano roll opens
+ * Smart container for sample editor that handles:
+ * 1. Auto-scroll to clip when sample editor opens
  * 2. Empty state when no clip is selected
  * 3. Proper clip data validation
  * 
- * This is the "glue" layer between SequencerSplitLayout and SequencerPianoRoll.
+ * This is the "glue" layer between SequencerSplitLayout and SequencerSampleEditor.
  */
 
-import { SequencerPianoRoll } from "../components/PianoRoll/SequencerPianoRoll.tsx";
+import { SequencerSampleEditor } from "../components/SampleEditor/SequencerSampleEditor.tsx";
 import { Music } from "lucide-react";
-import type { Clip, SequencerTrack } from "@/types/sequencer";
-import type { MIDIEvent } from "../types.ts";
-import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
+import type { Clip } from "@/types/sequencer";
 
-interface PianoRollWrapperProps {
+interface SampleEditorWrapperProps {
     // Clip data
     clip: Clip | undefined;
-    track: SequencerTrack | undefined; // Track for instrument info
 
     // Drag state (for real-time sync with timeline)
     clipDragState?: { startTime: number; duration: number } | null;
@@ -28,23 +25,20 @@ interface PianoRollWrapperProps {
     snapEnabled: boolean;
     gridSize: number;
     totalBeats: number;
-    activeNotes?: ActiveNote[];
-
-    // Playback state
-    currentPosition: number;
-    isPlaying: boolean;
+    currentPosition: number; // Playback position
+    isPlaying: boolean; // Playback state
     isLooping: boolean;
     loopStart: number;
     loopEnd: number;
 
     // Scroll refs
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
-    pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
-    onPianoRollScroll: (e: React.UIEvent<HTMLDivElement>) => void;
+    sampleEditorScrollRef: React.RefObject<HTMLDivElement | null>;
+    onSampleEditorScroll: (e: React.UIEvent<HTMLDivElement>) => void;
 
     // Handlers
     onClose: () => void;
-    onUpdateNotes: (clipId: string, notes: MIDIEvent[]) => Promise<void>;
+    onUpdateClip: (clipId: string, updates: { gain?: number; audio_offset?: number }) => Promise<void>;
     onToggleSnap: () => void;
     onSetGridSize: (size: number) => void;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
@@ -52,10 +46,9 @@ interface PianoRollWrapperProps {
     onLoopEndChange: (end: number) => void;
 }
 
-export function PianoRollWrapper(props: PianoRollWrapperProps) {
+export function SampleEditorWrapper(props: SampleEditorWrapperProps) {
     const {
         clip,
-        track,
         clipDragState,
         zoom,
         snapEnabled,
@@ -67,10 +60,10 @@ export function PianoRollWrapper(props: PianoRollWrapperProps) {
         loopStart,
         loopEnd,
         timelineScrollRef,
-        pianoRollScrollRef,
-        onPianoRollScroll,
+        sampleEditorScrollRef,
+        onSampleEditorScroll,
         onClose,
-        onUpdateNotes,
+        onUpdateClip,
         onToggleSnap,
         onSetGridSize,
         onSeek,
@@ -84,61 +77,75 @@ export function PianoRollWrapper(props: PianoRollWrapperProps) {
             <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center overflow-hidden min-h-0 min-w-0">
                 <div className="text-muted-foreground">
                     <Music size={48} className="mx-auto mb-4 opacity-20" />
-                    <div className="text-base font-medium mb-1">No MIDI Clip Selected</div>
+                    <div className="text-base font-medium mb-1">No Audio Clip Selected</div>
                     <div className="text-xs text-muted-foreground/70">
-                        Double-click a MIDI clip in the timeline above to open it in the piano roll editor.
+                        Double-click an audio clip in the timeline above to open it in the sample editor.
                     </div>
                 </div>
             </div>
         );
     }
 
-    // Invalid clip type
-    if (clip.type !== "midi") {
+    // Validate clip type
+    if (clip.type !== "audio") {
         return (
             <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center overflow-hidden min-h-0 min-w-0">
                 <div className="text-muted-foreground">
                     <Music size={48} className="mx-auto mb-4 opacity-20" />
-                    <div className="text-base font-medium mb-1">Audio Clip Selected</div>
+                    <div className="text-base font-medium mb-1">Invalid Clip Type</div>
                     <div className="text-xs text-muted-foreground/70">
-                        Piano roll only works with MIDI clips. The selected clip is an audio clip.
+                        Sample editor can only edit audio clips. This is a {clip.type} clip.
                     </div>
                 </div>
             </div>
         );
     }
 
-    // Valid MIDI clip - render piano roll
-    // Use drag state if available (for real-time sync with timeline), otherwise use clip props
+    // Validate audio file path
+    if (!clip.audio_file_path) {
+        return (
+            <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center overflow-hidden min-h-0 min-w-0">
+                <div className="text-muted-foreground">
+                    <Music size={48} className="mx-auto mb-4 opacity-20" />
+                    <div className="text-base font-medium mb-1">No Audio File</div>
+                    <div className="text-xs text-muted-foreground/70">
+                        This audio clip has no associated audio file.
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Use drag state if available (for real-time sync with timeline)
     const effectiveStartTime = clipDragState?.startTime ?? clip.start_time;
     const effectiveDuration = clipDragState?.duration ?? clip.duration;
 
-    // Use key to force re-render when clip data changes
-    const clipKey = `${clip.id}-${effectiveDuration}-${effectiveStartTime}-${clip.midi_events?.length || 0}`;
+    // Force re-render when clip changes (to reset scroll position)
+    const clipKey = `${clip.id}-${effectiveStartTime}-${effectiveDuration}`;
 
     return (
-        <SequencerPianoRoll
+        <SequencerSampleEditor
             key={clipKey}
             clipId={clip.id}
             clipName={clip.name}
             clipDuration={effectiveDuration}
             clipStartTime={effectiveStartTime}
-            midiEvents={clip.midi_events || []}
+            audioFilePath={clip.audio_file_path}
+            audioOffset={clip.audio_offset}
+            gain={clip.gain}
             snapEnabled={snapEnabled}
             gridSize={gridSize}
             zoom={zoom}
             totalBeats={totalBeats}
-            instrument={track?.instrument}
-            activeNotes={props.activeNotes}
             currentPosition={currentPosition}
             isPlaying={isPlaying}
             isLooping={isLooping}
             loopStart={loopStart}
             loopEnd={loopEnd}
-            pianoRollScrollRef={pianoRollScrollRef}
-            onPianoRollScroll={onPianoRollScroll}
+            sampleEditorScrollRef={sampleEditorScrollRef}
+            onSampleEditorScroll={onSampleEditorScroll}
             onClose={onClose}
-            onUpdateNotes={onUpdateNotes}
+            onUpdateClip={onUpdateClip}
             onToggleSnap={onToggleSnap}
             onSetGridSize={onSetGridSize}
             onSeek={onSeek}

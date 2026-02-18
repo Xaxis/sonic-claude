@@ -95,50 +95,105 @@ export function WaveformDisplay({
         }
 
         const midY = canvasHeight / 2;
+        const waveformScale = 0.85; // Scale waveform to 85% of available height
 
-        // Draw left/mono channel waveform
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        if (glowEffect) {
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = color;
-        }
-        ctx.beginPath();
-        data.forEach((value, index) => {
-            const x = (index / data.length) * canvasWidth;
-            const y = rightData
-                ? midY - value * midY * 0.8 // Stereo: top half
-                : midY - value * midY; // Mono: full height
-            if (index === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
+        // Check if we have stereo data
+        const isStereo = rightData && rightData.length > 0;
 
-        // Draw right channel if stereo
-        if (rightData && rightData.length > 0) {
-            ctx.strokeStyle = rightColor;
+        if (isStereo) {
+            // Stereo mode: Top half = left channel, Bottom half = right channel (Ableton style)
+
+            // Draw left channel in top half
+            ctx.fillStyle = color;
+            if (glowEffect) {
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = color;
+            }
+
+            // Top half - left channel (mirrored within top half)
+            const topMidY = canvasHeight / 4;
+            ctx.beginPath();
+            ctx.moveTo(0, topMidY);
+            data.forEach((value, index) => {
+                const x = (index / data.length) * canvasWidth;
+                const y = topMidY - value * topMidY * waveformScale;
+                ctx.lineTo(x, y);
+            });
+            ctx.lineTo(canvasWidth, topMidY);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(0, topMidY);
+            data.forEach((value, index) => {
+                const x = (index / data.length) * canvasWidth;
+                const y = topMidY + value * topMidY * waveformScale;
+                ctx.lineTo(x, y);
+            });
+            ctx.lineTo(canvasWidth, topMidY);
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw right channel in bottom half
+            ctx.fillStyle = rightColor;
             if (glowEffect) {
                 ctx.shadowColor = rightColor;
             }
+
+            // Bottom half - right channel (mirrored within bottom half)
+            const bottomMidY = (canvasHeight * 3) / 4;
             ctx.beginPath();
+            ctx.moveTo(0, bottomMidY);
             rightData.forEach((value, index) => {
                 const x = (index / rightData.length) * canvasWidth;
-                const y = midY + value * midY * 0.8; // Bottom half
-                if (index === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
+                const y = bottomMidY - value * (canvasHeight / 4) * waveformScale;
+                ctx.lineTo(x, y);
             });
-            ctx.stroke();
-        }
+            ctx.lineTo(canvasWidth, bottomMidY);
+            ctx.closePath();
+            ctx.fill();
 
-        // Draw center line
-        if (glowEffect || rightData) {
-            ctx.shadowBlur = 0;
-            ctx.strokeStyle = gridColor;
-            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, bottomMidY);
+            rightData.forEach((value, index) => {
+                const x = (index / rightData.length) * canvasWidth;
+                const y = bottomMidY + value * (canvasHeight / 4) * waveformScale;
+                ctx.lineTo(x, y);
+            });
+            ctx.lineTo(canvasWidth, bottomMidY);
+            ctx.closePath();
+            ctx.fill();
+        } else {
+            // Mono mode: Mirror waveform across center line
+            ctx.fillStyle = color;
+            if (glowEffect) {
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = color;
+            }
+
+            // Draw top half (mirrored)
             ctx.beginPath();
             ctx.moveTo(0, midY);
+            data.forEach((value, index) => {
+                const x = (index / data.length) * canvasWidth;
+                const y = midY - value * midY * waveformScale;
+                ctx.lineTo(x, y);
+            });
             ctx.lineTo(canvasWidth, midY);
-            ctx.stroke();
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw bottom half (mirrored)
+            ctx.beginPath();
+            ctx.moveTo(0, midY);
+            data.forEach((value, index) => {
+                const x = (index / data.length) * canvasWidth;
+                const y = midY + value * midY * waveformScale;
+                ctx.lineTo(x, y);
+            });
+            ctx.lineTo(canvasWidth, midY);
+            ctx.closePath();
+            ctx.fill();
         }
     }, [data, rightData, width, height, color, rightColor, backgroundColor, showGrid, gridColor, glowEffect]);
 

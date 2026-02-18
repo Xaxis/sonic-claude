@@ -1,5 +1,5 @@
 /**
- * SequencerPanelTimelineGrid - Grid lines background
+ * SequencerTimelineGrid - Grid lines background
  * 
  * Displays vertical grid lines for beats and measures.
  */
@@ -12,13 +12,13 @@ interface RulerMarker {
     label: string;
 }
 
-interface SequencerPanelTimelineGridProps {
+interface SequencerTimelineGridProps {
     rulerMarkers: RulerMarker[];
 }
 
-export function SequencerPanelTimelineGrid({
+export function SequencerTimelineGrid({
     rulerMarkers,
-}: SequencerPanelTimelineGridProps) {
+}: SequencerTimelineGridProps) {
     return (
         <div className="absolute inset-0 pointer-events-none">
             {rulerMarkers.map((marker, index) => (

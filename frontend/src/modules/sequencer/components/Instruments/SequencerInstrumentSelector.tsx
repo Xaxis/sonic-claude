@@ -1,5 +1,5 @@
 /**
- * InstrumentSelector Component
+ * SequencerInstrumentSelector Component
  * 
  * Dropdown selector for choosing MIDI track instruments (SynthDefs).
  * Displays instrument name with category grouping.
@@ -25,19 +25,19 @@ import {
 import { audioEngineService } from "@/services/audio-engine/audio-engine.service.ts";
 import type { SynthDefInfo } from "../../types.ts";
 
-interface InstrumentSelectorProps {
+interface SequencerInstrumentSelectorProps {
     trackId: string;
     currentInstrument?: string;
     onInstrumentChange: (trackId: string, instrument: string) => void;
     disabled?: boolean;
 }
 
-export function InstrumentSelector({
+export function SequencerInstrumentSelector({
     trackId,
     currentInstrument,
     onInstrumentChange,
     disabled = false,
-}: InstrumentSelectorProps) {
+}: SequencerInstrumentSelectorProps) {
     const [synthDefs, setSynthDefs] = useState<SynthDefInfo[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 

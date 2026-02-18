@@ -1,5 +1,5 @@
 /**
- * SequencerPanelPianoRollKeyboard - Piano keyboard display for piano roll
+ * SequencerPianoRollKeyboard - Piano keyboard display for piano roll
  *
  * Shows piano keys from minPitch to maxPitch with visual distinction between white and black keys.
  * Click keys to preview notes.
@@ -9,7 +9,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils.ts";
 import { api } from "@/services/api";
 
-interface SequencerPanelPianoRollKeyboardProps {
+interface SequencerPianoRollKeyboardProps {
     minPitch: number; // MIDI note number (e.g., 36 = C2)
     maxPitch: number; // MIDI note number (e.g., 96 = C7)
     noteHeight: number; // pixels per note row
@@ -18,12 +18,12 @@ interface SequencerPanelPianoRollKeyboardProps {
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-export function SequencerPanelPianoRollKeyboard({
+export function SequencerPianoRollKeyboard({
     minPitch,
     maxPitch,
     noteHeight,
     instrument = "sine",
-}: SequencerPanelPianoRollKeyboardProps) {
+}: SequencerPianoRollKeyboardProps) {
     const [activeKey, setActiveKey] = useState<number | null>(null);
 
     const getNoteName = (pitch: number): string => {

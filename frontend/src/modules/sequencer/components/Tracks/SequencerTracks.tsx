@@ -1,13 +1,13 @@
 /**
- * SequencerPanelTracks - Track list container
+ * SequencerTracks - Track list container
  *
- * Renders track headers using the professional TrackHeader component.
+ * Renders track headers using the professional SequencerTrackHeader component.
  * Handles delete confirmation dialog.
  */
 
 import { Volume2 } from "lucide-react";
 import { useState } from "react";
-import { TrackHeader } from "./TrackHeader.tsx";
+import { SequencerTrackHeader } from "././SequencerTrackHeader.tsx";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -33,7 +33,7 @@ interface Track {
     instrument?: string; // MIDI track instrument (SynthDef name)
 }
 
-interface SequencerPanelTrackListProps {
+interface SequencerTrackListProps {
     tracks: Track[];
     onToggleMute: (trackId: string) => void;
     onToggleSolo: (trackId: string) => void;
@@ -44,7 +44,7 @@ interface SequencerPanelTrackListProps {
     onExpandedTracksChange?: (expandedTracks: Set<string>) => void;
 }
 
-export function SequencerPanelTracks({
+export function SequencerTracks({
     tracks,
     onToggleMute,
     onToggleSolo,
@@ -53,7 +53,7 @@ export function SequencerPanelTracks({
     onUpdateTrack,
     expandedTracks: externalExpandedTracks,
     onExpandedTracksChange,
-}: SequencerPanelTrackListProps) {
+}: SequencerTrackListProps) {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [trackToDelete, setTrackToDelete] = useState<{ id: string; name: string } | null>(null);
     const [internalExpandedTracks, setInternalExpandedTracks] = useState<Set<string>>(new Set());
@@ -104,7 +104,7 @@ export function SequencerPanelTracks({
                 </div>
             ) : (
                 tracks.map((track) => (
-                    <TrackHeader
+                    <SequencerTrackHeader
                         key={track.id}
                         track={track}
                         onToggleMute={onToggleMute}

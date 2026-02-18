@@ -1,5 +1,5 @@
 /**
- * SequencerPanelTimelinePlayhead - Playhead indicator with drag support
+ * SequencerTimelinePlayhead - Playhead indicator with drag support
  *
  * Professional implementation with:
  * - GPU-accelerated rendering (transform instead of left)
@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-interface SequencerPanelTimelinePlayheadProps {
+interface SequencerTimelinePlayheadProps {
     currentPosition: number;
     pixelsPerBeat: number;
     zoom: number;
@@ -24,7 +24,7 @@ interface SequencerPanelTimelinePlayheadProps {
     onSeek?: (position: number, triggerAudio?: boolean) => void;
 }
 
-export function SequencerPanelTimelinePlayhead({
+export function SequencerTimelinePlayhead({
     currentPosition,
     pixelsPerBeat,
     zoom,
@@ -36,7 +36,7 @@ export function SequencerPanelTimelinePlayhead({
     loopStart = 0,
     loopEnd = 16,
     onSeek,
-}: SequencerPanelTimelinePlayheadProps) {
+}: SequencerTimelinePlayheadProps) {
     const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
     const [draggedPlayheadPosition, setDraggedPlayheadPosition] = useState<number | null>(null);
     const dragStartXRef = useRef<number>(0);

@@ -1,5 +1,5 @@
 /**
- * SequencerPanelTrackTypeDialog - Dialog for selecting track type when adding a new track
+ * SequencerTrackTypeDialog - Dialog for selecting track type when adding a new track
  *
  * Allows user to choose between:
  * - MIDI Track (for synths & instruments)
@@ -16,19 +16,19 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Button } from "@/components/ui/button.tsx";
 
-interface SequencerPanelTrackTypeDialogProps {
+interface SequencerTrackTypeDialogProps {
     isOpen: boolean;
     onClose: () => void;
     onSelectMIDI: () => void;
     onSelectSample: () => void;
 }
 
-export function SequencerPanelTrackTypeDialog({
+export function SequencerTrackTypeDialog({
     isOpen,
     onClose,
     onSelectMIDI,
     onSelectSample,
-}: SequencerPanelTrackTypeDialogProps) {
+}: SequencerTrackTypeDialogProps) {
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="sm:max-w-lg">

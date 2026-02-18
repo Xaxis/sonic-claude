@@ -1,25 +1,7 @@
 /**
- * TrackHeader Component
+ * SequencerTrackHeader Component
  * 
  * Professional DAW-style track header with clean hierarchical organization.
- * 
- * Layout Pattern (3 rows):
- * ┌─────────────────────────────────────────────────────────────┐
- * │ Row 1: IDENTITY                                             │
- * │   [Track Name] [Type Badge] [Instrument Selector] [Actions] │
- * ├─────────────────────────────────────────────────────────────┤
- * │ Row 2: TRANSPORT                                            │
- * │   [M] [S] [R]                                               │
- * ├─────────────────────────────────────────────────────────────┤
- * │ Row 3: MIXING                                               │
- * │   Vol [━━━━━━━] 100%    Pan [◉] C                          │
- * └─────────────────────────────────────────────────────────────┘
- * 
- * Architecture:
- * - Follows UI_DESIGN_SYSTEM.md patterns
- * - Uses Fader for volume (vertical in mixer, horizontal in sequencer)
- * - Uses Knob for pan (rotary control)
- * - Clean separation of concerns
  */
 
 import { useState } from "react";
@@ -28,8 +10,8 @@ import { IconButton } from "@/components/ui/icon-button.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
-import { InstrumentSelector } from "../Instruments/InstrumentSelector.tsx";
-import { TrackButton } from "./TrackButton.tsx";
+import { SequencerInstrumentSelector } from "../Instruments/SequencerInstrumentSelector.tsx";
+import { SequencerTrackButton } from "././SequencerTrackButton.tsx";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -38,7 +20,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 
-interface TrackHeaderProps {
+interface SequencerTrackHeaderProps {
     track: {
         id: string;
         name: string;
@@ -61,7 +43,7 @@ interface TrackHeaderProps {
     onToggleExpand?: (trackId: string) => void; // Toggle expanded/minimized
 }
 
-export function TrackHeader({
+export function SequencerTrackHeader({
     track,
     onToggleMute,
     onToggleSolo,
@@ -70,7 +52,7 @@ export function TrackHeader({
     onUpdateTrack,
     isExpanded = false,
     onToggleExpand,
-}: TrackHeaderProps) {
+}: SequencerTrackHeaderProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState(track.name);
 
@@ -169,23 +151,23 @@ export function TrackHeader({
                     </div>
 
                     {/* Mute/Solo - Always visible */}
-                    <TrackButton
+                    <SequencerTrackButton
                         variant="mute"
                         active={track.is_muted}
                         onClick={() => onToggleMute(track.id)}
                         size="xs"
                     >
                         M
-                    </TrackButton>
+                    </SequencerTrackButton>
 
-                    <TrackButton
+                    <SequencerTrackButton
                         variant="solo"
                         active={track.is_solo}
                         onClick={() => onToggleSolo(track.id)}
                         size="xs"
                     >
                         S
-                    </TrackButton>
+                    </SequencerTrackButton>
                 </div>
             )}
 
@@ -236,7 +218,7 @@ export function TrackHeader({
                     <div className="flex items-center gap-2">
                         {track.type === "midi" && onUpdateTrack && (
                             <div className="flex items-center gap-2">
-                                <InstrumentSelector
+                                <SequencerInstrumentSelector
                                     trackId={track.id}
                                     currentInstrument={track.instrument}
                                     onInstrumentChange={(trackId, instrument) => {
@@ -248,7 +230,7 @@ export function TrackHeader({
 
                         {/* TRANSPORT - Mute, Solo, Arm */}
                         <div className="flex items-center gap-1.5">
-                            <TrackButton
+                            <SequencerTrackButton
                                 variant="mute"
                                 active={track.is_muted}
                                 onClick={() => onToggleMute(track.id)}
@@ -256,9 +238,9 @@ export function TrackHeader({
                                 bordered
                             >
                                 M
-                            </TrackButton>
+                            </SequencerTrackButton>
 
-                            <TrackButton
+                            <SequencerTrackButton
                                 variant="solo"
                                 active={track.is_solo}
                                 onClick={() => onToggleSolo(track.id)}
@@ -266,9 +248,9 @@ export function TrackHeader({
                                 bordered
                             >
                                 S
-                            </TrackButton>
+                            </SequencerTrackButton>
 
-                            <TrackButton
+                            <SequencerTrackButton
                                 variant="arm"
                                 active={track.is_armed}
                                 disabled
@@ -276,7 +258,7 @@ export function TrackHeader({
                                 bordered
                             >
                                 R
-                            </TrackButton>
+                            </SequencerTrackButton>
                         </div>
                     </div>
 

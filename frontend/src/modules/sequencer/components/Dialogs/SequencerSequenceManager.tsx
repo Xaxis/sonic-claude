@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils.ts";
 import { audioEngineService } from "@/services/audio-engine/audio-engine.service.ts";
 import { toast } from "sonner";
 
-interface SequencerPanelSequenceManagerProps {
+interface SequencerSequenceManagerProps {
     isOpen: boolean;
     onClose: () => void;
     currentSequenceId: string | null;
@@ -51,13 +51,13 @@ interface VersionInfo {
     file_path: string;
 }
 
-export function SequencerPanelSequenceManager({
+export function SequencerSequenceManager({
     isOpen,
     onClose,
     currentSequenceId,
     onSequenceChange,
     onDeleteSequence,
-}: SequencerPanelSequenceManagerProps) {
+}: SequencerSequenceManagerProps) {
     const [sequences, setSequences] = useState<SequenceInfo[]>([]);
     const [versions, setVersions] = useState<VersionInfo[]>([]);
     const [newSequenceName, setNewSequenceName] = useState("");
