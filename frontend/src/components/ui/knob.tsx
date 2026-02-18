@@ -54,9 +54,30 @@ export function Knob({
 
         // Drag UP to increase, drag DOWN to decrease (standard DAW knob behavior)
         const deltaY = startYRef.current - e.clientY;
-        const sensitivity = 0.005;
+
+        // Use fine sensitivity when Shift is held (10x slower for precise control)
+        const baseSensitivity = 0.005;
+        const fineSensitivity = 0.0005;
+        const sensitivity = e.shiftKey ? fineSensitivity : baseSensitivity;
+
         const delta = deltaY * sensitivity * (max - min);
         const newValue = Math.max(min, Math.min(max, startValueRef.current + delta));
+
+        onChange(Math.round(newValue * 100) / 100);
+    };
+
+    const handleWheel = (e: React.WheelEvent) => {
+        if (disabled) return;
+        e.preventDefault();
+
+        // Mouse wheel: scroll up = increase, scroll down = decrease
+        // Use fine sensitivity when Shift is held
+        const baseSensitivity = 0.01;
+        const fineSensitivity = 0.001;
+        const sensitivity = e.shiftKey ? fineSensitivity : baseSensitivity;
+
+        const delta = -e.deltaY * sensitivity * (max - min);
+        const newValue = Math.max(min, Math.min(max, value + delta));
 
         onChange(Math.round(newValue * 100) / 100);
     };
@@ -96,6 +117,7 @@ export function Knob({
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
                     onPointerCancel={handlePointerUp}
+                    onWheel={handleWheel}
                 >
                     <defs>
                         <linearGradient id="knobGradient" x1="0%" y1="0%" x2="100%" y2="100%">

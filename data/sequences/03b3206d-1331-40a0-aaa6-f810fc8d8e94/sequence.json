@@ -13,7 +13,7 @@
       "is_muted": false,
       "is_solo": false,
       "is_armed": false,
-      "volume": 1.9952623149688795,
+      "volume": 0.01333521432163324,
       "pan": -0.05,
       "instrument": "lead",
       "midi_channel": 0,
@@ -30,7 +30,7 @@
       "is_muted": false,
       "is_solo": false,
       "is_armed": false,
-      "volume": 0.050699070827470445,
+      "volume": 0.17378008287493754,
       "pan": 0.26,
       "instrument": "pad",
       "midi_channel": 0,
@@ -82,7 +82,7 @@
       "is_solo": false,
       "is_armed": false,
       "volume": 1.0,
-      "pan": 0.3,
+      "pan": 0.1,
       "instrument": null,
       "midi_channel": 0,
       "sample_id": null,
@@ -99,7 +99,7 @@
       "is_solo": false,
       "is_armed": false,
       "volume": 1.0,
-      "pan": 0.0,
+      "pan": -0.59,
       "instrument": null,
       "midi_channel": 0,
       "sample_id": null,
@@ -551,5 +551,5 @@
   "piano_roll_clip_id": "dc133baf-c03c-45f4-8a7c-46e7ab2a5e57",
   "sample_editor_clip_id": null,
   "created_at": "2026-02-13T14:49:01.328412",
-  "updated_at": "2026-02-17T20:45:23.024979"
+  "updated_at": "2026-02-17T20:50:04.601085"
 }
