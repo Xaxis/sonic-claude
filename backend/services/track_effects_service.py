@@ -92,10 +92,19 @@ class TrackEffectsService:
             if any(effect.slot_index == slot_index for effect in chain.effects):
                 raise ValueError(f"Slot {slot_index} is already occupied on track {track_id}")
             
-            # Get track bus
+            # Get or allocate track bus
             track_bus = self.bus_manager.get_track_bus(track_id)
             if track_bus is None:
-                raise ValueError(f"Track {track_id} has no allocated bus")
+                # Allocate bus and create mixer channel for this track
+                track_bus = self.bus_manager.allocate_track_bus(track_id)
+                await self.mixer_channel_service.create_mixer_channel(
+                    track_id=track_id,
+                    volume=1.0,  # Default volume
+                    pan=0.0,     # Center pan
+                    mute=False,
+                    solo=False
+                )
+                logger.info(f"🎚️ Auto-created mixer channel for track {track_id} on bus {track_bus}")
             
             # Generate instance ID and display name
             instance_id = str(uuid.uuid4())

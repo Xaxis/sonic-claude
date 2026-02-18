@@ -27,11 +27,11 @@ interface EffectsContextValue {
 
     // Handlers (from useEffectsHandlers)
     handlers: {
-        handleAddEffect: (trackId: string, effectName: string, slotIndex: number) => Promise<void>;
-        handleDeleteEffect: (effectId: string, trackId: string) => Promise<void>;
-        handleReorderEffect: (effectId: string, newSlotIndex: number, trackId: string) => Promise<void>;
-        handleUpdateParameter: (effectId: string, paramName: string, value: number) => Promise<void>;
-        handleToggleBypass: (effectId: string, trackId: string) => Promise<void>;
+        handleAddEffect: (trackId: string, effectName: string) => Promise<void>;
+        handleDeleteEffect: (effectId: string) => Promise<void>;
+        handleMoveEffect: (effectId: string, newSlotIndex: number) => Promise<void>;
+        handleUpdateEffectParameter: (effectId: string, paramName: string, value: number) => Promise<void>;
+        handleToggleEffectBypass: (effectId: string) => Promise<void>;
     };
 }
 

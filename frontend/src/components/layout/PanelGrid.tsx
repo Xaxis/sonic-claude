@@ -3,12 +3,6 @@
  *
  * Manages the draggable/resizable grid layout of panels within a tab.
  * Uses react-grid-layout for drag-and-drop functionality.
- *
- * Responsibilities:
- * - Render panels in a grid layout
- * - Handle panel dragging and resizing
- * - Persist layout to localStorage
- * - Broadcast layout changes via BroadcastChannel
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -162,13 +156,25 @@ export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridPro
     const detectSnapZone = useCallback(
         (draggedPanelId: string, draggedLayout: GridLayoutItem): SnapZone | null => {
             const draggedPanel = panels.find((p) => p.id === draggedPanelId);
-            if (!draggedPanel?.snapTargets) return null;
+            if (!draggedPanel?.snapTargets) {
+                console.log('❌ No snap targets for panel:', draggedPanelId);
+                return null;
+            }
 
-            const SNAP_DISTANCE = 1; // Grid units (not pixels)
+            console.log('🔍 Checking snap targets for', draggedPanelId, draggedPanel.snapTargets);
 
             for (const snapTarget of draggedPanel.snapTargets) {
                 const targetLayout = layout.find((l) => l.i === snapTarget.panelId);
-                if (!targetLayout) continue;
+                if (!targetLayout) {
+                    console.log('❌ Target panel not found in layout:', snapTarget.panelId);
+                    continue;
+                }
+
+                // Use configured snap distance (in pixels) or default to 20 pixels
+                // Convert to grid units by dividing by rowHeight
+                const snapDistancePixels = snapTarget.snapDistance ?? 20;
+                const SNAP_DISTANCE = snapDistancePixels / GRID_CONFIG.rowHeight;
+                console.log('📏 Snap distance:', snapDistancePixels, 'pixels =', SNAP_DISTANCE, 'grid units');
 
                 for (const edge of snapTarget.edges) {
                     let distance = Infinity;
@@ -179,6 +185,7 @@ export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridPro
                             // Check if dragged panel is near bottom edge of target
                             const targetBottom = targetLayout.y + targetLayout.h;
                             distance = Math.abs(draggedLayout.y - targetBottom);
+                            console.log(`📐 Bottom edge check: dragged.y=${draggedLayout.y}, targetBottom=${targetBottom}, distance=${distance}`);
                             if (distance <= SNAP_DISTANCE) {
                                 snapPosition = { x: targetLayout.x, y: targetBottom };
                             }
@@ -208,6 +215,7 @@ export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridPro
                     }
 
                     if (distance <= SNAP_DISTANCE) {
+                        console.log('✅ SNAP ZONE DETECTED!', { targetPanelId: snapTarget.panelId, edge, snapPosition, distance });
                         return {
                             targetPanelId: snapTarget.panelId,
                             edge,
@@ -287,6 +295,11 @@ export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridPro
                 onLayoutChange?.([...updatedLayout]);
 
                 console.log(`✅ Snapped ${draggingPanelId} to ${activeSnapZone.targetPanelId} ${activeSnapZone.edge} edge`);
+                console.log(`📎 Creating attachment:`, {
+                    panelId: draggingPanelId,
+                    attachedTo: activeSnapZone.targetPanelId,
+                    edge: activeSnapZone.edge
+                });
             } else {
                 // No snap - just update layout normally
                 setCurrentLayout([...newLayout]);
@@ -413,38 +426,70 @@ export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridPro
                         <div
                             key={panel.id}
                             className="grid-item-wrapper relative"
-                            style={{
-                                // Override grid margin to eliminate spacing between attached panels
-                                marginTop: attachmentEdge === 'bottom' ? '-8px' : undefined,
-                                marginBottom: attachmentEdge === 'top' ? '-8px' : undefined,
-                            }}
                         >
-                            <Panel
-                                title={combinedTitle}
-                                subtitle={panel.getSubtitle?.()}
-                                draggable={!isAttachedChild} // Child panels can't be dragged independently
-                                closeable={panel.closeable ?? true}
-                                onClose={() => onPanelClose?.(panel.id)}
-                                isMaximized={false}
-                                onMaximize={() => maximizePanel(panel.id)}
-                                showHeader={!isAttachedChild} // ALWAYS hide child panel's header
-                                headerActions={detachButton}
-                                className={`h-full transition-all ${
-                                    // When attached to parent's bottom edge: child is below, remove top border/corners
-                                    attachmentEdge === 'bottom' ? 'rounded-t-none border-t-0' : ''
-                                } ${
-                                    // When attached to parent's top edge: child is above, remove bottom border/corners
-                                    attachmentEdge === 'top' ? 'rounded-b-none border-b-0' : ''
-                                } ${
-                                    // When child is attached to our bottom: we're parent, remove bottom border/corners
-                                    childAttachmentEdge === 'bottom' ? 'rounded-b-none border-b-0' : ''
-                                } ${
-                                    // When child is attached to our top: we're parent, remove top border/corners
-                                    childAttachmentEdge === 'top' ? 'rounded-t-none border-t-0' : ''
-                                }`}
-                            >
-                                {panel.component}
-                            </Panel>
+                            <div className="h-full flex flex-col">
+                                {/* Render child panel ABOVE if attached to top */}
+                                {hasAttachedChildren && childAttachmentEdge === 'top' && attachedChildPanel && (
+                                    <Panel
+                                        title={attachedChildPanel.title}
+
+                                        draggable={false}
+                                        closeable={false}
+                                        showHeader={false}
+                                        className="flex-1 min-h-0 rounded-b-none border-b-0"
+                                    >
+                                        {attachedChildPanel.component}
+                                    </Panel>
+                                )}
+
+                                {/* Main panel with combined header */}
+                                <Panel
+                                    title={displayTitle}
+                                    subtitle={panel.getSubtitle ? panel.getSubtitle() : undefined}
+                                    draggable={true}
+                                    closeable={panel.closeable ?? true}
+                                    onClose={() => onPanelClose?.(panel.id)}
+                                    isMaximized={false}
+                                    onMaximize={() => maximizePanel(panel.id)}
+                                    showHeader={true}
+                                    headerActions={detachButton}
+                                    className={`flex-1 min-h-0 ${
+                                        childAttachmentEdge === 'top' ? 'rounded-t-none border-t-0' : ''
+                                    } ${
+                                        childAttachmentEdge === 'bottom' ? 'rounded-b-none border-b-0' : ''
+                                    }`}
+                                >
+                                    {panel.component}
+                                </Panel>
+
+                                {/* Render child panel BELOW if attached to bottom */}
+                                {hasAttachedChildren && childAttachmentEdge === 'bottom' && attachedChildPanel && (
+                                    <Panel
+                                        title={attachedChildPanel.title}
+
+                                        draggable={false}
+                                        closeable={false}
+                                        showHeader={false}
+                                        className="flex-1 min-h-0 rounded-t-none border-t-0"
+                                    >
+                                        {attachedChildPanel.component}
+                                    </Panel>
+                                )}
+                            </div>
+
+                            {/* Visual indicator at join point where panels merge */}
+                            {hasAttachedChildren && (
+                                <div
+                                    className="absolute left-0 right-0 z-10 pointer-events-none"
+                                    style={{
+                                        // Position at the edge where panels join
+                                        [childAttachmentEdge === 'bottom' ? 'bottom' : 'top']: childAttachmentEdge === 'bottom' ? '50%' : '50%',
+                                        height: '2px',
+                                        background: 'linear-gradient(90deg, transparent 0%, rgba(34, 211, 238, 0.4) 20%, rgba(34, 211, 238, 0.6) 50%, rgba(34, 211, 238, 0.4) 80%, transparent 100%)',
+                                        boxShadow: '0 0 8px rgba(34, 211, 238, 0.3)',
+                                    }}
+                                />
+                            )}
 
                             {/* Animated Drop Zone Indicator */}
                             {isSnapTarget && activeSnapZone && !isDraggingPanel && (

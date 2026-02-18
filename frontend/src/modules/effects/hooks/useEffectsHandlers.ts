@@ -31,13 +31,25 @@ export function useEffectsHandlers(props: UseEffectsHandlersProps) {
     // ========================================================================
 
     const handleAddEffect = useCallback(
-        async (trackId: string, effectName: string, slotIndex: number) => {
+        async (trackId: string, effectName: string) => {
             try {
-                await effectsService.addEffect(trackId, {
+                // Find next available slot
+                const chain = await effectsService.getTrackEffectChain(trackId);
+                const usedSlots = chain.effects.map(e => e.slot_index);
+                const nextSlot = Array.from({ length: 8 }, (_, i) => i).find(
+                    slot => !usedSlots.includes(slot)
+                );
+
+                if (nextSlot === undefined) {
+                    toast.error("No available effect slots");
+                    return;
+                }
+
+                await effectsService.createEffect(trackId, {
                     effect_name: effectName,
-                    slot_index: slotIndex,
+                    slot_index: nextSlot,
                 });
-                toast.success(`Added ${effectName} to slot ${slotIndex + 1}`);
+                toast.success(`Added ${effectName}`);
                 onEffectChainChanged?.(trackId);
             } catch (error) {
                 console.error("Failed to add effect:", error);
@@ -48,11 +60,12 @@ export function useEffectsHandlers(props: UseEffectsHandlersProps) {
     );
 
     const handleDeleteEffect = useCallback(
-        async (effectId: string, trackId: string) => {
+        async (effectId: string) => {
             try {
                 await effectsService.deleteEffect(effectId);
                 toast.success("Effect removed");
-                onEffectChainChanged?.(trackId);
+                // Trigger refresh - we don't have trackId here, so refresh all
+                onEffectChainChanged?.("");
             } catch (error) {
                 console.error("Failed to delete effect:", error);
                 toast.error("Failed to delete effect");
@@ -61,15 +74,15 @@ export function useEffectsHandlers(props: UseEffectsHandlersProps) {
         [onEffectChainChanged]
     );
 
-    const handleReorderEffect = useCallback(
-        async (effectId: string, newSlotIndex: number, trackId: string) => {
+    const handleMoveEffect = useCallback(
+        async (effectId: string, newSlotIndex: number) => {
             try {
-                await effectsService.reorderEffect(effectId, newSlotIndex);
+                await effectsService.moveEffect(effectId, { new_slot_index: newSlotIndex });
                 toast.success(`Moved to slot ${newSlotIndex + 1}`);
-                onEffectChainChanged?.(trackId);
+                onEffectChainChanged?.("");
             } catch (error) {
-                console.error("Failed to reorder effect:", error);
-                toast.error("Failed to reorder effect");
+                console.error("Failed to move effect:", error);
+                toast.error("Failed to move effect");
             }
         },
         [onEffectChainChanged]
@@ -79,13 +92,10 @@ export function useEffectsHandlers(props: UseEffectsHandlersProps) {
     // PARAMETER HANDLERS
     // ========================================================================
 
-    const handleUpdateParameter = useCallback(
+    const handleUpdateEffectParameter = useCallback(
         async (effectId: string, paramName: string, value: number) => {
             try {
-                await effectsService.updateParameter(effectId, {
-                    parameter_name: paramName,
-                    value,
-                });
+                await effectsService.updateEffectParameter(effectId, paramName, value);
                 // No toast for parameter changes (too noisy)
             } catch (error) {
                 console.error("Failed to update parameter:", error);
@@ -99,11 +109,13 @@ export function useEffectsHandlers(props: UseEffectsHandlersProps) {
     // BYPASS HANDLERS
     // ========================================================================
 
-    const handleToggleBypass = useCallback(
-        async (effectId: string, trackId: string) => {
+    const handleToggleEffectBypass = useCallback(
+        async (effectId: string) => {
             try {
-                await effectsService.toggleBypass(effectId);
-                onEffectChainChanged?.(trackId);
+                // Get current effect to toggle bypass state
+                const effect = await effectsService.getEffect(effectId);
+                await effectsService.toggleEffectBypass(effectId, !effect.is_bypassed);
+                onEffectChainChanged?.("");
             } catch (error) {
                 console.error("Failed to toggle bypass:", error);
                 toast.error("Failed to toggle bypass");
@@ -115,9 +127,9 @@ export function useEffectsHandlers(props: UseEffectsHandlersProps) {
     return {
         handleAddEffect,
         handleDeleteEffect,
-        handleReorderEffect,
-        handleUpdateParameter,
-        handleToggleBypass,
+        handleMoveEffect,
+        handleUpdateEffectParameter,
+        handleToggleEffectBypass,
     };
 }
 

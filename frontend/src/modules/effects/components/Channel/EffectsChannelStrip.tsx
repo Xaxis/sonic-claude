@@ -4,11 +4,17 @@
  * Displays a sequencer track's effects chain as a vertical column.
  * Follows professional DAW layout: track header, 8 effect slots, add button.
  * Matches MixerChannelStrip width (w-36) for 1:1 alignment.
+ *
+ * Architecture:
+ * - Uses EffectSlot for each effect instance
+ * - Uses EffectSelector for adding new effects
+ * - Manages effect chain state via context
+ * - Follows established UI/UX patterns
  */
 
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useEffectsContext } from "../../contexts/EffectsContext";
+import { EffectSlot } from "./EffectSlot";
+import { EffectSelector } from "./EffectSelector";
 import type { SequencerTrack } from "@/modules/sequencer/types";
 import type { TrackEffectChain } from "@/services/effects";
 
@@ -18,20 +24,20 @@ interface EffectsChannelStripProps {
 }
 
 export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripProps) {
-    const { handlers } = useEffectsContext();
-    const { handleAddEffect } = handlers;
+    const { handlers, effectDefinitions } = useEffectsContext();
+    const {
+        handleAddEffect,
+        handleUpdateEffectParameter,
+        handleToggleEffectBypass,
+        handleDeleteEffect,
+    } = handlers;
 
-    // 8 slots per track (0-7)
-    const TOTAL_SLOTS = 8;
-    const slots = Array.from({ length: TOTAL_SLOTS }, (_, i) => i);
+    // Get effects sorted by slot index
+    const effects = effectChain?.effects || [];
+    const sortedEffects = [...effects].sort((a, b) => a.slot_index - b.slot_index);
 
-    // Map effects to slots
-    const effectsBySlot = new Map<number, typeof effectChain.effects[0]>();
-    if (effectChain) {
-        effectChain.effects.forEach((effect) => {
-            effectsBySlot.set(effect.slot_index, effect);
-        });
-    }
+    // Check if we can add more effects (max 8)
+    const canAddMore = effects.length < 8;
 
     return (
         <div className="flex w-36 flex-shrink-0 flex-col gap-3 rounded-lg border border-border/70 bg-gradient-to-b from-card to-card/60 p-3 shadow-lg hover:border-border transition-all">
@@ -61,58 +67,46 @@ export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripP
                 </div>
             </div>
 
-            {/* Effects Chain - 8 Slots */}
+            {/* Effects Chain - Scrollable */}
             <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
-                {slots.map((slotIndex) => {
-                    const effect = effectsBySlot.get(slotIndex);
-
-                    if (effect) {
-                        // Slot has an effect - show effect card
-                        return (
-                            <div
-                                key={slotIndex}
-                                className="rounded-md border border-primary/30 bg-primary/10 p-2 text-xs"
-                            >
-                                <div className="font-bold text-primary truncate" title={effect.effect_name}>
-                                    {effect.effect_name}
-                                </div>
-                                <div className="text-[10px] text-muted-foreground">
-                                    Slot {slotIndex + 1}
-                                </div>
-                            </div>
+                {sortedEffects.length === 0 ? (
+                    // Empty state
+                    <div className="flex flex-1 items-center justify-center">
+                        <div className="text-center space-y-2">
+                            <div className="text-2xl opacity-20">⚡</div>
+                            <p className="text-[9px] text-muted-foreground">
+                                No Effects
+                            </p>
+                        </div>
+                    </div>
+                ) : (
+                    // Effect slots
+                    sortedEffects.map((effect) => {
+                        const effectDef = effectDefinitions.find(
+                            (def) => def.name === effect.effect_name
                         );
-                    } else {
-                        // Empty slot - show placeholder
                         return (
-                            <div
-                                key={slotIndex}
-                                className="rounded-md border border-dashed border-border/50 bg-background/20 p-2 text-xs text-muted-foreground text-center"
-                            >
-                                <div className="text-[10px]">Slot {slotIndex + 1}</div>
-                                <div className="text-[9px] opacity-50">Empty</div>
-                            </div>
+                            <EffectSlot
+                                key={effect.id}
+                                effect={effect}
+                                effectDefinition={effectDef}
+                                onParameterChange={handleUpdateEffectParameter}
+                                onToggleBypass={handleToggleEffectBypass}
+                                onDelete={handleDeleteEffect}
+                            />
                         );
-                    }
-                })}
+                    })
+                )}
             </div>
 
-            {/* Add Effect Button */}
-            <Button
-                variant="outline"
-                size="sm"
-                className="w-full text-xs"
-                onClick={() => {
-                    // Find first empty slot
-                    const emptySlot = slots.find((slot) => !effectsBySlot.has(slot));
-                    if (emptySlot !== undefined) {
-                        // TODO: Open effect browser dialog
-                        console.log("Add effect to slot", emptySlot);
-                    }
-                }}
-            >
-                <Plus className="h-3 w-3 mr-1" />
-                Add FX
-            </Button>
+            {/* Add Effect Selector */}
+            {canAddMore && (
+                <EffectSelector
+                    effectDefinitions={effectDefinitions}
+                    onEffectSelected={(effectName) => handleAddEffect(track.id, effectName)}
+                    disabled={!canAddMore}
+                />
+            )}
         </div>
     );
 }

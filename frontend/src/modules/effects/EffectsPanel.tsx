@@ -86,6 +86,12 @@ export function EffectsPanel() {
     // Callback for when effect chain changes (used by handlers)
     const handleEffectChainChanged = useCallback(
         async (trackId: string) => {
+            // If trackId is empty, reload all chains
+            if (!trackId) {
+                await loadEffectChains();
+                return;
+            }
+
             try {
                 const chain = await effectsService.getTrackEffectChain(trackId);
                 setEffectChains((prev) => ({
@@ -96,7 +102,7 @@ export function EffectsPanel() {
                 console.error(`Failed to reload effect chain for track ${trackId}:`, error);
             }
         },
-        []
+        [loadEffectChains]
     );
 
     // Event handlers

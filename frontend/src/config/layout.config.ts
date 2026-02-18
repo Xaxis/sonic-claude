@@ -83,15 +83,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         component: createElement(InputPanel),
         closeable: false,
         getSubtitle: () => "Library • 4 samples loaded",
-        defaultLayout: { x: 0, y: 0, w: 3, h: 10 },
-    },
-    {
-        id: "sequencer",
-        title: "SEQUENCER",
-        component: createElement(SequencerPanel),
-        closeable: false,
-        getSubtitle: () => "Timeline + Transport • 0 tracks • 0 clips",
-        defaultLayout: { x: 3, y: 0, w: 6, h: 10 },
+        defaultLayout: { x: 0, y: 0, w: 6, h: 8 },
     },
     {
         id: "loop-visualizer",
@@ -99,7 +91,15 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         component: createElement(LoopVisualizerPanel),
         closeable: false,
         getSubtitle: () => "Active • 120 BPM • 4/4 • Position: 8.2 beats",
-        defaultLayout: { x: 9, y: 0, w: 3, h: 10 },
+        defaultLayout: { x: 6, y: 0, w: 6, h: 8 },
+    },
+    {
+        id: "sequencer",
+        title: "SEQUENCER",
+        component: createElement(SequencerPanel),
+        closeable: false,
+        getSubtitle: () => "Timeline + Transport • 0 tracks • 0 clips",
+        defaultLayout: { x: 0, y: 6, w: 12, h: 12 },
     },
     {
         id: "mixer",
@@ -107,14 +107,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         component: createElement(MixerPanel),
         closeable: false,
         getSubtitle: () => "0 channels • Master: 0.0 dB",
-        defaultLayout: { x: 0, y: 10, w: 12, h: 14 },
-        snapTargets: [
-            {
-                panelId: "effects",
-                edges: ["top"],
-                snapDistance: 20,
-            },
-        ],
+        defaultLayout: { x: 0, y: 12, w: 12, h: 14 },
     },
     {
         id: "effects",
@@ -122,7 +115,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         component: createElement(EffectsPanel),
         closeable: false,
         getSubtitle: () => "Track FX • 0 effects",
-        defaultLayout: { x: 0, y: 24, w: 12, h: 12 },
+        defaultLayout: { x: 0, y: 26, w: 12, h: 12 },
         snapTargets: [
             {
                 panelId: "mixer",
@@ -144,13 +137,19 @@ export const DEFAULT_TABS = [
         id: "compose",
         name: "COMPOSE",
         panelIds: [
-            "input",
-            "loop-visualizer",
             "sequencer",
             "mixer",
             "effects",
         ],
     },
+    // {
+    //     id: "feedback",
+    //     name: "FEEDBACK",
+    //     panelIds: [
+    //         "input",
+    //         "loop-visualizer"
+    //     ],
+    // },
 ];
 
 /**
