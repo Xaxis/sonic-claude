@@ -2,4 +2,5 @@
 - metronome feature unselectable (cant turn it on) and doesnt work
 - beats per minute adjustment has no effect and doesnt work
 
-- vertically scrolling the timeline/tracks in the sequencer doesnt simultaneously scroll its corresponding track headers with it
+- implement "timeline" layout abstraction
+- while sequencer playing horizontal scrolling should follow playhead position

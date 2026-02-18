@@ -24,8 +24,8 @@ export function useSequencerScroll() {
     // Flag to prevent infinite scroll loops
     const isScrollingRef = useRef(false);
 
-    // Timeline scroll handler - syncs track list vertical + ruler horizontal + piano roll horizontal + sample editor horizontal
-    // Uses CSS Grid layout with synchronized scroll containers for perfect performance
+    // Timeline scroll handler - syncs piano roll horizontal + sample editor horizontal
+    // Note: Track list vertical + ruler horizontal sync is handled internally by EditorGridLayout
     const handleTimelineScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
         // Prevent infinite loop
         if (isScrollingRef.current) {
@@ -33,28 +33,15 @@ export function useSequencerScroll() {
             return;
         }
 
-        const scrollTop = e.currentTarget.scrollTop;
         const scrollLeft = e.currentTarget.scrollLeft;
 
-        // Sync track list vertical scroll (CSS Grid sibling - vertical only)
-        const trackListEl = document.querySelector('[data-track-list]') as HTMLDivElement;
-        if (trackListEl && trackListEl.scrollTop !== scrollTop) {
-            trackListEl.scrollTop = scrollTop;
-        }
-
-        // Sync ruler horizontal scroll (CSS Grid sibling - horizontal only)
-        const rulerScrollEl = document.querySelector('[data-ruler-scroll]') as HTMLDivElement;
-        if (rulerScrollEl && rulerScrollEl.scrollLeft !== scrollLeft) {
-            rulerScrollEl.scrollLeft = scrollLeft;
-        }
-
-        // Sync piano roll horizontal scroll
+        // Sync piano roll horizontal scroll (cross-editor sync)
         if (pianoRollScrollRef.current) {
             isScrollingRef.current = true;
             pianoRollScrollRef.current.scrollLeft = scrollLeft;
         }
 
-        // Sync sample editor horizontal scroll
+        // Sync sample editor horizontal scroll (cross-editor sync)
         if (sampleEditorScrollRef.current) {
             isScrollingRef.current = true;
             sampleEditorScrollRef.current.scrollLeft = scrollLeft;

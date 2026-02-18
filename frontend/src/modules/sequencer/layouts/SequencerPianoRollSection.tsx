@@ -17,6 +17,7 @@ import { SequencerPianoRollGrid } from "../components/PianoRoll/SequencerPianoRo
 import { SequencerPianoRollRuler } from "../components/PianoRoll/SequencerPianoRollRuler.tsx";
 import { SequencerTimelineLoopRegion } from "../components/Timeline/SequencerTimelineLoopRegion.tsx";
 import { useSequencerContext } from "../contexts/SequencerContext.tsx";
+import { EditorGridLayout } from "@/components/layout/EditorGridLayout.tsx";
 import type { MIDIEvent } from "../types.ts";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
@@ -98,94 +99,75 @@ export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps)
     // Add extra width to ensure content extends beyond viewport for smooth scrolling
     const totalWidth = totalBeats * beatWidth + 1000;
 
-    // Local scroll handler - syncs keyboard vertical + calls parent handler for timeline horizontal
-    const handleLocalScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        // Sync piano keyboard vertical scroll
-        const keyboardEl = e.currentTarget.parentElement?.querySelector('[data-piano-keyboard]') as HTMLDivElement;
-        if (keyboardEl) {
-            keyboardEl.scrollTop = e.currentTarget.scrollTop;
-        }
-
-        // Call parent handler for timeline horizontal sync
-        onPianoRollScroll(e);
-    };
-
     return (
-        <div className="flex flex-1 min-h-0 relative">
-            {/* Piano Keyboard (Left) - Fixed width, NO scrollbar */}
-            <div className="w-64 border-r border-border flex flex-col flex-shrink-0 bg-background absolute left-0 top-0 bottom-0 z-10">
-                {/* Piano Keyboard - Controlled scroll (no scrollbar) */}
-                <div
-                    data-piano-keyboard
-                    className="flex-1 overflow-hidden"
-                >
-                    <SequencerPianoRollKeyboard
+        <EditorGridLayout
+            cornerHeader={
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+                    Notes
+                </span>
+            }
+            ruler={
+                <SequencerPianoRollRuler
+                    totalBeats={totalBeats}
+                    currentPosition={currentPosition}
+                    isPlaying={isPlaying}
+                    zoom={zoom}
+                    pixelsPerBeat={pixelsPerBeat}
+                    totalWidth={totalWidth}
+                    snapEnabled={snapEnabled}
+                    gridSize={gridSize}
+                    onSeek={onSeek}
+                />
+            }
+            sidebar={
+                <SequencerPianoRollKeyboard
+                    minPitch={minPitch}
+                    maxPitch={maxPitch}
+                    noteHeight={noteHeight}
+                    instrument={instrument}
+                />
+            }
+            mainContent={
+                <div className="relative">
+                    <SequencerPianoRollGrid
+                        notes={notes}
+                        selectedNotes={selectedNotes}
                         minPitch={minPitch}
                         maxPitch={maxPitch}
+                        clipStartTime={clipStartTime}
+                        clipDuration={clipDuration}
+                        totalBeats={totalBeats}
+                        beatWidth={beatWidth}
                         noteHeight={noteHeight}
-                        instrument={instrument}
+                        snapEnabled={snapEnabled}
+                        gridSize={gridSize}
+                        clipId={clipId}
+                        activeNotes={activeNotes}
+                        onAddNote={onAddNote}
+                        onMoveNote={onMoveNote}
+                        onResizeNote={onResizeNote}
+                        onUpdateVelocity={onUpdateVelocity}
+                        onDeleteNote={onDeleteNote}
+                        onSelectNote={onSelectNote}
+                        onToggleSelectNote={onToggleSelectNote}
+                    />
+
+                    {/* Loop Region - Overlaid on grid */}
+                    <SequencerTimelineLoopRegion
+                        pixelsPerBeat={pixelsPerBeat}
+                        onLoopStartChange={onLoopStartChange}
+                        onLoopEndChange={onLoopEndChange}
                     />
                 </div>
-            </div>
-
-            {/* Piano Grid (Right) - ONLY scrollbar, controls everything */}
-            <div
-                ref={pianoRollScrollRef}
-                className="flex-1 min-w-0 min-h-0 overflow-auto"
-                onScroll={handleLocalScroll}
-                style={{ paddingLeft: '256px' }}
-            >
-                <div className="flex flex-col">
-                    {/* Ruler - Sticky at top, z-index lower than left panel so it scrolls underneath */}
-                    <div className="sticky top-0 z-[5] bg-background">
-                        <SequencerPianoRollRuler
-                            totalBeats={totalBeats}
-                            currentPosition={currentPosition}
-                            isPlaying={isPlaying}
-                            zoom={zoom}
-                            pixelsPerBeat={pixelsPerBeat}
-                            totalWidth={totalWidth}
-                            snapEnabled={snapEnabled}
-                            gridSize={gridSize}
-                            onSeek={onSeek}
-                        />
-                    </div>
-
-                    {/* Piano Roll Grid - Wrapped in relative container for loop region */}
-                    <div className="relative">
-                        <SequencerPianoRollGrid
-                            notes={notes}
-                            selectedNotes={selectedNotes}
-                            minPitch={minPitch}
-                            maxPitch={maxPitch}
-                            clipStartTime={clipStartTime}
-                            clipDuration={clipDuration}
-                            totalBeats={totalBeats}
-                            beatWidth={beatWidth}
-                            noteHeight={noteHeight}
-                            snapEnabled={snapEnabled}
-                            gridSize={gridSize}
-                            clipId={clipId}
-                            activeNotes={activeNotes}
-                            onAddNote={onAddNote}
-                            onMoveNote={onMoveNote}
-                            onResizeNote={onResizeNote}
-                            onUpdateVelocity={onUpdateVelocity}
-                            onDeleteNote={onDeleteNote}
-                            onSelectNote={onSelectNote}
-                            onToggleSelectNote={onToggleSelectNote}
-                        />
-
-                        {/* Loop Region - Overlaid on grid */}
-                        <SequencerTimelineLoopRegion
-                            pixelsPerBeat={pixelsPerBeat}
-                            onLoopStartChange={onLoopStartChange}
-                            onLoopEndChange={onLoopEndChange}
-                        />
-                    </div>
-                </div>
-            </div>
-        </div>
+            }
+            sidebarWidth={256}
+            headerHeight={32}
+            contentWidth={totalWidth}
+            scrollRef={pianoRollScrollRef}
+            onScroll={onPianoRollScroll}
+            rulerScrollDataAttr="data-piano-ruler-scroll"
+            sidebarScrollDataAttr="data-piano-keyboard"
+        />
     );
 }
 

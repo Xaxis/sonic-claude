@@ -16,6 +16,7 @@ import { SequencerTimeline } from "../components/Timeline/SequencerTimeline.tsx"
 import { SequencerTimelineRuler } from "../components/Timeline/SequencerTimelineRuler.tsx";
 import { useSequencerContext } from "../contexts/SequencerContext.tsx";
 import { useTimelineCalculations } from "../hooks/useTimelineCalculations.ts";
+import { EditorGridLayout } from "@/components/layout/EditorGridLayout.tsx";
 import type { SequencerTrack, Clip } from "@/types/sequencer";
 
 interface SequencerTimelineSectionProps {
@@ -88,44 +89,24 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
     const { totalWidth, rulerMarkers, pixelsPerBeat } = useTimelineCalculations();
 
     return (
-        <div
-            className="flex-1 min-h-0"
-            style={{
-                display: 'grid',
-                gridTemplateColumns: '256px 1fr',
-                gridTemplateRows: '32px 1fr',
-            }}
-        >
-            {/* Top-Left: Track List Header - Fixed, no scroll */}
-            <div className="border-r border-b border-border bg-muted/30 flex items-center px-3">
+        <EditorGridLayout
+            cornerHeader={
                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
                     Tracks
                 </span>
-            </div>
-
-            {/* Top-Right: Ruler - Scrolls horizontally only, synced with timeline */}
-            <div
-                data-ruler-scroll
-                className="border-b border-border overflow-x-auto overflow-y-hidden scrollbar-hide"
-            >
-                <div style={{ width: `${totalWidth}px`, minWidth: `${totalWidth}px` }}>
-                    <SequencerTimelineRuler
-                        rulerMarkers={rulerMarkers}
-                        totalWidth={totalWidth}
-                        onSeek={onSeek}
-                        pixelsPerBeat={pixelsPerBeat}
-                        zoom={zoom}
-                        snapEnabled={snapEnabled}
-                        gridSize={gridSize}
-                    />
-                </div>
-            </div>
-
-            {/* Bottom-Left: Track Headers - Scrolls vertically only, synced with timeline */}
-            <div
-                data-track-list
-                className="border-r border-border bg-background overflow-y-auto overflow-x-hidden scrollbar-hide"
-            >
+            }
+            ruler={
+                <SequencerTimelineRuler
+                    rulerMarkers={rulerMarkers}
+                    totalWidth={totalWidth}
+                    onSeek={onSeek}
+                    pixelsPerBeat={pixelsPerBeat}
+                    zoom={zoom}
+                    snapEnabled={snapEnabled}
+                    gridSize={gridSize}
+                />
+            }
+            sidebar={
                 <SequencerTracks
                     tracks={tracks}
                     onToggleMute={onToggleMute}
@@ -136,14 +117,8 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
                     expandedTracks={expandedTracks}
                     onExpandedTracksChange={setExpandedTracks}
                 />
-            </div>
-
-            {/* Bottom-Right: Timeline - Scrolls both directions, has scrollbar */}
-            <div
-                ref={timelineScrollRef}
-                className="overflow-auto"
-                onScroll={onTimelineScroll}
-            >
+            }
+            mainContent={
                 <SequencerTimeline
                     expandedTracks={expandedTracks}
                     onSelectClip={onSelectClip}
@@ -160,8 +135,15 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
                     onSeek={onSeek}
                     onClipDragStateChange={onClipDragStateChange}
                 />
-            </div>
-        </div>
+            }
+            sidebarWidth={256}
+            headerHeight={32}
+            contentWidth={totalWidth}
+            scrollRef={timelineScrollRef}
+            onScroll={onTimelineScroll}
+            rulerScrollDataAttr="data-ruler-scroll"
+            sidebarScrollDataAttr="data-track-list"
+        />
     );
 }
 
