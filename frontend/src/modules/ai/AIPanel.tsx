@@ -17,6 +17,7 @@ import { AnalysisLayout } from "./layouts/AnalysisLayout";
 import { StateLayout } from "./layouts/StateLayout";
 import { aiService } from "@/services/ai/ai.service";
 import { useAIEngine } from "@/contexts/AIEngineContext";
+import { useAudioEngine } from "@/contexts/AudioEngineContext";
 
 export function AIPanel() {
     // UI State
@@ -34,6 +35,13 @@ export function AIPanel() {
         setAIContext,
     } = useAIEngine();
 
+    // Audio Engine Context (for reloading sequencer after AI actions)
+    const {
+        activeSequenceId,
+        loadSequencerTracks,
+        loadSequences,
+    } = useAudioEngine();
+
     // Event handlers
     const handlers = useAIHandlers({
         addChatMessage,
@@ -42,6 +50,10 @@ export function AIPanel() {
         setAIContext,
         setIsSendingMessage: actions.setIsSendingMessage,
         setIsLoadingState: actions.setIsLoadingState,
+        // Reload functions to update UI after AI actions
+        activeSequenceId,
+        loadSequencerTracks,
+        loadSequences,
     });
 
     // Load initial state on mount (only if not already loaded)

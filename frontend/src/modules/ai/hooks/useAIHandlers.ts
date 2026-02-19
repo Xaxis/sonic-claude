@@ -25,6 +25,11 @@ interface UseAIHandlersProps {
     // UI state actions
     setIsSendingMessage: (sending: boolean) => void;
     setIsLoadingState: (loading: boolean) => void;
+
+    // Audio Engine reload functions (to update UI after AI actions)
+    activeSequenceId: string | null;
+    loadSequencerTracks: (sequenceId?: string) => Promise<void>;
+    loadSequences: () => Promise<void>;
 }
 
 export function useAIHandlers(props: UseAIHandlersProps) {
@@ -35,6 +40,9 @@ export function useAIHandlers(props: UseAIHandlersProps) {
         setAIContext,
         setIsSendingMessage,
         setIsLoadingState,
+        activeSequenceId,
+        loadSequencerTracks,
+        loadSequences,
     } = props;
 
     // ========================================================================
@@ -111,6 +119,15 @@ export function useAIHandlers(props: UseAIHandlersProps) {
                     });
                 }
 
+                // Reload sequencer UI to show changes made by AI
+                if (response.actions_executed && response.actions_executed.length > 0) {
+                    console.log("AI executed actions - reloading sequencer UI...");
+                    await loadSequences(); // Reload sequences (in case tempo changed or new sequence created)
+                    if (activeSequenceId) {
+                        await loadSequencerTracks(activeSequenceId); // Reload tracks (in case tracks were created/modified)
+                    }
+                }
+
                 toast.success("AI responded");
             } catch (error: any) {
                 console.error("Failed to send message:", error);
@@ -128,7 +145,7 @@ export function useAIHandlers(props: UseAIHandlersProps) {
                 setIsSendingMessage(false);
             }
         },
-        [addChatMessage, addAnalysisEvent, setIsSendingMessage]
+        [addChatMessage, addAnalysisEvent, setIsSendingMessage, loadSequences, loadSequencerTracks, activeSequenceId]
     );
 
     // ========================================================================

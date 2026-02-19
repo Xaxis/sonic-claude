@@ -90,8 +90,8 @@ async def update_sequence(
     if "sample_editor_clip_id" in request:
         sequence.sample_editor_clip_id = request["sample_editor_clip_id"]
 
-    # Save to disk
-    sequencer_service.storage.save_sequence(sequence)
+    # NOTE: Composition auto-save handled by CompositionService
+    # No need to manually save sequences anymore
 
     return sequence
 
@@ -114,22 +114,8 @@ async def save_sequence(
     create_version: bool = False,
     sequencer_service: SequencerService = Depends(get_sequencer_service)
 ):
-    """
-    Manually save sequence to disk
-
-    Args:
-        sequence_id: Sequence ID to save
-        create_version: Whether to create a version snapshot
-    """
-    sequence = sequencer_service.get_sequence(sequence_id)
-    if not sequence:
-        raise SequenceNotFoundError(sequence_id)
-
-    success = sequencer_service.storage.save_sequence(sequence, create_version=create_version)
-    if not success:
-        raise ServiceError(f"Failed to save sequence {sequence_id}")
-
-    return {"status": "ok", "message": f"Sequence {sequence_id} saved", "version_created": create_version}
+    """Save composition - moved to composition API"""
+    raise ServiceError("Sequence save moved to composition API - use /api/compositions/{id}/save")
 
 
 @router.get("/sequences/{sequence_id}/versions")
@@ -137,12 +123,8 @@ async def list_versions(
     sequence_id: str,
     sequencer_service: SequencerService = Depends(get_sequencer_service)
 ):
-    """List all versions for a sequence"""
-    versions = sequencer_service.storage.list_versions(sequence_id)
-    return {"sequence_id": sequence_id, "versions": versions}
-
-
-
+    """List composition versions - moved to composition API"""
+    raise ServiceError("Version listing moved to composition API - use /api/compositions/{id}/history")
 
 
 @router.post("/sequences/{sequence_id}/versions/{version_num}/restore")
@@ -151,23 +133,8 @@ async def restore_version(
     version_num: int,
     sequencer_service: SequencerService = Depends(get_sequencer_service)
 ):
-    """Restore a sequence from a specific version"""
-    version_sequence = sequencer_service.storage.load_version(sequence_id, version_num)
-    if not version_sequence:
-        raise VersionNotFoundError(version_num, sequence_id)
-
-    # Save current state as a version before restoring
-    current_sequence = sequencer_service.get_sequence(sequence_id)
-    if current_sequence:
-        sequencer_service.storage.save_sequence(current_sequence, create_version=True)
-
-    # Update in-memory sequence
-    sequencer_service.sequences[sequence_id] = version_sequence
-
-    # Save restored version as current
-    sequencer_service.storage.save_sequence(version_sequence)
-
-    return {"status": "ok", "message": f"Restored sequence to version {version_num}"}
+    """Restore composition version - moved to composition API"""
+    raise ServiceError("Version restore moved to composition API - use /api/compositions/{id}/history/{version}/restore")
 
 
 @router.post("/sequences/{sequence_id}/recover")
@@ -175,15 +142,5 @@ async def recover_from_autosave(
     sequence_id: str,
     sequencer_service: SequencerService = Depends(get_sequencer_service)
 ):
-    """Recover sequence from autosave file"""
-    recovered_sequence = sequencer_service.storage.recover_from_autosave(sequence_id)
-    if not recovered_sequence:
-        raise SequenceNotFoundError(sequence_id)
-
-    # Update in-memory sequence
-    sequencer_service.sequences[sequence_id] = recovered_sequence
-
-    # Save recovered version
-    sequencer_service.storage.save_sequence(recovered_sequence, create_version=True)
-
-    return {"status": "ok", "message": f"Recovered sequence from autosave"}
+    """Recover composition from autosave - moved to composition API"""
+    raise ServiceError("Autosave recovery moved to composition API - use /api/compositions/{id}/recover")

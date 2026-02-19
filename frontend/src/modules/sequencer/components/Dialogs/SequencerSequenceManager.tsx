@@ -94,10 +94,17 @@ export function SequencerSequenceManager({
     const loadVersions = async (sequenceId: string) => {
         try {
             const response = await fetch(
-                `http://localhost:8000/api/audio-engine/audio/sequencer/sequences/${sequenceId}/versions`
+                `http://localhost:8000/api/compositions/${sequenceId}/history`
             );
             const data = await response.json();
-            setVersions(data.versions || []);
+            // Map history entries to version format
+            const historyEntries = data.history || [];
+            const mappedVersions = historyEntries.map((entry: any) => ({
+                version: entry.version,
+                timestamp: entry.timestamp,
+                file_path: entry.summary || `Version ${entry.version}`
+            }));
+            setVersions(mappedVersions);
         } catch (error) {
             console.error("Failed to load versions:", error);
         }
@@ -137,20 +144,32 @@ export function SequencerSequenceManager({
         setIsLoading(true);
         try {
             const response = await fetch(
-                `http://localhost:8000/api/audio-engine/audio/sequencer/sequences/${currentSequenceId}/save?create_version=${createVersion}`,
-                { method: "POST" }
+                `http://localhost:8000/api/compositions/save`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        sequence_id: currentSequenceId,
+                        create_history: createVersion,
+                        is_autosave: false,
+                        metadata: {
+                            source: "manual_save",
+                            timestamp: new Date().toISOString()
+                        }
+                    })
+                }
             );
             const data = await response.json();
 
             if (createVersion) {
-                toast.success("Sequence saved with new version");
+                toast.success("Composition saved with new version");
                 await loadVersions(currentSequenceId);
             } else {
-                toast.success("Sequence saved");
+                toast.success("Composition saved");
             }
         } catch (error) {
-            console.error("Failed to save sequence:", error);
-            toast.error("Failed to save sequence");
+            console.error("Failed to save composition:", error);
+            toast.error("Failed to save composition");
         } finally {
             setIsLoading(false);
         }
@@ -202,13 +221,13 @@ export function SequencerSequenceManager({
         setIsLoading(true);
         try {
             const response = await fetch(
-                `http://localhost:8000/api/audio-engine/audio/sequencer/sequences/${currentSequenceId}/versions/${versionToRestore}/restore`,
+                `http://localhost:8000/api/compositions/${currentSequenceId}/history/${versionToRestore}/restore`,
                 { method: "POST" }
             );
             const data = await response.json();
-            toast.success(`Restored to version ${versionToRestore}`);
+            toast.success(`Restored composition to version ${versionToRestore}`);
             await loadVersions(currentSequenceId);
-            window.location.reload(); // Reload to refresh sequence data
+            window.location.reload(); // Reload to refresh all composition data (sequence + mixer + effects)
         } catch (error) {
             console.error("Failed to restore version:", error);
             toast.error("Failed to restore version");
@@ -225,12 +244,12 @@ export function SequencerSequenceManager({
         setIsLoading(true);
         try {
             const response = await fetch(
-                `http://localhost:8000/api/audio-engine/audio/sequencer/sequences/${currentSequenceId}/recover`,
+                `http://localhost:8000/api/compositions/${currentSequenceId}/recover`,
                 { method: "POST" }
             );
             const data = await response.json();
-            toast.success("Recovered from autosave");
-            window.location.reload(); // Reload to refresh sequence data
+            toast.success("Recovered composition from autosave");
+            window.location.reload(); // Reload to refresh all composition data (sequence + mixer + effects)
         } catch (error) {
             console.error("Failed to recover autosave:", error);
             toast.error("No autosave found or recovery failed");

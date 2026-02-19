@@ -76,13 +76,15 @@ class StorageConfig(BaseSettings):
     """Storage paths configuration"""
     data_dir: Path = Field(default=Path("data"), description="Data directory")
     samples_dir: Path = Field(default=Path("data/samples"), description="Samples directory")
-    sequences_dir: Path = Field(default=Path("data/sequences"), description="Sequences directory")
-    
+    compositions_dir: Path = Field(default=Path("data/compositions"), description="Compositions directory (unified storage)")
+    sequences_dir: Path = Field(default=Path("data/sequences"), description="Sequences directory (DEPRECATED - use compositions_dir)")
+
     def ensure_directories(self) -> None:
         """Create directories if they don't exist"""
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.samples_dir.mkdir(parents=True, exist_ok=True)
-        self.sequences_dir.mkdir(parents=True, exist_ok=True)
+        self.compositions_dir.mkdir(parents=True, exist_ok=True)
+        self.sequences_dir.mkdir(parents=True, exist_ok=True)  # Keep for migration
 
 
 class AudioConfig(BaseSettings):

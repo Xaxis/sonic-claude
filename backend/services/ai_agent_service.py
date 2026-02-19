@@ -40,12 +40,14 @@ class AIAgentService:
         self,
         state_service: DAWStateService,
         action_service: DAWActionService,
-        api_key: Optional[str],
-        model: str = " claude-sonnet-4-5-20250929",
+        composition_service: Optional['CompositionService'] = None,
+        api_key: Optional[str] = None,
+        model: str = "claude-sonnet-4-5-20250929",
         samples_dir: Optional[Path] = None
     ):
         self.state_service = state_service
         self.action_service = action_service
+        self.composition_service = composition_service
         self.client = anthropic.Anthropic(api_key=api_key) if api_key else None
         self.model = model
 

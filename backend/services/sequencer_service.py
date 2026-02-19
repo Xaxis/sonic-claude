@@ -19,7 +19,6 @@ from backend.models.sequence import (
     UpdateClipRequest,
 )
 from backend.models.types import ActiveMIDINote, PlaybackState
-from backend.services.sequence_storage import SequenceStorage
 from backend.services.buffer_manager import BufferManager
 from backend.core.engine_manager import AudioEngineManager
 from backend.services.websocket_manager import WebSocketManager
@@ -46,7 +45,8 @@ class SequencerService:
         engine_manager: Optional[AudioEngineManager] = None,
         websocket_manager: Optional[WebSocketManager] = None,
         audio_bus_manager: Optional[AudioBusManager] = None,
-        mixer_channel_service: Optional[MixerChannelService] = None
+        mixer_channel_service: Optional[MixerChannelService] = None,
+        composition_service: Optional['CompositionService'] = None
     ) -> None:
         """
         Initialize sequencer service
@@ -56,21 +56,19 @@ class SequencerService:
             websocket_manager: WebSocket manager for real-time updates
             audio_bus_manager: Audio bus manager for track routing
             mixer_channel_service: Mixer channel service for per-track metering
+            composition_service: Unified composition storage service
         """
         self.engine_manager = engine_manager
         self.websocket_manager = websocket_manager
         self.audio_bus_manager = audio_bus_manager
         self.mixer_channel_service = mixer_channel_service
-
-        # Persistent storage
-        self.storage = SequenceStorage()
+        self.composition_service = composition_service
 
         # Buffer manager for sample playback
         self.buffer_manager = BufferManager(engine_manager) if engine_manager else None
 
-        # State storage (in-memory cache)
+        # State storage (in-memory ONLY - persistence handled by CompositionService)
         self.sequences: Dict[str, Sequence] = {}
-        self.tracks: Dict[str, SequencerTrack] = {}
 
         # Global playback state
         self.is_playing = False
@@ -94,34 +92,7 @@ class SequencerService:
         # Callback for MIDI content changes (for AI musical context analysis)
         self.on_sequence_changed: Optional[callable] = None
 
-        # Load sequences from disk
-        self._load_sequences_from_disk()
-
-        logger.info("✅ SequencerService initialized")
-
-    def _load_sequences_from_disk(self) -> None:
-        """Load all sequences from persistent storage"""
-        try:
-            sequences = self.storage.load_all_sequences()
-            for sequence in sequences:
-                # Migration: Add sequence_id to tracks if missing
-                for track in sequence.tracks:
-                    if not hasattr(track, 'sequence_id') or track.sequence_id is None:
-                        track.sequence_id = sequence.id
-                        logger.info(f"🔄 Migrated track {track.id} to include sequence_id")
-
-                self.sequences[sequence.id] = sequence
-                # Also populate global tracks dict for backwards compatibility
-                for track in sequence.tracks:
-                    self.tracks[track.id] = track
-
-                # Save migrated sequence
-                if any(not hasattr(t, 'sequence_id') or t.sequence_id is None for t in sequence.tracks):
-                    self.storage.save_sequence(sequence)
-
-            logger.info(f"✅ Loaded {len(sequences)} sequences from disk")
-        except Exception as e:
-            logger.error(f"❌ Failed to load sequences from disk: {e}")
+        logger.info("✅ SequencerService initialized - NO PERSISTENCE (handled by CompositionService)")
 
     # ========================================================================
     # PLAYBACK ENGINE
@@ -602,9 +573,6 @@ class SequencerService:
         )
         self.sequences[sequence_id] = sequence
 
-        # Save to disk
-        self.storage.save_sequence(sequence, create_version=True)
-
         logger.info(f"✅ Created sequence: {request.name} (ID: {sequence_id})")
         return sequence
 
@@ -626,18 +594,8 @@ class SequencerService:
             # Get the sequence to access its tracks
             sequence = self.sequences[sequence_id]
 
-            # Remove all tracks belonging to this sequence from global tracks dict
-            track_ids_to_remove = [track.id for track in sequence.tracks]
-            for track_id in track_ids_to_remove:
-                if track_id in self.tracks:
-                    del self.tracks[track_id]
-                    logger.info(f"  ✅ Removed track {track_id} from global tracks dict")
-
             # Delete sequence from memory
             del self.sequences[sequence_id]
-
-            # Delete from disk
-            self.storage.delete_sequence(sequence_id)
 
             logger.info(f"✅ Deleted sequence: {sequence_id} (removed {len(track_ids_to_remove)} tracks)")
             return True
@@ -667,10 +625,9 @@ class SequencerService:
                     updated_count += 1
                     sequence_modified = True
 
-            # Save sequence if any tracks were updated
+            # Sequence modified in memory - persistence handled by CompositionService
             if sequence_modified:
-                self.storage.save_sequence(sequence)
-                logger.info(f"💾 Saved sequence '{sequence.name}' with updated sample references")
+                logger.info(f"✅ Updated sequence '{sequence.name}' with new sample references")
 
         return updated_count
 
@@ -723,9 +680,6 @@ class SequencerService:
         sequence.clips.append(clip)
         sequence.updated_at = datetime.now()
 
-        # Autosave sequence
-        self.storage.autosave_sequence(sequence)
-
         # Trigger musical context analysis (async, non-blocking)
         if self.on_sequence_changed:
             asyncio.create_task(asyncio.to_thread(self.on_sequence_changed))
@@ -768,9 +722,6 @@ class SequencerService:
 
         sequence.updated_at = datetime.now()
 
-        # Autosave sequence
-        self.storage.autosave_sequence(sequence)
-
         # Trigger musical context analysis (async, non-blocking)
         if self.on_sequence_changed:
             asyncio.create_task(asyncio.to_thread(self.on_sequence_changed))
@@ -790,9 +741,6 @@ class SequencerService:
 
         sequence.clips.remove(clip)
         sequence.updated_at = datetime.now()
-
-        # Autosave sequence
-        self.storage.autosave_sequence(sequence)
 
         # Trigger musical context analysis (async, non-blocking)
         if self.on_sequence_changed:
@@ -829,9 +777,6 @@ class SequencerService:
 
         sequence.clips.append(new_clip)
         sequence.updated_at = datetime.now()
-
-        # Autosave sequence
-        self.storage.autosave_sequence(sequence)
 
         logger.info(f"✅ Duplicated clip {clip_id} → {new_clip_id}")
         return new_clip
@@ -876,12 +821,6 @@ class SequencerService:
         # Add track to sequence
         sequence.tracks.append(track)
 
-        # Also keep in global dict for backwards compatibility
-        self.tracks[track_id] = track
-
-        # Auto-save sequence
-        self.storage.autosave_sequence(sequence)
-
         logger.info(f"✅ Created track: {name} (ID: {track_id}, Type: {track_type}, Sample: {sample_name}) in sequence {sequence_id}")
         return track
 
@@ -890,22 +829,33 @@ class SequencerService:
         if sequence_id:
             sequence = self.sequences.get(sequence_id)
             return sequence.tracks if sequence else []
-        return list(self.tracks.values())
+
+        # Return all tracks from all sequences
+        all_tracks = []
+        for sequence in self.sequences.values():
+            all_tracks.extend(sequence.tracks)
+        return all_tracks
 
     def get_track(self, track_id: str) -> Optional[SequencerTrack]:
         """Get track by ID"""
-        return self.tracks.get(track_id)
+        # Find track in sequences
+        for sequence in self.sequences.values():
+            track = next((t for t in sequence.tracks if t.id == track_id), None)
+            if track:
+                return track
+        return None
 
     async def update_track_mute(self, track_id: str, is_muted: bool) -> Optional[SequencerTrack]:
         """Toggle track mute"""
-        track = self.tracks.get(track_id)
+        # Find track in sequences
+        track = None
+        for sequence in self.sequences.values():
+            track = next((t for t in sequence.tracks if t.id == track_id), None)
+            if track:
+                break
+
         if track:
             track.is_muted = is_muted
-            # Find and auto-save the sequence containing this track
-            for sequence in self.sequences.values():
-                if any(t.id == track_id for t in sequence.tracks):
-                    self.storage.autosave_sequence(sequence)
-                    break
 
             # Update mixer channel synth
             if self.mixer_channel_service:
@@ -919,14 +869,15 @@ class SequencerService:
 
     async def update_track_solo(self, track_id: str, is_solo: bool) -> Optional[SequencerTrack]:
         """Toggle track solo"""
-        track = self.tracks.get(track_id)
+        # Find track in sequences
+        track = None
+        for sequence in self.sequences.values():
+            track = next((t for t in sequence.tracks if t.id == track_id), None)
+            if track:
+                break
+
         if track:
             track.is_solo = is_solo
-            # Find and auto-save the sequence containing this track
-            for sequence in self.sequences.values():
-                if any(t.id == track_id for t in sequence.tracks):
-                    self.storage.autosave_sequence(sequence)
-                    break
 
             # Update mixer channel synth
             if self.mixer_channel_service:
@@ -950,7 +901,13 @@ class SequencerService:
         Returns:
             Updated track, or None if track not found
         """
-        track = self.tracks.get(track_id)
+        # Find track in sequences
+        track = None
+        for sequence in self.sequences.values():
+            track = next((t for t in sequence.tracks if t.id == track_id), None)
+            if track:
+                break
+
         if not track:
             return None
 
@@ -959,12 +916,6 @@ class SequencerService:
             track.volume = volume
         if pan is not None:
             track.pan = pan
-
-        # Find and auto-save the sequence containing this track
-        for sequence in self.sequences.values():
-            if any(t.id == track_id for t in sequence.tracks):
-                self.storage.autosave_sequence(sequence)
-                break
 
         # Update mixer channel synth (create if it doesn't exist)
         if self.mixer_channel_service and (volume is not None or pan is not None):
@@ -1021,9 +972,15 @@ class SequencerService:
 
     def delete_track(self, track_id: str) -> bool:
         """Delete a track from its sequence"""
-        track = self.tracks.get(track_id)
+        # Find track in sequences
+        track = None
+        for sequence in self.sequences.values():
+            track = next((t for t in sequence.tracks if t.id == track_id), None)
+            if track:
+                break
+
         if not track:
-            logger.warning(f"Track {track_id} not found in tracks dict")
+            logger.warning(f"Track {track_id} not found")
             return False
 
         # Find the sequence containing this track
@@ -1035,17 +992,11 @@ class SequencerService:
         # Remove track from sequence
         sequence.tracks = [t for t in sequence.tracks if t.id != track_id]
 
-        # Remove track from global tracks dict
-        del self.tracks[track_id]
-
         # Remove all clips belonging to this track
         sequence.clips = [c for c in sequence.clips if c.track_id != track_id]
 
         # Update timestamp
         sequence.updated_at = datetime.now()
-
-        # Auto-save the sequence
-        self.storage.autosave_sequence(sequence)
 
         logger.info(f"✅ Deleted track {track_id} from sequence {track.sequence_id}")
         return True
@@ -1173,8 +1124,6 @@ class SequencerService:
             sequence = self.sequences.get(self.current_sequence_id)
             if sequence:
                 sequence.tempo = tempo
-                # Save the sequence with new tempo
-                self.storage.autosave_sequence(sequence)
 
         logger.info(f"🎵 Set tempo: {old_tempo} → {tempo} BPM")
 

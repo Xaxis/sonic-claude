@@ -29,48 +29,15 @@ class MixerService:
         self.websocket_manager = websocket_manager
         self.audio_analyzer = audio_analyzer  # Optional, set later in dependencies.py
 
-        # Mixer state
+        # Mixer state (in-memory ONLY - persistence handled by CompositionService)
         self.state = MixerState()
 
-        # Storage
-        self.storage_dir = Path("data/mixer")
-        self.storage_dir.mkdir(parents=True, exist_ok=True)
-        self.state_file = self.storage_dir / "mixer_state.json"
-
-        # Load saved state
-        self._load_state()
-
-        logger.info("✅ MixerService initialized")
+        logger.info("✅ MixerService initialized - NO PERSISTENCE (handled by CompositionService)")
     
     # ========================================================================
     # STATE MANAGEMENT
     # ========================================================================
-    
-    def _load_state(self):
-        """Load mixer state from disk"""
-        if self.state_file.exists():
-            try:
-                with open(self.state_file, 'r') as f:
-                    data = json.load(f)
-                    self.state = MixerState(**data)
-                logger.info(f"✅ Loaded mixer state: {len(self.state.channels)} channels")
-            except Exception as e:
-                logger.error(f"❌ Failed to load mixer state: {e}")
-                self.state = MixerState()
-        else:
-            # Create default state with master channel
-            self.state = MixerState()
-            self._save_state()
-    
-    def _save_state(self):
-        """Save mixer state to disk"""
-        try:
-            with open(self.state_file, 'w') as f:
-                json.dump(self.state.model_dump(), f, indent=2, default=str)
-            logger.debug("💾 Saved mixer state")
-        except Exception as e:
-            logger.error(f"❌ Failed to save mixer state: {e}")
-    
+
     def get_state(self) -> MixerState:
         """Get current mixer state"""
         return self.state
@@ -93,9 +60,8 @@ class MixerService:
             color=request.color or "#3b82f6",
             sc_bus_index=sc_bus_index,
         )
-        
+
         self.state.channels.append(channel)
-        self._save_state()
 
         logger.info(f"✅ Created mixer channel: {request.name} (ID: {channel_id})")
         return channel
@@ -132,8 +98,6 @@ class MixerService:
             channel.phase_invert = request.phase_invert
         if request.output_bus is not None:
             channel.output_bus = request.output_bus
-        
-        self._save_state()
 
         logger.debug(f"🔄 Updated channel: {channel.name}")
         return channel
@@ -145,7 +109,6 @@ class MixerService:
             raise ValueError(f"Channel not found: {channel_id}")
 
         self.state.channels = [c for c in self.state.channels if c.id != channel_id]
-        self._save_state()
 
         logger.info(f"🗑️ Deleted channel: {channel.name}")
 
@@ -173,8 +136,6 @@ class MixerService:
             master.limiter_enabled = request.limiter_enabled
         if request.limiter_threshold is not None:
             master.limiter_threshold = max(-12.0, min(0.0, request.limiter_threshold))
-
-        self._save_state()
 
         # Update SuperCollider audioMonitor synth with new volume/mute
         if self.audio_analyzer and (request.fader is not None or request.mute is not None):

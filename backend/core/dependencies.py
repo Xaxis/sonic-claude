@@ -43,6 +43,7 @@ from backend.services.musical_context_analyzer import MusicalContextAnalyzer
 from backend.services.daw_state_service import DAWStateService
 from backend.services.daw_action_service import DAWActionService
 from backend.services.ai_agent_service import AIAgentService
+from backend.services.composition_service import CompositionService
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,7 @@ _audio_feature_extractor: Optional[AudioFeatureExtractor] = None
 _musical_context_analyzer: Optional[MusicalContextAnalyzer] = None
 _daw_state_service: Optional[DAWStateService] = None
 _daw_action_service: Optional[DAWActionService] = None
+_composition_service: Optional[CompositionService] = None
 _ai_agent_service: Optional[AIAgentService] = None
 
 
@@ -89,7 +91,7 @@ async def initialize_services(settings: Settings) -> None:
     global _synthesis_service, _sequencer_service, _ws_manager, _buffer_manager, _mixer_service
     global _track_meter_service, _audio_bus_manager, _mixer_channel_service, _track_effects_service
     global _audio_feature_extractor, _musical_context_analyzer, _daw_state_service
-    global _daw_action_service, _ai_agent_service
+    global _daw_action_service, _composition_service, _ai_agent_service
 
     logger.info("🚀 Initializing services...")
 
@@ -109,12 +111,25 @@ async def initialize_services(settings: Settings) -> None:
     _track_meter_service = TrackMeterService(_engine_manager, _mixer_channel_service)
     _track_effects_service = TrackEffectsService(_engine_manager, _audio_bus_manager, _mixer_channel_service)
 
-    # Step 4: Initialize audio services (depend on engine_manager and metering services)
+    # Step 4: Initialize unified composition service FIRST (needed by other services)
+    logger.info("💾 Initializing unified composition service...")
+    _composition_service = CompositionService(
+        storage_dir=settings.storage.compositions_dir,
+        samples_dir=settings.storage.samples_dir
+    )
+
+    # Step 5: Initialize audio services (depend on engine_manager and metering services)
     logger.info("🎵 Initializing audio services...")
     _audio_analyzer = AudioAnalyzerService(_engine_manager)
     _audio_input_service = AudioInputService(_engine_manager)
     _synthesis_service = SynthesisService(_engine_manager)
-    _sequencer_service = SequencerService(_engine_manager, _ws_manager, _audio_bus_manager, _mixer_channel_service)
+    _sequencer_service = SequencerService(
+        engine_manager=_engine_manager,
+        websocket_manager=_ws_manager,
+        audio_bus_manager=_audio_bus_manager,
+        mixer_channel_service=_mixer_channel_service,
+        composition_service=_composition_service
+    )
     _buffer_manager = BufferManager(_engine_manager)
     _mixer_service = MixerService(_engine_manager, _ws_manager, _audio_analyzer)
 
@@ -169,6 +184,7 @@ async def initialize_services(settings: Settings) -> None:
     _ai_agent_service = AIAgentService(
         state_service=_daw_state_service,
         action_service=_daw_action_service,
+        composition_service=_composition_service,
         api_key=api_key,
         model=settings.ai.model,
         samples_dir=settings.storage.samples_dir
@@ -225,10 +241,8 @@ async def shutdown_services() -> None:
 
     logger.info("🛑 Shutting down services...")
 
-    # Promote all autosaves before shutdown
-    if _sequencer_service and _sequencer_service.storage:
-        logger.info("💾 Promoting autosaves to main sequence files...")
-        _sequencer_service.storage.promote_all_autosaves()
+    # NOTE: Autosave promotion now handled by CompositionService
+    # No need to manually promote autosaves anymore
 
     # Stop monitoring services
     if _audio_analyzer:
@@ -363,6 +377,13 @@ def get_daw_action_service() -> DAWActionService:
     if _daw_action_service is None:
         raise RuntimeError("DAWActionService not initialized")
     return _daw_action_service
+
+
+def get_composition_service() -> CompositionService:
+    """Get CompositionService instance"""
+    if _composition_service is None:
+        raise RuntimeError("CompositionService not initialized")
+    return _composition_service
 
 
 def get_ai_agent_service() -> AIAgentService:

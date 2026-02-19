@@ -153,11 +153,8 @@ async def update_track(
             pan=request.pan
         )
 
-    # Save the sequence containing this track (if not already saved by update_track)
-    if request.name is not None or request.instrument is not None:
-        sequence = sequencer_service.get_sequence(track.sequence_id)
-        if sequence:
-            sequencer_service.storage.save_sequence(sequence)
+    # NOTE: Composition auto-save handled by CompositionService
+    # No need to manually save sequences anymore
 
     return track
 

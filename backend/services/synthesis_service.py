@@ -1,6 +1,9 @@
 """
 Synthesis Service - Manages synth creation and control
 
+@TODO - Research whether this is even being used anymore.
+@TODO - Research why we wouldnt also want AI to directly create synths
+
 Clean, organized service layer for synth management
 """
 import logging
