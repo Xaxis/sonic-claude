@@ -282,7 +282,7 @@ export function TabbedWrapper({
                     </div>
                 ) : (
                     <>
-                        {/* X-Ray Background Layer (target tab) */}
+                        {/* X-Ray Background Layer (target tab) - Skews INTO view */}
                         {xrayEnabled && xrayPanels.length > 0 && (
                             <div
                                 className="absolute inset-0 pointer-events-none transition-all duration-300"
@@ -291,10 +291,10 @@ export function TabbedWrapper({
                                     zIndex: 0,
                                     transform: `
                                         perspective(1200px)
-                                        rotateX(${xrayOpacity * 8}deg)
-                                        rotateY(${xrayOpacity * -3}deg)
-                                        scale(${1 - (xrayOpacity * 0.08)})
-                                        translateZ(${-xrayOpacity * 50}px)
+                                        rotateX(${(1 - xrayOpacity) * -12}deg)
+                                        rotateY(${(1 - xrayOpacity) * 5}deg)
+                                        scale(${0.92 + (xrayOpacity * 0.08)})
+                                        translateZ(${(xrayOpacity - 1) * 80}px)
                                     `,
                                     transformOrigin: 'center center',
                                     transformStyle: 'preserve-3d',
@@ -315,12 +315,21 @@ export function TabbedWrapper({
                             </div>
                         )}
 
-                        {/* Active Tab Layer (foreground) */}
+                        {/* Active Tab Layer (foreground) - Skews OUT of view */}
                         <div
-                            className="absolute inset-0 transition-opacity duration-300"
+                            className="absolute inset-0 transition-all duration-300"
                             style={{
-                                opacity: xrayEnabled ? 1 - (xrayOpacity * 0.3) : 1, // Slightly reduce active tab opacity when x-ray is on
+                                opacity: xrayEnabled ? 1 - (xrayOpacity * 0.3) : 1,
                                 zIndex: 1,
+                                transform: xrayEnabled ? `
+                                    perspective(1200px)
+                                    rotateX(${xrayOpacity * 8}deg)
+                                    rotateY(${xrayOpacity * -3}deg)
+                                    scale(${1 - (xrayOpacity * 0.05)})
+                                    translateZ(${xrayOpacity * 40}px)
+                                ` : 'none',
+                                transformOrigin: 'center center',
+                                transformStyle: 'preserve-3d',
                             }}
                         >
                             <PanelGrid

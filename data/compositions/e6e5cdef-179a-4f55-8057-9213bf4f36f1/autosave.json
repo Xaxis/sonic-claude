@@ -1,7 +1,7 @@
 {
-  "id": "ea661f25-c84b-45d3-9b12-4c88823909f3",
+  "id": "c6231e3e-43b0-4109-ad6b-c8a42154d68b",
   "name": "Sequence 1",
-  "created_at": "2026-02-19T09:33:25.207669",
+  "created_at": "2026-02-19T09:35:36.666823",
   "sequence": {
     "id": "e6e5cdef-179a-4f55-8057-9213bf4f36f1",
     "name": "Sequence 1",
@@ -155,6 +155,6 @@
   "chat_history": [],
   "metadata": {
     "source": "autosave",
-    "timestamp": "2026-02-19T18:33:25.201Z"
+    "timestamp": "2026-02-19T18:35:36.662Z"
   }
 }
