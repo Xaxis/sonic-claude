@@ -1,11 +1,10 @@
 """
-Sample Library Routes - REST API for sample storage and management
+Sample CRUD Operations - Upload, get, update, delete samples
 
-Provides endpoints for uploading, retrieving, and managing audio samples
+This module handles basic sample lifecycle operations.
 """
 import logging
 import os
-import json
 import uuid
 import subprocess
 from datetime import datetime
@@ -19,20 +18,15 @@ from backend.core.dependencies import get_settings, get_sequencer_service
 from backend.core.config import Settings
 from backend.core.exceptions import SampleNotFoundError, SampleInUseError, ServiceError
 from backend.services.sequencer_service import SequencerService
+from .utils import get_samples_dir, get_metadata_file, load_metadata, save_metadata
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def get_samples_dir(settings: Settings = Depends(get_settings)) -> str:
-    """Get samples directory from settings (already ensured by config.ensure_directories())"""
-    return str(settings.storage.samples_dir)
-
-
-def get_metadata_file(settings: Settings = Depends(get_settings)) -> str:
-    """Get metadata file path from settings"""
-    return os.path.join(settings.storage.samples_dir, "metadata.json")
-
+# ============================================================================
+# RESPONSE MODELS
+# ============================================================================
 
 class SampleMetadata(BaseModel):
     """Sample metadata model"""
@@ -60,27 +54,9 @@ class SampleListResponse(BaseModel):
     total: int
 
 
-def load_metadata(metadata_file: str) -> dict:
-    """Load sample metadata from JSON file"""
-    if not os.path.exists(metadata_file):
-        return {}
-    try:
-        with open(metadata_file, 'r') as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Failed to load metadata: {e}")
-        return {}
-
-
-def save_metadata(metadata: dict, metadata_file: str):
-    """Save sample metadata to JSON file"""
-    try:
-        with open(metadata_file, 'w') as f:
-            json.dump(metadata, f, indent=2)
-    except Exception as e:
-        logger.error(f"Failed to save metadata: {e}")
-        raise
-
+# ============================================================================
+# CRUD ENDPOINTS
+# ============================================================================
 
 @router.post("/upload", response_model=SampleResponse)
 async def upload_sample(
@@ -172,7 +148,10 @@ async def upload_sample(
         raise ServiceError(f"Failed to upload sample: {str(e)}")
 
 
-@router.get("", response_model=SampleListResponse)
+
+
+
+@router.get("/", response_model=SampleListResponse)
 async def get_all_samples(
     metadata_file: str = Depends(get_metadata_file)
 ):
@@ -237,32 +216,6 @@ async def download_sample(
     except Exception as e:
         logger.error(f"❌ Failed to download sample: {e}")
         raise ServiceError(f"Failed to download sample: {str(e)}")
-
-
-@router.post("/{sample_id}/duration", response_model=SampleResponse)
-async def update_sample_duration(
-    sample_id: str,
-    duration: float = Form(...),
-    metadata_file: str = Depends(get_metadata_file)
-):
-    """Update sample duration"""
-    try:
-        metadata = load_metadata(metadata_file)
-        if sample_id not in metadata:
-            raise SampleNotFoundError(sample_id)
-
-        metadata[sample_id]["duration"] = duration
-        metadata[sample_id]["updated_at"] = datetime.now().isoformat()
-        save_metadata(metadata, metadata_file)
-
-        return SampleResponse(
-            success=True,
-            message="Duration updated",
-            sample=SampleMetadata(**metadata[sample_id])
-        )
-    except Exception as e:
-        logger.error(f"❌ Failed to update duration: {e}")
-        raise ServiceError(f"Failed to update duration: {str(e)}")
 
 
 @router.patch("/{sample_id}", response_model=SampleResponse)
@@ -336,4 +289,3 @@ async def delete_sample(
     except Exception as e:
         logger.error(f"❌ Failed to delete sample: {e}")
         raise ServiceError(f"Failed to delete sample: {str(e)}")
-

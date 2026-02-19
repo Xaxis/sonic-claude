@@ -27,12 +27,14 @@ from backend.core.exceptions import (
     ValidationError,
     ServiceError,
 )
-from backend.api import websocket_routes, sample_routes, composition_routes
+from backend.api import websocket_routes
 from backend.api.audio import router as audio_router
 from backend.api.sequencer import router as sequencer_router
 from backend.api.mixer import router as mixer_router
 from backend.api.effects import router as effects_router
-from backend.api.ai_routes import router as ai_router
+from backend.api.ai import router as ai_router
+from backend.api.samples import router as samples_router
+from backend.api.compositions import router as compositions_router
 
 logger = logging.getLogger(__name__)
 
@@ -206,8 +208,8 @@ app.include_router(sequencer_router, prefix="/audio-engine/audio/sequencer")
 app.include_router(mixer_router, prefix="/audio-engine/audio/mixer")
 app.include_router(effects_router, prefix="/audio-engine/audio")
 app.include_router(websocket_routes.router, prefix="/audio-engine/ws", tags=["websocket"])
-app.include_router(sample_routes.router, prefix="/api/samples", tags=["samples"])
-app.include_router(composition_routes.router, prefix="/api")
+app.include_router(samples_router, prefix="/api/samples")
+app.include_router(compositions_router, prefix="/api/compositions")
 app.include_router(ai_router, prefix="/api")
 
 

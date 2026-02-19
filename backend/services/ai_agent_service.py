@@ -116,14 +116,14 @@ class AIAgentService:
         logger.info(f"📋 Generated plan:\n{plan_text}")
 
         # ====================================================================
-        # STAGE 2: EXECUTION
+        # STAGE 2: EXECUTION (MULTI-TURN LOOP)
         # ====================================================================
         logger.info(f"⚡ STAGE 2: Executing plan")
 
         execution_prompt = self._build_execution_prompt()
 
         # Inject the plan into the execution request
-        execution_message = f"""EXECUTION PLAN (follow this EXACTLY):
+        initial_message = f"""EXECUTION PLAN (follow this EXACTLY):
 {plan_text}
 
 Current DAW state:
@@ -131,63 +131,134 @@ Current DAW state:
 
 Original user request: {user_message}
 
-Execute the plan above using the available tools. Follow EVERY step in the plan."""
+Execute the plan above using the available tools. Follow EVERY step in the plan.
+Call ALL the tools needed to complete ALL steps. Don't stop after one tool call."""
 
-        # Call Claude with function calling for execution
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=4096,  # More tokens for execution
-            system=execution_prompt,
-            messages=[{
-                "role": "user",
-                "content": execution_message
-            }],
-            tools=self._get_tool_definitions()
-        )
-        
-        # Update last call time
-        self.last_call_time = datetime.now()
-        
-        # Process response
-        assistant_message = ""
+        # Multi-turn execution loop
         actions_executed = []
         track_ids_created = []  # Track IDs from create_track actions
+        assistant_message = ""
+        track_name_to_id = {}  # Map track names to IDs for reference
 
-        for block in response.content:
-            if block.type == "text":
-                assistant_message += block.text
-            elif block.type == "tool_use":
-                # Execute action
-                action = DAWAction(
-                    action=block.name,
-                    parameters=block.input
-                )
+        # Build conversation history for multi-turn execution
+        messages = [{
+            "role": "user",
+            "content": initial_message
+        }]
 
-                logger.info(f"🎯 AI calling tool: {block.name} with params: {block.input}")
+        max_turns = 10  # Safety limit to prevent infinite loops
+        turn = 0
 
-                result = await self.action_service.execute_action(action)
-                actions_executed.append(result)
+        while turn < max_turns:
+            turn += 1
+            logger.info(f"🔄 Execution turn {turn}/{max_turns}")
 
-                # Track create_track actions to detect empty tracks
-                if block.name == "create_track":
-                    if result.success and result.data and "track_id" in result.data:
-                        track_ids_created.append(result.data["track_id"])
-                        logger.info(f"✅ Created track: {result.data['track_id']}")
+            # Call Claude with function calling for execution
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=4096,  # More tokens for execution
+                system=execution_prompt,
+                messages=messages,
+                tools=self._get_tool_definitions()
+            )
 
-                # Log if create_midi_clip is called
-                if block.name == "create_midi_clip":
-                    track_id = block.input.get("track_id")
-                    if track_id in track_ids_created:
-                        track_ids_created.remove(track_id)  # Track now has content
-                        logger.info(f"✅ Added clip to track: {track_id}")
+            # Update last call time
+            self.last_call_time = datetime.now()
 
-                # Add result to message
-                assistant_message += f"\n[Executed: {block.name}]"
+            # Check if Claude made any tool calls
+            tool_calls_made = False
+            turn_results = []
+
+            # Process response blocks
+            for block in response.content:
+                if block.type == "text":
+                    assistant_message += block.text
+                elif block.type == "tool_use":
+                    tool_calls_made = True
+
+                    # Execute action
+                    action = DAWAction(
+                        action=block.name,
+                        parameters=block.input
+                    )
+
+                    logger.info(f"🎯 AI calling tool: {block.name} with params: {block.input}")
+
+                    result = await self.action_service.execute_action(action)
+                    actions_executed.append(result)
+
+                    # Track create_track actions to detect empty tracks
+                    if block.name == "create_track":
+                        if result.success and result.data and "track_id" in result.data:
+                            track_id = result.data["track_id"]
+                            track_name = block.input.get("name", "Unknown")
+                            track_ids_created.append(track_id)
+                            track_name_to_id[track_name] = track_id
+                            logger.info(f"✅ Created track: {track_name} -> {track_id}")
+
+                    # Log if create_midi_clip is called
+                    if block.name == "create_midi_clip":
+                        track_id = block.input.get("track_id")
+                        if track_id in track_ids_created:
+                            track_ids_created.remove(track_id)  # Track now has content
+                            logger.info(f"✅ Added clip to track: {track_id}")
+
+                    # Add result to message
+                    assistant_message += f"\n[Executed: {block.name}]"
+
+                    # Build tool result message with track ID mapping if relevant
+                    result_content = f"Success: {result.message}" if result.success else f"Error: {result.error}"
+
+                    # If this was create_track, include the track_id in the result
+                    if block.name == "create_track" and result.success and result.data:
+                        track_id = result.data.get("track_id")
+                        track_name = block.input.get("name")
+                        result_content += f"\n✅ Track ID for '{track_name}': {track_id}"
+                        result_content += f"\n⚠️ IMPORTANT: Use track_id='{track_id}' (not '{track_name}') for subsequent operations on this track"
+
+                    # Store tool result for next turn
+                    turn_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": result_content
+                    })
+
+            # If no tool calls were made, we're done
+            if not tool_calls_made:
+                logger.info(f"✅ Execution complete - no more tool calls")
+                break
+
+            # Add assistant response to conversation
+            messages.append({
+                "role": "assistant",
+                "content": response.content
+            })
+
+            # Add tool results to conversation
+            messages.append({
+                "role": "user",
+                "content": turn_results
+            })
+
+            logger.info(f"📊 Turn {turn} complete: {len(turn_results)} tools executed, {len(actions_executed)} total actions")
 
         # CRITICAL: Warn if tracks were created without clips
         if track_ids_created:
             logger.error(f"🚨 AI CREATED EMPTY TRACKS: {track_ids_created}")
             logger.error(f"🚨 This violates the system prompt! Tracks without clips are useless!")
+
+        logger.info(f"✅ Execution complete after {turn} turns: {len(actions_executed)} total actions")
+
+        # Log execution summary
+        if actions_executed:
+            action_summary = {}
+            for action in actions_executed:
+                action_type = action.action
+                action_summary[action_type] = action_summary.get(action_type, 0) + 1
+
+            logger.info(f"📊 Action summary: {action_summary}")
+        else:
+            logger.warning(f"⚠️ No actions were executed! This might indicate a problem.")
 
         # Build comprehensive response including plan
         full_response = f"""**PLAN:**
@@ -386,10 +457,12 @@ Your task: Execute the provided plan EXACTLY using the available tools.
 EXECUTION RULES
 ═══════════════════════════════════════════════════════════════════════════════
 
-1. **Follow the plan step-by-step**
-   - Execute EVERY step in the plan
+1. **Execute ALL steps in ONE response**
+   - Make MULTIPLE tool calls in a SINGLE response
+   - Execute EVERY step in the plan sequentially
    - Use the EXACT parameters specified in the plan
    - Don't skip steps or improvise
+   - Don't stop after one tool call - keep going until ALL steps are complete
 
 2. **Use tools correctly**
    - create_track: Creates a new track (returns track_id)
@@ -408,13 +481,22 @@ EXECUTION RULES
    - Use compact format: {{n: MIDI_NOTE, s: START_BEAT, d: DURATION, v: VELOCITY}}
    - Example: {{n: 60, s: 0, d: 1, v: 100}} = Middle C, beat 0, 1 beat long, velocity 100
 
+5. **Multi-step execution**
+   - If the plan has 14 steps, make 14 tool calls
+   - If the plan has 5 steps, make 5 tool calls
+   - Continue making tool calls until the entire plan is complete
+   - You can make multiple tool calls in a single response
+
 ═══════════════════════════════════════════════════════════════════════════════
 CRITICAL
 ═══════════════════════════════════════════════════════════════════════════════
 
-🚨 **EXECUTE THE ENTIRE PLAN** - Don't stop halfway
+🚨 **EXECUTE THE ENTIRE PLAN IN THIS RESPONSE** - Make ALL tool calls needed
+🚨 **DON'T STOP AFTER ONE TOOL CALL** - Continue until all steps are done
 🚨 **USE EXACT VALUES FROM PLAN** - Don't improvise or change parameters
 🚨 **FOLLOW TOOL CALL ORDER** - create_track THEN create_midi_clip THEN add_effect
+
+Example: If plan has steps 1-14, you should make 14 tool calls in your response.
 
 Execute now."""
 
@@ -907,7 +989,7 @@ Keep suggestions simple and musical. Explain your reasoning briefly."""
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "track_id": {"type": "string", "description": "Track ID to add clip to (from create_track response)"},
+                        "track_id": {"type": "string", "description": "Track ID (UUID) to add clip to. MUST use the track_id returned from create_track, NOT the track name. Example: '17c79f6d-7507-4d40-baec-4fe84c3cf165'"},
                         "start_time": {"type": "number", "description": "Start time in beats (0 = beginning of sequence)"},
                         "duration": {"type": "number", "description": "Clip duration in beats (e.g., 4 for 4 bars, 8 for 8 bars)"},
                         "notes": {
@@ -998,7 +1080,7 @@ Keep suggestions simple and musical. Explain your reasoning briefly."""
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "track_id": {"type": "string"},
+                        "track_id": {"type": "string", "description": "Track ID (UUID). MUST use the track_id returned from create_track, NOT the track name."},
                         "parameter": {"type": "string", "enum": ["volume", "pan", "mute", "solo"]},
                         "value": {"description": "Parameter value (number for volume/pan, boolean for mute/solo)"}
                     },
@@ -1011,7 +1093,7 @@ Keep suggestions simple and musical. Explain your reasoning briefly."""
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "track_id": {"type": "string", "description": "Track ID to add effect to (from create_track response)"},
+                        "track_id": {"type": "string", "description": "Track ID (UUID) to add effect to. MUST use the track_id returned from create_track, NOT the track name."},
                         "effect_name": {"type": "string", "description": "Effect type. Available: reverb, delay, lpf, hpf, distortion, chorus, flanger, phaser. Choose based on desired sound: reverb for space, delay for echo, lpf for warmth, hpf for clarity, distortion for grit."},
                         "slot_index": {"type": "integer", "description": "Effect slot index (optional, auto-assigns if not specified)"}
                     },

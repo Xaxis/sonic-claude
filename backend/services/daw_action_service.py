@@ -169,12 +169,20 @@ class DAWActionService:
                     error="NO_SEQUENCE"
                 )
             
-            # Add clip
-            clip = await self.sequencer.add_clip(
+            # Add clip (NOT async - remove await)
+            clip = self.sequencer.add_clip(
                 self.sequencer.current_sequence_id,
                 clip_request
             )
-            
+
+            if not clip:
+                return ActionResult(
+                    success=False,
+                    action="create_midi_clip",
+                    message="Failed to create clip",
+                    error="CLIP_CREATION_FAILED"
+                )
+
             return ActionResult(
                 success=True,
                 action="create_midi_clip",
