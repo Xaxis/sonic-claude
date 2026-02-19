@@ -593,11 +593,12 @@ class SequencerService:
 
             # Get the sequence to access its tracks
             sequence = self.sequences[sequence_id]
+            track_count = len(sequence.tracks)
 
             # Delete sequence from memory
             del self.sequences[sequence_id]
 
-            logger.info(f"✅ Deleted sequence: {sequence_id} (removed {len(track_ids_to_remove)} tracks)")
+            logger.info(f"✅ Deleted sequence: {sequence_id} (removed {track_count} tracks)")
             return True
         return False
 

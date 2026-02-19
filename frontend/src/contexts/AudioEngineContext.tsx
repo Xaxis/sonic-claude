@@ -214,25 +214,15 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         inputLevel: -60,
     });
 
-    // Broadcast state changes to other windows
+    // Broadcast state changes to other windows (for multi-window sync)
+    // Also notify composition context that changes happened (triggers autosave)
     const broadcastUpdate = useCallback((key: string, value: any) => {
         windowManager.broadcastState(key, value);
+        notifyCompositionChanged();
     }, []);
 
-    // Listen for state updates from other windows
-    useEffect(() => {
-        const unsubscribe = windowManager.subscribeToState("state-update", (data: any) => {
-            if (data.key.startsWith("audioEngine.")) {
-                const stateKey = data.key.replace("audioEngine.", "");
-                setState((prev) => ({
-                    ...prev,
-                    [stateKey]: data.value,
-                }));
-            }
-        });
-
-        return unsubscribe;
-    }, []);
+    // NOTE: We do NOT listen for state updates from other windows because it causes
+    // infinite loops. Each window maintains its own state and syncs via backend API.
 
     // WebSocket integration for real-time data
     const transportWsRef = useRef<WebSocket | null>(null);

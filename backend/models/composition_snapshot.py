@@ -20,40 +20,58 @@ from backend.models.mixer import MixerState, MixerChannel, MasterChannel
 from backend.models.effects import EffectInstance, TrackEffectChain
 
 
+class ChatMessage(BaseModel):
+    """A single chat message in the conversation history"""
+    role: str = Field(description="Message role: 'user' or 'assistant'")
+    content: str = Field(description="Message content")
+    timestamp: datetime = Field(default_factory=datetime.now)
+    actions_executed: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Actions executed (for assistant messages)"
+    )
+
+
 class CompositionSnapshot(BaseModel):
     """
     Complete composition state snapshot
-    
+
     This captures EVERYTHING needed to restore the exact state of a composition:
     - All sequence data (tracks, clips, tempo, etc.)
     - All mixer state (channels, volumes, pans, etc.)
     - All effects (track effect chains with parameters)
     - All sample assignments
     - UI state (zoom, grid, selected clips, etc.)
+    - Chat history (all AI conversations)
     """
     id: str = Field(description="Unique snapshot ID")
     name: str = Field(description="Snapshot name/description")
     created_at: datetime = Field(default_factory=datetime.now)
-    
+
     # === SEQUENCE STATE ===
     sequence: Sequence = Field(description="Complete sequence with tracks and clips")
-    
+
     # === MIXER STATE ===
     mixer_state: MixerState = Field(description="Complete mixer state")
-    
+
     # === EFFECTS STATE ===
     track_effects: List[TrackEffectChain] = Field(
         default_factory=list,
         description="All track effect chains"
     )
-    
+
     # === SAMPLE ASSIGNMENTS ===
     # Map of track_id -> sample_file_path for sample tracks
     sample_assignments: Dict[str, str] = Field(
         default_factory=dict,
         description="Sample file assignments for sample tracks"
     )
-    
+
+    # === CHAT HISTORY ===
+    chat_history: List[ChatMessage] = Field(
+        default_factory=list,
+        description="Complete conversation history with AI"
+    )
+
     # === METADATA ===
     # Store any additional metadata that might be useful
     metadata: Dict[str, Any] = Field(

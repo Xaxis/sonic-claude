@@ -153,7 +153,7 @@ class DAWActionService:
             # Create clip request
             clip_request = AddClipRequest(
                 name=params.get("name", f"AI Clip {uuid.uuid4().hex[:6]}"),
-                type="midi",
+                clip_type="midi",
                 track_id=params["track_id"],
                 start_time=params["start_time"],
                 duration=params["duration"],

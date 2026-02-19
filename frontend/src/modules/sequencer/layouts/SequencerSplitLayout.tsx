@@ -11,6 +11,7 @@ import { SequencerTimelineSection } from "./SequencerTimelineSection.tsx";
 import { PianoRollWrapper } from "./PianoRollWrapper.tsx";
 import { SampleEditorWrapper } from "./SampleEditorWrapper.tsx";
 import { useSequencerContext } from "../contexts/SequencerContext.tsx";
+import { statePersistence } from "@/services/state-persistence/state-persistence.service";
 import type { MIDIEvent } from "../types.ts";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
@@ -80,8 +81,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
 
     // Resizable split state - percentage of height for timeline (0-100)
     const [timelineHeightPercent, setTimelineHeightPercent] = useState(() => {
-        const saved = localStorage.getItem('sequencer-split-ratio');
-        return saved ? parseFloat(saved) : 50;
+        return statePersistence.getSequencerSplitRatio();
     });
     const [isDragging, setIsDragging] = useState(false);
 
@@ -103,7 +103,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
 
     // Save split ratio to localStorage
     useEffect(() => {
-        localStorage.setItem('sequencer-split-ratio', timelineHeightPercent.toString());
+        statePersistence.setSequencerSplitRatio(timelineHeightPercent);
     }, [timelineHeightPercent]);
 
     // Handle divider drag

@@ -136,6 +136,30 @@ class StatePersistenceService {
     }
 
     // ========================================================================
+    // LAYOUT STATE
+    // ========================================================================
+
+    getLayout<T>(): T | null {
+        return this.get<T | null>(STORAGE_KEYS.LAYOUT, null);
+    }
+
+    setLayout<T>(layout: T): void {
+        this.set(STORAGE_KEYS.LAYOUT, layout);
+    }
+
+    // ========================================================================
+    // SETTINGS
+    // ========================================================================
+
+    getSettings<T>(): T | null {
+        return this.get<T | null>(STORAGE_KEYS.SETTINGS, null);
+    }
+
+    setSettings<T>(settings: T): void {
+        this.set(STORAGE_KEYS.SETTINGS, settings);
+    }
+
+    // ========================================================================
     // UTILITY
     // ========================================================================
 

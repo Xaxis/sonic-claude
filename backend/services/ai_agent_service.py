@@ -63,6 +63,9 @@ class AIAgentService:
 
         # Track last state hash for efficient diffs (optional optimization)
         self.last_state_hash: Optional[str] = None
+
+        # Chat history tracking (per composition)
+        self.chat_histories: Dict[str, List[Dict[str, Any]]] = {}
     
     async def send_message(self, user_message: str) -> Dict[str, Any]:
         """
@@ -186,17 +189,6 @@ Execute the plan above using the available tools. Follow EVERY step in the plan.
             logger.error(f"🚨 AI CREATED EMPTY TRACKS: {track_ids_created}")
             logger.error(f"🚨 This violates the system prompt! Tracks without clips are useless!")
 
-        # Auto-save composition as iteration if actions were executed
-        if actions_executed and len(actions_executed) > 0:
-            await self._save_ai_iteration(user_message, actions_executed)
-
-        # Update state hash
-        if state_response.full_state:
-            self.last_state_hash = state_response.full_state.state_hash
-
-        # Store actions count for API response
-        self.last_actions_executed = len(actions_executed)
-
         # Build comprehensive response including plan
         full_response = f"""**PLAN:**
 {plan_text}
@@ -206,6 +198,17 @@ Execute the plan above using the available tools. Follow EVERY step in the plan.
 
 **ACTIONS EXECUTED:** {len(actions_executed)}"""
 
+        # Auto-save composition as iteration if actions were executed
+        if actions_executed and len(actions_executed) > 0:
+            await self._save_ai_iteration(user_message, full_response, actions_executed)
+
+        # Update state hash
+        if state_response.full_state:
+            self.last_state_hash = state_response.full_state.state_hash
+
+        # Store actions count for API response
+        self.last_actions_executed = len(actions_executed)
+
         return {
             "response": full_response,
             "actions_executed": actions_executed,
@@ -213,7 +216,7 @@ Execute the plan above using the available tools. Follow EVERY step in the plan.
             "plan": plan_text  # Include the plan separately for frontend
         }
 
-    async def _save_ai_iteration(self, user_message: str, actions_executed: List[ActionResult]) -> None:
+    async def _save_ai_iteration(self, user_message: str, assistant_response: str, actions_executed: List[ActionResult]) -> None:
         """Save composition as AI iteration after actions are executed"""
         try:
             # Check if we have all required services
@@ -234,6 +237,34 @@ Execute the plan above using the available tools. Follow EVERY step in the plan.
                 logger.warning(f"⚠️ Cannot save AI iteration: sequence {sequence_id} not found")
                 return
 
+            # Get or initialize chat history for this composition
+            if sequence_id not in self.chat_histories:
+                self.chat_histories[sequence_id] = []
+
+            # Add user message to chat history
+            self.chat_histories[sequence_id].append({
+                "role": "user",
+                "content": user_message,
+                "timestamp": datetime.now().isoformat(),
+                "actions_executed": None
+            })
+
+            # Add assistant response to chat history
+            self.chat_histories[sequence_id].append({
+                "role": "assistant",
+                "content": assistant_response,
+                "timestamp": datetime.now().isoformat(),
+                "actions_executed": [
+                    {
+                        "action": result.action,
+                        "success": result.success,
+                        "data": result.data,
+                        "error": result.error
+                    }
+                    for result in actions_executed
+                ]
+            })
+
             # Build snapshot
             snapshot = self.composition_service.build_snapshot_from_services(
                 sequencer_service=self.action_service.sequencer,
@@ -246,7 +277,8 @@ Execute the plan above using the available tools. Follow EVERY step in the plan.
                     "user_message": user_message,
                     "actions_count": len(actions_executed),
                     "timestamp": datetime.now().isoformat()
-                }
+                },
+                chat_history=self.chat_histories[sequence_id]  # Pass chat history
             )
 
             if not snapshot:
@@ -261,7 +293,7 @@ Execute the plan above using the available tools. Follow EVERY step in the plan.
                 is_autosave=False
             )
 
-            logger.info(f"💾 Saved AI iteration for sequence {sequence_id}")
+            logger.info(f"💾 Saved AI iteration for sequence {sequence_id} with {len(self.chat_histories[sequence_id])} chat messages")
 
         except Exception as e:
             logger.error(f"❌ Failed to save AI iteration: {e}", exc_info=True)

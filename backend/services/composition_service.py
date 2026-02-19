@@ -157,6 +157,15 @@ class CompositionService:
             source_file = comp_dir / "autosave.json"
         else:
             source_file = comp_dir / "current.json"
+            # Fall back to autosave if current doesn't exist
+            if not source_file.exists():
+                autosave_file = comp_dir / "autosave.json"
+                if autosave_file.exists():
+                    logger.warning(f"⚠️ current.json not found for {composition_id}, falling back to autosave.json")
+                    source_file = autosave_file
+                else:
+                    logger.warning(f"⚠️ Composition {composition_id} not found (no current.json or autosave.json)")
+                    return None
 
         if not source_file.exists():
             logger.warning(f"⚠️ Composition {composition_id} not found at {source_file}")
@@ -319,7 +328,8 @@ class CompositionService:
         effects_service: 'TrackEffectsService',
         sequence_id: str,
         name: str = "Snapshot",
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        chat_history: Optional[List[Dict[str, Any]]] = None
     ) -> Optional[CompositionSnapshot]:
         """
         Build a complete composition snapshot from current service states
@@ -331,6 +341,7 @@ class CompositionService:
             sequence_id: ID of the sequence to snapshot
             name: Name for the snapshot
             metadata: Additional metadata
+            chat_history: Chat conversation history
 
         Returns:
             Complete composition snapshot or None if sequence not found
@@ -366,6 +377,7 @@ class CompositionService:
             mixer_state=mixer_state,
             track_effects=track_effects,
             sample_assignments=sample_assignments,
+            chat_history=chat_history or [],
             metadata=metadata or {}
         )
 
@@ -376,7 +388,8 @@ class CompositionService:
         snapshot: CompositionSnapshot,
         sequencer_service: 'SequencerService',
         mixer_service: 'MixerService',
-        effects_service: 'TrackEffectsService'
+        effects_service: 'TrackEffectsService',
+        set_as_current: bool = True
     ) -> bool:
         """
         Restore a composition snapshot to the services
@@ -388,6 +401,7 @@ class CompositionService:
             sequencer_service: SequencerService instance
             mixer_service: MixerService instance
             effects_service: TrackEffectsService instance
+            set_as_current: Whether to set this sequence as the current sequence (default: True)
 
         Returns:
             True if successful, False otherwise
@@ -397,15 +411,11 @@ class CompositionService:
             sequence = snapshot.sequence
             sequencer_service.sequences[sequence.id] = sequence
 
-            # Update global tracks dict
-            for track in sequence.tracks:
-                sequencer_service.tracks[track.id] = track
-
-            # Set as current sequence
-            sequencer_service.current_sequence_id = sequence.id
-
-            # Restore mixer state
-            mixer_service.state = snapshot.mixer_state
+            # Set as current sequence (only if requested)
+            if set_as_current:
+                sequencer_service.current_sequence_id = sequence.id
+                # Restore mixer state (only for current sequence)
+                mixer_service.state = snapshot.mixer_state
 
             # Restore effects
             for effect_chain in snapshot.track_effects:
@@ -413,11 +423,12 @@ class CompositionService:
 
             # Restore sample assignments
             for track_id, sample_path in snapshot.sample_assignments.items():
-                track = sequencer_service.tracks.get(track_id)
+                # Find track in sequence
+                track = next((t for t in sequence.tracks if t.id == track_id), None)
                 if track and hasattr(track, 'sample_path'):
                     track.sample_path = sample_path
 
-            logger.info(f"✅ Restored composition snapshot: {snapshot.name}")
+            logger.info(f"✅ Restored composition snapshot: {snapshot.name} (set_as_current={set_as_current})")
             return True
 
         except Exception as e:
