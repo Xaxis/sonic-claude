@@ -37,6 +37,11 @@ from backend.services.track_meter_service import TrackMeterService
 from backend.services.audio_bus_manager import AudioBusManager
 from backend.services.mixer_channel_service import MixerChannelService
 from backend.services.track_effects_service import TrackEffectsService
+from backend.services.audio_feature_extractor import AudioFeatureExtractor
+from backend.services.musical_context_analyzer import MusicalContextAnalyzer
+from backend.services.daw_state_service import DAWStateService
+from backend.services.daw_action_service import DAWActionService
+from backend.services.ai_agent_service import AIAgentService
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +62,11 @@ _track_meter_service: Optional[TrackMeterService] = None
 _audio_bus_manager: Optional[AudioBusManager] = None
 _mixer_channel_service: Optional[MixerChannelService] = None
 _track_effects_service: Optional[TrackEffectsService] = None
+_audio_feature_extractor: Optional[AudioFeatureExtractor] = None
+_musical_context_analyzer: Optional[MusicalContextAnalyzer] = None
+_daw_state_service: Optional[DAWStateService] = None
+_daw_action_service: Optional[DAWActionService] = None
+_ai_agent_service: Optional[AIAgentService] = None
 
 
 # ============================================================================
@@ -77,6 +87,8 @@ async def initialize_services(settings: Settings) -> None:
     global _engine_manager, _audio_analyzer, _audio_input_service
     global _synthesis_service, _sequencer_service, _ws_manager, _buffer_manager, _mixer_service
     global _track_meter_service, _audio_bus_manager, _mixer_channel_service, _track_effects_service
+    global _audio_feature_extractor, _musical_context_analyzer, _daw_state_service
+    global _daw_action_service, _ai_agent_service
 
     logger.info("🚀 Initializing services...")
 
@@ -118,6 +130,43 @@ async def initialize_services(settings: Settings) -> None:
 
     # Wire up per-track meter pipeline
     _track_meter_service.on_meter_update = _ws_manager.broadcast_meters
+
+    # Step 6: Initialize AI services (if enabled)
+    if settings.ai.enabled and settings.ai.anthropic_api_key:
+        logger.info("🤖 Initializing AI services...")
+
+        # Create AI analysis services
+        _audio_feature_extractor = AudioFeatureExtractor()
+        _musical_context_analyzer = MusicalContextAnalyzer()
+
+        # Create DAW state and action services
+        _daw_state_service = DAWStateService(
+            sequencer_service=_sequencer_service,
+            mixer_service=_mixer_service,
+            engine_manager=_engine_manager
+        )
+
+        _daw_action_service = DAWActionService(
+            sequencer_service=_sequencer_service,
+            mixer_service=_mixer_service,
+            track_effects_service=_track_effects_service
+        )
+
+        # Create AI agent service
+        _ai_agent_service = AIAgentService(
+            state_service=_daw_state_service,
+            action_service=_daw_action_service,
+            api_key=settings.ai.anthropic_api_key,
+            model=settings.ai.model
+        )
+
+        # Configure AI settings
+        _ai_agent_service.min_call_interval = settings.ai.min_call_interval
+        _ai_agent_service.autonomous_interval = settings.ai.autonomous_interval
+
+        logger.info("✅ AI services initialized")
+    else:
+        logger.info("⏭️  AI services disabled (set AI_ENABLED=true and ANTHROPIC_API_KEY)")
 
     logger.info("✅ Services initialized successfully")
 
@@ -245,3 +294,38 @@ def get_track_effects_service() -> TrackEffectsService:
     if _track_effects_service is None:
         raise RuntimeError("TrackEffectsService not initialized")
     return _track_effects_service
+
+
+def get_audio_feature_extractor() -> AudioFeatureExtractor:
+    """Get AudioFeatureExtractor instance"""
+    if _audio_feature_extractor is None:
+        raise RuntimeError("AudioFeatureExtractor not initialized (AI features disabled)")
+    return _audio_feature_extractor
+
+
+def get_musical_context_analyzer() -> MusicalContextAnalyzer:
+    """Get MusicalContextAnalyzer instance"""
+    if _musical_context_analyzer is None:
+        raise RuntimeError("MusicalContextAnalyzer not initialized (AI features disabled)")
+    return _musical_context_analyzer
+
+
+def get_daw_state_service() -> DAWStateService:
+    """Get DAWStateService instance"""
+    if _daw_state_service is None:
+        raise RuntimeError("DAWStateService not initialized (AI features disabled)")
+    return _daw_state_service
+
+
+def get_daw_action_service() -> DAWActionService:
+    """Get DAWActionService instance"""
+    if _daw_action_service is None:
+        raise RuntimeError("DAWActionService not initialized (AI features disabled)")
+    return _daw_action_service
+
+
+def get_ai_agent_service() -> AIAgentService:
+    """Get AIAgentService instance"""
+    if _ai_agent_service is None:
+        raise RuntimeError("AIAgentService not initialized (AI features disabled)")
+    return _ai_agent_service

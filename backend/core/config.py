@@ -27,7 +27,12 @@ Environment Variables:
     
     # CORS
     CORS_ORIGINS: Allowed CORS origins (default: *)
-    
+
+    # AI
+    ANTHROPIC_API_KEY: Anthropic API key for Claude
+    AI_MODEL: AI model to use (default: claude-3-5-sonnet-20241022)
+    AI_ENABLED: Enable AI features (default: False)
+
     # Development
     DEBUG: Enable debug mode (default: False)
     RELOAD: Enable auto-reload (default: False)
@@ -101,8 +106,19 @@ class CORSConfig(BaseSettings):
     credentials: bool = Field(default=True, description="Allow credentials")
     methods: List[str] = Field(default=["*"], description="Allowed methods")
     headers: List[str] = Field(default=["*"], description="Allowed headers")
-    
+
     model_config = SettingsConfigDict(env_prefix="CORS_")
+
+
+class AIConfig(BaseSettings):
+    """AI integration configuration"""
+    enabled: bool = Field(default=False, description="Enable AI features")
+    anthropic_api_key: str = Field(default="", description="Anthropic API key")
+    model: str = Field(default="claude-3-5-sonnet-20241022", description="AI model to use")
+    min_call_interval: float = Field(default=2.0, ge=0.5, description="Minimum seconds between LLM calls")
+    autonomous_interval: float = Field(default=10.0, ge=1.0, description="Seconds between autonomous checks")
+
+    model_config = SettingsConfigDict(env_prefix="AI_")
 
 
 class Settings(BaseSettings):
@@ -110,13 +126,14 @@ class Settings(BaseSettings):
     # Application metadata
     app_name: str = Field(default="Sonic Claude Backend", description="Application name")
     app_version: str = Field(default="1.0.0", description="Application version")
-    
+
     # Sub-configurations
     server: ServerConfig = Field(default_factory=ServerConfig)
     supercollider: SuperColliderConfig = Field(default_factory=SuperColliderConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     audio: AudioConfig = Field(default_factory=AudioConfig)
     cors: CORSConfig = Field(default_factory=CORSConfig)
+    ai: AIConfig = Field(default_factory=AIConfig)
     
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -10,3 +10,13 @@
 
 - Sample Editor in the sequencer is now completely broken, no double waveform, no grid, at least not visible.
 
+- Future feature: sequencer "inline sample editing" track. Add a track, record a clip directly to that track, save/edit/the sample inline
+
+- Recording samples is not working anymore!
+
+- What happened to the preview waveform in the sample clips?
+
+- Cant delete samples in sample library panel:
+  useSampleLibrary.ts:124 Failed to delete sample: ReferenceError: sampleApi is not defined
+  at useSampleLibrary.ts:116:13
+  at onClick (SampleLibraryBrowser.tsx:221:60)
