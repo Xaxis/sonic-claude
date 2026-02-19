@@ -49,6 +49,7 @@ export function TabbedWrapper({
         updateTabLayout,
         poppedOutTabs,
         xrayEnabled,
+        xraySourceTab,
         xrayTargetTab,
         xrayOpacity,
         enableXray,
@@ -137,22 +138,39 @@ export function TabbedWrapper({
             <div className="border-primary/10 bg-card/20 flex items-center gap-1 border-b px-2">
                 {tabs.map((tab) => {
                     const isPoppedOut = poppedOutTabs.has(tab.id);
+                    const isXrayTarget = xrayEnabled && tab.id === xrayTargetTab;
+                    const isXraySource = xrayEnabled && tab.id === xraySourceTab;
 
                     return (
                         <div
                             key={tab.id}
-                            className={`group relative flex cursor-pointer items-center gap-2 px-4 py-2.5 transition-colors ${
+                            className={`group relative flex cursor-pointer items-center gap-2 px-4 py-2.5 transition-all duration-300 ${
                                 isPoppedOut
                                     ? "border-b-2 border-purple-500 bg-purple-500/20 text-purple-400"
-                                    : tab.id === activeTab
-                                      ? "bg-primary/10 text-primary border-primary border-b-2"
-                                      : "text-muted-foreground hover:bg-card/30 hover:text-foreground"
+                                    : isXrayTarget
+                                      ? "border-b-2 border-cyan-500 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-400 shadow-lg shadow-cyan-500/20"
+                                      : isXraySource
+                                        ? "border-b-2 border-purple-500/50 bg-purple-500/10 text-purple-300"
+                                        : tab.id === activeTab
+                                          ? "bg-primary/10 text-primary border-primary border-b-2"
+                                          : "text-muted-foreground hover:bg-card/30 hover:text-foreground"
                             }`}
                             onClick={() => !isPoppedOut && handleTabClick(tab.id)}
-                            title={isPoppedOut ? "Tab is popped out to separate window" : undefined}
+                            title={
+                                isPoppedOut
+                                    ? "Tab is popped out to separate window"
+                                    : isXrayTarget
+                                      ? "X-Ray Target - Viewing this tab"
+                                      : isXraySource
+                                        ? "X-Ray Source - Currently active"
+                                        : undefined
+                            }
                         >
                             {isPoppedOut && (
                                 <ExternalLink className="h-3.5 w-3.5 text-purple-400" />
+                            )}
+                            {isXrayTarget && (
+                                <Scan className="h-3.5 w-3.5 text-cyan-400 animate-pulse" />
                             )}
                             <span className="text-sm font-medium">{tab.name}</span>
 
@@ -207,11 +225,11 @@ export function TabbedWrapper({
                             className={xrayEnabled ? "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30" : ""}
                         />
 
-                        {/* Opacity Slider (shown when x-ray is enabled) */}
+                        {/* X-Ray Slider (shown when x-ray is enabled) */}
                         {xrayEnabled && (
                             <div className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-200">
                                 <Label className="text-xs text-muted-foreground whitespace-nowrap">
-                                    Opacity
+                                    X-RAY
                                 </Label>
                                 <Slider
                                     value={[xrayOpacity * 100]}
@@ -285,10 +303,11 @@ export function TabbedWrapper({
                         {/* X-Ray Background Layer (target tab) - Skews INTO view */}
                         {xrayEnabled && xrayPanels.length > 0 && (
                             <div
-                                className="absolute inset-0 pointer-events-none transition-all duration-300"
+                                className="absolute inset-0 transition-all duration-300"
                                 style={{
                                     opacity: xrayOpacity,
-                                    zIndex: 0,
+                                    zIndex: xrayOpacity > 0 ? 1 : 0, // Bring to front when opacity > 0
+                                    pointerEvents: xrayOpacity > 0 ? 'auto' : 'none', // Enable interactions when opacity > 0
                                     transform: `
                                         perspective(1200px)
                                         rotateX(${(1 - xrayOpacity) * -12}deg)
@@ -319,8 +338,9 @@ export function TabbedWrapper({
                         <div
                             className="absolute inset-0 transition-all duration-300"
                             style={{
-                                opacity: xrayEnabled ? 1 - (xrayOpacity * 0.3) : 1,
-                                zIndex: 1,
+                                opacity: xrayEnabled ? 1 - xrayOpacity : 1, // Fully transparent at 100% x-ray opacity
+                                zIndex: xrayEnabled && xrayOpacity > 0 ? 0 : 1, // Send to back when x-ray opacity > 0
+                                pointerEvents: xrayEnabled && xrayOpacity > 0 ? 'none' : 'auto', // Disable interactions when x-ray opacity > 0
                                 transform: xrayEnabled ? `
                                     perspective(1200px)
                                     rotateX(${xrayOpacity * 8}deg)
@@ -344,23 +364,6 @@ export function TabbedWrapper({
                                 }}
                             />
                         </div>
-
-                        {/* X-Ray Mode Indicator */}
-                        {xrayEnabled && (
-                            <div className="absolute top-4 right-4 z-50 pointer-events-none">
-                                <div className="bg-purple-500/20 border border-purple-500/50 rounded-lg px-3 py-2 backdrop-blur-sm animate-in fade-in duration-300">
-                                    <div className="flex items-center gap-2">
-                                        <Scan className="h-4 w-4 text-purple-400 animate-pulse" />
-                                        <span className="text-xs font-medium text-purple-400">
-                                            X-RAY MODE
-                                        </span>
-                                        <span className="text-xs text-purple-300/70">
-                                            Viewing: {xrayTabConfig?.name}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </>
                 )}
             </div>

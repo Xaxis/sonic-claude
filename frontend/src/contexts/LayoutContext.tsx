@@ -388,6 +388,8 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
                     xrayEnabled: true,
                     xraySourceTab: prev.activeTab,
                     xrayTargetTab: targetTabId,
+                    // Reset to 50% only if x-ray was previously disabled
+                    xrayOpacity: prev.xrayEnabled ? prev.xrayOpacity : 0.5,
                 };
                 broadcastState(newState);
                 return newState;
