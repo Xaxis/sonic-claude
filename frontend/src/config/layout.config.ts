@@ -83,7 +83,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         component: createElement(InputPanel),
         closeable: false,
         getSubtitle: () => "Library • 4 samples loaded",
-        defaultLayout: { x: 0, y: 0, w: 6, h: 8 },
+        defaultLayout: { x: 0, y: 0, w: 6, h: 10 },
     },
     {
         id: "loop-visualizer",
@@ -91,7 +91,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         component: createElement(LoopVisualizerPanel),
         closeable: false,
         getSubtitle: () => "Active • 120 BPM • 4/4 • Position: 8.2 beats",
-        defaultLayout: { x: 6, y: 0, w: 6, h: 8 },
+        defaultLayout: { x: 6, y: 0, w: 6, h: 10 },
     },
     {
         id: "sequencer",

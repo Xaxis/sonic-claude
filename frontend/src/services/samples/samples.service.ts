@@ -104,6 +104,16 @@ export class SampleService extends BaseAPIClient {
     }
 
     /**
+     * Delete a sample
+     */
+    async deleteSample(sampleId: string): Promise<void> {
+        const response = await this.delete<{ success: boolean; message: string }>(`/api/samples/${sampleId}`);
+        if (!response.success) {
+            throw new Error(response.message || "Failed to delete sample");
+        }
+    }
+
+    /**
      * Get download URL for a sample
      */
     getDownloadUrl(sampleId: string): string {

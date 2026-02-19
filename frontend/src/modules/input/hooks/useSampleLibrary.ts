@@ -113,10 +113,10 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
     // Delete sample
     const handleDeleteSample = useCallback(async (sampleId: string) => {
         try {
-            await sampleApi.deleteSample(sampleId);
+            await api.samples.deleteSample(sampleId);
             toast.success("Sample deleted successfully");
             await loadSamples();
-            
+
             if (selectedSample?.id === sampleId) {
                 setSelectedSample(null);
             }

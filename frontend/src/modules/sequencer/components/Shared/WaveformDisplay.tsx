@@ -197,6 +197,11 @@ export function WaveformDisplay({
         }
     }, [data, rightData, width, height, color, rightColor, backgroundColor, showGrid, gridColor, glowEffect]);
 
-    return <canvas ref={canvasRef} className={className} style={{ width: "100%", height: "100%" }} />;
+    // Use explicit dimensions if provided, otherwise use 100%
+    const canvasStyle = width && height
+        ? { width: `${width}px`, height: `${height}px` }
+        : { width: "100%", height: "100%" };
+
+    return <canvas ref={canvasRef} className={className} style={canvasStyle} />;
 }
 

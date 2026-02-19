@@ -152,15 +152,34 @@ export function useAudioInput({ onRecordingComplete }: UseAudioInputProps = {}) 
             }
 
             // Create audio context
-            if (!audioContextRef.current) {
+            if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
                 audioContextRef.current = new AudioContext();
             }
 
-            // Get media stream
+            // Resume audio context if suspended (required by browsers)
+            if (audioContextRef.current.state === 'suspended') {
+                await audioContextRef.current.resume();
+            }
+
+            // Get media stream with proper constraints
             const stream = await navigator.mediaDevices.getUserMedia({
-                audio: { deviceId: { exact: deviceId } },
+                audio: {
+                    deviceId: { exact: deviceId },
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false,
+                },
             });
             mediaStreamRef.current = stream;
+
+            console.log("📡 Media stream acquired, tracks:", stream.getTracks().map(t => ({
+                kind: t.kind,
+                label: t.label,
+                enabled: t.enabled,
+                muted: t.muted,
+                readyState: t.readyState,
+                settings: t.getSettings()
+            })));
 
             // Create analyser node
             const analyser = audioContextRef.current.createAnalyser();
@@ -170,7 +189,8 @@ export function useAudioInput({ onRecordingComplete }: UseAudioInputProps = {}) 
 
             // Create gain node
             const gainNode = audioContextRef.current.createGain();
-            gainNode.gain.value = 1.0; // Will be updated by handleGainChange
+            const gainLinear = Math.pow(10, gainRef.current / 20);
+            gainNode.gain.value = gainLinear;
             gainNodeRef.current = gainNode;
 
             // Connect: source -> gain -> analyser (NO destination to avoid feedback)
@@ -183,6 +203,8 @@ export function useAudioInput({ onRecordingComplete }: UseAudioInputProps = {}) 
             updateInputLevel();
 
             console.log("✅ Audio input started:", deviceId);
+            console.log("   Audio context state:", audioContextRef.current.state);
+            console.log("   Sample rate:", audioContextRef.current.sampleRate);
         } catch (error) {
             console.error("Failed to start audio input:", error);
             toast.error("Failed to start audio input");
@@ -201,7 +223,7 @@ export function useAudioInput({ onRecordingComplete }: UseAudioInputProps = {}) 
             mediaStreamRef.current = null;
         }
 
-        if (audioContextRef.current) {
+        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
             audioContextRef.current.close();
             audioContextRef.current = null;
         }
@@ -269,13 +291,25 @@ export function useAudioInput({ onRecordingComplete }: UseAudioInputProps = {}) 
             }
         } else {
             // Start recording
-            if (!mediaStreamRef.current) {
-                toast.error("No audio input available");
-                return;
-            }
-
             try {
-                const mediaRecorder = new MediaRecorder(mediaStreamRef.current, {
+                // Ensure we have a media stream - create one if needed
+                let stream = mediaStreamRef.current;
+                if (!stream) {
+                    // No stream yet - create one using selected device or default
+                    const deviceId = selectedInputDevice || audioInputDevicesRef.current[0]?.deviceId;
+                    if (!deviceId) {
+                        toast.error("No audio input device available");
+                        return;
+                    }
+
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        audio: { deviceId: { exact: deviceId } },
+                    });
+                    mediaStreamRef.current = stream;
+                    console.log("📡 Created media stream for recording");
+                }
+
+                const mediaRecorder = new MediaRecorder(stream, {
                     mimeType: "audio/webm;codecs=opus",
                 });
 
@@ -312,24 +346,25 @@ export function useAudioInput({ onRecordingComplete }: UseAudioInputProps = {}) 
                 toast.error("Failed to start recording");
             }
         }
-    }, [isRecording, onRecordingComplete]);
+    }, [isRecording, onRecordingComplete, selectedInputDevice]);
 
     // Effect: Start/stop audio monitoring when device or monitoring state changes
     useEffect(() => {
         if (isMonitoring && selectedInputDevice) {
-            // Only start if not already running
-            if (!mediaStreamRef.current) {
-                startAudioInput(selectedInputDevice);
-                startSupercolliderInput(selectedInputDevice);
-            }
+            console.log("🎤 Starting monitoring for device:", selectedInputDevice);
+            // Start audio input
+            startAudioInput(selectedInputDevice);
+            startSupercolliderInput(selectedInputDevice);
 
-            // Cleanup: stop audio when effect re-runs or unmounts
+            // Cleanup: stop audio when unmounting or when monitoring/device changes
             return () => {
+                console.log("🛑 Cleanup: stopping monitoring");
                 stopAudioInput();
                 stopSupercolliderInput();
             };
-        } else {
+        } else if (!isMonitoring) {
             // Stop audio if monitoring is disabled
+            console.log("🛑 Monitoring disabled, stopping audio");
             stopAudioInput();
             stopSupercolliderInput();
         }
