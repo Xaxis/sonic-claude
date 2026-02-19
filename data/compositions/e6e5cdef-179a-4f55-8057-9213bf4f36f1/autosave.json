@@ -1,7 +1,7 @@
 {
-  "id": "4e37770f-718e-41ad-a732-200ccfe11ba5",
+  "id": "028f6bff-ea6f-4034-add1-19f2de56b997",
   "name": "Sequence 1",
-  "created_at": "2026-02-19T09:47:56.127849",
+  "created_at": "2026-02-19T10:16:23.788676",
   "sequence": {
     "id": "e6e5cdef-179a-4f55-8057-9213bf4f36f1",
     "name": "Sequence 1",
@@ -33,7 +33,7 @@
         "type": "midi",
         "track_id": "17c79f6d-7507-4d40-baec-4fe84c3cf165",
         "start_time": 0.0,
-        "duration": 24.0,
+        "duration": 32.0,
         "is_muted": false,
         "is_looped": false,
         "gain": 1.0,
@@ -42,72 +42,88 @@
             "note": 48,
             "note_name": "C3",
             "start_time": 0.0,
-            "duration": 8.0,
-            "velocity": 80,
+            "duration": 12.0,
+            "velocity": 65,
             "channel": 0
           },
           {
             "note": 52,
             "note_name": "E3",
             "start_time": 0.0,
-            "duration": 8.0,
-            "velocity": 75,
+            "duration": 12.0,
+            "velocity": 60,
             "channel": 0
           },
           {
             "note": 55,
             "note_name": "G3",
             "start_time": 0.0,
-            "duration": 8.0,
-            "velocity": 70,
+            "duration": 12.0,
+            "velocity": 55,
             "channel": 0
           },
           {
             "note": 45,
             "note_name": "A2",
             "start_time": 8.0,
-            "duration": 8.0,
-            "velocity": 80,
+            "duration": 12.0,
+            "velocity": 65,
             "channel": 0
           },
           {
             "note": 52,
             "note_name": "E3",
             "start_time": 8.0,
-            "duration": 8.0,
-            "velocity": 75,
+            "duration": 12.0,
+            "velocity": 60,
             "channel": 0
           },
           {
             "note": 57,
             "note_name": "A3",
             "start_time": 8.0,
-            "duration": 8.0,
-            "velocity": 70,
+            "duration": 12.0,
+            "velocity": 55,
             "channel": 0
           },
           {
             "note": 41,
             "note_name": "F2",
             "start_time": 16.0,
-            "duration": 8.0,
-            "velocity": 80,
+            "duration": 12.0,
+            "velocity": 65,
             "channel": 0
           },
           {
             "note": 48,
             "note_name": "C3",
             "start_time": 16.0,
-            "duration": 8.0,
-            "velocity": 75,
+            "duration": 12.0,
+            "velocity": 60,
             "channel": 0
           },
           {
             "note": 53,
             "note_name": "F3",
             "start_time": 16.0,
+            "duration": 12.0,
+            "velocity": 55,
+            "channel": 0
+          },
+          {
+            "note": 48,
+            "note_name": "C3",
+            "start_time": 24.0,
             "duration": 8.0,
-            "velocity": 70,
+            "velocity": 60,
+            "channel": 0
+          },
+          {
+            "note": 52,
+            "note_name": "E3",
+            "start_time": 24.0,
+            "duration": 8.0,
+            "velocity": 55,
             "channel": 0
           }
         ],
@@ -127,7 +143,7 @@
     "piano_roll_clip_id": "79eb017a-be63-4a03-a21c-66dc8e080fa0",
     "sample_editor_clip_id": null,
     "created_at": "2026-02-18T23:39:22.683081",
-    "updated_at": "2026-02-19T09:13:50.173194"
+    "updated_at": "2026-02-19T10:15:41.692897"
   },
   "mixer_state": {
     "channels": [],
@@ -143,8 +159,8 @@
       "limiter_enabled": false,
       "limiter_threshold": -1.0,
       "sc_bus_index": 0,
-      "created_at": "2026-02-19T08:01:29.798955",
-      "updated_at": "2026-02-19T08:01:29.798957"
+      "created_at": "2026-02-19T10:08:28.185991",
+      "updated_at": "2026-02-19T10:08:28.185992"
     },
     "show_meters": true,
     "meter_mode": "peak",
@@ -155,6 +171,6 @@
   "chat_history": [],
   "metadata": {
     "source": "autosave",
-    "timestamp": "2026-02-19T18:47:56.125Z"
+    "timestamp": "2026-02-19T19:16:23.786Z"
   }
 }

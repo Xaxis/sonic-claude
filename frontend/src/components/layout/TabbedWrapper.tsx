@@ -14,7 +14,9 @@
 import { useState, useEffect } from "react";
 import { Plus, X, ExternalLink, Scan, Layers } from "lucide-react";
 import { PanelGrid, type PanelConfig } from "./PanelGrid";
+import { ActivityBadge } from "@/components/activity";
 import { useLayout } from "@/contexts/LayoutContext";
+import { useActivity } from "@/contexts/ActivityContext";
 import { IconButton } from "@/components/ui/icon-button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -56,6 +58,8 @@ export function TabbedWrapper({
         disableXray,
         setXrayOpacity,
     } = useLayout();
+
+    const { getActivitiesForTab } = useActivity();
 
     // Use controlled or local state
     const activeTab = controlledActiveTab ?? localActiveTab;
@@ -140,6 +144,7 @@ export function TabbedWrapper({
                     const isPoppedOut = poppedOutTabs.has(tab.id);
                     const isXrayTarget = xrayEnabled && tab.id === xrayTargetTab;
                     const isXraySource = xrayEnabled && tab.id === xraySourceTab;
+                    const tabActivities = getActivitiesForTab(tab.id);
 
                     return (
                         <div
@@ -173,6 +178,9 @@ export function TabbedWrapper({
                                 <Scan className="h-3.5 w-3.5 text-cyan-400 animate-pulse" />
                             )}
                             <span className="text-sm font-medium">{tab.name}</span>
+
+                            {/* AI Activity Badge */}
+                            <ActivityBadge count={tabActivities.length} />
 
                             {/* Tab Actions (show on hover) */}
                             {!isPoppedOut && (

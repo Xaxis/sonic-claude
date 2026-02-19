@@ -15,6 +15,7 @@
 
 import { Header } from "@/components/layout/Header";
 import { TabbedWrapper } from "@/components/layout/TabbedWrapper";
+import { ActivityContainer } from "@/components/activity";
 import { useLayout } from "@/contexts/LayoutContext";
 import { useAudioEngine } from "@/contexts/AudioEngineContext";
 import { DEFAULT_PANELS } from "@/config/layout.config";
@@ -47,6 +48,9 @@ export default function App() {
                     onTabPopout={popoutTab}
                 />
             </div>
+
+            {/* AI Activity Animations - Global overlay */}
+            <ActivityContainer />
         </div>
     );
 }

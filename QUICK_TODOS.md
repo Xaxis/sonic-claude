@@ -1,3 +1,5 @@
+- Find a better name than "Sonic Claude" and completely rename the project/references/copy/everything
+
 - metronome feature unselectable (cant turn it on) and doesnt work
 - beats per minute adjustment has no effect and doesnt work
 
@@ -11,13 +13,6 @@
 - Work on/create beautiful "PERFORMANCE" tab and all associated brilliant integrated panels
 
 - Future feature: sequencer "inline sample editing" track. Add a track, record a clip directly to that track, save/edit/the sample inline
-
-- Whats up with data/mixer?! Shoulnd that state have been built into the sequences in our consistent pattern
-
-- ✅ COMPLETED: Implement "x-ray" mode, so if youre in a given tab, you can "x-ray", transparently see through to another tab behind it
-  - Full implementation with opacity control, smooth animations, keyboard shortcuts (⌘X)
-  - State persistence, visual indicators, and comprehensive documentation
-  - See docs/X_RAY_MODE.md for details
 
 - What do you mean our backend ai analysis only occurs on MIDI changes? What does that mean? What does that translate to on our frontend? Are you sure thats the right way to do this, are you missing anything?
 

@@ -13,6 +13,8 @@
 import { useCallback } from "react";
 import { toast } from "sonner";
 import { aiService } from "@/services/ai/ai.service";
+import { useActivity } from "@/contexts/ActivityContext";
+import { useLayout } from "@/contexts/LayoutContext";
 import type { ChatMessage, AnalysisEvent } from "../types";
 
 interface UseAIHandlersProps {
@@ -48,6 +50,10 @@ export function useAIHandlers(props: UseAIHandlersProps) {
         loadTracks,
         loadEffectDefs,
     } = props;
+
+    // Activity tracking for animations
+    const { startActivity, completeActivity } = useActivity();
+    const { activeTab } = useLayout();
 
     // ========================================================================
     // CHAT HANDLERS
@@ -114,9 +120,10 @@ export function useAIHandlers(props: UseAIHandlersProps) {
                     content: response.response,
                 });
 
-                // Add action results
+                // Add action results and trigger activity animations
                 if (response.actions_executed) {
                     response.actions_executed.forEach((action, idx) => {
+                        // Add to analysis events
                         addAnalysisEvent({
                             id: `event-${Date.now()}-action-${idx}`,
                             timestamp: new Date().toISOString(),
@@ -124,6 +131,26 @@ export function useAIHandlers(props: UseAIHandlersProps) {
                             content: `${action.action}: ${action.message}`,
                             metadata: action,
                         });
+
+                        // Start activity animation with staggered delay
+                        setTimeout(() => {
+                            const activityId = startActivity(action.action, action.message, {
+                                targetId: action.data?.track_id || action.data?.clip_id || action.data?.effect_id,
+                                targetType: action.action.includes("track") ? "track" :
+                                           action.action.includes("clip") ? "clip" :
+                                           action.action.includes("effect") ? "effect" :
+                                           action.action.includes("tempo") ? "tempo" :
+                                           action.action.includes("play") || action.action.includes("stop") ? "playback" :
+                                           undefined,
+                                tabId: activeTab,
+                                metadata: action.data,
+                            });
+
+                            // Auto-complete activity after animation duration
+                            setTimeout(() => {
+                                completeActivity(activityId, action.success);
+                            }, 1500); // Match animation duration
+                        }, idx * 100); // Stagger animations by 100ms
                     });
                 }
 
