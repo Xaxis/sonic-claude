@@ -132,74 +132,71 @@ async def initialize_services(settings: Settings) -> None:
     # Wire up per-track meter pipeline
     _track_meter_service.on_meter_update = _ws_manager.broadcast_meters
 
-    # Step 6: Initialize AI services (if enabled)
-    if settings.ai.enabled and settings.ai.anthropic_api_key:
-        logger.info("🤖 Initializing AI services...")
+    # Step 6: Initialize AI services
+    logger.info("🤖 Initializing AI services...")
 
-        # Create AI analysis services
-        _audio_feature_extractor = AudioFeatureExtractor()
-        _musical_context_analyzer = MusicalContextAnalyzer()
+    # Create AI analysis services
+    _audio_feature_extractor = AudioFeatureExtractor()
+    _musical_context_analyzer = MusicalContextAnalyzer()
 
-        # Create DAW state and action services
-        _daw_state_service = DAWStateService(
-            sequencer_service=_sequencer_service,
-            mixer_service=_mixer_service,
-            engine_manager=_engine_manager,
-            audio_feature_extractor=_audio_feature_extractor,
-            musical_context_analyzer=_musical_context_analyzer
-        )
+    # Create DAW state and action services
+    _daw_state_service = DAWStateService(
+        sequencer_service=_sequencer_service,
+        mixer_service=_mixer_service,
+        engine_manager=_engine_manager,
+        audio_feature_extractor=_audio_feature_extractor,
+        musical_context_analyzer=_musical_context_analyzer
+    )
 
-        _daw_action_service = DAWActionService(
-            sequencer_service=_sequencer_service,
-            mixer_service=_mixer_service,
-            track_effects_service=_track_effects_service
-        )
+    _daw_action_service = DAWActionService(
+        sequencer_service=_sequencer_service,
+        mixer_service=_mixer_service,
+        track_effects_service=_track_effects_service
+    )
 
-        # Create AI agent service
-        _ai_agent_service = AIAgentService(
-            state_service=_daw_state_service,
-            action_service=_daw_action_service,
-            api_key=settings.ai.anthropic_api_key,
-            model=settings.ai.model
-        )
+    # Create AI agent service (API key can be None, will fail gracefully on LLM calls)
+    _ai_agent_service = AIAgentService(
+        state_service=_daw_state_service,
+        action_service=_daw_action_service,
+        api_key=settings.ai.anthropic_api_key if settings.ai.enabled else None,
+        model=settings.ai.model
+    )
 
-        # Configure AI settings
-        _ai_agent_service.min_call_interval = settings.ai.min_call_interval
-        _ai_agent_service.autonomous_interval = settings.ai.autonomous_interval
+    # Configure AI settings
+    _ai_agent_service.min_call_interval = settings.ai.min_call_interval
+    _ai_agent_service.autonomous_interval = settings.ai.autonomous_interval
 
-        # Wire up audio feature extraction pipeline
-        # Hook into audio analyzer to extract features from spectrum/meter data
-        def _extract_and_update_features(spectrum_data):
-            """Extract features from spectrum data and update DAW state"""
-            try:
-                features = _audio_feature_extractor.extract_features(
-                    spectrum=spectrum_data.get("spectrum", []),
-                    peak_db=spectrum_data.get("peak_db"),
-                    rms_db=spectrum_data.get("rms_db"),
-                    is_playing=_sequencer_service.is_playing if _sequencer_service else False
-                )
-                _daw_state_service.update_audio_features(features)
-            except Exception as e:
-                logger.error(f"Error extracting audio features: {e}")
+    # Wire up audio feature extraction pipeline
+    # Hook into audio analyzer to extract features from spectrum/meter data
+    def _extract_and_update_features(spectrum_data):
+        """Extract features from spectrum data and update DAW state"""
+        try:
+            features = _audio_feature_extractor.extract_features(
+                spectrum=spectrum_data.get("spectrum", []),
+                peak_db=spectrum_data.get("peak_db"),
+                rms_db=spectrum_data.get("rms_db"),
+                is_playing=_sequencer_service.is_playing if _sequencer_service else False
+            )
+            _daw_state_service.update_audio_features(features)
+        except Exception as e:
+            logger.error(f"Error extracting audio features: {e}")
 
-        # Register feature extraction callback (runs after spectrum broadcast)
-        original_spectrum_callback = _audio_analyzer.on_spectrum_update
-        def _spectrum_with_features(data):
-            # First broadcast to WebSocket
-            if original_spectrum_callback:
-                asyncio.create_task(original_spectrum_callback(data))
-            # Then extract features for AI
-            _extract_and_update_features(data)
+    # Register feature extraction callback (runs after spectrum broadcast)
+    original_spectrum_callback = _audio_analyzer.on_spectrum_update
+    async def _spectrum_with_features(data):
+        # First broadcast to WebSocket
+        if original_spectrum_callback:
+            await original_spectrum_callback(data)
+        # Then extract features for AI
+        _extract_and_update_features(data)
 
-        _audio_analyzer.on_spectrum_update = _spectrum_with_features
+    _audio_analyzer.on_spectrum_update = _spectrum_with_features
 
-        # Wire up musical context analysis
-        # Triggered automatically when MIDI content changes (add/update/delete clip)
-        _sequencer_service.on_sequence_changed = _daw_state_service.analyze_current_sequence
+    # Wire up musical context analysis
+    # Triggered automatically when MIDI content changes (add/update/delete clip)
+    _sequencer_service.on_sequence_changed = _daw_state_service.analyze_current_sequence
 
-        logger.info("✅ AI services initialized")
-    else:
-        logger.info("⏭️  AI services disabled (set AI_ENABLED=true and ANTHROPIC_API_KEY)")
+    logger.info("✅ AI services initialized")
 
     logger.info("✅ Services initialized successfully")
 
@@ -332,33 +329,33 @@ def get_track_effects_service() -> TrackEffectsService:
 def get_audio_feature_extractor() -> AudioFeatureExtractor:
     """Get AudioFeatureExtractor instance"""
     if _audio_feature_extractor is None:
-        raise RuntimeError("AudioFeatureExtractor not initialized (AI features disabled)")
+        raise RuntimeError("AudioFeatureExtractor not initialized")
     return _audio_feature_extractor
 
 
 def get_musical_context_analyzer() -> MusicalContextAnalyzer:
     """Get MusicalContextAnalyzer instance"""
     if _musical_context_analyzer is None:
-        raise RuntimeError("MusicalContextAnalyzer not initialized (AI features disabled)")
+        raise RuntimeError("MusicalContextAnalyzer not initialized")
     return _musical_context_analyzer
 
 
 def get_daw_state_service() -> DAWStateService:
     """Get DAWStateService instance"""
     if _daw_state_service is None:
-        raise RuntimeError("DAWStateService not initialized (AI features disabled)")
+        raise RuntimeError("DAWStateService not initialized")
     return _daw_state_service
 
 
 def get_daw_action_service() -> DAWActionService:
     """Get DAWActionService instance"""
     if _daw_action_service is None:
-        raise RuntimeError("DAWActionService not initialized (AI features disabled)")
+        raise RuntimeError("DAWActionService not initialized")
     return _daw_action_service
 
 
 def get_ai_agent_service() -> AIAgentService:
     """Get AIAgentService instance"""
     if _ai_agent_service is None:
-        raise RuntimeError("AIAgentService not initialized (AI features disabled)")
+        raise RuntimeError("AIAgentService not initialized")
     return _ai_agent_service

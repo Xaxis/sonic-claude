@@ -7,7 +7,6 @@
 
 import type {
     DAWStateSnapshot,
-    ChatRequest,
     ChatResponse,
     AutonomousStatus,
     DAWAction,

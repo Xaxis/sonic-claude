@@ -13,3 +13,5 @@
 - Future feature: sequencer "inline sample editing" track. Add a track, record a clip directly to that track, save/edit/the sample inline
 
 - Whats up with data/mixer?! Shoulnd that state have been built into the sequences in our consistent pattern
+
+- Implement "x-ray" mode, so if youre in a given tab, you can "x-ray", transparently see through to another tab behind it
