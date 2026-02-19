@@ -318,3 +318,61 @@ async def recover_from_autosave(
     except Exception as e:
         logger.error(f"❌ Failed to recover from autosave: {e}")
         raise ServiceError(f"Failed to recover from autosave: {str(e)}")
+
+
+# ============================================================================
+# STARTUP/INITIALIZATION ENDPOINTS
+# ============================================================================
+
+@router.post("/load-all")
+async def load_all_compositions(
+    composition_service: CompositionService = Depends(get_composition_service),
+    sequencer_service: SequencerService = Depends(get_sequencer_service),
+    mixer_service: MixerService = Depends(get_mixer_service),
+    effects_service: TrackEffectsService = Depends(get_track_effects_service),
+):
+    """
+    Load ALL saved compositions into memory on app startup
+
+    This restores all compositions from disk to the in-memory services.
+    Should be called once when the frontend initializes.
+    """
+    try:
+        compositions = composition_service.list_compositions()
+        loaded_count = 0
+
+        for comp_meta in compositions:
+            composition_id = comp_meta["id"]
+
+            # Load composition snapshot
+            snapshot = composition_service.load_composition(composition_id)
+            if not snapshot:
+                logger.warning(f"⚠️ Failed to load composition {composition_id}")
+                continue
+
+            # Restore to services
+            success = composition_service.restore_snapshot_to_services(
+                snapshot=snapshot,
+                sequencer_service=sequencer_service,
+                mixer_service=mixer_service,
+                effects_service=effects_service
+            )
+
+            if success:
+                loaded_count += 1
+                logger.info(f"✅ Loaded composition: {snapshot.name} ({composition_id})")
+            else:
+                logger.error(f"❌ Failed to restore composition {composition_id}")
+
+        logger.info(f"🎵 Loaded {loaded_count}/{len(compositions)} compositions into memory")
+
+        return {
+            "status": "ok",
+            "message": f"Loaded {loaded_count} compositions",
+            "total": len(compositions),
+            "loaded": loaded_count
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Failed to load compositions: {e}")
+        raise ServiceError(f"Failed to load compositions: {str(e)}")

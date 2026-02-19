@@ -98,7 +98,8 @@ class AIAgentService:
         # Process response
         assistant_message = ""
         actions_executed = []
-        
+        track_ids_created = []  # Track IDs from create_track actions
+
         for block in response.content:
             if block.type == "text":
                 assistant_message += block.text
@@ -108,11 +109,32 @@ class AIAgentService:
                     action=block.name,
                     parameters=block.input
                 )
+
+                logger.info(f"🎯 AI calling tool: {block.name} with params: {block.input}")
+
                 result = await self.action_service.execute_action(action)
                 actions_executed.append(result)
-                
+
+                # Track create_track actions to detect empty tracks
+                if block.name == "create_track":
+                    if result.success and result.data and "track_id" in result.data:
+                        track_ids_created.append(result.data["track_id"])
+                        logger.info(f"✅ Created track: {result.data['track_id']}")
+
+                # Log if create_midi_clip is called
+                if block.name == "create_midi_clip":
+                    track_id = block.input.get("track_id")
+                    if track_id in track_ids_created:
+                        track_ids_created.remove(track_id)  # Track now has content
+                        logger.info(f"✅ Added clip to track: {track_id}")
+
                 # Add result to message
                 assistant_message += f"\n[Executed: {block.name}]"
+
+        # CRITICAL: Warn if tracks were created without clips
+        if track_ids_created:
+            logger.error(f"🚨 AI CREATED EMPTY TRACKS: {track_ids_created}")
+            logger.error(f"🚨 This violates the system prompt! Tracks without clips are useless!")
 
         # Update state hash
         if state_response.full_state:
@@ -127,9 +149,65 @@ class AIAgentService:
             "musical_context": context_message  # Include the full musical analysis
         }
     
+    def _build_instruments_list(self) -> str:
+        """Build formatted list of available instruments from SYNTHDEF_REGISTRY"""
+        # Lazy import to avoid circular dependency
+        from backend.api.sequencer.synthdefs import SYNTHDEF_REGISTRY
+
+        categories = {}
+        for synth in SYNTHDEF_REGISTRY:
+            cat = synth.category
+            if cat not in categories:
+                categories[cat] = []
+            categories[cat].append(f"  • {synth.name} - {synth.description}")
+
+        lines = []
+        for cat in sorted(categories.keys()):
+            lines.append(f"\n{cat.upper()}:")
+            lines.extend(sorted(categories[cat]))
+
+        return "\n".join(lines)
+
+    def _build_effects_list(self) -> str:
+        """Build formatted list of available effects from EFFECT_DEFINITIONS"""
+        # Lazy import to avoid circular dependency
+        from backend.services.effect_definitions import EFFECT_DEFINITIONS
+
+        categories = {}
+        for name, effect_def in EFFECT_DEFINITIONS.items():
+            cat = effect_def.category
+            if cat not in categories:
+                categories[cat] = []
+
+            # Build parameter list
+            params = []
+            for param in effect_def.parameters:
+                if param.name == "bypass":
+                    continue  # Skip bypass parameter in documentation
+                param_str = f"{param.name}"
+                if param.min is not None and param.max is not None:
+                    param_str += f" ({param.min}-{param.max}"
+                    if param.unit:
+                        param_str += f" {param.unit}"
+                    param_str += ")"
+                params.append(param_str)
+
+            params_str = ", ".join(params) if params else "no parameters"
+            categories[cat].append(f"  • {name} - {effect_def.description}\n    Parameters: {params_str}")
+
+        lines = []
+        for cat in sorted(categories.keys()):
+            lines.append(f"\n{cat.upper()}:")
+            lines.extend(sorted(categories[cat]))
+
+        return "\n".join(lines)
+
     def _build_system_prompt(self) -> str:
         """Build system prompt for Claude"""
-        return """You are an AI music producer integrated into a DAW (Digital Audio Workstation).
+        instruments_list = self._build_instruments_list()
+        effects_list = self._build_effects_list()
+
+        return f"""You are an AI music producer integrated into a DAW (Digital Audio Workstation).
 
 IMPORTANT: Each request is ONE-SHOT with fresh DAW state. No conversation history.
 
@@ -153,30 +231,183 @@ Guidelines:
 - Don't ask for clarification - be bold and creative with your interpretation
 - EXECUTE ACTIONS to make changes happen
 
-Available actions (use these to modify the sequence):
-- create_midi_clip: Add new MIDI clips with notes to a track
+═══════════════════════════════════════════════════════════════════════════════
+CRITICAL WORKFLOW RULES - READ THIS CAREFULLY
+═══════════════════════════════════════════════════════════════════════════════
+
+🚨 **NEVER CREATE EMPTY TRACKS** 🚨
+
+When you create a track, you MUST IMMEDIATELY follow these steps IN THE SAME RESPONSE:
+
+1. **create_track** - Create the track with name, type, and instrument
+2. **create_midi_clip** - Add at least ONE clip with actual musical notes
+3. **add_effect** (optional) - Add effects to enhance the sound
+
+A track without clips is COMPLETELY USELESS. It's like ordering a pizza and leaving the box empty.
+You MUST add musical content (clips with notes) to every track you create.
+
+═══════════════════════════════════════════════════════════════════════════════
+AVAILABLE INSTRUMENTS (use in create_track "instrument" parameter)
+═══════════════════════════════════════════════════════════════════════════════
+{instruments_list}
+
+═══════════════════════════════════════════════════════════════════════════════
+AVAILABLE EFFECTS (use in add_effect "effect_name" parameter)
+═══════════════════════════════════════════════════════════════════════════════
+{effects_list}
+
+═══════════════════════════════════════════════════════════════════════════════
+AVAILABLE TOOLS
+═══════════════════════════════════════════════════════════════════════════════
+
+- create_track: Create a new track (MUST be followed by create_midi_clip)
+- create_midi_clip: Add MIDI clips with notes to a track
 - modify_clip: Change existing clip notes, timing, or properties
 - delete_clip: Remove a clip from the sequence
-- create_track: Add a new track to the sequence
 - set_track_parameter: Adjust track volume, pan, mute, solo
-- add_effect: Add effects to tracks (reverb, delay, filter, distortion, etc.)
+- add_effect: Add effects to tracks
 - set_tempo: Change global tempo
 - play_sequence/stop_playback: Control playback
 
-Note format for MIDI (compact):
+═══════════════════════════════════════════════════════════════════════════════
+MIDI NOTE FORMAT (COMPACT)
+═══════════════════════════════════════════════════════════════════════════════
+
+{{n: MIDI_NOTE, s: START_TIME, d: DURATION, v: VELOCITY}}
+
 - n: MIDI note number (0-127, middle C = 60)
 - s: Start time in beats (relative to clip start)
 - d: Duration in beats
 - v: Velocity (0-127, default 100)
 
-Example: {n: 60, s: 0, d: 1, v: 100} = Middle C, starts at beat 0, lasts 1 beat
+Example: {{n: 60, s: 0, d: 1, v: 100}} = Middle C, starts at beat 0, lasts 1 beat
+
+Common MIDI notes:
+- C4 (middle C) = 60
+- D4 = 62
+- E4 = 64
+- F4 = 65
+- G4 = 67
+- A4 = 69
+- B4 = 71
+- C5 = 72
+
+═══════════════════════════════════════════════════════════════════════════════
+COMPLETE WORKFLOW EXAMPLES - STUDY THESE CAREFULLY
+═══════════════════════════════════════════════════════════════════════════════
+
+Example 1: "Add a kick drum"
+──────────────────────────────────────────────────────────────────────────────
+Step 1: create_track(name="Kick Drum", type="midi", instrument="kick")
+  → Returns: {{track_id: "abc123"}}
+
+Step 2: create_midi_clip(
+  track_id="abc123",
+  start_time=0,
+  duration=4,
+  notes=[
+    {{n: 36, s: 0, d: 0.5, v: 110}},    # Kick on beat 1
+    {{n: 36, s: 2, d: 0.5, v: 110}}     # Kick on beat 3
+  ]
+)
+
+Step 3: add_effect(track_id="abc123", effect_name="reverb")
+
+Example 2: "Add a subtle beat that blends into the chorus"
+──────────────────────────────────────────────────────────────────────────────
+Step 1: create_track(name="Percussion", type="midi", instrument="triangle")
+  → Returns: {{track_id: "xyz789"}}
+
+Step 2: create_midi_clip(
+  track_id="xyz789",
+  start_time=0,
+  duration=8,
+  notes=[
+    {{n: 81, s: 0.5, d: 0.25, v: 60}},   # Soft triangle on offbeat
+    {{n: 81, s: 1.5, d: 0.25, v: 65}},
+    {{n: 81, s: 2.5, d: 0.25, v: 70}},
+    {{n: 81, s: 3.5, d: 0.25, v: 75}},
+    {{n: 81, s: 4.5, d: 0.25, v: 80}},   # Building intensity
+    {{n: 81, s: 5.5, d: 0.25, v: 85}},
+    {{n: 81, s: 6.5, d: 0.25, v: 90}},
+    {{n: 81, s: 7.5, d: 0.25, v: 95}}
+  ]
+)
+
+Step 3: add_effect(track_id="xyz789", effect_name="reverb")
+Step 4: set_track_parameter(track_id="xyz789", parameter="volume", value=0.6)
+
+Example 3: "Add a bass line in D major"
+──────────────────────────────────────────────────────────────────────────────
+Step 1: create_track(name="Bass", type="midi", instrument="sine")
+  → Returns: {{track_id: "bass001"}}
+
+Step 2: create_midi_clip(
+  track_id="bass001",
+  start_time=0,
+  duration=8,
+  notes=[
+    {{n: 50, s: 0, d: 1, v: 100}},    # D2
+    {{n: 50, s: 1, d: 1, v: 90}},
+    {{n: 54, s: 2, d: 1, v: 95}},     # F#2
+    {{n: 57, s: 3, d: 1, v: 100}},    # A2
+    {{n: 50, s: 4, d: 1, v: 100}},    # D2
+    {{n: 50, s: 5, d: 1, v: 90}},
+    {{n: 54, s: 6, d: 1, v: 95}},     # F#2
+    {{n: 57, s: 7, d: 1, v: 100}}     # A2
+  ]
+)
+
+Step 3: add_effect(track_id="bass001", effect_name="lpf")
+
+Example 4: "Add a melodic pad"
+──────────────────────────────────────────────────────────────────────────────
+Step 1: create_track(name="Pad", type="midi", instrument="saw")
+  → Returns: {{track_id: "pad001"}}
+
+Step 2: create_midi_clip(
+  track_id="pad001",
+  start_time=0,
+  duration=16,
+  notes=[
+    {{n: 62, s: 0, d: 4, v: 70}},     # D major chord
+    {{n: 66, s: 0, d: 4, v: 70}},
+    {{n: 69, s: 0, d: 4, v: 70}},
+    {{n: 64, s: 4, d: 4, v: 70}},     # E minor chord
+    {{n: 67, s: 4, d: 4, v: 70}},
+    {{n: 71, s: 4, d: 4, v: 70}},
+    {{n: 65, s: 8, d: 4, v: 70}},     # F# minor chord
+    {{n: 69, s: 8, d: 4, v: 70}},
+    {{n: 72, s: 8, d: 4, v: 70}},
+    {{n: 62, s: 12, d: 4, v: 70}},    # D major chord
+    {{n: 66, s: 12, d: 4, v: 70}},
+    {{n: 69, s: 12, d: 4, v: 70}}
+  ]
+)
+
+Step 3: add_effect(track_id="pad001", effect_name="reverb")
+Step 4: set_track_parameter(track_id="pad001", parameter="volume", value=0.7)
+
+═══════════════════════════════════════════════════════════════════════════════
+REMEMBER
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ DO: Create track → Add clip with notes → Add effects (complete workflow)
+❌ DON'T: Create track and stop (empty track is useless)
+
+✅ DO: Think about the complete musical gesture
+❌ DON'T: Create infrastructure without content
+
+✅ DO: Add actual note data with musically sensible patterns
+❌ DON'T: Create clips without notes or with placeholder notes
 
 When modifying sequences:
 - You can see ALL tracks, clips, and notes in the context
 - Use modify_clip to change existing clips (replaces all notes)
 - Use delete_clip + create_midi_clip to restructure
 - Create new tracks for new instruments/parts
-- Think holistically about the entire composition"""
+- Think holistically about the entire composition
+- ALWAYS follow through with complete workflows - never leave empty tracks"""
 
     def _build_context_message(self, state: Optional[DAWStateSnapshot]) -> str:
         """Build COMPLETE MUSICAL CONTEXT - everything AI needs to understand and modify the sequence"""
@@ -403,28 +634,28 @@ Keep suggestions simple and musical. Explain your reasoning briefly."""
         return [
             {
                 "name": "create_midi_clip",
-                "description": "Create a new MIDI clip with notes on a track",
+                "description": "Create a new MIDI clip with notes on a track. This is how you add actual musical content to a track. You MUST call this immediately after create_track. The 'notes' array contains the actual musical pattern - don't leave it empty!",
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "track_id": {"type": "string", "description": "Track ID to add clip to"},
-                        "start_time": {"type": "number", "description": "Start time in beats"},
-                        "duration": {"type": "number", "description": "Clip duration in beats"},
+                        "track_id": {"type": "string", "description": "Track ID to add clip to (from create_track response)"},
+                        "start_time": {"type": "number", "description": "Start time in beats (0 = beginning of sequence)"},
+                        "duration": {"type": "number", "description": "Clip duration in beats (e.g., 4 for 4 bars, 8 for 8 bars)"},
                         "notes": {
                             "type": "array",
-                            "description": "Array of notes: [{n: 60, s: 0, d: 1, v: 100}, ...]",
+                            "description": "Array of MIDI notes in compact format: [{n: MIDI_NOTE, s: START_BEAT, d: DURATION, v: VELOCITY}, ...]. Example: [{n: 60, s: 0, d: 1, v: 100}, {n: 64, s: 1, d: 1, v: 100}] creates two notes. MUST contain at least one note!",
                             "items": {
                                 "type": "object",
                                 "properties": {
-                                    "n": {"type": "integer", "description": "MIDI note (0-127)"},
-                                    "s": {"type": "number", "description": "Start time in beats (relative to clip)"},
-                                    "d": {"type": "number", "description": "Duration in beats"},
-                                    "v": {"type": "integer", "description": "Velocity (0-127)"}
+                                    "n": {"type": "integer", "description": "MIDI note number (0-127). Middle C = 60, D = 62, E = 64, F = 65, G = 67, A = 69, B = 71, C5 = 72. Kick drum = 36."},
+                                    "s": {"type": "number", "description": "Start time in beats RELATIVE to clip start (0 = clip start, 1 = one beat in, etc.)"},
+                                    "d": {"type": "number", "description": "Note duration in beats (0.25 = sixteenth note, 0.5 = eighth note, 1 = quarter note, 2 = half note, 4 = whole note)"},
+                                    "v": {"type": "integer", "description": "Velocity/volume (0-127, default 100). Higher = louder."}
                                 },
                                 "required": ["n", "s", "d"]
                             }
                         },
-                        "name": {"type": "string", "description": "Clip name (optional)"}
+                        "name": {"type": "string", "description": "Clip name (optional, e.g., 'Kick Pattern', 'Bass Line')"}
                     },
                     "required": ["track_id", "start_time", "duration", "notes"]
                 }
@@ -470,15 +701,15 @@ Keep suggestions simple and musical. Explain your reasoning briefly."""
             },
             {
                 "name": "create_track",
-                "description": "Create a new track",
+                "description": "Create a new track. WARNING: You MUST immediately follow this with create_midi_clip to add musical content. A track without clips is useless. Complete workflow: 1) create_track, 2) create_midi_clip with notes, 3) optionally add_effect.",
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string", "description": "Track name"},
-                        "type": {"type": "string", "enum": ["midi", "audio"], "description": "Track type"},
-                        "instrument": {"type": "string", "description": "Instrument name (sine, saw, square, triangle, etc.)"}
+                        "name": {"type": "string", "description": "Track name (e.g., 'Kick Drum', 'Bass', 'Pad')"},
+                        "type": {"type": "string", "enum": ["midi", "audio"], "description": "Track type - use 'midi' for synthesized instruments"},
+                        "instrument": {"type": "string", "description": "Instrument/synth name for MIDI tracks. Available: sine, saw, square, triangle, kick, snare, hihat. REQUIRED for MIDI tracks to produce sound."}
                     },
-                    "required": ["name", "type"]
+                    "required": ["name", "type", "instrument"]
                 }
             },
             {
@@ -507,13 +738,13 @@ Keep suggestions simple and musical. Explain your reasoning briefly."""
             },
             {
                 "name": "add_effect",
-                "description": "Add an effect to a track (reverb, delay, filter, distortion, etc.)",
+                "description": "Add an audio effect to a track to enhance the sound. Use this as the final step after creating a track and adding clips. Common effects: reverb (space/ambience), delay (echo), lpf (low-pass filter, removes highs), hpf (high-pass filter, removes lows), distortion (grit/saturation).",
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "track_id": {"type": "string", "description": "Track ID to add effect to"},
-                        "effect_name": {"type": "string", "description": "Effect type (reverb, delay, lpf, hpf, distortion, etc.)"},
-                        "slot_index": {"type": "integer", "description": "Effect slot index (optional)"}
+                        "track_id": {"type": "string", "description": "Track ID to add effect to (from create_track response)"},
+                        "effect_name": {"type": "string", "description": "Effect type. Available: reverb, delay, lpf, hpf, distortion, chorus, flanger, phaser. Choose based on desired sound: reverb for space, delay for echo, lpf for warmth, hpf for clarity, distortion for grit."},
+                        "slot_index": {"type": "integer", "description": "Effect slot index (optional, auto-assigns if not specified)"}
                     },
                     "required": ["track_id", "effect_name"]
                 }

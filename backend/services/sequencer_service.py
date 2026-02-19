@@ -793,7 +793,8 @@ class SequencerService:
         color: str = "#3b82f6",
         sample_id: Optional[str] = None,
         sample_name: Optional[str] = None,
-        sample_file_path: Optional[str] = None
+        sample_file_path: Optional[str] = None,
+        instrument: Optional[str] = None
     ) -> Optional[SequencerTrack]:
         """Create a new track in a sequence"""
         sequence = self.sequences.get(sequence_id)
@@ -815,13 +816,14 @@ class SequencerService:
             pan=0.0,  # Center
             sample_id=sample_id,
             sample_name=sample_name,
-            sample_file_path=sample_file_path
+            sample_file_path=sample_file_path,
+            instrument=instrument  # Set instrument for MIDI tracks
         )
 
         # Add track to sequence
         sequence.tracks.append(track)
 
-        logger.info(f"✅ Created track: {name} (ID: {track_id}, Type: {track_type}, Sample: {sample_name}) in sequence {sequence_id}")
+        logger.info(f"✅ Created track: {name} (ID: {track_id}, Type: {track_type}, Instrument: {instrument}, Sample: {sample_name}) in sequence {sequence_id}")
         return track
 
     def get_tracks(self, sequence_id: Optional[str] = None) -> List[SequencerTrack]:

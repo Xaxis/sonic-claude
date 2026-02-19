@@ -19,7 +19,7 @@ Environment Variables:
     # Storage
     DATA_DIR: Data directory (default: data)
     SAMPLES_DIR: Samples directory (default: data/samples)
-    SEQUENCES_DIR: Sequences directory (default: data/sequences)
+    COMPOSITIONS_DIR: Compositions directory (default: data/compositions)
     
     # Audio
     SAMPLE_RATE: Audio sample rate (default: 48000)
@@ -73,18 +73,36 @@ class SuperColliderConfig(BaseSettings):
 
 
 class StorageConfig(BaseSettings):
-    """Storage paths configuration"""
-    data_dir: Path = Field(default=Path("data"), description="Data directory")
-    samples_dir: Path = Field(default=Path("data/samples"), description="Samples directory")
-    compositions_dir: Path = Field(default=Path("data/compositions"), description="Compositions directory (unified storage)")
-    sequences_dir: Path = Field(default=Path("data/sequences"), description="Sequences directory (DEPRECATED - use compositions_dir)")
+    """
+    Storage paths configuration
+
+    Directory Structure:
+        data/
+        ├── compositions/          # Unified composition storage (sequences + mixer + effects)
+        │   └── <composition_id>/
+        │       ├── current.json
+        │       ├── metadata.json
+        │       ├── history/
+        │       └── autosave.json
+        └── samples/               # Audio samples
+            ├── <sample_files>
+            ├── metadata.json
+            └── cache/             # Sample analysis cache
+    """
+    data_dir: Path = Field(default=Path("data"), description="Root data directory")
+    samples_dir: Path = Field(default=Path("data/samples"), description="Audio samples directory")
+    compositions_dir: Path = Field(default=Path("data/compositions"), description="Unified composition storage")
 
     def ensure_directories(self) -> None:
-        """Create directories if they don't exist"""
+        """
+        Create required directories if they don't exist
+
+        ONLY these directories should be created at startup.
+        All other directories are created on-demand by their respective services.
+        """
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.samples_dir.mkdir(parents=True, exist_ok=True)
         self.compositions_dir.mkdir(parents=True, exist_ok=True)
-        self.sequences_dir.mkdir(parents=True, exist_ok=True)  # Keep for migration
 
 
 class AudioConfig(BaseSettings):

@@ -25,10 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 def get_samples_dir(settings: Settings = Depends(get_settings)) -> str:
-    """Get samples directory from settings and ensure it exists"""
-    samples_dir = settings.storage.samples_dir
-    os.makedirs(samples_dir, exist_ok=True)
-    return samples_dir
+    """Get samples directory from settings (already ensured by config.ensure_directories())"""
+    return str(settings.storage.samples_dir)
 
 
 def get_metadata_file(settings: Settings = Depends(get_settings)) -> str:

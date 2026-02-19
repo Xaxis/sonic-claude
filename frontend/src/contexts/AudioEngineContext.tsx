@@ -22,6 +22,19 @@ import type { Effect } from "@/modules/effects";
 import type { MixerTrack } from "@/modules/mixer";
 import type { Sequence } from "@/modules/sequencer";
 
+// Global composition change callback (set by CompositionContext)
+let compositionChangeCallback: (() => void) | null = null;
+
+export function setCompositionChangeCallback(callback: (() => void) | null) {
+    compositionChangeCallback = callback;
+}
+
+function notifyCompositionChanged() {
+    if (compositionChangeCallback) {
+        compositionChangeCallback();
+    }
+}
+
 // WebSocket message types
 interface TransportWebSocketData {
     type: "transport";
@@ -431,10 +444,10 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
         };
     }, []);
 
-    // Load existing sequences on mount (NO DEFAULT CREATION)
+    // Load ALL saved compositions on mount
     const hasInitializedRef = useRef(false);
     useEffect(() => {
-        const loadExistingSequences = async () => {
+        const loadAllCompositions = async () => {
             if (hasInitializedRef.current) return;
             hasInitializedRef.current = true;
 
@@ -442,7 +455,21 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 // Wait a bit for backend to be ready
                 await new Promise((resolve) => setTimeout(resolve, 1000));
 
-                // Load existing sequences
+                console.log("🔄 Loading all saved compositions from disk...");
+
+                // Call backend to load ALL compositions into memory
+                const response = await fetch("http://localhost:8000/api/compositions/load-all", {
+                    method: "POST",
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to load compositions");
+                }
+
+                const data = await response.json();
+                console.log(`✅ Loaded ${data.loaded}/${data.total} compositions`);
+
+                // Now fetch sequences from in-memory services
                 const sequences = await audioEngineService.getSequences();
                 if (sequences.length > 0) {
                     setState((prev) => ({
@@ -450,6 +477,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                         sequences: sequences as any[],
                         activeSequenceId: sequences[0].id,
                     }));
+                    console.log(`✅ Restored ${sequences.length} sequences to UI`);
                 } else {
                     // No sequences exist - user can create one manually
                     setState((prev) => ({
@@ -457,13 +485,14 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                         sequences: [],
                         activeSequenceId: null,
                     }));
+                    console.log("ℹ️ No saved compositions found");
                 }
             } catch (error) {
-                console.error("Failed to load sequences:", error);
+                console.error("❌ Failed to load compositions:", error);
             }
         };
 
-        loadExistingSequences();
+        loadAllCompositions();
     }, []);
 
     // Engine actions
@@ -909,6 +938,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 await audioEngineService.setTempo({ tempo });
                 setState((prev) => ({ ...prev, tempo }));
                 broadcastUpdate("audioEngine.tempo", tempo);
+                notifyCompositionChanged();
             } catch (error) {
                 console.error("Failed to set tempo:", error);
             }
@@ -985,6 +1015,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 await loadSequences();
                 console.log("🔧 Sequences reloaded");
                 toast.success(`Added clip to sequence`);
+                notifyCompositionChanged();
                 return clip;
             } catch (error) {
                 console.error("Failed to add clip:", error);
@@ -1001,6 +1032,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 await audioEngineService.updateClip(sequenceId, clipId, request);
                 // Reload sequences to get updated clips
                 await loadSequences();
+                notifyCompositionChanged();
             } catch (error) {
                 console.error("Failed to update clip:", error);
                 toast.error("Failed to update clip");
@@ -1016,6 +1048,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 // Reload sequences to get updated clips
                 await loadSequences();
                 toast.success("Deleted clip");
+                notifyCompositionChanged();
             } catch (error) {
                 console.error("Failed to delete clip:", error);
                 toast.error("Failed to delete clip");
@@ -1031,6 +1064,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 // Reload sequences to get updated clips
                 await loadSequences();
                 toast.success("Duplicated clip");
+                notifyCompositionChanged();
             } catch (error) {
                 console.error("Failed to duplicate clip:", error);
                 toast.error("Failed to duplicate clip");
@@ -1077,6 +1111,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 });
                 await loadSequencerTracks(sequenceId);
                 toast.success(`Track "${name}" created`);
+                notifyCompositionChanged();
             } catch (error) {
                 console.error("Failed to create sequencer track:", error);
                 toast.error("Failed to create track");
@@ -1095,6 +1130,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 ),
             }));
             toast.success(`Track renamed to "${newName}"`);
+            notifyCompositionChanged();
         } catch (error) {
             console.error("Failed to rename sequencer track:", error);
             toast.error("Failed to rename track");
@@ -1114,6 +1150,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
             if (updates.instrument) {
                 toast.success(`Instrument changed to ${updates.instrument}`);
             }
+            notifyCompositionChanged();
         } catch (error) {
             console.error("Failed to update sequencer track:", error);
             toast.error("Failed to update track");
@@ -1128,6 +1165,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 sequencerTracks: prev.sequencerTracks.filter((t) => t.id !== trackId),
             }));
             toast.success("Track deleted");
+            notifyCompositionChanged();
         } catch (error) {
             console.error("Failed to delete sequencer track:", error);
             toast.error("Failed to delete track");
@@ -1143,6 +1181,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                     t.id === trackId ? { ...t, is_muted: muted } : t
                 ),
             }));
+            notifyCompositionChanged();
         } catch (error) {
             console.error("Failed to mute sequencer track:", error);
         }
@@ -1157,6 +1196,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                     t.id === trackId ? { ...t, is_solo: soloed } : t
                 ),
             }));
+            notifyCompositionChanged();
         } catch (error) {
             console.error("Failed to solo sequencer track:", error);
         }

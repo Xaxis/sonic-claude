@@ -18,12 +18,9 @@ class SynthDefInfo(BaseModel):
     parameters: list[str]
 
 
-@router.get("/synthdefs", response_model=list[SynthDefInfo])
-async def get_synthdefs():
-    """Get list of available SynthDefs for MIDI tracks"""
-    # This is a static list based on what's loaded in load_synthdefs.scd
-    # In a more advanced system, this could query SuperCollider dynamically
-    synthdefs = [
+# Module-level registry of all available SynthDefs
+# This is a static list based on what's loaded in load_synthdefs.scd
+SYNTHDEF_REGISTRY = [
         # Basic Synths
         SynthDefInfo(
             name="sine",
@@ -1324,7 +1321,11 @@ async def get_synthdefs():
             description="Low-pitched agogô bell",
             parameters=["amp", "freq", "decay"]
         ),
-    ]
+]
 
-    return synthdefs
+
+@router.get("/synthdefs", response_model=list[SynthDefInfo])
+async def get_synthdefs():
+    """Get list of available SynthDefs for MIDI tracks"""
+    return SYNTHDEF_REGISTRY
 

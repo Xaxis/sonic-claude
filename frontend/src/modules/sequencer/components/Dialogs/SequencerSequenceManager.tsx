@@ -143,6 +143,7 @@ export function SequencerSequenceManager({
 
         setIsLoading(true);
         try {
+            console.log("💾 Saving composition:", currentSequenceId, "createVersion:", createVersion);
             const response = await fetch(
                 `http://localhost:8000/api/compositions/save`,
                 {
@@ -159,7 +160,13 @@ export function SequencerSequenceManager({
                     })
                 }
             );
+
             const data = await response.json();
+            console.log("💾 Save response:", data);
+
+            if (!response.ok) {
+                throw new Error(data.detail || "Failed to save composition");
+            }
 
             if (createVersion) {
                 toast.success("Composition saved with new version");
@@ -168,8 +175,8 @@ export function SequencerSequenceManager({
                 toast.success("Composition saved");
             }
         } catch (error) {
-            console.error("Failed to save composition:", error);
-            toast.error("Failed to save composition");
+            console.error("❌ Failed to save composition:", error);
+            toast.error(`Failed to save composition: ${error instanceof Error ? error.message : String(error)}`);
         } finally {
             setIsLoading(false);
         }

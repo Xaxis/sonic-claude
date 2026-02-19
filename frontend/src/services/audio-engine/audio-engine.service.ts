@@ -129,7 +129,7 @@ export class AudioEngineService extends BaseAPIClient {
      * Get all available EffectDefs
      */
     async getEffectDefs(): Promise<EffectDefInfo[]> {
-        return this.get("/audio-engine/audio/effects/effectdefs");
+        return this.get("/audio-engine/audio/effects/definitions");
     }
 
     /**
@@ -175,7 +175,7 @@ export class AudioEngineService extends BaseAPIClient {
      * Get all mixer tracks
      */
     async getTracks(): Promise<MixerTrack[]> {
-        return this.get("/audio-engine/audio/mixer/tracks");
+        return this.get("/audio-engine/audio/mixer/channels");
     }
 
     /**

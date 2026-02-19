@@ -31,7 +31,8 @@ from backend.models.sequence import (
     AddClipRequest,
     UpdateClipRequest,
     MIDINote,
-    CreateSequenceRequest
+    CreateSequenceRequest,
+    Sequence
 )
 from backend.services.sequencer_service import SequencerService
 from backend.services.mixer_service import MixerService
@@ -61,16 +62,23 @@ class DAWActionService:
         try:
             action_type = action.action
             params = action.parameters
-            
+
+            logger.info(f"🎯 Executing action: {action_type}")
+            logger.info(f"   Parameters: {params}")
+
             # Route to appropriate handler
             if action_type == "create_midi_clip":
-                return await self._create_midi_clip(params)
+                result = await self._create_midi_clip(params)
+                logger.info(f"   ✅ create_midi_clip result: {result.message}")
+                return result
             elif action_type == "modify_clip":
                 return await self._modify_clip(params)
             elif action_type == "delete_clip":
                 return await self._delete_clip(params)
             elif action_type == "create_track":
-                return await self._create_track(params)
+                result = await self._create_track(params)
+                logger.info(f"   ✅ create_track result: {result.message}")
+                return result
             elif action_type == "set_track_parameter":
                 return await self._set_track_parameter(params)
             elif action_type == "set_tempo":
@@ -90,9 +98,9 @@ class DAWActionService:
                     message=f"Unknown action type: {action_type}",
                     error="UNKNOWN_ACTION"
                 )
-        
+
         except Exception as e:
-            logger.error(f"Error executing action {action.action}: {e}", exc_info=True)
+            logger.error(f"❌ Error executing action {action.action}: {e}", exc_info=True)
             return ActionResult(
                 success=False,
                 action=action.action,
@@ -273,7 +281,8 @@ class DAWActionService:
                 sequence_id=self.sequencer.current_sequence_id,
                 name=params.get("name", "AI Track"),
                 track_type=params.get("type", "midi"),
-                color=params.get("color", "#3b82f6")
+                color=params.get("color", "#3b82f6"),
+                instrument=params.get("instrument")  # Set instrument for MIDI tracks
             )
 
             if not track:
@@ -284,11 +293,16 @@ class DAWActionService:
                     error="CREATION_FAILED"
                 )
 
+            # Build message with instrument info if provided
+            message = f"Created track '{track.name}'"
+            if track.instrument:
+                message += f" with instrument '{track.instrument}'"
+
             return ActionResult(
                 success=True,
                 action="create_track",
-                message=f"Created track '{track.name}'",
-                data={"track_id": track.id}
+                message=message,
+                data={"track_id": track.id, "instrument": track.instrument}
             )
 
         except Exception as e:

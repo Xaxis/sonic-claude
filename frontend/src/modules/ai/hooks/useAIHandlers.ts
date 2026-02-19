@@ -30,6 +30,8 @@ interface UseAIHandlersProps {
     activeSequenceId: string | null;
     loadSequencerTracks: (sequenceId?: string) => Promise<void>;
     loadSequences: () => Promise<void>;
+    loadTracks: () => Promise<void>;  // Reload mixer tracks
+    loadEffectDefs: () => Promise<void>;  // Reload effect definitions
 }
 
 export function useAIHandlers(props: UseAIHandlersProps) {
@@ -43,6 +45,8 @@ export function useAIHandlers(props: UseAIHandlersProps) {
         activeSequenceId,
         loadSequencerTracks,
         loadSequences,
+        loadTracks,
+        loadEffectDefs,
     } = props;
 
     // ========================================================================
@@ -90,6 +94,10 @@ export function useAIHandlers(props: UseAIHandlersProps) {
 
                 // Add musical context analysis if available
                 if (response.musical_context) {
+                    // Update AI context for Analysis tab
+                    setAIContext(response.musical_context);
+
+                    // Also add to analysis events
                     addAnalysisEvent({
                         id: `event-${Date.now()}-context`,
                         timestamp: new Date().toISOString(),
@@ -119,13 +127,26 @@ export function useAIHandlers(props: UseAIHandlersProps) {
                     });
                 }
 
-                // Reload sequencer UI to show changes made by AI
+                // Reload ALL UI components to show changes made by AI
                 if (response.actions_executed && response.actions_executed.length > 0) {
-                    console.log("AI executed actions - reloading sequencer UI...");
-                    await loadSequences(); // Reload sequences (in case tempo changed or new sequence created)
+                    console.log("🔄 AI executed actions - reloading ALL UI components...");
+
+                    // Reload sequencer (THIS LOADS CLIPS!)
+                    // Sequences contain clips, so this is critical for showing clip modifications
+                    await loadSequences();
+
+                    // Reload tracks (in case tracks were created/modified)
                     if (activeSequenceId) {
-                        await loadSequencerTracks(activeSequenceId); // Reload tracks (in case tracks were created/modified)
+                        await loadSequencerTracks(activeSequenceId);
                     }
+
+                    // Reload mixer (to show new tracks and volume/pan changes)
+                    await loadTracks();
+
+                    // Reload effects (to show new effects added to tracks)
+                    await loadEffectDefs();
+
+                    console.log("✅ UI reload complete");
                 }
 
                 toast.success("AI responded");
@@ -145,7 +166,7 @@ export function useAIHandlers(props: UseAIHandlersProps) {
                 setIsSendingMessage(false);
             }
         },
-        [addChatMessage, addAnalysisEvent, setIsSendingMessage, loadSequences, loadSequencerTracks, activeSequenceId]
+        [addChatMessage, addAnalysisEvent, setIsSendingMessage, loadSequences, loadSequencerTracks, loadTracks, loadEffectDefs, activeSequenceId]
     );
 
     // ========================================================================

@@ -35,11 +35,13 @@ export function AIPanel() {
         setAIContext,
     } = useAIEngine();
 
-    // Audio Engine Context (for reloading sequencer after AI actions)
+    // Audio Engine Context (for reloading ALL UI after AI actions)
     const {
         activeSequenceId,
         loadSequencerTracks,
         loadSequences,
+        loadTracks,
+        loadEffectDefs,
     } = useAudioEngine();
 
     // Event handlers
@@ -50,22 +52,36 @@ export function AIPanel() {
         setAIContext,
         setIsSendingMessage: actions.setIsSendingMessage,
         setIsLoadingState: actions.setIsLoadingState,
-        // Reload functions to update UI after AI actions
+        // Reload functions to update ALL UI components after AI actions
         activeSequenceId,
         loadSequencerTracks,
         loadSequences,
+        loadTracks,
+        loadEffectDefs,
     });
 
-    // Load initial state on mount (only if not already loaded)
+    // Load initial state AND AI context on mount
     useEffect(() => {
         const loadInitialState = async () => {
             try {
                 actions.setIsLoadingState(true);
-                console.log("AIPanel: Loading initial DAW state...");
+                console.log("AIPanel: Loading initial DAW state and AI context...");
+
+                // Load DAW state
                 const response = await aiService.getState();
                 console.log("AIPanel: Received state response:", response);
                 setDawState(response.full_state || null);
                 console.log("AIPanel: Set dawState to:", response.full_state || null);
+
+                // Load AI context (what the LLM sees)
+                try {
+                    const contextResponse = await aiService.getAIContext();
+                    setAIContext(contextResponse.context);
+                    console.log("AIPanel: Loaded AI context");
+                } catch (error) {
+                    console.error("AIPanel: Failed to load AI context:", error);
+                    setAIContext("Error loading AI context: " + (error as Error).message);
+                }
             } catch (error) {
                 console.error("AIPanel: Failed to load initial state:", error);
             } finally {

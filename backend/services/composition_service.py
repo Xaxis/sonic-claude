@@ -347,8 +347,8 @@ class CompositionService:
         # Get all track effects
         track_effects = []
         for track in sequence.tracks:
-            effect_chain = effects_service.get_track_effects(track.id)
-            if effect_chain:
+            effect_chain = effects_service.get_track_effect_chain(track.id)
+            if effect_chain and effect_chain.effects:  # Only include if there are effects
                 track_effects.append(effect_chain)
 
         # Get sample assignments (from sample tracks)

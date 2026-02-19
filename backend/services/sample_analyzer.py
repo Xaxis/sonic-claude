@@ -52,13 +52,12 @@ class SampleAnalyzer:
         Initialize sample analyzer
 
         Args:
-            cache_dir: Directory to cache analysis results (default: data/sample_cache)
+            cache_dir: Directory to cache analysis results (default: data/samples/cache)
             samples_dir: Directory where samples are stored (default: data/samples)
         """
-        self.cache_dir = cache_dir or Path("data/sample_cache")
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-
         self.samples_dir = samples_dir or Path("data/samples")
+        self.cache_dir = cache_dir or (self.samples_dir / "cache")
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # In-memory cache
         self.database = SampleDatabase()
