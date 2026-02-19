@@ -6,8 +6,6 @@
 
 - The sequencer "play ahead" line or whatever the fuck is called, is not animated smoothly, not sure if its because of performance issues recieving data, frontend poor choices, or both, but you need to completely refactor so that the timeline processing and interaction with that line is smooth and perfect without jankyness
 
-- There are tons of disparate "local storage" key/value pairs and it is very disorganized and reflects how you didnt build a cohesive system for managing state on the fronntend and backend of the app. Critically examine 
-
 - When we scroll the tracks on sequencer timeline (over the tracks header - that column) it doesnt vertically scroll the corresponding tracks in the timeline!
 
 - Work on/create beautiful "PERFORMANCE" tab and all associated brilliant integrated panels

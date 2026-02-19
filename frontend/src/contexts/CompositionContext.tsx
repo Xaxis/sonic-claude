@@ -56,7 +56,7 @@ export function CompositionProvider({
     const [isAutosaveEnabled, setIsAutosaveEnabled] = useState(true);
     const autosaveIntervalRef = useRef<number | undefined>(undefined);
 
-    // @TODO - Why isnt this being called?
+    // @TODO - Why isnt this being called? Is it supposed to be used?
     const changeTimeoutRef = useRef<number | undefined>(undefined);
 
     // Mark composition as changed

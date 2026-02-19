@@ -20,6 +20,13 @@ from backend.models.ai_actions import DAWAction, ActionResult
 from backend.services.daw_state_service import DAWStateService
 from backend.services.daw_action_service import DAWActionService
 from backend.services.sample_analyzer import SampleAnalyzer
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.services.composition_service import CompositionService
+    from backend.services.sequencer_service import SequencerService
+    from backend.services.mixer_service import MixerService
+    from backend.services.track_effects_service import TrackEffectsService
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +66,16 @@ class AIAgentService:
     
     async def send_message(self, user_message: str) -> Dict[str, Any]:
         """
-        Send user message and get AI response
+        TWO-STAGE AI EXECUTION:
+
+        STAGE 1 (PLANNING): Analyze request + DAW state → Generate detailed execution plan
+        STAGE 2 (EXECUTION): Execute plan with tool calls
+
+        This ensures:
+        - AI fully understands the request before acting
+        - Complete workflows (e.g., create_track → create_midi_clip → add_effect)
+        - No skipped steps or empty tracks
+        - Better constraint enforcement
 
         Args:
             user_message: User's message/request
@@ -69,26 +85,60 @@ class AIAgentService:
         """
         # Get current state (FRESH - no history)
         state_response = self.state_service.get_state(previous_hash=self.last_state_hash)
-
-        # Build system prompt
-        system_prompt = self._build_system_prompt()
-
-        # Build user message with context (ONE-SHOT)
         context_message = self._build_context_message(state_response.full_state)
-        full_message = f"{context_message}\n\nUser: {user_message}"
 
-        # ONE-SHOT REQUEST - no conversation history
-        messages = [{
-            "role": "user",
-            "content": full_message
-        }]
+        # ====================================================================
+        # STAGE 1: PLANNING
+        # ====================================================================
+        logger.info(f"🎯 STAGE 1: Planning for request: '{user_message}'")
 
-        # Call Claude with function calling (ONE-SHOT)
-        response = self.client.messages.create(
+        planning_prompt = self._build_planning_prompt(user_message, context_message)
+
+        planning_response = self.client.messages.create(
             model=self.model,
             max_tokens=2048,
-            system=system_prompt,
-            messages=messages,
+            system=planning_prompt,
+            messages=[{
+                "role": "user",
+                "content": f"User request: {user_message}\n\nCurrent DAW state:\n{context_message}"
+            }]
+        )
+
+        # Extract plan from response
+        plan_text = ""
+        for block in planning_response.content:
+            if block.type == "text":
+                plan_text += block.text
+
+        logger.info(f"📋 Generated plan:\n{plan_text}")
+
+        # ====================================================================
+        # STAGE 2: EXECUTION
+        # ====================================================================
+        logger.info(f"⚡ STAGE 2: Executing plan")
+
+        execution_prompt = self._build_execution_prompt()
+
+        # Inject the plan into the execution request
+        execution_message = f"""EXECUTION PLAN (follow this EXACTLY):
+{plan_text}
+
+Current DAW state:
+{context_message}
+
+Original user request: {user_message}
+
+Execute the plan above using the available tools. Follow EVERY step in the plan."""
+
+        # Call Claude with function calling for execution
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=4096,  # More tokens for execution
+            system=execution_prompt,
+            messages=[{
+                "role": "user",
+                "content": execution_message
+            }],
             tools=self._get_tool_definitions()
         )
         
@@ -136,6 +186,10 @@ class AIAgentService:
             logger.error(f"🚨 AI CREATED EMPTY TRACKS: {track_ids_created}")
             logger.error(f"🚨 This violates the system prompt! Tracks without clips are useless!")
 
+        # Auto-save composition as iteration if actions were executed
+        if actions_executed and len(actions_executed) > 0:
+            await self._save_ai_iteration(user_message, actions_executed)
+
         # Update state hash
         if state_response.full_state:
             self.last_state_hash = state_response.full_state.state_hash
@@ -143,12 +197,195 @@ class AIAgentService:
         # Store actions count for API response
         self.last_actions_executed = len(actions_executed)
 
+        # Build comprehensive response including plan
+        full_response = f"""**PLAN:**
+{plan_text}
+
+**EXECUTION:**
+{assistant_message}
+
+**ACTIONS EXECUTED:** {len(actions_executed)}"""
+
         return {
-            "response": assistant_message,
+            "response": full_response,
             "actions_executed": actions_executed,
-            "musical_context": context_message  # Include the full musical analysis
+            "musical_context": context_message,  # Include the full musical analysis
+            "plan": plan_text  # Include the plan separately for frontend
         }
-    
+
+    async def _save_ai_iteration(self, user_message: str, actions_executed: List[ActionResult]) -> None:
+        """Save composition as AI iteration after actions are executed"""
+        try:
+            # Check if we have all required services
+            if not all([self.composition_service, self.action_service.sequencer,
+                       self.action_service.mixer, self.action_service.effects]):
+                logger.warning("⚠️ Cannot save AI iteration: missing required services")
+                return
+
+            # Get current sequence ID
+            sequence_id = self.action_service.sequencer.current_sequence_id
+            if not sequence_id:
+                logger.warning("⚠️ Cannot save AI iteration: no active sequence")
+                return
+
+            # Get sequence
+            sequence = self.action_service.sequencer.get_sequence(sequence_id)
+            if not sequence:
+                logger.warning(f"⚠️ Cannot save AI iteration: sequence {sequence_id} not found")
+                return
+
+            # Build snapshot
+            snapshot = self.composition_service.build_snapshot_from_services(
+                sequencer_service=self.action_service.sequencer,
+                mixer_service=self.action_service.mixer,
+                effects_service=self.action_service.effects,
+                sequence_id=sequence_id,
+                name=sequence.name,
+                metadata={
+                    "source": "ai_iteration",
+                    "user_message": user_message,
+                    "actions_count": len(actions_executed),
+                    "timestamp": datetime.now().isoformat()
+                }
+            )
+
+            if not snapshot:
+                logger.error("❌ Failed to build snapshot for AI iteration")
+                return
+
+            # Save with history
+            self.composition_service.save_composition(
+                composition_id=sequence_id,
+                snapshot=snapshot,
+                create_history=True,  # Create history entry for AI iteration
+                is_autosave=False
+            )
+
+            logger.info(f"💾 Saved AI iteration for sequence {sequence_id}")
+
+        except Exception as e:
+            logger.error(f"❌ Failed to save AI iteration: {e}", exc_info=True)
+
+    def _build_planning_prompt(self, user_message: str, context_message: str) -> str:
+        """Build STAGE 1 planning prompt"""
+        instruments_list = self._build_instruments_list()
+        effects_list = self._build_effects_list()
+
+        return f"""You are a music production AI in PLANNING mode.
+
+Your task: Analyze the user's request and current DAW state, then generate a DETAILED execution plan.
+
+═══════════════════════════════════════════════════════════════════════════════
+PLANNING GUIDELINES
+═══════════════════════════════════════════════════════════════════════════════
+
+1. **Understand the request holistically**
+   - What is the user trying to achieve musically?
+   - What changes are needed to existing tracks/clips/effects/mixer?
+   - What new elements need to be created?
+
+2. **Analyze current state**
+   - What tracks/clips/effects already exist?
+   - What's the current tempo, key, style?
+   - What's missing or needs modification?
+
+3. **Generate COMPLETE workflow**
+   - For NEW tracks: ALWAYS include create_track → create_midi_clip → add_effect
+   - For MODIFICATIONS: Specify exact clips/tracks to modify and how
+   - For MIXER changes: Specify exact parameter adjustments
+   - For EFFECTS: Specify which tracks and which effects
+
+4. **Be SPECIFIC with musical content**
+   - Specify exact MIDI note patterns (not "add some notes")
+   - Specify exact parameter values (not "adjust volume")
+   - Specify exact timing (start_time, duration in beats)
+
+═══════════════════════════════════════════════════════════════════════════════
+AVAILABLE INSTRUMENTS
+═══════════════════════════════════════════════════════════════════════════════
+{instruments_list}
+
+═══════════════════════════════════════════════════════════════════════════════
+AVAILABLE EFFECTS
+═══════════════════════════════════════════════════════════════════════════════
+{effects_list}
+
+═══════════════════════════════════════════════════════════════════════════════
+OUTPUT FORMAT
+═══════════════════════════════════════════════════════════════════════════════
+
+Generate a plan in this format:
+
+**ANALYSIS:**
+[Brief analysis of the request and current state]
+
+**PLAN:**
+Step 1: [Action] - [Specific details]
+  - Parameter 1: [value]
+  - Parameter 2: [value]
+
+Step 2: [Action] - [Specific details]
+  - Parameter 1: [value]
+  - Parameter 2: [value]
+
+[Continue for all steps...]
+
+**MUSICAL REASONING:**
+[Explain why this plan achieves the user's goal]
+
+═══════════════════════════════════════════════════════════════════════════════
+CRITICAL RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+🚨 **NEVER plan to create a track without immediately adding a clip with notes**
+🚨 **ALWAYS specify exact MIDI note patterns** - use format: {{n: 60, s: 0, d: 1, v: 100}}
+🚨 **ALWAYS specify exact parameter values** - no vague terms like "adjust" or "tweak"
+🚨 **THINK COMPLETE WORKFLOWS** - don't plan half-finished actions
+
+Remember: You're PLANNING, not executing. Be thorough and specific."""
+
+    def _build_execution_prompt(self) -> str:
+        """Build STAGE 2 execution prompt"""
+        return """You are a music production AI in EXECUTION mode.
+
+Your task: Execute the provided plan EXACTLY using the available tools.
+
+═══════════════════════════════════════════════════════════════════════════════
+EXECUTION RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+1. **Follow the plan step-by-step**
+   - Execute EVERY step in the plan
+   - Use the EXACT parameters specified in the plan
+   - Don't skip steps or improvise
+
+2. **Use tools correctly**
+   - create_track: Creates a new track (returns track_id)
+   - create_midi_clip: Adds notes to a track (requires track_id from create_track)
+   - modify_clip: Changes existing clip notes/timing
+   - add_effect: Adds effect to track
+   - set_track_parameter: Adjusts volume/pan/mute/solo
+   - set_tempo: Changes global tempo
+
+3. **Complete workflows**
+   - ALWAYS call create_midi_clip immediately after create_track
+   - ALWAYS use the track_id returned from create_track
+   - ALWAYS include actual note data in create_midi_clip
+
+4. **MIDI note format**
+   - Use compact format: {{n: MIDI_NOTE, s: START_BEAT, d: DURATION, v: VELOCITY}}
+   - Example: {{n: 60, s: 0, d: 1, v: 100}} = Middle C, beat 0, 1 beat long, velocity 100
+
+═══════════════════════════════════════════════════════════════════════════════
+CRITICAL
+═══════════════════════════════════════════════════════════════════════════════
+
+🚨 **EXECUTE THE ENTIRE PLAN** - Don't stop halfway
+🚨 **USE EXACT VALUES FROM PLAN** - Don't improvise or change parameters
+🚨 **FOLLOW TOOL CALL ORDER** - create_track THEN create_midi_clip THEN add_effect
+
+Execute now."""
+
     def _build_instruments_list(self) -> str:
         """Build formatted list of available instruments from SYNTHDEF_REGISTRY"""
         # Lazy import to avoid circular dependency
