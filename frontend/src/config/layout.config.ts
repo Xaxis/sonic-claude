@@ -142,14 +142,14 @@ export const DEFAULT_TABS = [
             "effects",
         ],
     },
-    // {
-    //     id: "feedback",
-    //     name: "FEEDBACK",
-    //     panelIds: [
-    //         "input",
-    //         "loop-visualizer"
-    //     ],
-    // },
+    {
+        id: "feedback",
+        name: "FEEDBACK",
+        panelIds: [
+            "input",
+            "loop-visualizer"
+        ],
+    },
 ];
 
 /**

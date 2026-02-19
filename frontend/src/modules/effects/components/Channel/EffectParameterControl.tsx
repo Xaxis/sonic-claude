@@ -15,12 +15,14 @@ interface EffectParameterControlProps {
     parameter: EffectParameter;
     value: number;
     onChange: (value: number) => void;
+    disabled?: boolean;
 }
 
 export function EffectParameterControl({
     parameter,
     value,
     onChange,
+    disabled = false,
 }: EffectParameterControlProps) {
     // Format value for display
     const formatValue = (val: number): string => {
@@ -79,6 +81,7 @@ export function EffectParameterControl({
                 min={parameter.min}
                 max={parameter.max}
                 step={getStepSize()}
+                disabled={disabled}
                 className="w-full"
             />
         </div>

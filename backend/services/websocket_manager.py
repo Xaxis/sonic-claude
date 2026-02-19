@@ -125,17 +125,24 @@ class WebSocketManager:
         """
         if not self.spectrum_clients:
             return
-        
+
         message = json.dumps(data)
         disconnected = set()
-        
-        for client in self.spectrum_clients:
+
+        for client in list(self.spectrum_clients):
             try:
                 await client.send_text(message)
+            except RuntimeError as e:
+                # WebSocket already closed - silently disconnect
+                if "websocket.close" in str(e) or "already completed" in str(e):
+                    disconnected.add(client)
+                else:
+                    logger.error(f"❌ Error sending to spectrum client: {e}")
+                    disconnected.add(client)
             except Exception as e:
                 logger.error(f"❌ Error sending to spectrum client: {e}")
                 disconnected.add(client)
-        
+
         # Remove disconnected clients
         for client in disconnected:
             self.disconnect_spectrum(client)
@@ -157,6 +164,13 @@ class WebSocketManager:
         for client in list(self.waveform_clients):
             try:
                 await client.send_text(message)
+            except RuntimeError as e:
+                # WebSocket already closed - silently disconnect
+                if "websocket.close" in str(e) or "already completed" in str(e):
+                    disconnected.add(client)
+                else:
+                    logger.error(f"❌ Error sending to waveform client: {e}")
+                    disconnected.add(client)
             except Exception as e:
                 logger.error(f"❌ Error sending to waveform client: {e}")
                 disconnected.add(client)
@@ -181,6 +195,13 @@ class WebSocketManager:
         for client in list(self.meter_clients):
             try:
                 await client.send_text(message)
+            except RuntimeError as e:
+                # WebSocket already closed - silently disconnect
+                if "websocket.close" in str(e) or "already completed" in str(e):
+                    disconnected.add(client)
+                else:
+                    logger.error(f"❌ Error sending to meters client: {e}")
+                    disconnected.add(client)
             except Exception as e:
                 logger.error(f"❌ Error sending to meters client: {e}")
                 disconnected.add(client)
@@ -208,6 +229,13 @@ class WebSocketManager:
         for client in list(self.transport_clients):
             try:
                 await client.send_text(message)
+            except RuntimeError as e:
+                # WebSocket already closed - silently disconnect
+                if "websocket.close" in str(e) or "already completed" in str(e):
+                    disconnected.add(client)
+                else:
+                    logger.error(f"❌ Error sending to transport client: {e}")
+                    disconnected.add(client)
             except Exception as e:
                 logger.error(f"❌ Error sending to transport client: {e}")
                 disconnected.add(client)
