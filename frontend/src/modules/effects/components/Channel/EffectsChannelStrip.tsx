@@ -3,20 +3,22 @@
  *
  * Displays a sequencer track's effects chain as a vertical column.
  * Follows professional DAW layout: track header, 8 effect slots, add button.
- * Matches MixerChannelStrip width (w-36) for 1:1 alignment.
+ * Matches MixerChannelStrip width (w-56) for 1:1 alignment.
  *
  * Architecture:
  * - Uses EffectSlot for each effect instance
  * - Uses EffectSelector for adding new effects
  * - Manages effect chain state via context
  * - Follows established UI/UX patterns
+ * - Supports native drag-and-drop reordering of effects
  */
 
+import { useState } from "react";
 import { useEffectsContext } from "../../contexts/EffectsContext";
 import { EffectSlot } from "./EffectSlot";
 import { EffectSelector } from "./EffectSelector";
 import type { SequencerTrack } from "@/modules/sequencer/types";
-import type { TrackEffectChain } from "@/services/effects";
+import type { TrackEffectChain, EffectInstance } from "@/services/effects";
 
 interface EffectsChannelStripProps {
     track: SequencerTrack;
@@ -30,6 +32,7 @@ export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripP
         handleUpdateEffectParameter,
         handleToggleEffectBypass,
         handleDeleteEffect,
+        handleMoveEffect,
     } = handlers;
 
     // Get effects sorted by slot index
@@ -39,8 +42,12 @@ export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripP
     // Check if we can add more effects (max 8)
     const canAddMore = effects.length < 8;
 
+    // Drag state for reordering effects
+    const [draggingEffectId, setDraggingEffectId] = useState<string | null>(null);
+    const [dragOverEffectId, setDragOverEffectId] = useState<string | null>(null);
+
     return (
-        <div className="flex w-36 flex-shrink-0 flex-col gap-3 rounded-lg border border-border/70 bg-gradient-to-b from-card to-card/60 p-3 shadow-lg hover:border-border transition-all">
+        <div className="flex w-56 flex-shrink-0 flex-col gap-3 rounded-lg border border-border/70 bg-gradient-to-b from-card to-card/60 p-3 shadow-lg hover:border-border transition-all">
             {/* Track Header - Matches MixerChannelStrip */}
             <div className="flex flex-col gap-1.5 border-b border-border/30 pb-2.5">
                 {/* Track Name */}
@@ -67,7 +74,7 @@ export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripP
                 </div>
             </div>
 
-            {/* Effects Chain - Scrollable */}
+            {/* Effects Chain - Scrollable with Drag and Drop */}
             <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
                 {sortedEffects.length === 0 ? (
                     // Empty state
@@ -80,7 +87,7 @@ export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripP
                         </div>
                     </div>
                 ) : (
-                    // Effect slots
+                    // Effect slots with native drag and drop
                     sortedEffects.map((effect) => {
                         const effectDef = effectDefinitions.find(
                             (def) => def.name === effect.effect_name
@@ -93,6 +100,26 @@ export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripP
                                 onParameterChange={handleUpdateEffectParameter}
                                 onToggleBypass={handleToggleEffectBypass}
                                 onDelete={handleDeleteEffect}
+                                isDragging={draggingEffectId === effect.id}
+                                isDragOver={dragOverEffectId === effect.id}
+                                onDragStart={() => setDraggingEffectId(effect.id)}
+                                onDragEnd={() => {
+                                    setDraggingEffectId(null);
+                                    setDragOverEffectId(null);
+                                }}
+                                onDragOver={() => setDragOverEffectId(effect.id)}
+                                onDragLeave={() => setDragOverEffectId(null)}
+                                onDrop={(targetEffectId) => {
+                                    if (draggingEffectId && draggingEffectId !== targetEffectId) {
+                                        // Find the target effect's slot index
+                                        const targetEffect = sortedEffects.find(e => e.id === targetEffectId);
+                                        if (targetEffect) {
+                                            handleMoveEffect(draggingEffectId, targetEffect.slot_index);
+                                        }
+                                    }
+                                    setDraggingEffectId(null);
+                                    setDragOverEffectId(null);
+                                }}
                             />
                         );
                     })

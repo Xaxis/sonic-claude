@@ -36,7 +36,7 @@ export function MixerChannelStrip({ track, showMeters, meterMode }: MixerChannel
     const peakRight = trackMeter?.peakRight ?? -60;
 
     return (
-        <div className="flex w-36 flex-shrink-0 flex-col gap-3 rounded-lg border border-border/70 bg-gradient-to-b from-card to-card/60 p-3 shadow-lg hover:border-border transition-all">
+        <div className="flex w-56 flex-shrink-0 flex-col gap-3 rounded-lg border border-border/70 bg-gradient-to-b from-card to-card/60 p-3 shadow-lg hover:border-border transition-all">
             {/* Track Header */}
             <div className="flex flex-col gap-1.5 border-b border-border/30 pb-2.5">
                 {/* Track Name */}

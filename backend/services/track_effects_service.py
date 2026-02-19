@@ -302,6 +302,11 @@ class TrackEffectsService:
         """
         Move an effect to a different slot
 
+        This properly reorders the effect chain in SuperCollider by:
+        1. Freeing the old effect synth
+        2. Updating the slot index
+        3. Recreating all effects in the correct order
+
         Args:
             effect_id: Effect instance ID
             new_slot_index: New slot position (0-7)
@@ -335,16 +340,21 @@ class TrackEffectsService:
                 raise ValueError(f"Slot {new_slot_index} is already occupied")
 
             old_slot = effect.slot_index
+
+            # If slot hasn't changed, nothing to do
+            if old_slot == new_slot_index:
+                return effect
+
+            # Update slot index
             effect.slot_index = new_slot_index
             effect.updated_at = datetime.now()
 
             # Re-sort chain by slot index
             chain.effects.sort(key=lambda e: e.slot_index)
 
-            # Note: In SuperCollider, node order matters for signal flow
-            # We would need to recreate the effect synth in the correct position
-            # For now, we'll just update the slot index in our model
-            # TODO: Implement proper node reordering in SuperCollider
+            # Recreate all effects in the correct order in SuperCollider
+            # This ensures proper signal flow: synth → effect[0] → effect[1] → ... → mixer
+            await self._rebuild_effect_chain(chain)
 
             logger.info(f"🎛️ Moved effect {effect_id} from slot {old_slot} to slot {new_slot_index}")
 
@@ -352,6 +362,31 @@ class TrackEffectsService:
 
         except Exception as e:
             logger.error(f"❌ Failed to move effect: {e}")
+            raise
+
+    async def _rebuild_effect_chain(self, chain: TrackEffectChain) -> None:
+        """
+        Rebuild entire effect chain in SuperCollider with correct node order
+
+        This is necessary when reordering effects because SuperCollider's
+        node order determines signal flow.
+
+        Args:
+            chain: Track effect chain to rebuild
+        """
+        try:
+            # Free all existing effect synths
+            for effect in chain.effects:
+                self.engine_manager.send_message("/n_free", effect.sc_node_id)
+
+            # Recreate effects in slot order (already sorted)
+            for effect in chain.effects:
+                await self._create_effect_synth(effect)
+
+            logger.info(f"🔄 Rebuilt effect chain for track {chain.track_id} with {len(chain.effects)} effects")
+
+        except Exception as e:
+            logger.error(f"❌ Failed to rebuild effect chain: {e}")
             raise
 
     def get_track_effect_chain(self, track_id: str) -> TrackEffectChain:
