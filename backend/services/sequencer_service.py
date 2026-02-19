@@ -966,13 +966,30 @@ class SequencerService:
                 self.storage.autosave_sequence(sequence)
                 break
 
-        # Update mixer channel synth (if it exists)
+        # Update mixer channel synth (create if it doesn't exist)
         if self.mixer_channel_service and (volume is not None or pan is not None):
-            await self.mixer_channel_service.update_mixer_channel(
-                track_id=track_id,
-                volume=volume,
-                pan=pan
-            )
+            # Check if mixer channel exists, create if not
+            if track_id not in self.mixer_channel_service.mixer_channels:
+                # Allocate bus and create mixer channel
+                if self.audio_bus_manager:
+                    track_bus = self.audio_bus_manager.get_track_bus(track_id)
+                    if track_bus is None:
+                        track_bus = self.audio_bus_manager.allocate_track_bus(track_id)
+                    await self.mixer_channel_service.create_mixer_channel(
+                        track_id=track_id,
+                        volume=track.volume,
+                        pan=track.pan,
+                        mute=track.is_muted,
+                        solo=track.is_solo
+                    )
+                    logger.info(f"🎚️ Created mixer channel for track {track_id} on bus {track_bus}")
+            else:
+                # Update existing mixer channel
+                await self.mixer_channel_service.update_mixer_channel(
+                    track_id=track_id,
+                    volume=volume,
+                    pan=pan
+                )
 
         # Update all currently playing synths for this track
         if self.engine_manager and (volume is not None or pan is not None):

@@ -39,7 +39,7 @@ async def get_daw_state(
 ):
     """
     Get current DAW state with optional diff detection
-    
+
     Efficiency features:
     - Returns diff if previous_hash matches
     - Configurable detail level to reduce payload
@@ -49,6 +49,34 @@ async def get_daw_state(
         detail=request.detail,
         previous_hash=request.previous_hash
     )
+
+
+@router.get("/context")
+async def get_ai_context(
+    ai_service: AIAgentService = Depends(get_ai_agent_service),
+    state_service: DAWStateService = Depends(get_daw_state_service)
+):
+    """
+    Get the EXACT context message that would be sent to the LLM
+
+    This shows what the AI actually sees - useful for debugging and transparency.
+    """
+    # Get current state with full detail
+    state_response = state_service.get_state(
+        detail=StateDetailLevel(
+            include_clips=True,
+            include_notes=True,
+            include_audio_analysis=True,
+            include_musical_analysis=True,
+            max_clips=None,
+            max_notes_per_clip=None
+        )
+    )
+
+    # Build the context message (same as what gets sent to LLM)
+    context = ai_service._build_context_message(state_response.full_state)
+
+    return {"context": context}
 
 
 # ============================================================================
@@ -91,7 +119,8 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     """Chat message response"""
     response: str
-    actions_executed: int = 0
+    actions_executed: list = []
+    musical_context: str | None = None  # The full musical analysis sent to LLM
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -100,75 +129,43 @@ async def chat(
     ai_service: AIAgentService = Depends(get_ai_agent_service)
 ):
     """
-    Send message to AI agent
-    
+    Send ONE-SHOT message to AI agent (no conversation history)
+
+    Each request is independent with fresh DAW state.
+
+    The AI accepts vague, creative commands like:
+    - "Make this more ambient"
+    - "Add tension to the drums"
+    - "Recompose as jazz"
+    - "Add variation"
+
     The AI will:
-    1. Analyze current DAW state
+    1. Analyze current DAW state (fresh)
     2. Understand user request
     3. Generate response and/or actions
     4. Execute actions automatically
     """
     try:
-        response = await ai_service.send_message(request.message)
+        if not ai_service.client:
+            raise HTTPException(
+                status_code=503,
+                detail="AI service not available. Set AI_ANTHROPIC_API_KEY in your .env file at the project root."
+            )
+
+        response_dict = await ai_service.send_message(request.message)
 
         return ChatResponse(
-            response=response,
-            actions_executed=ai_service.last_actions_executed
+            response=response_dict["response"],
+            actions_executed=response_dict.get("actions_executed", []),
+            musical_context=response_dict.get("musical_context")
         )
-    
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Chat error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ============================================================================
-# AUTONOMOUS MODE ENDPOINTS
-# ============================================================================
 
-class AutonomousConfig(BaseModel):
-    """Autonomous mode configuration"""
-    enabled: bool
-    interval_seconds: float = 10.0
-    min_call_interval: float = 2.0
-
-
-@router.post("/autonomous/start")
-async def start_autonomous_mode(
-    config: AutonomousConfig,
-    ai_service: AIAgentService = Depends(get_ai_agent_service)
-):
-    """
-    Start autonomous mode
-    
-    AI will periodically:
-    - Analyze current state
-    - Suggest improvements
-    - Execute actions (if enabled)
-    """
-    ai_service.autonomous_interval = config.interval_seconds
-    ai_service.min_call_interval = config.min_call_interval
-    ai_service.start_autonomous_mode()
-    
-    return {"status": "started", "config": config}
-
-
-@router.post("/autonomous/stop")
-async def stop_autonomous_mode(
-    ai_service: AIAgentService = Depends(get_ai_agent_service)
-):
-    """Stop autonomous mode"""
-    ai_service.stop_autonomous_mode()
-    return {"status": "stopped"}
-
-
-@router.get("/autonomous/status")
-async def get_autonomous_status(
-    ai_service: AIAgentService = Depends(get_ai_agent_service)
-):
-    """Get autonomous mode status"""
-    return {
-        "enabled": ai_service.autonomous_mode,
-        "interval": ai_service.autonomous_interval,
-        "last_call": ai_service.last_call_time.isoformat() if ai_service.last_call_time else None
-    }
 

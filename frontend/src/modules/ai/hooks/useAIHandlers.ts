@@ -1,0 +1,166 @@
+/**
+ * useAIHandlers Hook
+ *
+ * Centralizes all event handler logic for the AI module.
+ * Separates business logic from UI rendering.
+ *
+ * Handler Categories:
+ * - Chat: send message, receive response
+ * - Autonomous: start/stop autonomous mode
+ * - State: refresh DAW state snapshot
+ */
+
+import { useCallback } from "react";
+import { toast } from "sonner";
+import { aiService } from "@/services/ai/ai.service";
+import type { ChatMessage, AnalysisEvent } from "../types";
+
+interface UseAIHandlersProps {
+    // State actions (from AIEngineContext)
+    addChatMessage: (message: ChatMessage) => void;
+    addAnalysisEvent: (event: AnalysisEvent) => void;
+    setDawState: (state: any) => void;
+    setAIContext: (context: string | null) => void;
+
+    // UI state actions
+    setIsSendingMessage: (sending: boolean) => void;
+    setIsLoadingState: (loading: boolean) => void;
+}
+
+export function useAIHandlers(props: UseAIHandlersProps) {
+    const {
+        addChatMessage,
+        addAnalysisEvent,
+        setDawState,
+        setAIContext,
+        setIsSendingMessage,
+        setIsLoadingState,
+    } = props;
+
+    // ========================================================================
+    // CHAT HANDLERS
+    // ========================================================================
+
+    const handleSendMessage = useCallback(
+        async (message: string) => {
+            if (!message.trim()) return;
+
+            try {
+                setIsSendingMessage(true);
+
+                // Add user message to chat history
+                const userMessage: ChatMessage = {
+                    role: "user",
+                    content: message,
+                    timestamp: new Date().toISOString(),
+                };
+                addChatMessage(userMessage);
+
+                // Add analysis event for user message
+                addAnalysisEvent({
+                    id: `event-${Date.now()}-user`,
+                    timestamp: new Date().toISOString(),
+                    type: "user_message",
+                    content: message,
+                });
+
+                // Send to backend
+                console.log("Sending message to AI backend:", message);
+                const response = await aiService.sendMessage(message);
+                console.log("Received response from AI backend:", response);
+
+                // Add assistant response to chat history
+                const assistantMessage: ChatMessage = {
+                    role: "assistant",
+                    content: response.response,
+                    timestamp: new Date().toISOString(),
+                    actions_executed: response.actions_executed,
+                };
+                addChatMessage(assistantMessage);
+
+                // Add analysis events: musical context, LLM response, and actions
+
+                // Add musical context analysis if available
+                if (response.musical_context) {
+                    addAnalysisEvent({
+                        id: `event-${Date.now()}-context`,
+                        timestamp: new Date().toISOString(),
+                        type: "context",
+                        content: response.musical_context,
+                    });
+                }
+
+                // Add LLM response
+                addAnalysisEvent({
+                    id: `event-${Date.now()}-llm`,
+                    timestamp: new Date().toISOString(),
+                    type: "llm_response",
+                    content: response.response,
+                });
+
+                // Add action results
+                if (response.actions_executed) {
+                    response.actions_executed.forEach((action, idx) => {
+                        addAnalysisEvent({
+                            id: `event-${Date.now()}-action-${idx}`,
+                            timestamp: new Date().toISOString(),
+                            type: "action_result",
+                            content: `${action.action}: ${action.message}`,
+                            metadata: action,
+                        });
+                    });
+                }
+
+                toast.success("AI responded");
+            } catch (error: any) {
+                console.error("Failed to send message:", error);
+
+                // Add error message to chat
+                const errorMessage: ChatMessage = {
+                    role: "assistant",
+                    content: `Error: ${error.message || "Failed to communicate with AI service. Please check that the backend is running and the Claude API key is configured."}`,
+                    timestamp: new Date().toISOString(),
+                };
+                addChatMessage(errorMessage);
+
+                toast.error(`AI Error: ${error.message || "Failed to send message"}`);
+            } finally {
+                setIsSendingMessage(false);
+            }
+        },
+        [addChatMessage, addAnalysisEvent, setIsSendingMessage]
+    );
+
+    // ========================================================================
+    // STATE REFRESH HANDLER
+    // ========================================================================
+
+    const handleRefreshState = useCallback(async () => {
+        try {
+            setIsLoadingState(true);
+
+            // Fetch DAW state
+            const response = await aiService.getState();
+            setDawState(response.full_state);
+
+            // Fetch AI context (what the LLM sees)
+            try {
+                const contextResponse = await aiService.getAIContext();
+                setAIContext(contextResponse.context);
+            } catch (error) {
+                console.error("Failed to fetch AI context:", error);
+                setAIContext("Error loading AI context: " + (error as Error).message);
+            }
+        } catch (error) {
+            console.error("Failed to refresh state:", error);
+        } finally {
+            setIsLoadingState(false);
+        }
+    }, [setDawState, setAIContext, setIsLoadingState]);
+
+    return {
+        handleSendMessage,
+        handleRefreshState,
+    };
+}
+

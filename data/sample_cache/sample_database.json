@@ -1,0 +1,60 @@
+{
+  "samples": {
+    "/Users/wilneeley/Projects/sonic-claude/data/samples/a16d82aa-42bf-4aae-b559-9ebdd89850a8.wav": {
+      "file_path": "/Users/wilneeley/Projects/sonic-claude/data/samples/a16d82aa-42bf-4aae-b559-9ebdd89850a8.wav",
+      "file_hash": "7aef6ecf26c8b22a089018a514c24410",
+      "analyzed_at": "2026-02-18 19:40:23.385473",
+      "sample_rate": 48000,
+      "channels": 2,
+      "bit_depth": 16,
+      "spectral": {
+        "centroid": 4817.577900994849,
+        "rolloff": 9559.529809907834,
+        "flux": 1.266779899597168,
+        "flatness": 0.003114294959232211,
+        "bandwidth": 4367.8925959881235,
+        "sub_bass_energy": 0.029723530916633975,
+        "bass_energy": 0.29849864424150585,
+        "low_mid_energy": 0.4772246533759881,
+        "mid_energy": 0.10833401881010501,
+        "high_mid_energy": 0.054573767021578824,
+        "high_energy": 0.031645385627657806
+      },
+      "temporal": {
+        "duration": 4.62,
+        "attack_time": 0.43733333333333335,
+        "decay_time": 0.010666666666666666,
+        "sustain_level": 0.1229991614818573,
+        "release_time": 1.3973333333333333,
+        "is_percussive": true,
+        "is_sustained": false,
+        "transient_strength": 0.8239122496648811,
+        "zcr_mean": 0.1205784670218894,
+        "zcr_std": 0.05436595273494871
+      },
+      "pitch": {
+        "has_pitch": true,
+        "fundamental_freq": 110.21610704785473,
+        "midi_note": 45,
+        "pitch_confidence": 1.0,
+        "harmonicity": 0.9968857050407678
+      },
+      "timbre": {
+        "brightness": 0.043109576324618315,
+        "warmth": 0.2927793360930465,
+        "roughness": 0.061846380990560806,
+        "fullness": 0.9968857050407678,
+        "tags": [
+          "percussive",
+          "tonal",
+          "dark",
+          "smooth"
+        ]
+      },
+      "rms_db": -24.954941357607858,
+      "peak_db": -3.2680510329193977,
+      "summary": "Percussive | percussive, tonal, dark | pitched at A2"
+    }
+  },
+  "last_updated": "2026-02-18 19:40:06.496204"
+}

@@ -127,7 +127,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
     },
     {
         id: "ai",
-        title: "AI ASSISTANT",
+        title: "ASSISTANT",
         component: createElement(AIPanel),
         closeable: false,
         getSubtitle: () => "Chat • State Viewer • Autonomous: Off",
@@ -149,7 +149,6 @@ export const DEFAULT_TABS = [
             "sequencer",
             "mixer",
             "effects",
-            "ai",
         ],
     },
     {

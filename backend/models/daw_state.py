@@ -33,12 +33,13 @@ class CompactClip(BaseModel):
     start: float = Field(..., description="Start time in beats")
     dur: float = Field(..., description="Duration in beats")
     muted: bool = False
-    
+
     # MIDI-specific (only if type=midi)
     notes: Optional[List[CompactMIDINote]] = None
-    
+
     # Audio-specific (only if type=audio)
     file: Optional[str] = None
+    audio_analysis: Optional[Dict[str, Any]] = Field(None, description="Audio analysis summary")
 
 
 class CompactTrack(BaseModel):

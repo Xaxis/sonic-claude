@@ -15,6 +15,38 @@ export interface CompactMIDINote {
     v: number;  // Velocity
 }
 
+export interface CompactClip {
+    id: string;
+    name: string;
+    track: string;  // Track ID
+    type: "midi" | "audio";
+    start: number;  // Start time in beats
+    dur: number;    // Duration in beats
+    muted: boolean;
+    notes?: CompactMIDINote[] | null;  // MIDI-specific
+    file?: string | null;  // Audio-specific
+}
+
+export interface CompactTrack {
+    id: string;
+    name: string;
+    type: "midi" | "audio" | "sample";
+    instrument?: string | null;  // For MIDI tracks
+    vol: number;  // Volume (0.0-2.0)
+    pan: number;  // Pan (-1.0 to 1.0)
+    muted: boolean;
+    solo: boolean;
+}
+
+export interface CompactSequence {
+    id: string;
+    name: string;
+    tempo: number;
+    time_sig: string;
+    tracks: CompactTrack[];
+    clips: CompactClip[];
+}
+
 export interface AudioFeatures {
     energy: number;
     brightness: number;
@@ -32,10 +64,10 @@ export interface MusicalContext {
 
 export interface DAWStateSnapshot {
     timestamp: string;
+    playing: boolean;
+    position: number;
     tempo: number;
-    is_playing: boolean;
-    track_count: number;
-    clip_count: number;
+    sequence: CompactSequence | null;
     audio: AudioFeatures | null;
     musical: MusicalContext | null;
     state_hash: string | null;
@@ -63,11 +95,10 @@ export interface ActionResult {
 // ============================================================================
 
 export interface ChatMessage {
-    id: string;
     role: "user" | "assistant";
     content: string;
-    timestamp: Date;
-    actions_executed?: number;
+    timestamp: string;
+    actions_executed?: ActionResult[];
 }
 
 export interface ChatRequest {
@@ -76,16 +107,15 @@ export interface ChatRequest {
 
 export interface ChatResponse {
     response: string;
-    actions_executed: number;
+    actions_executed?: ActionResult[];
+    musical_context?: string;  // Full musical analysis sent to LLM
 }
 
-// ============================================================================
-// AUTONOMOUS MODE
-// ============================================================================
-
-export interface AutonomousStatus {
-    enabled: boolean;
-    interval: number;
-    last_run: string | null;
+export interface AnalysisEvent {
+    id: string;
+    timestamp: string;
+    type: "system_prompt" | "context" | "user_message" | "llm_response" | "tool_call" | "action_result";
+    content: string;
+    metadata?: Record<string, any>;
 }
 

@@ -139,13 +139,18 @@ async def initialize_services(settings: Settings) -> None:
     _audio_feature_extractor = AudioFeatureExtractor()
     _musical_context_analyzer = MusicalContextAnalyzer()
 
+    # Create sample analyzer (shared between DAW state and AI agent)
+    from backend.services.sample_analyzer import SampleAnalyzer
+    _sample_analyzer = SampleAnalyzer(samples_dir=settings.storage.samples_dir)
+
     # Create DAW state and action services
     _daw_state_service = DAWStateService(
         sequencer_service=_sequencer_service,
         mixer_service=_mixer_service,
         engine_manager=_engine_manager,
         audio_feature_extractor=_audio_feature_extractor,
-        musical_context_analyzer=_musical_context_analyzer
+        musical_context_analyzer=_musical_context_analyzer,
+        sample_analyzer=_sample_analyzer
     )
 
     _daw_action_service = DAWActionService(
@@ -154,17 +159,23 @@ async def initialize_services(settings: Settings) -> None:
         track_effects_service=_track_effects_service
     )
 
-    # Create AI agent service (API key can be None, will fail gracefully on LLM calls)
+    # Create AI agent service (always enabled, API key from env)
+    api_key = settings.ai.anthropic_api_key
+    if api_key:
+        logger.info(f"🤖 AI API key loaded: {api_key[:10]}...")
+    else:
+        logger.warning("⚠️  No AI API key found! Set AI__ANTHROPIC_API_KEY in .env file (note: double underscore)")
+
     _ai_agent_service = AIAgentService(
         state_service=_daw_state_service,
         action_service=_daw_action_service,
-        api_key=settings.ai.anthropic_api_key if settings.ai.enabled else None,
-        model=settings.ai.model
+        api_key=api_key,
+        model=settings.ai.model,
+        samples_dir=settings.storage.samples_dir
     )
 
     # Configure AI settings
     _ai_agent_service.min_call_interval = settings.ai.min_call_interval
-    _ai_agent_service.autonomous_interval = settings.ai.autonomous_interval
 
     # Wire up audio feature extraction pipeline
     # Hook into audio analyzer to extract features from spectrum/meter data

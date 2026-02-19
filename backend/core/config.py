@@ -28,10 +28,9 @@ Environment Variables:
     # CORS
     CORS_ORIGINS: Allowed CORS origins (default: *)
 
-    # AI
-    ANTHROPIC_API_KEY: Anthropic API key for Claude
-    AI_MODEL: AI model to use (default: claude-3-5-sonnet-20241022)
-    AI_ENABLED: Enable AI features (default: False)
+    # AI (use __ for nested config, e.g., AI__ANTHROPIC_API_KEY)
+    AI__ANTHROPIC_API_KEY: Anthropic API key for Claude
+    AI__MODEL: AI model to use (default: claude-3-5-sonnet-20241022)
 
     # Development
     DEBUG: Enable debug mode (default: False)
@@ -112,13 +111,9 @@ class CORSConfig(BaseSettings):
 
 class AIConfig(BaseSettings):
     """AI integration configuration"""
-    enabled: bool = Field(default=False, description="Enable AI features")
-    anthropic_api_key: str = Field(default="", description="Anthropic API key")
+    anthropic_api_key: str = Field(default="", description="Anthropic API key", validation_alias="ANTHROPIC_API_KEY")
     model: str = Field(default="claude-3-5-sonnet-20241022", description="AI model to use")
     min_call_interval: float = Field(default=2.0, ge=0.5, description="Minimum seconds between LLM calls")
-    autonomous_interval: float = Field(default=10.0, ge=1.0, description="Seconds between autonomous checks")
-
-    model_config = SettingsConfigDict(env_prefix="AI_")
 
 
 class Settings(BaseSettings):
@@ -134,9 +129,9 @@ class Settings(BaseSettings):
     audio: AudioConfig = Field(default_factory=AudioConfig)
     cors: CORSConfig = Field(default_factory=CORSConfig)
     ai: AIConfig = Field(default_factory=AIConfig)
-    
+
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(Path(__file__).parent.parent / ".env"),  # backend/core/config.py -> backend/.env
         env_file_encoding="utf-8",
         env_nested_delimiter="__",
         case_sensitive=False,
@@ -156,13 +151,41 @@ _settings: Settings | None = None
 def get_settings() -> Settings:
     """
     Get application settings (singleton pattern)
-    
+
     Returns:
         Settings instance
     """
     global _settings
     if _settings is None:
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Debug: Show where we're looking for .env
+        cwd = os.getcwd()
+        logger.info(f"🔍 Current working directory: {cwd}")
+
+        env_paths = [".env", "../.env"]
+        for env_path in env_paths:
+            full_path = os.path.abspath(os.path.join(cwd, env_path))
+            if os.path.exists(full_path):
+                logger.info(f"✅ Found .env file at: {full_path}")
+                # Read and show AI__ variables
+                with open(full_path, 'r') as f:
+                    for line in f:
+                        if line.strip().startswith('AI__'):
+                            logger.info(f"   📄 {line.strip()[:50]}...")
+            else:
+                logger.info(f"❌ No .env file at: {full_path}")
+
         _settings = Settings()
+
+        # Debug: Show what was loaded
+        logger.info(f"🔑 AI API key loaded: {'YES' if _settings.ai.anthropic_api_key else 'NO'}")
+        if _settings.ai.anthropic_api_key:
+            logger.info(f"🔑 API key starts with: {_settings.ai.anthropic_api_key[:15]}...")
+        else:
+            logger.error(f"❌ AI config: anthropic_api_key='{_settings.ai.anthropic_api_key}'")
+            logger.error(f"❌ AI config: model='{_settings.ai.model}'")
     return _settings
 
 

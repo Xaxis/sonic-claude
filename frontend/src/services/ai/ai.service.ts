@@ -8,7 +8,6 @@
 import type {
     DAWStateSnapshot,
     ChatResponse,
-    AutonomousStatus,
     DAWAction,
     ActionResult,
 } from "@/modules/ai/types";
@@ -36,6 +35,16 @@ class AIService {
         });
         if (!response.ok) {
             throw new Error(`Failed to get DAW state: ${response.statusText}`);
+        }
+        return response.json();
+    }
+
+    async getAIContext(): Promise<{ context: string }> {
+        const response = await fetch(`${BASE_URL}/context`, {
+            method: "GET",
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to get AI context: ${response.statusText}`);
         }
         return response.json();
     }
@@ -79,39 +88,14 @@ class AIService {
             body: JSON.stringify({ message }),
         });
         if (!response.ok) {
-            throw new Error(`Failed to send chat message: ${response.statusText}`);
-        }
-        return response.json();
-    }
+            const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+            const errorMessage = errorData.detail || response.statusText;
 
-    // ========================================================================
-    // AUTONOMOUS MODE
-    // ========================================================================
+            if (response.status === 503) {
+                throw new Error(`AI service not available. Please restart the backend with AI_ENABLED=true in .env`);
+            }
 
-    async startAutonomous(): Promise<{ status: string; message: string }> {
-        const response = await fetch(`${BASE_URL}/autonomous/start`, {
-            method: "POST",
-        });
-        if (!response.ok) {
-            throw new Error(`Failed to start autonomous mode: ${response.statusText}`);
-        }
-        return response.json();
-    }
-
-    async stopAutonomous(): Promise<{ status: string; message: string }> {
-        const response = await fetch(`${BASE_URL}/autonomous/stop`, {
-            method: "POST",
-        });
-        if (!response.ok) {
-            throw new Error(`Failed to stop autonomous mode: ${response.statusText}`);
-        }
-        return response.json();
-    }
-
-    async getAutonomousStatus(): Promise<AutonomousStatus> {
-        const response = await fetch(`${BASE_URL}/autonomous/status`);
-        if (!response.ok) {
-            throw new Error(`Failed to get autonomous status: ${response.statusText}`);
+            throw new Error(`Failed to send chat message: ${errorMessage}`);
         }
         return response.json();
     }

@@ -5,6 +5,7 @@ import App from "./App";
 import { PopoutWindow } from "@/components/layout";
 import { LayoutProvider } from "./contexts/LayoutContext";
 import { AudioEngineProvider } from "./contexts/AudioEngineContext";
+import { AIEngineProvider } from "./contexts/AIEngineContext";
 import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./styles/globals.css";
@@ -16,10 +17,12 @@ createRoot(document.getElementById("root")!).render(
                 <ToastProvider>
                     <LayoutProvider>
                         <AudioEngineProvider>
-                            <Routes>
-                                <Route path="/" element={<App />} />
-                                <Route path="/popout" element={<PopoutWindow />} />
-                            </Routes>
+                            <AIEngineProvider>
+                                <Routes>
+                                    <Route path="/" element={<App />} />
+                                    <Route path="/popout" element={<PopoutWindow />} />
+                                </Routes>
+                            </AIEngineProvider>
                         </AudioEngineProvider>
                     </LayoutProvider>
                 </ToastProvider>
