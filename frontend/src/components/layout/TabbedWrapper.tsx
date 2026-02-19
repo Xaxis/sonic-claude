@@ -285,10 +285,19 @@ export function TabbedWrapper({
                         {/* X-Ray Background Layer (target tab) */}
                         {xrayEnabled && xrayPanels.length > 0 && (
                             <div
-                                className="absolute inset-0 pointer-events-none transition-opacity duration-300"
+                                className="absolute inset-0 pointer-events-none transition-all duration-300"
                                 style={{
                                     opacity: xrayOpacity,
                                     zIndex: 0,
+                                    transform: `
+                                        perspective(1200px)
+                                        rotateX(${xrayOpacity * 8}deg)
+                                        rotateY(${xrayOpacity * -3}deg)
+                                        scale(${1 - (xrayOpacity * 0.08)})
+                                        translateZ(${-xrayOpacity * 50}px)
+                                    `,
+                                    transformOrigin: 'center center',
+                                    transformStyle: 'preserve-3d',
                                 }}
                             >
                                 <PanelGrid
