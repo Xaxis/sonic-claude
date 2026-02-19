@@ -46,6 +46,11 @@ interface LayoutState {
     layouts: TabLayouts;
     maximizedPanel: string | null; // Panel ID that is currently maximized
     attachments: Record<string, PanelAttachment>; // Panel ID -> attachment state
+    // X-Ray Mode - See through to another tab
+    xrayEnabled: boolean; // Whether x-ray mode is active
+    xraySourceTab: string | null; // The tab we're looking FROM (current active tab)
+    xrayTargetTab: string | null; // The tab we're looking AT (background tab)
+    xrayOpacity: number; // Opacity of the background tab (0-1)
 }
 
 interface LayoutContextValue extends LayoutState {
@@ -71,6 +76,11 @@ interface LayoutContextValue extends LayoutState {
     // Window management
     popoutTab: (tabId: string, openWindow?: boolean) => void;
     closePopout: (tabId: string) => void;
+
+    // X-Ray Mode
+    enableXray: (targetTabId: string) => void;
+    disableXray: () => void;
+    setXrayOpacity: (opacity: number) => void;
 }
 
 const LayoutContext = createContext<LayoutContextValue | undefined>(undefined);
@@ -100,6 +110,10 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
             poppedOutTabs: new Set(), // Always start with no popouts
             maximizedPanel: null, // No panel maximized by default
             attachments: {}, // No attachments by default
+            xrayEnabled: false, // X-ray mode disabled by default
+            xraySourceTab: null,
+            xrayTargetTab: null,
+            xrayOpacity: 0.5, // Default 50% opacity
         };
     });
 
@@ -359,6 +373,56 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         [broadcastState]
     );
 
+    // X-Ray Mode Methods
+    const enableXray = useCallback(
+        (targetTabId: string) => {
+            setState((prev) => {
+                // Don't enable x-ray if target is the same as active tab
+                if (targetTabId === prev.activeTab) {
+                    console.warn("Cannot x-ray the active tab");
+                    return prev;
+                }
+
+                const newState = {
+                    ...prev,
+                    xrayEnabled: true,
+                    xraySourceTab: prev.activeTab,
+                    xrayTargetTab: targetTabId,
+                };
+                broadcastState(newState);
+                return newState;
+            });
+        },
+        [broadcastState]
+    );
+
+    const disableXray = useCallback(() => {
+        setState((prev) => {
+            const newState = {
+                ...prev,
+                xrayEnabled: false,
+                xraySourceTab: null,
+                xrayTargetTab: null,
+            };
+            broadcastState(newState);
+            return newState;
+        });
+    }, [broadcastState]);
+
+    const setXrayOpacity = useCallback(
+        (opacity: number) => {
+            setState((prev) => {
+                const newState = {
+                    ...prev,
+                    xrayOpacity: Math.max(0, Math.min(1, opacity)), // Clamp to 0-1
+                };
+                broadcastState(newState);
+                return newState;
+            });
+        },
+        [broadcastState]
+    );
+
     const value: LayoutContextValue = {
         ...state,
         setActiveTab,
@@ -374,6 +438,9 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         detachPanel,
         popoutTab,
         closePopout,
+        enableXray,
+        disableXray,
+        setXrayOpacity,
     };
 
     return <LayoutContext.Provider value={value}>{children}</LayoutContext.Provider>;

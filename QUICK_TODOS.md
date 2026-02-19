@@ -14,7 +14,10 @@
 
 - Whats up with data/mixer?! Shoulnd that state have been built into the sequences in our consistent pattern
 
-- Implement "x-ray" mode, so if youre in a given tab, you can "x-ray", transparently see through to another tab behind it
+- ✅ COMPLETED: Implement "x-ray" mode, so if youre in a given tab, you can "x-ray", transparently see through to another tab behind it
+  - Full implementation with opacity control, smooth animations, keyboard shortcuts (⌘X)
+  - State persistence, visual indicators, and comprehensive documentation
+  - See docs/X_RAY_MODE.md for details
 
 - What do you mean our backend ai analysis only occurs on MIDI changes? What does that mean? What does that translate to on our frontend? Are you sure thats the right way to do this, are you missing anything?
 

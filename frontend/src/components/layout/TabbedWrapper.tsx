@@ -11,10 +11,13 @@
  * - Sync state across all windows via BroadcastChannel
  */
 
-import { useState } from "react";
-import { Plus, X, ExternalLink } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, X, ExternalLink, Scan, Layers } from "lucide-react";
 import { PanelGrid, type PanelConfig } from "./PanelGrid";
 import { useLayout } from "@/contexts/LayoutContext";
+import { IconButton } from "@/components/ui/icon-button";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 
 export interface TabConfig {
     id: string;
@@ -42,7 +45,16 @@ export function TabbedWrapper({
     onTabPopout,
 }: TabbedWrapperProps) {
     const [localActiveTab, setLocalActiveTab] = useState(tabs[0]?.id || "");
-    const { updateTabLayout, poppedOutTabs } = useLayout();
+    const {
+        updateTabLayout,
+        poppedOutTabs,
+        xrayEnabled,
+        xrayTargetTab,
+        xrayOpacity,
+        enableXray,
+        disableXray,
+        setXrayOpacity,
+    } = useLayout();
 
     // Use controlled or local state
     const activeTab = controlledActiveTab ?? localActiveTab;
@@ -51,6 +63,29 @@ export function TabbedWrapper({
         setLocalActiveTab(tabId);
         onTabChange?.(tabId);
     };
+
+    // Keyboard shortcut for x-ray mode (Cmd/Ctrl + X)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Cmd/Ctrl + X to toggle x-ray mode
+            if ((e.metaKey || e.ctrlKey) && e.key === 'x') {
+                e.preventDefault();
+
+                if (xrayEnabled) {
+                    disableXray();
+                } else {
+                    // Find the first non-active, non-popped-out tab
+                    const otherTab = tabs.find(t => t.id !== activeTab && !poppedOutTabs.has(t.id));
+                    if (otherTab) {
+                        enableXray(otherTab.id);
+                    }
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [xrayEnabled, activeTab, tabs, poppedOutTabs, enableXray, disableXray]);
 
     const handleTabDelete = (tabId: string, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -83,6 +118,14 @@ export function TabbedWrapper({
     const activeTabConfig = tabs.find((t) => t.id === activeTab);
     const activePanels = activeTabConfig
         ? panels.filter((p) => activeTabConfig.panelIds.includes(p.id))
+        : [];
+
+    // Get panels for x-ray target tab (if enabled)
+    const xrayTabConfig = xrayEnabled && xrayTargetTab
+        ? tabs.find((t) => t.id === xrayTargetTab)
+        : null;
+    const xrayPanels = xrayTabConfig
+        ? panels.filter((p) => xrayTabConfig.panelIds.includes(p.id))
         : [];
 
     // Check if active tab is popped out
@@ -138,6 +181,81 @@ export function TabbedWrapper({
                     );
                 })}
 
+                {/* Spacer */}
+                <div className="flex-1" />
+
+                {/* X-Ray Mode Controls */}
+                {tabs.length > 1 && !isActiveTabPoppedOut && (
+                    <div className="flex items-center gap-2 border-l border-border/50 pl-3 ml-2">
+                        {/* X-Ray Toggle Button */}
+                        <IconButton
+                            icon={Scan}
+                            tooltip={xrayEnabled ? "Disable X-Ray Mode (⌘X)" : "Enable X-Ray Mode (⌘X)"}
+                            onClick={() => {
+                                if (xrayEnabled) {
+                                    disableXray();
+                                } else {
+                                    // Find the previously active tab or first non-active tab
+                                    const otherTab = tabs.find(t => t.id !== activeTab && !poppedOutTabs.has(t.id));
+                                    if (otherTab) {
+                                        enableXray(otherTab.id);
+                                    }
+                                }
+                            }}
+                            variant={xrayEnabled ? "default" : "ghost"}
+                            size="icon-sm"
+                            className={xrayEnabled ? "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30" : ""}
+                        />
+
+                        {/* Opacity Slider (shown when x-ray is enabled) */}
+                        {xrayEnabled && (
+                            <div className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-200">
+                                <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                                    Opacity
+                                </Label>
+                                <Slider
+                                    value={[xrayOpacity * 100]}
+                                    onValueChange={(values) => setXrayOpacity(values[0] / 100)}
+                                    min={0}
+                                    max={100}
+                                    step={5}
+                                    className="w-24"
+                                />
+                                <span className="text-xs text-muted-foreground w-8 text-right">
+                                    {Math.round(xrayOpacity * 100)}%
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Target Tab Selector (shown when x-ray is enabled) */}
+                        {xrayEnabled && tabs.length > 2 && (
+                            <div className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-200">
+                                <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                                    View
+                                </Label>
+                                <select
+                                    value={xrayTargetTab || ""}
+                                    onChange={(e) => {
+                                        if (e.target.value) {
+                                            enableXray(e.target.value);
+                                        }
+                                    }}
+                                    className="bg-card border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                >
+                                    {tabs
+                                        .filter(t => t.id !== activeTab && !poppedOutTabs.has(t.id))
+                                        .map(t => (
+                                            <option key={t.id} value={t.id}>
+                                                {t.name}
+                                            </option>
+                                        ))
+                                    }
+                                </select>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* New Tab Button */}
                 <button
                     onClick={onTabCreate}
@@ -149,7 +267,7 @@ export function TabbedWrapper({
             </div>
 
             {/* Tab Content */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden relative">
                 {isActiveTabPoppedOut ? (
                     <div className="flex h-full w-full items-center justify-center">
                         <div className="text-center">
@@ -163,17 +281,69 @@ export function TabbedWrapper({
                         </div>
                     </div>
                 ) : (
-                    <PanelGrid
-                        panels={activePanels}
-                        onLayoutChange={(layout) => {
-                            // Persist layout via LayoutContext
-                            updateTabLayout(activeTab, layout);
-                        }}
-                        onPanelClose={(panelId) => {
-                            // TODO: Handle panel close - remove from tab's panelIds
-                            console.log("Panel closed:", panelId);
-                        }}
-                    />
+                    <>
+                        {/* X-Ray Background Layer (target tab) */}
+                        {xrayEnabled && xrayPanels.length > 0 && (
+                            <div
+                                className="absolute inset-0 pointer-events-none transition-opacity duration-300"
+                                style={{
+                                    opacity: xrayOpacity,
+                                    zIndex: 0,
+                                }}
+                            >
+                                <PanelGrid
+                                    panels={xrayPanels}
+                                    onLayoutChange={(layout) => {
+                                        // Persist layout for x-ray tab
+                                        if (xrayTargetTab) {
+                                            updateTabLayout(xrayTargetTab, layout);
+                                        }
+                                    }}
+                                    onPanelClose={(panelId) => {
+                                        console.log("Panel closed:", panelId);
+                                    }}
+                                />
+                            </div>
+                        )}
+
+                        {/* Active Tab Layer (foreground) */}
+                        <div
+                            className="absolute inset-0 transition-opacity duration-300"
+                            style={{
+                                opacity: xrayEnabled ? 1 - (xrayOpacity * 0.3) : 1, // Slightly reduce active tab opacity when x-ray is on
+                                zIndex: 1,
+                            }}
+                        >
+                            <PanelGrid
+                                panels={activePanels}
+                                onLayoutChange={(layout) => {
+                                    // Persist layout via LayoutContext
+                                    updateTabLayout(activeTab, layout);
+                                }}
+                                onPanelClose={(panelId) => {
+                                    // TODO: Handle panel close - remove from tab's panelIds
+                                    console.log("Panel closed:", panelId);
+                                }}
+                            />
+                        </div>
+
+                        {/* X-Ray Mode Indicator */}
+                        {xrayEnabled && (
+                            <div className="absolute top-4 right-4 z-50 pointer-events-none">
+                                <div className="bg-purple-500/20 border border-purple-500/50 rounded-lg px-3 py-2 backdrop-blur-sm animate-in fade-in duration-300">
+                                    <div className="flex items-center gap-2">
+                                        <Scan className="h-4 w-4 text-purple-400 animate-pulse" />
+                                        <span className="text-xs font-medium text-purple-400">
+                                            X-RAY MODE
+                                        </span>
+                                        <span className="text-xs text-purple-300/70">
+                                            Viewing: {xrayTabConfig?.name}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>

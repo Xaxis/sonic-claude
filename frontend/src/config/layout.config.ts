@@ -187,4 +187,8 @@ export const DEFAULT_LAYOUT_STATE = {
     activeTab: "compose",
     poppedOutTabs: [] as string[],
     layouts: {} as Record<string, Record<string, { x: number; y: number; w: number; h: number }>>,
+    xrayEnabled: false,
+    xraySourceTab: null,
+    xrayTargetTab: null,
+    xrayOpacity: 0.5,
 };
