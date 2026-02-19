@@ -711,7 +711,9 @@ class SequencerService:
             midi_events=request.midi_events,
             audio_file_path=request.audio_file_path,
             is_muted=False,
-            is_looped=False,
+            # Audio clips should loop by default (standard DAW behavior)
+            # When clip duration > sample length, the sample repeats
+            is_looped=True if request.clip_type == "audio" else False,
             gain=1.0,
         )
 

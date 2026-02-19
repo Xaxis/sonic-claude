@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { SequencerSampleEditorSection } from "../../layouts/SequencerSampleEditorSection.tsx";
 import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
+import { useWaveformData } from "../../hooks/useWaveformData.ts";
 
 interface SequencerSampleEditorProps {
     clipId: string;
@@ -53,109 +54,28 @@ export function SequencerSampleEditor({
     onLoopStartChange,
     onLoopEndChange,
 }: SequencerSampleEditorProps) {
-    // Get state from context
-    const { state, actions } = useSequencerContext();
-    const { snapEnabled, gridSize, zoom, isLooping, loopStart, loopEnd } = state;
-    const { toggleSnap, setGridSize } = actions;
+    // Get tempo from context
+    const { tempo } = useSequencerContext();
 
     // Local UI state
     const [localGain, setLocalGain] = useState(gain);
-    const [waveformData, setWaveformData] = useState<number[]>([]);
-    const [waveformDataRight, setWaveformDataRight] = useState<number[]>([]);
+
+    // Load waveform data using hook (2000 samples for detailed editor view)
+    const { leftData: waveformData, rightData: waveformDataRight } = useWaveformData({
+        sampleId: audioFilePath,
+        clipDuration,
+        tempo,
+        samplesPerLoop: 2000,
+    });
 
     // Sample editor settings
     const pixelsPerBeat = 40; // Base pixels per beat (matches piano roll and timeline)
-
-    // Load waveform data for audio file
-    useEffect(() => {
-        if (audioFilePath) {
-            loadWaveform(audioFilePath);
-        }
-    }, [audioFilePath]);
-
-    const loadWaveform = async (sampleId: string) => {
-        try {
-            // Fetch audio file using sample ID
-            const url = `http://localhost:8000/api/samples/${sampleId}/download`;
-            const response = await fetch(url);
-
-            if (!response.ok) {
-                console.error(`Failed to fetch audio file: ${response.statusText}`);
-                return;
-            }
-
-            const arrayBuffer = await response.arrayBuffer();
-
-            // Decode audio
-            const audioContext = new AudioContext();
-            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            await audioContext.close();
-
-            // Extract waveform data from the complete audio file
-            // Use a fixed number of samples for good resolution (2000 samples = good detail)
-            // WaveformDisplay will automatically stretch this to fit the clip duration width
-            const targetSamples = 2000; // Fixed sample count for consistent quality
-
-            // Extract left channel (or mono)
-            const leftChannelData = audioBuffer.getChannelData(0);
-            const blockSize = Math.floor(leftChannelData.length / targetSamples);
-            const leftWaveform: number[] = [];
-
-            for (let i = 0; i < targetSamples; i++) {
-                const start = i * blockSize;
-                const end = start + blockSize;
-                let max = 0;
-
-                for (let j = start; j < end; j++) {
-                    const abs = Math.abs(leftChannelData[j]);
-                    if (abs > max) max = abs;
-                }
-
-                leftWaveform.push(max);
-            }
-
-            setWaveformData(leftWaveform);
-
-            // Extract right channel if stereo
-            if (audioBuffer.numberOfChannels > 1) {
-                const rightChannelData = audioBuffer.getChannelData(1);
-                const rightWaveform: number[] = [];
-
-                for (let i = 0; i < targetSamples; i++) {
-                    const start = i * blockSize;
-                    const end = start + blockSize;
-                    let max = 0;
-
-                    for (let j = start; j < end; j++) {
-                        const abs = Math.abs(rightChannelData[j]);
-                        if (abs > max) max = abs;
-                    }
-
-                    rightWaveform.push(max);
-                }
-
-                setWaveformDataRight(rightWaveform);
-            } else {
-                // Mono file - clear right channel
-                setWaveformDataRight([]);
-            }
-        } catch (error) {
-            console.error("Failed to load waveform:", error);
-        }
-    };
 
     const handleGainChange = async (value: number[]) => {
         const newGain = value[0];
         setLocalGain(newGain);
         await onUpdateClip(clipId, { gain: newGain });
     };
-
-    const gridSizeOptions = [
-        { value: 4, label: "1/4" },
-        { value: 8, label: "1/8" },
-        { value: 16, label: "1/16" },
-        { value: 32, label: "1/32" },
-    ];
 
     return (
         <div className="h-full flex flex-col bg-background border-t border-border overflow-hidden">

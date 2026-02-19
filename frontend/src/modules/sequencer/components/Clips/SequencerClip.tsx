@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils.ts";
 import type { MIDIEvent, SequencerClip } from "../../types.ts";
 import { WaveformDisplay } from "../Shared/WaveformDisplay.tsx";
 import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
+import { useWaveformData } from "../../hooks/useWaveformData.ts";
 
 interface SequencerClipProps {
     clip: SequencerClip;
@@ -50,11 +51,18 @@ export function SequencerClip({
     onClipDragStateChange,
 }: SequencerClipProps) {
     // Get state from context
-    const { state } = useSequencerContext();
+    const { state, tempo } = useSequencerContext();
     const { zoom, snapEnabled, gridSize, selectedClip } = state;
     const isSelected = selectedClip === clip.id;
 
-    const [waveformData, setWaveformData] = useState<number[]>([]);
+    // Load waveform data using hook (200 samples for clip preview)
+    const { leftData: waveformData } = useWaveformData({
+        sampleId: clip.type === "audio" ? clip.audio_file_path : null,
+        clipDuration: clip.duration,
+        tempo,
+        samplesPerLoop: 200,
+    });
+
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null);
     const [dragStartX, setDragStartX] = useState(0);
@@ -90,55 +98,6 @@ export function SequencerClip({
     const displayDuration = dragState?.duration ?? clip.duration;
     const left = displayStartTime * pixelsPerBeat * zoom;
     const width = displayDuration * pixelsPerBeat * zoom;
-
-    // Load waveform data for audio clips
-    useEffect(() => {
-        if (clip.type === "audio" && clip.audio_file_path) {
-            loadWaveform(clip.audio_file_path);
-        }
-    }, [clip.type, clip.audio_file_path]);
-
-    const loadWaveform = async (sampleId: string) => {
-        try {
-            // Fetch audio file using sample ID
-            const url = `http://localhost:8000/api/samples/${sampleId}/download`;
-            const response = await fetch(url);
-
-            if (!response.ok) {
-                console.error(`Failed to fetch audio file: ${response.statusText}`);
-                return;
-            }
-
-            const arrayBuffer = await response.arrayBuffer();
-
-            // Decode audio
-            const audioContext = new AudioContext();
-            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            await audioContext.close();
-
-            // Extract waveform data (downsample to ~200 points)
-            const channelData = audioBuffer.getChannelData(0);
-            const samples = 200;
-            const blockSize = Math.floor(channelData.length / samples);
-            const waveform: number[] = [];
-
-            for (let i = 0; i < samples; i++) {
-                const start = i * blockSize;
-                const end = start + blockSize;
-                let sum = 0;
-                for (let j = start; j < end; j++) {
-                    sum += Math.abs(channelData[j]);
-                }
-                waveform.push(sum / blockSize);
-            }
-
-            setWaveformData(waveform);
-        } catch (error) {
-            console.error("Failed to load waveform:", error);
-        }
-    };
-
-
 
     // Drag and resize handlers
     const handleMouseDown = (e: React.MouseEvent, action: "move" | "resize-left" | "resize-right") => {

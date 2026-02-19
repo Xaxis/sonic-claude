@@ -95,7 +95,7 @@ export function SequencerSampleEditorSection({
                 </div>
             }
             mainContent={
-                <div className="relative flex-1 min-h-0">
+                <div className="relative w-full" style={{ minHeight: '400px', height: '100%' }}>
                     {/* Grid background with beat lines */}
                     <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
                         {/* Beat lines - use percentage for y coordinates to fill height */}
@@ -136,7 +136,7 @@ export function SequencerSampleEditorSection({
 
                     {/* Waveform overlay - positioned within clip region */}
                     <div
-                        className="absolute top-0 bottom-0"
+                        className="absolute top-0 bottom-0 w-full h-full"
                         style={{
                             left: `${clipStartTime * beatWidth}px`,
                             width: `${clipDuration * beatWidth}px`,
@@ -145,11 +145,11 @@ export function SequencerSampleEditorSection({
                         <WaveformDisplay
                             data={waveformData}
                             rightData={waveformDataRight}
-                            width={clipDuration * beatWidth}
                             color="hsl(220 15% 50%)"
                             backgroundColor="transparent"
                             showGrid={false}
                             glowEffect={false}
+                            className="w-full h-full"
                         />
                     </div>
 
