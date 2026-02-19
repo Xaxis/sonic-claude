@@ -42,17 +42,21 @@ class DAWStateService:
         self,
         sequencer_service: SequencerService,
         mixer_service: MixerService,
-        engine_manager: AudioEngineManager
+        engine_manager: AudioEngineManager,
+        audio_feature_extractor=None,
+        musical_context_analyzer=None
     ):
         self.sequencer = sequencer_service
         self.mixer = mixer_service
         self.engine = engine_manager
-        
+        self.audio_feature_extractor = audio_feature_extractor
+        self.musical_context_analyzer = musical_context_analyzer
+
         # Cache for change detection
         self._last_state_hash: Optional[str] = None
         self._last_snapshot: Optional[DAWStateSnapshot] = None
-        
-        # Audio analysis cache (updated from WebSocket data)
+
+        # Audio analysis cache (updated from real-time data)
         self._audio_features: Optional[AudioFeatures] = None
         self._musical_context: Optional[MusicalContext] = None
     
@@ -63,7 +67,18 @@ class DAWStateService:
     def update_musical_context(self, context: MusicalContext):
         """Update cached musical context (called when MIDI changes)"""
         self._musical_context = context
-    
+
+    def analyze_current_sequence(self) -> None:
+        """Analyze current sequence and update musical context (called on MIDI changes)"""
+        if not self.musical_context_analyzer:
+            return
+
+        if self.sequencer.current_sequence_id:
+            sequence = self.sequencer.sequences.get(self.sequencer.current_sequence_id)
+            if sequence:
+                context = self.musical_context_analyzer.analyze_sequence(sequence)
+                self.update_musical_context(context)
+
     def get_state(
         self,
         detail: StateDetailLevel = StateDetailLevel(),

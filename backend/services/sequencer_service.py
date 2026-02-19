@@ -91,6 +91,9 @@ class SequencerService:
         # Active MIDI notes (for visual feedback in piano roll)
         self.active_midi_notes: Dict[int, ActiveMIDINote] = {}
 
+        # Callback for MIDI content changes (for AI musical context analysis)
+        self.on_sequence_changed: Optional[callable] = None
+
         # Load sequences from disk
         self._load_sequences_from_disk()
 
@@ -723,6 +726,10 @@ class SequencerService:
         # Autosave sequence
         self.storage.autosave_sequence(sequence)
 
+        # Trigger musical context analysis (async, non-blocking)
+        if self.on_sequence_changed:
+            asyncio.create_task(asyncio.to_thread(self.on_sequence_changed))
+
         logger.info(f"✅ Added clip to sequence {sequence_id}: {clip.name}")
         return clip
 
@@ -764,9 +771,12 @@ class SequencerService:
         # Autosave sequence
         self.storage.autosave_sequence(sequence)
 
+        # Trigger musical context analysis (async, non-blocking)
+        if self.on_sequence_changed:
+            asyncio.create_task(asyncio.to_thread(self.on_sequence_changed))
+
         logger.info(f"✅ Updated clip {clip_id} in sequence {sequence_id}")
         return clip
-
 
     def delete_clip(self, sequence_id: str, clip_id: str) -> bool:
         """Delete a clip from a sequence and autosave"""
@@ -783,6 +793,10 @@ class SequencerService:
 
         # Autosave sequence
         self.storage.autosave_sequence(sequence)
+
+        # Trigger musical context analysis (async, non-blocking)
+        if self.on_sequence_changed:
+            asyncio.create_task(asyncio.to_thread(self.on_sequence_changed))
 
         logger.info(f"✅ Deleted clip {clip_id} from sequence {sequence_id}")
         return True

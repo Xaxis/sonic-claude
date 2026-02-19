@@ -21,6 +21,7 @@ Usage:
         return await synthesis_service.create_synth(...)
 """
 import logging
+import asyncio
 from typing import Optional
 from fastapi import Depends
 
@@ -143,7 +144,9 @@ async def initialize_services(settings: Settings) -> None:
         _daw_state_service = DAWStateService(
             sequencer_service=_sequencer_service,
             mixer_service=_mixer_service,
-            engine_manager=_engine_manager
+            engine_manager=_engine_manager,
+            audio_feature_extractor=_audio_feature_extractor,
+            musical_context_analyzer=_musical_context_analyzer
         )
 
         _daw_action_service = DAWActionService(
@@ -163,6 +166,36 @@ async def initialize_services(settings: Settings) -> None:
         # Configure AI settings
         _ai_agent_service.min_call_interval = settings.ai.min_call_interval
         _ai_agent_service.autonomous_interval = settings.ai.autonomous_interval
+
+        # Wire up audio feature extraction pipeline
+        # Hook into audio analyzer to extract features from spectrum/meter data
+        def _extract_and_update_features(spectrum_data):
+            """Extract features from spectrum data and update DAW state"""
+            try:
+                features = _audio_feature_extractor.extract_features(
+                    spectrum=spectrum_data.get("spectrum", []),
+                    peak_db=spectrum_data.get("peak_db"),
+                    rms_db=spectrum_data.get("rms_db"),
+                    is_playing=_sequencer_service.is_playing if _sequencer_service else False
+                )
+                _daw_state_service.update_audio_features(features)
+            except Exception as e:
+                logger.error(f"Error extracting audio features: {e}")
+
+        # Register feature extraction callback (runs after spectrum broadcast)
+        original_spectrum_callback = _audio_analyzer.on_spectrum_update
+        def _spectrum_with_features(data):
+            # First broadcast to WebSocket
+            if original_spectrum_callback:
+                asyncio.create_task(original_spectrum_callback(data))
+            # Then extract features for AI
+            _extract_and_update_features(data)
+
+        _audio_analyzer.on_spectrum_update = _spectrum_with_features
+
+        # Wire up musical context analysis
+        # Triggered automatically when MIDI content changes (add/update/delete clip)
+        _sequencer_service.on_sequence_changed = _daw_state_service.analyze_current_sequence
 
         logger.info("✅ AI services initialized")
     else:

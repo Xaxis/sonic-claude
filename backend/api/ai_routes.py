@@ -110,10 +110,10 @@ async def chat(
     """
     try:
         response = await ai_service.send_message(request.message)
-        
+
         return ChatResponse(
             response=response,
-            actions_executed=0  # TODO: Track executed actions
+            actions_executed=ai_service.last_actions_executed
         )
     
     except Exception as e:

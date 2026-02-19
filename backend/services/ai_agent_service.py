@@ -68,6 +68,9 @@ class AIAgentService:
         self.autonomous_mode = False
         self.autonomous_interval = 10.0  # Seconds between autonomous checks
         self._autonomous_task: Optional[asyncio.Task] = None
+
+        # Track last execution stats
+        self.last_actions_executed = 0
     
     async def send_message(self, user_message: str) -> str:
         """
@@ -139,7 +142,10 @@ class AIAgentService:
         # Update state hash
         if state_response.full_state:
             self.last_state_hash = state_response.full_state.state_hash
-        
+
+        # Store actions count for API response
+        self.last_actions_executed = len(actions_executed)
+
         return assistant_message
     
     async def analyze_and_suggest(self) -> Optional[List[ActionResult]]:

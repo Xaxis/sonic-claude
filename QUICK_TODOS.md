@@ -8,8 +8,8 @@
 
 - When we scroll the tracks on sequencer timeline (over the tracks header - that column) it doesnt vertically scroll the corresponding tracks in the timeline!
 
-- Sample Editor in the sequencer is now completely broken, no double waveform, no grid, at least not visible.
-
 - Work on/create beautiful "PERFORMANCE" tab and all associated brilliant integrated panels
 
 - Future feature: sequencer "inline sample editing" track. Add a track, record a clip directly to that track, save/edit/the sample inline
+
+- Whats up with data/mixer?! Shoulnd that state have been built into the sequences in our consistent pattern

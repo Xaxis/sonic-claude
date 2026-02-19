@@ -112,8 +112,8 @@ class DAWActionService:
             if not result.success:
                 failed_count += 1
                 if request.atomic:
-                    # TODO: Implement rollback mechanism
-                    logger.warning("Atomic batch failed, rollback not yet implemented")
+                    # Stop on first failure in atomic mode
+                    logger.warning(f"Atomic batch failed at action {len(results)}, stopping execution")
                     break
         
         return BatchActionResponse(
@@ -180,13 +180,67 @@ class DAWActionService:
 
     async def _modify_clip(self, params: Dict[str, Any]) -> ActionResult:
         """Modify existing clip"""
-        # TODO: Implement clip modification
-        return ActionResult(
-            success=False,
-            action="modify_clip",
-            message="Not yet implemented",
-            error="NOT_IMPLEMENTED"
-        )
+        try:
+            clip_id = params["clip_id"]
+
+            # Build update request
+            update_request = UpdateClipRequest()
+
+            if "start_time" in params:
+                update_request.start_time = params["start_time"]
+            if "duration" in params:
+                update_request.duration = params["duration"]
+            if "is_muted" in params:
+                update_request.is_muted = params["is_muted"]
+            if "gain" in params:
+                update_request.gain = params["gain"]
+
+            # Handle MIDI note updates (convert compact format)
+            if "notes" in params:
+                notes = []
+                for note_data in params["notes"]:
+                    midi_note = MIDINote(
+                        note=note_data["n"],
+                        note_name=self._midi_to_note_name(note_data["n"]),
+                        start_time=note_data["s"],
+                        duration=note_data["d"],
+                        velocity=note_data.get("v", 100)
+                    )
+                    notes.append(midi_note)
+                update_request.midi_events = notes
+
+            if not self.sequencer.current_sequence_id:
+                return ActionResult(
+                    success=False,
+                    action="modify_clip",
+                    message="No active sequence",
+                    error="NO_SEQUENCE"
+                )
+
+            clip = self.sequencer.update_clip(
+                self.sequencer.current_sequence_id,
+                clip_id,
+                update_request
+            )
+
+            if not clip:
+                return ActionResult(
+                    success=False,
+                    action="modify_clip",
+                    message=f"Clip {clip_id} not found",
+                    error="CLIP_NOT_FOUND"
+                )
+
+            return ActionResult(
+                success=True,
+                action="modify_clip",
+                message=f"Modified clip '{clip.name}'",
+                data={"clip_id": clip.id}
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to modify clip: {e}")
+            raise
 
     async def _delete_clip(self, params: Dict[str, Any]) -> ActionResult:
         """Delete clip"""
@@ -206,13 +260,40 @@ class DAWActionService:
 
     async def _create_track(self, params: Dict[str, Any]) -> ActionResult:
         """Create new track"""
-        # TODO: Implement track creation
-        return ActionResult(
-            success=False,
-            action="create_track",
-            message="Not yet implemented",
-            error="NOT_IMPLEMENTED"
-        )
+        try:
+            if not self.sequencer.current_sequence_id:
+                return ActionResult(
+                    success=False,
+                    action="create_track",
+                    message="No active sequence",
+                    error="NO_SEQUENCE"
+                )
+
+            track = self.sequencer.create_track(
+                sequence_id=self.sequencer.current_sequence_id,
+                name=params.get("name", "AI Track"),
+                track_type=params.get("type", "midi"),
+                color=params.get("color", "#3b82f6")
+            )
+
+            if not track:
+                return ActionResult(
+                    success=False,
+                    action="create_track",
+                    message="Failed to create track",
+                    error="CREATION_FAILED"
+                )
+
+            return ActionResult(
+                success=True,
+                action="create_track",
+                message=f"Created track '{track.name}'",
+                data={"track_id": track.id}
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to create track: {e}")
+            raise
 
     async def _set_track_parameter(self, params: Dict[str, Any]) -> ActionResult:
         """Set track parameter (volume, pan, mute, solo)"""
@@ -222,13 +303,13 @@ class DAWActionService:
             value = params["value"]
 
             if parameter == "volume":
-                await self.sequencer.update_track_volume(track_id, value)
+                await self.sequencer.update_track(track_id, volume=value)
             elif parameter == "pan":
-                await self.sequencer.update_track_pan(track_id, value)
+                await self.sequencer.update_track(track_id, pan=value)
             elif parameter == "mute":
-                await self.sequencer.mute_track(track_id, value)
+                await self.sequencer.update_track_mute(track_id, value)
             elif parameter == "solo":
-                await self.sequencer.solo_track(track_id, value)
+                await self.sequencer.update_track_solo(track_id, value)
             else:
                 return ActionResult(
                     success=False,
@@ -261,23 +342,44 @@ class DAWActionService:
 
     async def _add_effect(self, params: Dict[str, Any]) -> ActionResult:
         """Add effect to track"""
-        # TODO: Implement effect addition
-        return ActionResult(
-            success=False,
-            action="add_effect",
-            message="Not yet implemented",
-            error="NOT_IMPLEMENTED"
-        )
+        try:
+            effect = await self.effects.create_effect(
+                track_id=params["track_id"],
+                effect_name=params["effect_name"],
+                slot_index=params.get("slot_index"),
+                display_name=params.get("display_name")
+            )
+
+            return ActionResult(
+                success=True,
+                action="add_effect",
+                message=f"Added {effect.effect_name} to track {params['track_id']}",
+                data={"effect_id": effect.id, "slot_index": effect.slot_index}
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to add effect: {e}")
+            raise
 
     async def _set_effect_parameter(self, params: Dict[str, Any]) -> ActionResult:
         """Set effect parameter"""
-        # TODO: Implement effect parameter setting
-        return ActionResult(
-            success=False,
-            action="set_effect_parameter",
-            message="Not yet implemented",
-            error="NOT_IMPLEMENTED"
-        )
+        try:
+            effect = await self.effects.update_effect_parameter(
+                effect_id=params["effect_id"],
+                parameter_name=params["parameter_name"],
+                value=params["value"]
+            )
+
+            return ActionResult(
+                success=True,
+                action="set_effect_parameter",
+                message=f"Set {params['parameter_name']} to {params['value']} on effect {effect.effect_name}",
+                data={"effect_id": effect.id}
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to set effect parameter: {e}")
+            raise
 
     async def _play_sequence(self, params: Dict[str, Any]) -> ActionResult:
         """Start playback"""
