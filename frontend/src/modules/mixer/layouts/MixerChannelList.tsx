@@ -5,7 +5,7 @@
  * Uses MixerContext for state management
  */
 
-import { useMixerContext } from "../contexts/MixerContext.tsx";
+import { useMixerContext } from '@/contexts/MixerContext';
 import { MixerChannelStrip } from "../components/Channel/MixerChannelStrip.tsx";
 import { MixerMasterSection } from "../components/Master/MixerMasterSection.tsx";
 

@@ -2,28 +2,21 @@
  * App.tsx
  *
  * Main application component.
- *
- * Architecture:
- * - LayoutProvider manages all tabs, panels, and window state
- * - AudioEngineProvider wraps everything for global audio state
- * - Header is always visible
- * - TabbedWrapper manages tabs and their panels
- * - Each tab contains panels (draggable/resizable)
- * - Panels contain SubPanels for feature organization
- * - State syncs across all tabs/windows via BroadcastChannel
  */
 
 import { Header } from "@/components/layout/Header";
 import { TabbedWrapper } from "@/components/layout/TabbedWrapper";
 import { ActivityContainer } from "@/components/activity";
 import { useLayout } from "@/contexts/LayoutContext";
-import { useAudioEngine } from "@/contexts/AudioEngineContext";
+import { useDAWState } from "@/contexts/DAWStateContext";
+import { useSynthesis } from "@/contexts/SynthesisContext";
 import { DEFAULT_PANELS } from "@/config/layout.config";
 
 export default function App() {
     const { tabs, activeTab, setActiveTab, createTab, deleteTab, popoutTab } = useLayout();
 
-    const { isEngineRunning, engineStatus, activeSynths } = useAudioEngine();
+    const { isEngineRunning, engineStatus } = useDAWState();
+    const { activeSynths } = useSynthesis();
 
     return (
         <div className="bg-background flex h-screen w-screen flex-col overflow-hidden">
@@ -31,7 +24,7 @@ export default function App() {
             <Header
                 isEngineRunning={isEngineRunning}
                 cpuUsage={engineStatus?.cpu_usage || 0}
-                activeSynths={activeSynths.length}
+                activeSynths={Object.keys(activeSynths).length}
             />
 
             {/* Main Content - Tabbed Layout */}

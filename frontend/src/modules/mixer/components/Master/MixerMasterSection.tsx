@@ -10,7 +10,7 @@ import { Meter } from "@/components/ui/meter.tsx";
 import { Toggle } from "@/components/ui/toggle.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
-import { useMixerContext } from "../../contexts/MixerContext.tsx";
+import { useMixerContext } from '@/contexts/MixerContext';
 import { formatDb } from "@/lib/audio-utils";
 import type { MasterChannel } from "../../types.ts";
 

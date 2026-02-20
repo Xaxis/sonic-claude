@@ -12,7 +12,7 @@
 
 import { useState, useEffect } from "react";
 import { Save, FolderOpen, Plus, Trash2, History, RotateCcw, Clock, Edit2, Check, X as XIcon, HardDrive } from "lucide-react";
-import { apiConfig } from "@/config/api.config";
+import { api } from "@/services/api";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -28,7 +28,6 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog.tsx";
 import { cn } from "@/lib/utils.ts";
-import { audioEngineService } from "@/services/audio-engine/audio-engine.service.ts";
 import { toast } from "sonner";
 
 interface SequencerSequenceManagerProps {
@@ -84,7 +83,7 @@ export function SequencerSequenceManager({
 
     const loadSequences = async () => {
         try {
-            const seqs = await audioEngineService.getSequences();
+            const seqs = await api.sequencer.getSequences();
             setSequences(seqs as any[]);
         } catch (error) {
             console.error("Failed to load sequences:", error);
@@ -94,10 +93,7 @@ export function SequencerSequenceManager({
 
     const loadVersions = async (sequenceId: string) => {
         try {
-            const response = await fetch(
-                apiConfig.getURL(`/api/compositions/${sequenceId}/history`)
-            );
-            const data = await response.json();
+            const data = await api.compositions.listHistory(sequenceId);
             // Map history entries to version format
             const historyEntries = data.history || [];
             const mappedVersions = historyEntries.map((entry: any) => ({
@@ -119,7 +115,7 @@ export function SequencerSequenceManager({
 
         setIsLoading(true);
         try {
-            const sequence = await audioEngineService.createSequence({
+            const sequence = await api.sequencer.createSequence({
                 name: newSequenceName,
                 tempo: 120,
                 time_signature: "4/4",
@@ -145,29 +141,16 @@ export function SequencerSequenceManager({
         setIsLoading(true);
         try {
             console.log("💾 Saving composition:", currentSequenceId, "createVersion:", createVersion);
-            const response = await fetch(
-                apiConfig.getURL("/api/compositions/save"),
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        sequence_id: currentSequenceId,
-                        create_history: createVersion,
-                        is_autosave: false,
-                        metadata: {
-                            source: "manual_save",
-                            timestamp: new Date().toISOString()
-                        }
-                    })
+            const data = await api.compositions.save({
+                sequence_id: currentSequenceId,
+                create_history: createVersion,
+                is_autosave: false,
+                metadata: {
+                    source: "manual_save",
+                    timestamp: new Date().toISOString()
                 }
-            );
-
-            const data = await response.json();
+            });
             console.log("💾 Save response:", data);
-
-            if (!response.ok) {
-                throw new Error(data.detail || "Failed to save composition");
-            }
 
             if (createVersion) {
                 toast.success("Composition saved with new version");
@@ -191,7 +174,7 @@ export function SequencerSequenceManager({
 
         setIsLoading(true);
         try {
-            await audioEngineService.updateSequence(sequenceId, { name: newName });
+            await api.sequencer.updateSequence(sequenceId, { name: newName });
             toast.success("Sequence renamed");
             await loadSequences();
             setEditingSequenceId(null);
@@ -228,11 +211,7 @@ export function SequencerSequenceManager({
 
         setIsLoading(true);
         try {
-            const response = await fetch(
-                apiConfig.getURL(`/api/compositions/${currentSequenceId}/history/${versionToRestore}/restore`),
-                { method: "POST" }
-            );
-            const data = await response.json();
+            await api.compositions.restoreVersion(currentSequenceId, versionToRestore);
             toast.success(`Restored composition to version ${versionToRestore}`);
             await loadVersions(currentSequenceId);
             window.location.reload(); // Reload to refresh all composition data (sequence + mixer + effects)
@@ -251,11 +230,7 @@ export function SequencerSequenceManager({
 
         setIsLoading(true);
         try {
-            const response = await fetch(
-                apiConfig.getURL(`/api/compositions/${currentSequenceId}/recover`),
-                { method: "POST" }
-            );
-            const data = await response.json();
+            await api.compositions.recoverFromAutosave(currentSequenceId);
             toast.success("Recovered composition from autosave");
             window.location.reload(); // Reload to refresh all composition data (sequence + mixer + effects)
         } catch (error) {

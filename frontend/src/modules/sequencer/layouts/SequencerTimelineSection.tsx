@@ -14,7 +14,7 @@ import React, { useState } from "react";
 import { SequencerTracks } from "../components/Tracks/SequencerTracks.tsx";
 import { SequencerTimeline } from "../components/Timeline/SequencerTimeline.tsx";
 import { SequencerTimelineRuler } from "../components/Timeline/SequencerTimelineRuler.tsx";
-import { useSequencerContext } from "../contexts/SequencerContext.tsx";
+import { useSequencerContext } from '@/contexts/SequencerContext';
 import { useTimelineCalculations } from "../hooks/useTimelineCalculations.ts";
 import { EditorGridLayout } from "@/components/layout/EditorGridLayout.tsx";
 import type { SequencerTrack, Clip } from "@/types/sequencer";

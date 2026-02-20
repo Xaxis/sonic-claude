@@ -5,7 +5,7 @@
  * Used by both SequencerTimeline and SequencerTimelineSection to ensure consistency.
  */
 
-import { useSequencerContext } from "../contexts/SequencerContext.tsx";
+import { useSequencerContext } from '@/contexts/SequencerContext';
 
 export function useTimelineCalculations() {
     const { state, clips } = useSequencerContext();

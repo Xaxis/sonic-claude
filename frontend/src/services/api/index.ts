@@ -8,7 +8,6 @@
  * - CONTEXTS: React state management that calls services
  */
 
-import { AudioEngineService } from "../audio-engine/audio-engine.service";
 import { SampleService } from "../samples/samples.service";
 import { AudioInputService } from "../audio-input/audio-input.service";
 import {
@@ -48,8 +47,7 @@ import {
  *   const samples = await api.samples.getAll();
  *   await api.samples.upload(file, "Kick", "Drums");
  *
- *   // Audio (legacy - kept for backward compatibility)
- *   const synths = await api.audioEngine.getSynthDefs();
+ *   // Audio Input (legacy - kept for backward compatibility)
  *   await api.audioInput.setInputDevice(0, 1.0);
  */
 export class APIClient {
@@ -63,7 +61,6 @@ export class APIClient {
     public samples: SamplesProvider;
 
     // === LEGACY SERVICES (kept for backward compatibility) ===
-    public audioEngine: AudioEngineService;
     public audioInput: AudioInputService;
     public samplesLegacy: SampleService;
 
@@ -78,7 +75,6 @@ export class APIClient {
         this.samples = new SamplesProvider(baseURL);
 
         // Legacy services (to be refactored)
-        this.audioEngine = new AudioEngineService(baseURL);
         this.audioInput = new AudioInputService(baseURL);
         this.samplesLegacy = new SampleService(baseURL);
     }
@@ -91,7 +87,6 @@ export const api = new APIClient();
 export * from "./providers";
 
 // Export legacy services for backward compatibility
-export { AudioEngineService } from "../audio-engine/audio-engine.service";
 export { SampleService } from "../samples/samples.service";
 export { AudioInputService } from "../audio-input/audio-input.service";
 

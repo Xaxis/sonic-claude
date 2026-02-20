@@ -1,6 +1,7 @@
 /**
  * Settings Context
  * Global application settings and preferences
+ * @TODO - This is broken bullshit and needs to be refactored/removed
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";

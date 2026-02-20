@@ -15,7 +15,7 @@ import { SequencerTimelineGrid } from "./SequencerTimelineGrid.tsx";
 import { SequencerTimelineLoopRegion } from "./SequencerTimelineLoopRegion.tsx";
 import { SequencerTimelinePlayhead } from "./SequencerTimelinePlayhead.tsx";
 import { SequencerTimelineTrackRow } from "./SequencerTimelineTrackRow.tsx";
-import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
+import { useSequencerContext } from '@/contexts/SequencerContext';
 import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
 
 interface SequencerTimelineProps {

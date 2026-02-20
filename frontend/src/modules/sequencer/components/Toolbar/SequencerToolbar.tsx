@@ -16,7 +16,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select.tsx";
-import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
+import { useSequencerContext } from '@/contexts/SequencerContext';
 import type { Sequence } from "../../types.ts";
 
 interface SequencerToolbarProps {

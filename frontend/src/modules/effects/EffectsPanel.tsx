@@ -14,17 +14,16 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
-import { useAudioEngine } from "@/contexts/AudioEngineContext.tsx";
+import { useSequencer } from "@/contexts/SequencerContext";
 import { useEffectsState } from "./hooks/useEffectsState";
 import { useEffectsHandlers } from "./hooks/useEffectsHandlers";
-import { EffectsProvider } from "./contexts/EffectsContext";
 import { EffectsChannelList } from "./layouts/EffectsChannelList";
 import { api } from "@/services/api";
 import type { TrackEffectChain, EffectDefinition } from "@/services/api/providers";
 
 export function EffectsPanel() {
-    // Get sequencer tracks from AudioEngine context
-    const { sequencerTracks, activeSequenceId, loadSequencerTracks } = useAudioEngine();
+    // Get sequencer tracks from Sequencer context
+    const { tracks: sequencerTracks, activeSequenceId, loadTracks: loadSequencerTracks } = useSequencer();
 
     // UI State
     const { state, actions } = useEffectsState();
@@ -112,15 +111,7 @@ export function EffectsPanel() {
     });
 
     return (
-        <EffectsProvider
-            state={state}
-            actions={actions}
-            tracks={sequencerTracks || []}
-            effectChains={effectChains}
-            effectDefinitions={effectDefinitions}
-            handlers={handlers}
-        >
-            <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
+        <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
                 {/* Effects Content - Flexible, takes all space */}
                 <div className="flex-1 min-h-0 flex flex-col">
                     <SubPanel title="EFFECTS" showHeader={false} contentOverflow="hidden">
@@ -131,6 +122,5 @@ export function EffectsPanel() {
                     </SubPanel>
                 </div>
             </div>
-        </EffectsProvider>
     );
 }

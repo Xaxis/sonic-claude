@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider.tsx";
 import { cn } from "@/lib/utils.ts";
 import type { MIDIEvent, SequencerClip } from "../../types.ts";
 import { WaveformDisplay } from "../Shared/WaveformDisplay.tsx";
-import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
+import { useSequencerContext } from '@/contexts/SequencerContext';
 import { useWaveformData } from "../../hooks/useWaveformData.ts";
 
 interface SequencerClipProps {

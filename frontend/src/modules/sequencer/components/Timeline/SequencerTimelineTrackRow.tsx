@@ -9,7 +9,7 @@
 import { useRef } from "react";
 import { SequencerClip } from "../Clips/SequencerClip.tsx";
 import { cn } from "@/lib/utils.ts";
-import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
+import { useSequencerContext } from '@/contexts/SequencerContext';
 
 interface Clip {
     id: string;

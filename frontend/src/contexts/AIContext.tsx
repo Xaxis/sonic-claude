@@ -1,7 +1,6 @@
 /**
- * AI Engine Context
+ * AI Context
  * Global state management for AI module (chat history, analysis events, DAW state)
- * Follows the same pattern as AudioEngineContext
  */
 
 import {
@@ -13,7 +12,7 @@ import {
 } from "react";
 import type { ChatMessage, AnalysisEvent, DAWStateSnapshot } from "@/modules/ai/types";
 
-interface AIEngineState {
+interface AIEState {
     // Chat state
     chatHistory: ChatMessage[];
     
@@ -27,7 +26,7 @@ interface AIEngineState {
     aiContext: string | null;
 }
 
-interface AIEngineContextValue extends AIEngineState {
+interface AIContextValue extends AIEState {
     // Chat actions
     addChatMessage: (message: ChatMessage) => void;
     clearChatHistory: () => void;
@@ -43,9 +42,9 @@ interface AIEngineContextValue extends AIEngineState {
     setAIContext: (context: string | null) => void;
 }
 
-const AIEngineContext = createContext<AIEngineContextValue | undefined>(undefined);
+const AIContext = createContext<AIContextValue | undefined>(undefined);
 
-export function AIEngineProvider({ children }: { children: ReactNode }) {
+export function AIProvider({ children }: { children: ReactNode }) {
     // Chat state
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
     
@@ -76,7 +75,7 @@ export function AIEngineProvider({ children }: { children: ReactNode }) {
         setAnalysisEvents([]);
     }, []);
     
-    const value: AIEngineContextValue = {
+    const value: AIContextValue = {
         // State
         chatHistory,
         analysisEvents,
@@ -93,14 +92,14 @@ export function AIEngineProvider({ children }: { children: ReactNode }) {
     };
     
     return (
-        <AIEngineContext.Provider value={value}>
+        <AIContext.Provider value={value}>
             {children}
-        </AIEngineContext.Provider>
+        </AIContext.Provider>
     );
 }
 
-export function useAIEngine() {
-    const context = useContext(AIEngineContext);
+export function useAI() {
+    const context = useContext(AIContext);
     if (context === undefined) {
         throw new Error("useAIEngine must be used within an AIEngineProvider");
     }

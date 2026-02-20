@@ -22,7 +22,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select.tsx";
-import { audioEngineService } from "@/services/audio-engine/audio-engine.service.ts";
+import { api } from "@/services/api";
 import type { SynthDefInfo } from "../../types.ts";
 
 interface SequencerInstrumentSelectorProps {
@@ -46,7 +46,7 @@ export function SequencerInstrumentSelector({
         const loadSynthDefs = async () => {
             try {
                 setIsLoading(true);
-                const defs = await audioEngineService.getSequencerSynthDefs();
+                const defs = await api.sequencer.getSynthDefs();
                 setSynthDefs(defs);
             } catch (error) {
                 console.error("Failed to load SynthDefs:", error);

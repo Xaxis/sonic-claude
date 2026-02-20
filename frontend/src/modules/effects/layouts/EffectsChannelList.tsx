@@ -6,7 +6,7 @@
  * Follows the exact pattern from MixerChannelList.
  */
 
-import { useEffectsContext } from "../contexts/EffectsContext";
+import { useEffectsContext } from '@/contexts/EffectsContext';
 import { EffectsChannelStrip } from "../components/Channel/EffectsChannelStrip";
 import { EffectsMasterSection } from "../components/Master/EffectsMasterSection";
 

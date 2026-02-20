@@ -10,6 +10,9 @@
  * - Cross-tab visibility (works with x-ray mode)
  * - Activity history and state persistence
  * - Multi-window synchronization
+ *
+ *
+ * @TODO - Should this best be implemented in the AIContext or not? Research
  */
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";

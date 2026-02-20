@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
+import { useSequencerContext } from '@/contexts/SequencerContext';
 
 interface SequencerTimelinePlayheadProps {
     pixelsPerBeat: number;

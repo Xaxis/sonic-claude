@@ -13,7 +13,7 @@ import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { useEffect, useRef, useState, useMemo } from "react";
-import { useAudioEngine } from "@/contexts/AudioEngineContext.tsx";
+import { useSpectrum, useWaveform } from "@/contexts/TelemetryContext";
 import { Activity, Waves, BarChart3, AlertTriangle } from "lucide-react";
 import { WaveformDisplay } from "../sequencer/components/Shared/WaveformDisplay.tsx";
 
@@ -38,7 +38,8 @@ interface AudioStats {
 }
 
 export function LoopVisualizerPanel() {
-    const { spectrum, waveform } = useAudioEngine();
+    const spectrum = useSpectrum();
+    const waveform = useWaveform();
     const spectrumCanvasRef = useRef<HTMLCanvasElement>(null);
     const [stats, setStats] = useState<AudioStats>({
         peakFrequency: 0,

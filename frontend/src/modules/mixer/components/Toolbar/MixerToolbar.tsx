@@ -15,7 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select.tsx";
-import { useMixerContext } from "../../contexts/MixerContext.tsx";
+import { useMixerContext } from '@/contexts/MixerContext';
 import { Badge } from "@/components/ui/badge.tsx";
 
 export function MixerToolbar() {

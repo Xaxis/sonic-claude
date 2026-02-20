@@ -43,7 +43,12 @@ export function SequencerPianoRollKeyboard({
         setTimeout(() => setActiveKey(null), 300);
 
         try {
-            await api.audioEngine.previewNote(pitch, 100, 0.5, instrument);
+            await api.sequencer.previewNote({
+                note: pitch,
+                velocity: 100,
+                duration: 0.5,
+                synthdef: instrument
+            });
         } catch (error) {
             console.error("Failed to preview note:", error);
         }

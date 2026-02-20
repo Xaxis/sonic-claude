@@ -10,7 +10,8 @@ import { useSearchParams } from "react-router-dom";
 import { PanelGrid } from "./PanelGrid";
 import { Header } from "./Header";
 import { useLayout } from "@/contexts/LayoutContext";
-import { useAudioEngine } from "@/contexts/AudioEngineContext";
+import { useDAWState } from "@/contexts/DAWStateContext";
+import { useSynthesis } from "@/contexts/SynthesisContext";
 import { DEFAULT_PANELS } from "@/config/layout.config";
 import { BROADCAST_KEYS } from "@/config/layout.config";
 
@@ -20,7 +21,8 @@ export function PopoutWindow() {
     const panelIdsParam = searchParams.get("panels");
 
     const { tabs, updateTabLayout, closePopout, popoutTab } = useLayout();
-    const { isEngineRunning, engineStatus, activeSynths } = useAudioEngine();
+    const { isEngineRunning, engineStatus } = useDAWState();
+    const { activeSynths } = useSynthesis();
 
     // Parse panel IDs from URL
     const panelIds = panelIdsParam ? panelIdsParam.split(",") : [];
@@ -94,7 +96,7 @@ export function PopoutWindow() {
             <Header
                 isEngineRunning={isEngineRunning}
                 cpuUsage={engineStatus?.cpu_usage || 0}
-                activeSynths={activeSynths.length}
+                activeSynths={Object.keys(activeSynths).length}
             />
 
             {/* Panel Grid */}

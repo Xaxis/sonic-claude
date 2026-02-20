@@ -14,7 +14,7 @@
 
 import { useCallback } from "react";
 import { toast } from "sonner";
-import { audioEngineService } from "@/services/audio-engine/audio-engine.service.ts";
+import { api } from "@/services/api";
 import type { SampleMetadata } from "@/services/sampleApi.ts";
 import type { MIDIEvent, AddClipRequest } from "../types.ts";
 import type { SequencerTrack, Clip } from "@/types/sequencer";
@@ -135,7 +135,7 @@ export function useSequencerHandlers(props: UseSequencerHandlersProps) {
 
         if (activeSequenceId) {
             try {
-                await audioEngineService.seek({ position: 0 });
+                await api.sequencer.seek({ position: 0 });
             } catch (error) {
                 console.error("Failed to seek to start:", error);
             }
@@ -159,7 +159,7 @@ export function useSequencerHandlers(props: UseSequencerHandlersProps) {
 
         if (activeSequenceId && activeSequence) {
             try {
-                await audioEngineService.updateSequence(activeSequenceId, {
+                await api.sequencer.updateSequence(activeSequenceId, {
                     loop_enabled: newLoopState,
                     loop_start: state.loopStart,
                     loop_end: state.loopEnd,
@@ -177,7 +177,7 @@ export function useSequencerHandlers(props: UseSequencerHandlersProps) {
         if (!activeSequenceId) return;
 
         try {
-            await audioEngineService.seek({ position, trigger_audio: triggerAudio });
+            await api.sequencer.seek({ position, trigger_audio: triggerAudio });
         } catch (error) {
             console.error("Failed to seek:", error);
             toast.error("Failed to seek to position");

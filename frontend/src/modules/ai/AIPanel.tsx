@@ -16,8 +16,10 @@ import { ChatLayout } from "./layouts/ChatLayout";
 import { AnalysisLayout } from "./layouts/AnalysisLayout";
 import { StateLayout } from "./layouts/StateLayout";
 import { api } from "@/services/api";
-import { useAIEngine } from "@/contexts/AIEngineContext";
-import { useAudioEngine } from "@/contexts/AudioEngineContext";
+import { useAI } from "@/contexts/AIContext.tsx";
+import { useSequencer } from "@/contexts/SequencerContext";
+import { useMixer } from "@/contexts/MixerContext";
+import { useEffects } from "@/contexts/EffectsContext";
 
 export function AIPanel() {
     // UI State
@@ -33,16 +35,12 @@ export function AIPanel() {
         setDawState,
         aiContext,
         setAIContext,
-    } = useAIEngine();
+    } = useAI();
 
-    // Audio Engine Context (for reloading ALL UI after AI actions)
-    const {
-        activeSequenceId,
-        loadSequencerTracks,
-        loadSequences,
-        loadTracks,
-        loadEffectDefs,
-    } = useAudioEngine();
+    // Domain contexts (for reloading ALL UI after AI actions)
+    const { activeSequenceId, loadTracks: loadSequencerTracks, loadSequences } = useSequencer();
+    const { loadChannels: loadTracks } = useMixer();
+    const { loadEffectDefinitions: loadEffectDefs } = useEffects();
 
     // Event handlers
     const handlers = useAIHandlers({

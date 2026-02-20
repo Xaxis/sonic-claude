@@ -8,25 +8,24 @@
 
 import { useEffect } from "react";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
-import { useAudioEngine } from "@/contexts/AudioEngineContext.tsx";
+import { useSequencer } from "@/contexts/SequencerContext";
 import { useMixerState } from "./hooks/useMixerState";
 import { useMixerHandlers } from "./hooks/useMixerHandlers";
-import { MixerProvider } from "./contexts/MixerContext";
 import { MixerToolbar } from "./components/Toolbar/MixerToolbar";
 import { MixerChannelList } from "./layouts/MixerChannelList";
 import { api } from "@/services/api";
 import { useMeterWebSocket } from "@/hooks/useMeterWebsocket";
 
 export function MixerPanel() {
-    // Get sequencer tracks from AudioEngine context
+    // Get sequencer tracks from Sequencer context
     const {
-        sequencerTracks,
+        tracks: sequencerTracks,
         activeSequenceId,
-        loadSequencerTracks,
-        updateSequencerTrack,
-        muteSequencerTrack,
-        soloSequencerTrack,
-    } = useAudioEngine();
+        loadTracks: loadSequencerTracks,
+        updateTrack: updateSequencerTrack,
+        muteTrack: muteSequencerTrack,
+        soloTrack: soloSequencerTrack,
+    } = useSequencer();
 
     // UI State
     const { state, actions } = useMixerState();
@@ -66,15 +65,7 @@ export function MixerPanel() {
     });
 
     return (
-        <MixerProvider
-            state={state}
-            actions={actions}
-            tracks={sequencerTracks || []}
-            master={state.master}
-            handlers={handlers}
-            meters={meters}
-        >
-            <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
+        <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
                 {/* Mixer Content - Flexible, takes all space */}
                 <div className="flex-1 min-h-0 flex flex-col">
                     <SubPanel title="MIXER" showHeader={false} contentOverflow="hidden">
@@ -90,7 +81,6 @@ export function MixerPanel() {
                     </SubPanel>
                 </div>
             </div>
-        </MixerProvider>
     );
 }
 

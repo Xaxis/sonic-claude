@@ -1,18 +1,33 @@
 /**
  * Composition Context
  * Manages composition persistence, autosave, and change tracking
- * 
+ *
+ * WHAT IS A COMPOSITION:
+ * A composition is the COMPLETE state of the DAW for a given sequence:
+ * - Sequence (tracks, clips, tempo, time signature, loop settings)
+ * - Mixer state (all channels, volumes, pans, mutes, solos, master)
+ * - Effects (all track effect chains with parameters)
+ * - Sample assignments
+ * - Chat history (AI conversations)
+ *
  * Responsibilities:
- * - Track changes to composition (any action that modifies sequence/mixer/effects)
+ * - Track changes to composition (any action that modifies sequence/mixer/effects/chat)
  * - Autosave compositions at regular intervals
  * - Manual save with version history
  * - Persist to backend composition API
+ *
+ * ARCHITECTURE:
+ * - The backend gathers state from all its services (sequencer, mixer, effects)
+ * - Frontend just needs to call api.compositions.save() with sequence_id
+ * - Backend creates CompositionSnapshot with ALL state
+ * - This context only manages the save/autosave logic, not the state itself
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from "react";
 import { toast } from "sonner";
-import { apiConfig } from "@/config/api.config";
-import { setCompositionChangeCallback } from "./AudioEngineContext";
+import { api } from "@/services/api";
+import { setCompositionChangeCallback } from "./DAWStateContext";
+import { useSequencer } from "./SequencerContext";
 
 interface CompositionState {
     hasUnsavedChanges: boolean;
@@ -24,10 +39,10 @@ interface CompositionState {
 interface CompositionContextValue extends CompositionState {
     // Mark composition as changed (call this after ANY action)
     markChanged: () => void;
-    
+
     // Manual save
     saveComposition: (createVersion?: boolean) => Promise<void>;
-    
+
     // Autosave control
     enableAutosave: () => void;
     disableAutosave: () => void;
@@ -38,15 +53,15 @@ const CompositionContext = createContext<CompositionContextValue | undefined>(un
 
 interface CompositionProviderProps {
     children: ReactNode;
-    sequenceId: string | null;
     autosaveIntervalSeconds?: number;
 }
 
 export function CompositionProvider({
     children,
-    sequenceId,
     autosaveIntervalSeconds = 60, // Default: 1 minute
 }: CompositionProviderProps) {
+    // Get active sequence ID from SequencerContext
+    const { activeSequenceId: sequenceId } = useSequencer();
     const [state, setState] = useState<CompositionState>({
         hasUnsavedChanges: false,
         lastSaveTime: null,
@@ -84,28 +99,15 @@ export function CompositionProvider({
 
         try {
             console.log("💾 Saving composition:", sequenceId, "createVersion:", createVersion);
-            const response = await fetch(
-                apiConfig.getURL("/api/compositions/save"),
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        sequence_id: sequenceId,
-                        create_history: createVersion,
-                        is_autosave: false,
-                        metadata: {
-                            source: "manual_save",
-                            timestamp: new Date().toISOString()
-                        }
-                    })
+            await api.compositions.save({
+                sequence_id: sequenceId,
+                create_history: createVersion,
+                is_autosave: false,
+                metadata: {
+                    source: "manual_save",
+                    timestamp: new Date().toISOString()
                 }
-            );
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.detail || "Failed to save composition");
-            }
+            });
 
             setState(prev => ({
                 ...prev,
@@ -144,28 +146,15 @@ export function CompositionProvider({
         console.log("💾 Autosaving composition:", sequenceId);
 
         try {
-            const response = await fetch(
-                apiConfig.getURL("/api/compositions/save"),
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        sequence_id: sequenceId,
-                        create_history: false,
-                        is_autosave: true,
-                        metadata: {
-                            source: "autosave",
-                            timestamp: new Date().toISOString()
-                        }
-                    })
+            await api.compositions.save({
+                sequence_id: sequenceId,
+                create_history: false,
+                is_autosave: true,
+                metadata: {
+                    source: "autosave",
+                    timestamp: new Date().toISOString()
                 }
-            );
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.detail || "Autosave failed");
-            }
+            });
 
             setState(prev => ({
                 ...prev,

@@ -8,7 +8,7 @@
 import { Fader } from "@/components/ui/fader.tsx";
 import { Knob } from "@/components/ui/knob.tsx";
 import { Meter } from "@/components/ui/meter.tsx";
-import { useMixerContext } from "../../contexts/MixerContext.tsx";
+import { useMixerContext } from '@/contexts/MixerContext';
 import { MixerButton } from "./MixerButton.tsx";
 import { volumeToDb, dbToVolume, formatDb } from "@/lib/audio-utils";
 import type { SequencerTrack } from "@/modules/sequencer/types";

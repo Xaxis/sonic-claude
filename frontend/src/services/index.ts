@@ -8,7 +8,6 @@ export { api, APIClient } from "./api";
 export { BaseAPIClient, APIError } from "./api/base";
 
 // === SERVICES (Business Logic Layer) ===
-export { AudioEngineService, audioEngineService } from "./audio-engine";
 export { windowManager } from "./window-manager";
 export { statePersistence } from "./state-persistence";
 

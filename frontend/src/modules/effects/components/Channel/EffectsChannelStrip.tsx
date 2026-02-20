@@ -14,7 +14,7 @@
  */
 
 import { useState } from "react";
-import { useEffectsContext } from "../../contexts/EffectsContext";
+import { useEffectsContext } from '@/contexts/EffectsContext';
 import { EffectSlot } from "./EffectSlot";
 import { EffectSelector } from "./EffectSelector";
 import type { SequencerTrack } from "@/modules/sequencer/types";

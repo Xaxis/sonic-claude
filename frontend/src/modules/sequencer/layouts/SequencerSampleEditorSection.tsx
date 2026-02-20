@@ -16,7 +16,7 @@ import React from "react";
 import { SampleEditorRuler } from "../components/SampleEditor/SampleEditorRuler.tsx";
 import { WaveformDisplay } from "../components/Shared/WaveformDisplay.tsx";
 import { SequencerTimelineLoopRegion } from "../components/Timeline/SequencerTimelineLoopRegion.tsx";
-import { useSequencerContext } from "../contexts/SequencerContext.tsx";
+import { useSequencerContext } from '@/contexts/SequencerContext';
 import { EditorGridLayout } from "@/components/layout/EditorGridLayout.tsx";
 
 interface SequencerSampleEditorSectionProps {

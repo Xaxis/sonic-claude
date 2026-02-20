@@ -7,7 +7,7 @@
  */
 
 import { useState } from "react";
-import { useEffectsContext } from "../../contexts/EffectsContext";
+import { useEffectsContext } from '@/contexts/EffectsContext';
 import { EffectSlot } from "../Channel/EffectSlot";
 import { EffectSelector } from "../Channel/EffectSelector";
 

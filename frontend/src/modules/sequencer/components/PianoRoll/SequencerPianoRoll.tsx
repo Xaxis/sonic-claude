@@ -10,7 +10,7 @@ import { X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { SequencerPianoRollSection } from "../../layouts/SequencerPianoRollSection.tsx";
-import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
+import { useSequencerContext } from '@/contexts/SequencerContext';
 import type { MIDIEvent } from "../../types.ts";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 import { api } from "@/services/api";
@@ -90,7 +90,12 @@ export function SequencerPianoRoll({
 
         // Preview the note
         try {
-            await api.audioEngine.previewNote(pitch, 100, 0.5, instrument || "sine");
+            await api.sequencer.previewNote({
+                note: pitch,
+                velocity: 100,
+                duration: 0.5,
+                synthdef: instrument || "sine"
+            });
         } catch (error) {
             console.error("Failed to preview note:", error);
         }
@@ -110,7 +115,12 @@ export function SequencerPianoRoll({
         // Preview the note only if pitch changed
         if (newPitch !== oldPitch) {
             try {
-                await api.audioEngine.previewNote(newPitch, updatedNotes[index].velocity, 0.5, instrument || "sine");
+                await api.sequencer.previewNote({
+                    note: newPitch,
+                    velocity: updatedNotes[index].velocity,
+                    duration: 0.5,
+                    synthdef: instrument || "sine"
+                });
             } catch (error) {
                 console.error("Failed to preview note:", error);
             }

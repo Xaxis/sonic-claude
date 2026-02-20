@@ -10,7 +10,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import { SequencerTimelineSection } from "./SequencerTimelineSection.tsx";
 import { PianoRollWrapper } from "./PianoRollWrapper.tsx";
 import { SampleEditorWrapper } from "./SampleEditorWrapper.tsx";
-import { useSequencerContext } from "../contexts/SequencerContext.tsx";
+import { useSequencerContext } from '@/contexts/SequencerContext';
 import { statePersistence } from "@/services/state-persistence/state-persistence.service";
 import type { MIDIEvent } from "../types.ts";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";

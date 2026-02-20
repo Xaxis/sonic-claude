@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { SequencerSampleEditorSection } from "../../layouts/SequencerSampleEditorSection.tsx";
-import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
+import { useSequencerContext } from '@/contexts/SequencerContext';
 import { useWaveformData } from "../../hooks/useWaveformData.ts";
 
 interface SequencerSampleEditorProps {

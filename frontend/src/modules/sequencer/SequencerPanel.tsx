@@ -6,14 +6,13 @@
  */
 
 import { useEffect } from "react";
-import { useAudioEngine } from "@/contexts/AudioEngineContext.tsx";
+import { useSequencer } from '@/contexts/SequencerContext';
 import { useTransportWebSocket } from "@/hooks/useTransportWebsocket.ts";
 import { useSequencerState } from "./hooks/useSequencerState.ts";
 import { useSequencerHandlers } from "./hooks/useSequencerHandlers.ts";
 import { useSequencerClipHandlers } from "./hooks/useSequencerClipHandlers.ts";
 import { useSequencerKeyboard } from "./hooks/useSequencerKeyboard.ts";
 import { useSequencerScroll } from "./hooks/useSequencerScroll.ts";
-import { SequencerProvider } from "./contexts/SequencerContext.tsx";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { SequencerSampleBrowser } from "./components/Dialogs/SequencerSampleBrowser.tsx";
 import { SequencerSequenceManager } from "./components/Dialogs/SequencerSequenceManager.tsx";
@@ -24,28 +23,28 @@ import { SequencerTransport } from "./components/Transport/SequencerTransport.ts
 import { SequencerToolbar } from "./components/Toolbar/SequencerToolbar.tsx";
 import { SequencerTimelineSection } from "./layouts/SequencerTimelineSection.tsx";
 import { SequencerSplitLayout } from "./layouts/SequencerSplitLayout.tsx";
-import { audioEngineService } from "@/services/audio-engine/audio-engine.service.ts";
+import { api } from "@/services/api";
 import { toast } from "sonner";
 
 export function SequencerPanel() {
-    // Audio Engine Context
+    // Sequencer Context
     const {
         sequences,
         activeSequenceId,
-        sequencerTracks,
+        tracks: sequencerTracks,
         isPlaying,
         tempo,
         metronomeEnabled,
         loadSequences,
         createSequence,
         deleteSequence,
-        loadSequencerTracks,
-        createSequencerTrack,
-        deleteSequencerTrack,
-        renameSequencerTrack,
-        updateSequencerTrack,
-        muteSequencerTrack,
-        soloSequencerTrack,
+        loadTracks: loadSequencerTracks,
+        createTrack: createSequencerTrack,
+        deleteTrack: deleteSequencerTrack,
+        renameTrack: renameSequencerTrack,
+        updateTrack: updateSequencerTrack,
+        muteTrack: muteSequencerTrack,
+        soloTrack: soloSequencerTrack,
         playSequence,
         stopPlayback,
         pausePlayback,
@@ -191,7 +190,7 @@ export function SequencerPanel() {
 
         const timeoutId = setTimeout(async () => {
             try {
-                await audioEngineService.updateSequence(activeSequenceId, {
+                await api.sequencer.updateSequence(activeSequenceId, {
                     zoom: state.zoom,
                     snap_enabled: state.snapEnabled,
                     grid_size: state.gridSize,
@@ -258,18 +257,7 @@ export function SequencerPanel() {
     const hasNoSequences = sequences.length === 0;
 
     return (
-        <SequencerProvider
-            state={state}
-            actions={actions}
-            sequences={sequences}
-            activeSequenceId={activeSequenceId}
-            tracks={tracks}
-            clips={clips}
-            currentPosition={currentPosition}
-            isPlaying={isPlaying ?? false}
-            tempo={tempo}
-        >
-            <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
+        <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
             {/* Transport Controls - Fixed height, never shrinks */}
             <div className="flex-shrink-0">
                 <SubPanel title="TRANSPORT" showHeader={false}>
@@ -376,7 +364,7 @@ export function SequencerPanel() {
                     onSave={async (settings) => {
                         try {
                             // Update sequence settings via API
-                            await audioEngineService.updateSequence(activeSequence.id, {
+                            await api.sequencer.updateSequence(activeSequence.id, {
                                 name: settings.name,
                                 tempo: settings.tempo,
                                 time_signature: settings.time_signature,
@@ -410,6 +398,5 @@ export function SequencerPanel() {
                 onSelectSample={handleAddSampleTrack}
             />
         </div>
-        </SequencerProvider>
     );
 }

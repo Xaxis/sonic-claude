@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { cn } from "@/lib/utils.ts";
-import { useSequencerContext } from "../../contexts/SequencerContext.tsx";
+import { useSequencerContext } from '@/contexts/SequencerContext';
 
 interface SequencerTransportProps {
     isPlaying: boolean;
