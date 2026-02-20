@@ -15,7 +15,7 @@ import {
 } from "react";
 import { windowManager } from "@/services/window-manager";
 import { audioEngineService } from "@/services/audio-engine/audio-engine.service";
-import { wsURLs } from "@/config/api.config";
+import { wsURLs, apiConfig } from "@/config/api.config";
 import { toast } from "sonner";
 import type { AudioEngineStatus } from "@/types";
 import type { Synth } from "@/modules/synthesis";

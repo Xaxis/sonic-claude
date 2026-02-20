@@ -88,7 +88,7 @@ export function SequencerToolbar({
 
             {/* Right: Track and Zoom Controls */}
             <div className="flex items-center gap-2">
-                <Button onClick={onAddTrack} size="sm" variant="default">
+                <Button onClick={onAddTrack} size="sm" variant="default" disabled={!activeSequenceId}>
                     <Plus size={14} className="mr-1" />
                     Track
                 </Button>
@@ -99,7 +99,7 @@ export function SequencerToolbar({
                         onClick={zoomOut}
                         variant="ghost"
                         size="icon-sm"
-                        disabled={zoom <= 0.25}
+                        disabled={!activeSequenceId || zoom <= 0.25}
                     />
                     <span className="text-xs text-muted-foreground w-12 text-center">
                         {Math.round(zoom * 100)}%
@@ -110,7 +110,7 @@ export function SequencerToolbar({
                         onClick={zoomIn}
                         variant="ghost"
                         size="icon-sm"
-                        disabled={zoom >= 4}
+                        disabled={!activeSequenceId || zoom >= 4}
                     />
                 </div>
                 <IconButton
@@ -120,6 +120,7 @@ export function SequencerToolbar({
                     variant={snapEnabled ? "default" : "ghost"}
                     size="icon-sm"
                     className={snapEnabled ? "bg-primary/20 text-primary" : ""}
+                    disabled={!activeSequenceId}
                 />
                 <div className="flex items-center gap-1">
                     <Label htmlFor="grid-size-select" className="text-xs text-muted-foreground">
@@ -128,7 +129,7 @@ export function SequencerToolbar({
                     <Select
                         value={gridSize.toString()}
                         onValueChange={(value) => setGridSize(parseInt(value))}
-                        disabled={!snapEnabled}
+                        disabled={!activeSequenceId || !snapEnabled}
                     >
                         <SelectTrigger id="grid-size-select" className="w-20 h-7 text-sm">
                             <SelectValue />

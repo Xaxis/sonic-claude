@@ -19,14 +19,14 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/effects/track/{track_id}", response_model=TrackEffectChainResponse)
+@router.get("/track/{track_id}", response_model=TrackEffectChainResponse)
 async def get_track_effect_chain(
     track_id: str,
     effects_service: TrackEffectsService = Depends(get_track_effects_service)
 ):
     """
     Get effect chain for a track
-    
+
     Returns all effects on the track ordered by slot index
     """
     try:
@@ -40,7 +40,7 @@ async def get_track_effect_chain(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/effects/track/{track_id}", response_model=EffectInstance)
+@router.post("/track/{track_id}", response_model=EffectInstance)
 async def create_effect(
     track_id: str,
     request: CreateEffectRequest,
@@ -48,11 +48,11 @@ async def create_effect(
 ):
     """
     Create a new effect on a track
-    
+
     Args:
         track_id: Track ID to add effect to
         request: Effect creation parameters
-        
+
     Returns:
         Created effect instance
     """
@@ -72,7 +72,7 @@ async def create_effect(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/effects/{effect_id}", response_model=EffectInstance)
+@router.get("/{effect_id}", response_model=EffectInstance)
 async def get_effect(
     effect_id: str,
     effects_service: TrackEffectsService = Depends(get_track_effects_service)
@@ -90,7 +90,7 @@ async def get_effect(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.patch("/effects/{effect_id}", response_model=EffectInstance)
+@router.patch("/{effect_id}", response_model=EffectInstance)
 async def update_effect(
     effect_id: str,
     request: UpdateEffectRequest,
@@ -98,7 +98,7 @@ async def update_effect(
 ):
     """
     Update effect parameters or state
-    
+
     Can update:
     - Individual parameters (e.g., cutoff, resonance)
     - Bypass state
@@ -108,22 +108,22 @@ async def update_effect(
         effect = effects_service.get_effect(effect_id)
         if effect is None:
             raise HTTPException(status_code=404, detail=f"Effect {effect_id} not found")
-        
+
         # Update parameters
         if request.parameters:
             for param_name, param_value in request.parameters.items():
                 await effects_service.update_effect_parameter(effect_id, param_name, param_value)
-        
+
         # Update bypass state
         if request.is_bypassed is not None:
             await effects_service.update_effect_bypass(effect_id, request.is_bypassed)
-        
+
         # Update display name
         if request.display_name is not None:
             effect.display_name = request.display_name
-        
+
         return effect
-        
+
     except HTTPException:
         raise
     except ValueError as e:
@@ -134,7 +134,7 @@ async def update_effect(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/effects/{effect_id}")
+@router.delete("/{effect_id}")
 async def delete_effect(
     effect_id: str,
     effects_service: TrackEffectsService = Depends(get_track_effects_service)
@@ -151,7 +151,7 @@ async def delete_effect(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/effects/{effect_id}/move", response_model=EffectInstance)
+@router.post("/{effect_id}/move", response_model=EffectInstance)
 async def move_effect(
     effect_id: str,
     request: MoveEffectRequest,
@@ -178,7 +178,7 @@ async def move_effect(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/effects/track/{track_id}/clear")
+@router.delete("/track/{track_id}/clear")
 async def clear_track_effects(
     track_id: str,
     effects_service: TrackEffectsService = Depends(get_track_effects_service)

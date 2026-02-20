@@ -4,7 +4,7 @@ Sequence Routes - CRUD operations and version management for sequences
 import logging
 from fastapi import APIRouter, Depends
 
-from backend.core.dependencies import get_sequencer_service
+from backend.core.dependencies import get_sequencer_service, get_composition_service
 from backend.core.exceptions import (
     SequenceNotFoundError,
     VersionNotFoundError,
@@ -99,12 +99,18 @@ async def update_sequence(
 @router.delete("/sequences/{sequence_id}")
 async def delete_sequence(
     sequence_id: str,
-    sequencer_service: SequencerService = Depends(get_sequencer_service)
+    sequencer_service: SequencerService = Depends(get_sequencer_service),
+    composition_service = Depends(get_composition_service)
 ):
-    """Delete a sequence"""
+    """Delete a sequence and its associated composition files"""
+    # Delete from memory
     success = sequencer_service.delete_sequence(sequence_id)
     if not success:
         raise SequenceNotFoundError(sequence_id)
+
+    # Delete composition files from disk
+    composition_service.delete_composition(sequence_id)
+
     return {"status": "ok", "message": f"Sequence {sequence_id} deleted"}
 
 

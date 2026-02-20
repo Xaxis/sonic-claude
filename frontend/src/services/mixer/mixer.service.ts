@@ -2,10 +2,10 @@
  * Mixer Service - API client for mixer operations
  *
  * Handles all HTTP requests to the mixer backend API.
- * Follows the same pattern as sequencer.service.ts
+ * Extends BaseAPIClient for consistent error handling and request management.
  */
 
-import { apiConfig } from "@/config/api.config";
+import { BaseAPIClient } from "../api/base";
 import type {
     MixerChannel,
     MasterChannel,
@@ -14,63 +14,32 @@ import type {
     UpdateMasterRequest,
 } from "@/modules/mixer/types";
 
-const BASE_URL = apiConfig.getURL(apiConfig.endpoints.api.mixer);
-
-class MixerService {
+export class MixerService extends BaseAPIClient {
     // ========================================================================
     // CHANNELS
     // ========================================================================
 
     async getChannels(): Promise<MixerChannel[]> {
-        const response = await fetch(`${BASE_URL}/channels`);
-        if (!response.ok) {
-            throw new Error(`Failed to get channels: ${response.statusText}`);
-        }
-        return response.json();
+        return this.get("/api/mixer/channels");
     }
 
     async createChannel(request: CreateChannelRequest): Promise<MixerChannel> {
-        const response = await fetch(`${BASE_URL}/channels`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(request),
-        });
-        if (!response.ok) {
-            throw new Error(`Failed to create channel: ${response.statusText}`);
-        }
-        return response.json();
+        return this.post("/api/mixer/channels", request);
     }
 
     async getChannel(channelId: string): Promise<MixerChannel> {
-        const response = await fetch(`${BASE_URL}/channels/${channelId}`);
-        if (!response.ok) {
-            throw new Error(`Failed to get channel: ${response.statusText}`);
-        }
-        return response.json();
+        return this.get(`/api/mixer/channels/${channelId}`);
     }
 
     async updateChannel(
         channelId: string,
         request: UpdateChannelRequest
     ): Promise<MixerChannel> {
-        const response = await fetch(`${BASE_URL}/channels/${channelId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(request),
-        });
-        if (!response.ok) {
-            throw new Error(`Failed to update channel: ${response.statusText}`);
-        }
-        return response.json();
+        return this.patch(`/api/mixer/channels/${channelId}`, request);
     }
 
     async deleteChannel(channelId: string): Promise<void> {
-        const response = await fetch(`${BASE_URL}/channels/${channelId}`, {
-            method: "DELETE",
-        });
-        if (!response.ok) {
-            throw new Error(`Failed to delete channel: ${response.statusText}`);
-        }
+        return this.delete(`/api/mixer/channels/${channelId}`);
     }
 
     // ========================================================================
@@ -78,23 +47,11 @@ class MixerService {
     // ========================================================================
 
     async getMaster(): Promise<MasterChannel> {
-        const response = await fetch(`${BASE_URL}/master`);
-        if (!response.ok) {
-            throw new Error(`Failed to get master: ${response.statusText}`);
-        }
-        return response.json();
+        return this.get("/api/mixer/master");
     }
 
     async updateMaster(request: UpdateMasterRequest): Promise<MasterChannel> {
-        const response = await fetch(`${BASE_URL}/master`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(request),
-        });
-        if (!response.ok) {
-            throw new Error(`Failed to update master: ${response.statusText}`);
-        }
-        return response.json();
+        return this.patch("/api/mixer/master", request);
     }
 }
 
