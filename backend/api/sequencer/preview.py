@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from backend.core.dependencies import get_sequencer_service
 from backend.core.exceptions import ServiceError
-from backend.services.sequencer_service import SequencerService
+from backend.services.daw.sequencer_service import SequencerService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

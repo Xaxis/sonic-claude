@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { apiConfig } from "@/config/api.config";
 import { api } from "@/services/api";
 
 interface UseWaveformDataOptions {
@@ -69,7 +70,7 @@ export function useWaveformData({
                 const sampleDurationSeconds = sampleMetadata.duration;
 
                 // Fetch audio file
-                const url = `http://localhost:8000/api/samples/${sampleId}/download`;
+                const url = apiConfig.getURL(`/api/samples/${sampleId}/download`);
                 const response = await fetch(url);
 
                 if (!response.ok) {

@@ -4,7 +4,7 @@ Mixer Master API - Master channel controls
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.models.mixer import MasterChannel, UpdateMasterRequest
-from backend.services.mixer_service import MixerService
+from backend.services.daw.mixer_service import MixerService
 from backend.core.dependencies import get_mixer_service
 
 router = APIRouter()

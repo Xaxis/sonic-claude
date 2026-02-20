@@ -15,6 +15,7 @@ import {
 } from "react";
 import { windowManager } from "@/services/window-manager";
 import { audioEngineService } from "@/services/audio-engine/audio-engine.service";
+import { wsURLs } from "@/config/api.config";
 import { toast } from "sonner";
 import type { AudioEngineStatus } from "@/types";
 import type { Synth } from "@/modules/synthesis";
@@ -240,7 +241,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
 
             try {
                 // Transport WebSocket
-                const transportWs = new WebSocket("ws://localhost:8000/audio-engine/ws/transport");
+                const transportWs = new WebSocket(wsURLs.transport);
                 transportWsRef.current = transportWs;
 
                 transportWs.onopen = () => {
@@ -283,7 +284,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 };
 
                 // Spectrum WebSocket
-                const spectrumWs = new WebSocket("ws://localhost:8000/audio-engine/ws/spectrum");
+                const spectrumWs = new WebSocket(wsURLs.spectrum);
                 spectrumWsRef.current = spectrumWs;
 
                 spectrumWs.onopen = () => {
@@ -321,7 +322,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 };
 
                 // Waveform WebSocket
-                const waveformWs = new WebSocket("ws://localhost:8000/audio-engine/ws/waveform");
+                const waveformWs = new WebSocket(wsURLs.waveform);
                 waveformWsRef.current = waveformWs;
 
                 waveformWs.onopen = () => {
@@ -364,7 +365,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 };
 
                 // Meters WebSocket
-                const metersWs = new WebSocket("ws://localhost:8000/audio-engine/ws/meters");
+                const metersWs = new WebSocket(wsURLs.meters);
                 metersWsRef.current = metersWs;
 
                 metersWs.onopen = () => {
@@ -448,7 +449,7 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 console.log("🔄 Loading all saved compositions from disk...");
 
                 // Call backend to load ALL compositions into memory
-                const response = await fetch("http://localhost:8000/api/compositions/load-all", {
+                const response = await fetch(apiConfig.getURL("/api/compositions/load-all"), {
                     method: "POST",
                 });
 

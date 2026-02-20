@@ -25,8 +25,8 @@ from backend.models.daw_state import (
     StateDetailLevel,
     GetStateResponse
 )
-from backend.services.sequencer_service import SequencerService
-from backend.services.mixer_service import MixerService
+from backend.services.daw.sequencer_service import SequencerService
+from backend.services.daw.mixer_service import MixerService
 from backend.core.engine_manager import AudioEngineManager
 
 logger = logging.getLogger(__name__)

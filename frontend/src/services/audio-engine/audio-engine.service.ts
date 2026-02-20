@@ -58,28 +58,28 @@ export class AudioEngineService extends BaseAPIClient {
      * Start the audio engine
      */
     async startEngine(): Promise<{ status: string; message?: string }> {
-        return this.post("/audio-engine/start");
+        return this.post("/api/audio/engine/start");
     }
 
     /**
      * Stop the audio engine
      */
     async stopEngine(): Promise<{ status: string; message?: string }> {
-        return this.post("/audio-engine/stop");
+        return this.post("/api/audio/engine/stop");
     }
 
     /**
      * Restart the audio engine
      */
     async restartEngine(): Promise<{ status: string; message?: string }> {
-        return this.post("/audio-engine/restart");
+        return this.post("/api/audio/engine/restart");
     }
 
     /**
      * Get engine status
      */
     async getEngineStatus(): Promise<AudioEngineStatus> {
-        return this.get("/audio-engine/status");
+        return this.get("/api/audio/status");
     }
 
     // ========================================================================
@@ -90,35 +90,35 @@ export class AudioEngineService extends BaseAPIClient {
      * Get all available SynthDefs (for synthesis module)
      */
     async getSynthDefs(): Promise<SynthesisSynthDefInfo[]> {
-        return this.get("/audio-engine/audio/synthesis/synthdefs");
+        return this.get("/api/audio/synthesis/synthdefs");
     }
 
     /**
      * Create a new synth instance
      */
     async createSynth(request: CreateSynthRequest): Promise<Synth> {
-        return this.post("/audio-engine/audio/synthesis/synths", request);
+        return this.post("/api/audio/synthesis/synths", request);
     }
 
     /**
      * Get synth by ID
      */
     async getSynth(synthId: string): Promise<Synth> {
-        return this.get(`/audio-engine/audio/synthesis/synths/${synthId}`);
+        return this.get(`/api/audio/synthesis/synths/${synthId}`);
     }
 
     /**
      * Update synth parameters
      */
     async updateSynth(synthId: string, request: UpdateSynthRequest): Promise<Synth> {
-        return this.put(`/audio-engine/audio/synthesis/synths/${synthId}`, request);
+        return this.put(`/api/audio/synthesis/synths/${synthId}`, request);
     }
 
     /**
      * Free (delete) a synth
      */
     async freeSynth(synthId: string): Promise<{ status: string; message?: string }> {
-        return this.delete(`/audio-engine/audio/synthesis/synths/${synthId}`);
+        return this.delete(`/api/audio/synthesis/synths/${synthId}`);
     }
 
     // ========================================================================
@@ -129,35 +129,35 @@ export class AudioEngineService extends BaseAPIClient {
      * Get all available EffectDefs
      */
     async getEffectDefs(): Promise<EffectDefInfo[]> {
-        return this.get("/audio-engine/audio/effects/definitions");
+        return this.get("/api/effects/definitions");
     }
 
     /**
      * Create a new effect instance
      */
     async createEffect(request: CreateEffectRequest): Promise<Effect> {
-        return this.post("/audio-engine/audio/effects/effects", request);
+        return this.post("/api/effects/effects", request);
     }
 
     /**
      * Get effect by ID
      */
     async getEffect(effectId: string): Promise<Effect> {
-        return this.get(`/audio-engine/audio/effects/effects/${effectId}`);
+        return this.get(`/api/effects/effects/${effectId}`);
     }
 
     /**
      * Update effect parameters
      */
     async updateEffect(effectId: string, request: UpdateEffectRequest): Promise<Effect> {
-        return this.put(`/audio-engine/audio/effects/effects/${effectId}`, request);
+        return this.put(`/api/effects/effects/${effectId}`, request);
     }
 
     /**
      * Free (delete) an effect
      */
     async freeEffect(effectId: string): Promise<{ status: string; message?: string }> {
-        return this.delete(`/audio-engine/audio/effects/effects/${effectId}`);
+        return this.delete(`/api/effects/effects/${effectId}`);
     }
 
     // ========================================================================
@@ -168,98 +168,98 @@ export class AudioEngineService extends BaseAPIClient {
      * Create a new mixer track
      */
     async createTrack(request: CreateTrackRequest): Promise<MixerTrack> {
-        return this.post("/audio-engine/audio/mixer/tracks", request);
+        return this.post("/api/mixer/tracks", request);
     }
 
     /**
      * Get all mixer tracks
      */
     async getTracks(): Promise<MixerTrack[]> {
-        return this.get("/audio-engine/audio/mixer/channels");
+        return this.get("/api/mixer/channels");
     }
 
     /**
      * Get track by ID
      */
     async getTrack(trackId: string): Promise<MixerTrack> {
-        return this.get(`/audio-engine/audio/mixer/tracks/${trackId}`);
+        return this.get(`/api/mixer/tracks/${trackId}`);
     }
 
     /**
      * Delete a track
      */
     async deleteTrack(trackId: string): Promise<{ status: string; message?: string }> {
-        return this.delete(`/audio-engine/audio/mixer/tracks/${trackId}`);
+        return this.delete(`/api/mixer/tracks/${trackId}`);
     }
 
     /**
      * Set track volume
      */
     async setTrackVolume(trackId: string, request: UpdateTrackVolumeRequest): Promise<MixerTrack> {
-        return this.put(`/audio-engine/audio/mixer/tracks/${trackId}/volume`, request);
+        return this.put(`/api/mixer/tracks/${trackId}/volume`, request);
     }
 
     /**
      * Set track pan
      */
     async setTrackPan(trackId: string, request: UpdateTrackPanRequest): Promise<MixerTrack> {
-        return this.put(`/audio-engine/audio/mixer/tracks/${trackId}/pan`, request);
+        return this.put(`/api/mixer/tracks/${trackId}/pan`, request);
     }
 
     /**
      * Mute a track
      */
     async muteTrack(trackId: string): Promise<MixerTrack> {
-        return this.post(`/audio-engine/audio/mixer/tracks/${trackId}/mute`);
+        return this.post(`/api/mixer/tracks/${trackId}/mute`);
     }
 
     /**
      * Unmute a track
      */
     async unmuteTrack(trackId: string): Promise<MixerTrack> {
-        return this.post(`/audio-engine/audio/mixer/tracks/${trackId}/unmute`);
+        return this.post(`/api/mixer/tracks/${trackId}/unmute`);
     }
 
     /**
      * Solo a track
      */
     async soloTrack(trackId: string): Promise<MixerTrack> {
-        return this.post(`/audio-engine/audio/mixer/tracks/${trackId}/solo`);
+        return this.post(`/api/mixer/tracks/${trackId}/solo`);
     }
 
     /**
      * Unsolo a track
      */
     async unsoloTrack(trackId: string): Promise<MixerTrack> {
-        return this.post(`/audio-engine/audio/mixer/tracks/${trackId}/unsolo`);
+        return this.post(`/api/mixer/tracks/${trackId}/unsolo`);
     }
 
     /**
      * Set send level to aux track
      */
     async setSendLevel(trackId: string, request: SetSendLevelRequest): Promise<MixerTrack> {
-        return this.put(`/audio-engine/audio/mixer/tracks/${trackId}/sends`, request);
+        return this.put(`/api/mixer/tracks/${trackId}/sends`, request);
     }
 
     /**
      * Add effect to track
      */
     async addEffectToTrack(trackId: string, request: AddEffectToTrackRequest): Promise<MixerTrack> {
-        return this.post(`/audio-engine/audio/mixer/tracks/${trackId}/effects`, request);
+        return this.post(`/api/mixer/tracks/${trackId}/effects`, request);
     }
 
     /**
      * Remove effect from track
      */
     async removeEffectFromTrack(trackId: string, effectId: string): Promise<MixerTrack> {
-        return this.delete(`/audio-engine/audio/mixer/tracks/${trackId}/effects/${effectId}`);
+        return this.delete(`/api/mixer/tracks/${trackId}/effects/${effectId}`);
     }
 
     /**
      * Reorder effects in track
      */
     async reorderTrackEffects(trackId: string, effectIds: string[]): Promise<MixerTrack> {
-        return this.put(`/audio-engine/audio/mixer/tracks/${trackId}/effects/order`, {
+        return this.put(`/api/mixer/tracks/${trackId}/effects/order`, {
             effect_ids: effectIds,
         });
     }
@@ -268,28 +268,28 @@ export class AudioEngineService extends BaseAPIClient {
      * Set track group
      */
     async setTrackGroup(trackId: string, request: SetTrackGroupRequest): Promise<MixerTrack> {
-        return this.put(`/audio-engine/audio/mixer/tracks/${trackId}/group`, request);
+        return this.put(`/api/mixer/tracks/${trackId}/group`, request);
     }
 
     /**
      * Get master track
      */
     async getMasterTrack(): Promise<MixerTrack> {
-        return this.get("/audio-engine/audio/mixer/master");
+        return this.get("/api/mixer/master");
     }
 
     /**
      * Set master volume
      */
     async setMasterVolume(request: UpdateTrackVolumeRequest): Promise<MixerTrack> {
-        return this.put("/audio-engine/audio/mixer/master/volume", request);
+        return this.put("/api/mixer/master/volume", request);
     }
 
     /**
      * Set master pan
      */
     async setMasterPan(request: UpdateTrackPanRequest): Promise<MixerTrack> {
-        return this.put("/audio-engine/audio/mixer/master/pan", request);
+        return this.put("/api/mixer/master/pan", request);
     }
 
     // ========================================================================
@@ -300,49 +300,49 @@ export class AudioEngineService extends BaseAPIClient {
      * Create a new sequence
      */
     async createSequence(request: CreateSequenceRequest): Promise<Sequence> {
-        return this.post("/audio-engine/audio/sequencer/sequences", request);
+        return this.post("/api/sequencer/sequences", request);
     }
 
     /**
      * Get all sequences
      */
     async getSequences(): Promise<Sequence[]> {
-        return this.get("/audio-engine/audio/sequencer/sequences");
+        return this.get("/api/sequencer/sequences");
     }
 
     /**
      * Get sequence by ID
      */
     async getSequence(sequenceId: string): Promise<Sequence> {
-        return this.get(`/audio-engine/audio/sequencer/sequences/${sequenceId}`);
+        return this.get(`/api/sequencer/sequences/${sequenceId}`);
     }
 
     /**
      * Update a sequence (name, tempo, time_signature, loop settings, UI settings)
      */
     async updateSequence(sequenceId: string, updates: Partial<{name: string; tempo: number; time_signature: string; loop_enabled: boolean; loop_start: number; loop_end: number; zoom: number; snap_enabled: boolean; grid_size: number; selected_clip_id: string | null; piano_roll_clip_id: string | null; sample_editor_clip_id: string | null}>): Promise<Sequence> {
-        return this.put(`/audio-engine/audio/sequencer/sequences/${sequenceId}`, updates);
+        return this.put(`/api/sequencer/sequences/${sequenceId}`, updates);
     }
 
     /**
      * Delete a sequence
      */
     async deleteSequence(sequenceId: string): Promise<{ status: string; message?: string }> {
-        return this.delete(`/audio-engine/audio/sequencer/sequences/${sequenceId}`);
+        return this.delete(`/api/sequencer/sequences/${sequenceId}`);
     }
 
     /**
      * Add clip to sequence
      */
     async addClip(sequenceId: string, request: AddClipRequest): Promise<SequencerClip> {
-        return this.post(`/audio-engine/audio/sequencer/sequences/${sequenceId}/clips`, request);
+        return this.post(`/api/sequencer/sequences/${sequenceId}/clips`, request);
     }
 
     /**
      * Get clip by ID
      */
     async getClip(sequenceId: string, clipId: string): Promise<SequencerClip> {
-        return this.get(`/audio-engine/audio/sequencer/sequences/${sequenceId}/clips/${clipId}`);
+        return this.get(`/api/sequencer/sequences/${sequenceId}/clips/${clipId}`);
     }
 
     /**
@@ -354,7 +354,7 @@ export class AudioEngineService extends BaseAPIClient {
         request: UpdateClipRequest
     ): Promise<SequencerClip> {
         return this.put(
-            `/audio-engine/audio/sequencer/sequences/${sequenceId}/clips/${clipId}`,
+            `/api/sequencer/sequences/${sequenceId}/clips/${clipId}`,
             request
         );
     }
@@ -366,7 +366,7 @@ export class AudioEngineService extends BaseAPIClient {
         sequenceId: string,
         clipId: string
     ): Promise<{ status: string; message?: string }> {
-        return this.delete(`/audio-engine/audio/sequencer/sequences/${sequenceId}/clips/${clipId}`);
+        return this.delete(`/api/sequencer/sequences/${sequenceId}/clips/${clipId}`);
     }
 
     /**
@@ -374,7 +374,7 @@ export class AudioEngineService extends BaseAPIClient {
      */
     async duplicateClip(sequenceId: string, clipId: string): Promise<SequencerClip> {
         return this.post(
-            `/audio-engine/audio/sequencer/sequences/${sequenceId}/clips/${clipId}/duplicate`,
+            `/api/sequencer/sequences/${sequenceId}/clips/${clipId}/duplicate`,
             {}
         );
     }
@@ -386,7 +386,7 @@ export class AudioEngineService extends BaseAPIClient {
         sequenceId: string,
         position: number = 0
     ): Promise<{ status: string; sequence_id: string; position: number }> {
-        return this.post(`/audio-engine/audio/sequencer/sequences/${sequenceId}/play`, {
+        return this.post(`/api/sequencer/sequences/${sequenceId}/play`, {
             position,
         });
     }
@@ -395,35 +395,35 @@ export class AudioEngineService extends BaseAPIClient {
      * Stop playback (global)
      */
     async stopPlayback(): Promise<{ status: string }> {
-        return this.post("/audio-engine/audio/sequencer/stop");
+        return this.post("/api/sequencer/stop");
     }
 
     /**
      * Pause playback (global)
      */
     async pausePlayback(): Promise<{ status: string }> {
-        return this.post("/audio-engine/audio/sequencer/pause");
+        return this.post("/api/sequencer/pause");
     }
 
     /**
      * Resume playback (global)
      */
     async resumePlayback(): Promise<{ status: string }> {
-        return this.post("/audio-engine/audio/sequencer/resume");
+        return this.post("/api/sequencer/resume");
     }
 
     /**
      * Set tempo (global)
      */
     async setTempo(request: SetTempoRequest): Promise<{ status: string; tempo: number }> {
-        return this.put("/audio-engine/audio/sequencer/tempo", request);
+        return this.put("/api/sequencer/tempo", request);
     }
 
     /**
      * Seek to position (global)
      */
     async seek(request: SeekRequest): Promise<{ status: string; position: number }> {
-        return this.put("/audio-engine/audio/sequencer/seek", request);
+        return this.put("/api/sequencer/seek", request);
     }
 
     /**
@@ -436,7 +436,7 @@ export class AudioEngineService extends BaseAPIClient {
         tempo: number;
         active_notes: number;
     }> {
-        return this.get("/audio-engine/audio/sequencer/state");
+        return this.get("/api/sequencer/state");
     }
 
     // ========================================================================
@@ -455,7 +455,7 @@ export class AudioEngineService extends BaseAPIClient {
         sample_name?: string;
         sample_file_path?: string;
     }): Promise<any> {
-        return this.post("/audio-engine/audio/sequencer/tracks", request);
+        return this.post("/api/sequencer/tracks", request);
     }
 
     /**
@@ -463,28 +463,28 @@ export class AudioEngineService extends BaseAPIClient {
      */
     async getSequencerTracks(sequenceId?: string): Promise<any[]> {
         const params = sequenceId ? { sequence_id: sequenceId } : {};
-        return this.get("/audio-engine/audio/sequencer/tracks", params);
+        return this.get("/api/sequencer/tracks", params);
     }
 
     /**
      * Rename sequencer track
      */
     async renameSequencerTrack(trackId: string, newName: string): Promise<any> {
-        return this.put(`/audio-engine/audio/sequencer/tracks/${trackId}`, { name: newName });
+        return this.put(`/api/sequencer/tracks/${trackId}`, { name: newName });
     }
 
     /**
      * Update sequencer track properties (volume, pan, instrument)
      */
     async updateSequencerTrack(trackId: string, updates: { volume?: number; pan?: number; instrument?: string }): Promise<any> {
-        return this.put(`/audio-engine/audio/sequencer/tracks/${trackId}`, updates);
+        return this.put(`/api/sequencer/tracks/${trackId}`, updates);
     }
 
     /**
      * Delete sequencer track
      */
     async deleteSequencerTrack(trackId: string): Promise<{ status: string; message?: string }> {
-        return this.delete(`/audio-engine/audio/sequencer/tracks/${trackId}`);
+        return this.delete(`/api/sequencer/tracks/${trackId}`);
     }
 
     // ========================================================================
@@ -495,21 +495,21 @@ export class AudioEngineService extends BaseAPIClient {
      * Get list of available SynthDefs for MIDI tracks (sequencer instruments)
      */
     async getSequencerSynthDefs(): Promise<SynthDefInfo[]> {
-        return this.get("/audio-engine/audio/sequencer/synthdefs");
+        return this.get("/api/sequencer/synthdefs");
     }
 
     /**
      * Mute/unmute sequencer track
      */
     async muteSequencerTrack(trackId: string, muted: boolean): Promise<any> {
-        return this.put(`/audio-engine/audio/sequencer/tracks/${trackId}/mute`, { is_muted: muted });
+        return this.put(`/api/sequencer/tracks/${trackId}/mute`, { is_muted: muted });
     }
 
     /**
      * Solo/unsolo sequencer track
      */
     async soloSequencerTrack(trackId: string, soloed: boolean): Promise<any> {
-        return this.put(`/audio-engine/audio/sequencer/tracks/${trackId}/solo`, { is_solo: soloed });
+        return this.put(`/api/sequencer/tracks/${trackId}/solo`, { is_solo: soloed });
     }
 
     // ========================================================================
@@ -520,14 +520,14 @@ export class AudioEngineService extends BaseAPIClient {
      * Toggle metronome on/off
      */
     async toggleMetronome(): Promise<{ enabled: boolean }> {
-        return this.put("/audio-engine/sequencer/metronome/toggle");
+        return this.put("/api/sequencer/metronome/toggle");
     }
 
     /**
      * Set metronome volume
      */
     async setMetronomeVolume(volume: number): Promise<{ volume: number }> {
-        return this.put("/audio-engine/sequencer/metronome/volume", { volume });
+        return this.put("/api/sequencer/metronome/volume", { volume });
     }
 
     // ========================================================================
@@ -545,7 +545,7 @@ export class AudioEngineService extends BaseAPIClient {
         duration: number = 0.5,
         instrument: string = "sine"
     ): Promise<{ status: string; note: number; velocity: number; duration: number; instrument: string }> {
-        return this.post("/audio-engine/audio/sequencer/preview-note", {
+        return this.post("/api/sequencer/preview-note", {
             note,
             velocity,
             duration,

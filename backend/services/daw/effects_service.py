@@ -18,7 +18,7 @@ from typing import Dict, List, Optional
 from datetime import datetime
 
 from backend.models.effects import EffectInstance, TrackEffectChain
-from backend.services.effect_definitions import get_effect_definition
+from backend.services.daw.effect_definitions import get_effect_definition
 
 logger = logging.getLogger(__name__)
 

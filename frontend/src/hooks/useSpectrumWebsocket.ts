@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { wsURLs } from "@/config/api.config";
 
 interface SpectrumData {
     type: "spectrum";
@@ -23,7 +24,7 @@ export function useSpectrumWebSocket() {
             if (isCleaningUpRef.current) return;
 
             try {
-                const ws = new WebSocket("ws://localhost:8000/audio-engine/ws/spectrum");
+                const ws = new WebSocket(wsURLs.spectrum);
                 wsRef.current = ws;
 
                 ws.onopen = () => {

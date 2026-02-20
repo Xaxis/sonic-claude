@@ -17,16 +17,16 @@ import anthropic
 
 from backend.models.daw_state import DAWStateSnapshot, AudioFeatures, MusicalContext
 from backend.models.ai_actions import DAWAction, ActionResult
-from backend.services.daw_state_service import DAWStateService
-from backend.services.daw_action_service import DAWActionService
-from backend.services.sample_analyzer import SampleAnalyzer
+from backend.services.ai.state_collector_service import DAWStateService
+from backend.services.ai.action_executor_service import DAWActionService
+from backend.services.analysis.sample_analyzer_service import SampleFileAnalyzer
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.services.composition_service import CompositionService
-    from backend.services.sequencer_service import SequencerService
-    from backend.services.mixer_service import MixerService
-    from backend.services.track_effects_service import TrackEffectsService
+    from backend.services.persistence.composition_service import CompositionService
+    from backend.services.daw.sequencer_service import SequencerService
+    from backend.services.daw.mixer_service import MixerService
+    from backend.services.daw.effects_service import TrackEffectsService
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class AIAgentService:
         self.model = model
 
         # Sample analyzer for audio understanding
-        self.sample_analyzer = SampleAnalyzer(samples_dir=samples_dir)
+        self.sample_analyzer = SampleFileAnalyzer(samples_dir=samples_dir)
 
         # Track last state hash for efficient diffs (optional optimization)
         self.last_state_hash: Optional[str] = None
@@ -522,7 +522,7 @@ Execute now."""
     def _build_effects_list(self) -> str:
         """Build formatted list of available effects from EFFECT_DEFINITIONS"""
         # Lazy import to avoid circular dependency
-        from backend.services.effect_definitions import EFFECT_DEFINITIONS
+        from backend.services.daw.effect_definitions import EFFECT_DEFINITIONS
 
         categories = {}
         for name, effect_def in EFFECT_DEFINITIONS.items():

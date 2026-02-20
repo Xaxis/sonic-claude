@@ -1,10 +1,11 @@
 /**
  * AI Service - API client for AI operations
- * 
+ *
  * Handles all HTTP requests to the AI backend API.
  * Follows the same pattern as mixer.service.ts and sequencer.service.ts
  */
 
+import { apiConfig } from "@/config/api.config";
 import type {
     DAWStateSnapshot,
     ChatResponse,
@@ -12,7 +13,7 @@ import type {
     ActionResult,
 } from "@/modules/ai/types";
 
-const BASE_URL = "http://localhost:8000/api/ai";
+const BASE_URL = apiConfig.getURL(apiConfig.endpoints.api.ai);
 
 class AIService {
     // ========================================================================

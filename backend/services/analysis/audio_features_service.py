@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class AudioFeatureExtractor:
     """
     Extracts musical features from real-time audio data
-    Uses existing FFT/meter data from AudioAnalyzerService
+    Uses existing FFT/meter data from RealtimeAudioAnalyzer
     """
     
     def __init__(self):
@@ -43,7 +43,7 @@ class AudioFeatureExtractor:
         Extract audio features from current data
         
         Args:
-            spectrum: FFT magnitude spectrum (already computed by AudioAnalyzerService)
+            spectrum: FFT magnitude spectrum (already computed by RealtimeAudioAnalyzer)
             peak_db: Peak level in dB
             rms_db: RMS level in dB
             is_playing: Whether audio is currently playing

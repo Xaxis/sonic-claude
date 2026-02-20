@@ -11,6 +11,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from "react";
 import { toast } from "sonner";
+import { apiConfig } from "@/config/api.config";
 import { setCompositionChangeCallback } from "./AudioEngineContext";
 
 interface CompositionState {
@@ -84,7 +85,7 @@ export function CompositionProvider({
         try {
             console.log("💾 Saving composition:", sequenceId, "createVersion:", createVersion);
             const response = await fetch(
-                `http://localhost:8000/api/compositions/save`,
+                apiConfig.getURL("/api/compositions/save"),
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -144,7 +145,7 @@ export function CompositionProvider({
 
         try {
             const response = await fetch(
-                `http://localhost:8000/api/compositions/save`,
+                apiConfig.getURL("/api/compositions/save"),
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },

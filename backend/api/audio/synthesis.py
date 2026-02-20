@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from backend.core.dependencies import get_synthesis_service
 from backend.core.exceptions import SynthNotFoundError, ServiceError
-from backend.services.synthesis_service import SynthesisService
+from backend.services.daw.synthesis_service import SynthesisService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

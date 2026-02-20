@@ -3,7 +3,9 @@
  * Provides core HTTP request functionality with error handling
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import { apiConfig } from "@/config/api.config";
+
+const API_BASE = apiConfig.baseURL;
 
 export class APIError extends Error {
     constructor(

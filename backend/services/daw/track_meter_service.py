@@ -16,9 +16,9 @@ from backend.core.engine_manager import AudioEngineManager
 logger = logging.getLogger(__name__)
 
 
-class TrackMeterService:
+class TrackMeterHandler:
     """
-    Manages per-track meter data from trackMixer synths
+    Handles per-track meter data from trackMixer synths (OSC message handler)
     """
 
     def __init__(self, engine_manager: AudioEngineManager, mixer_channel_service=None) -> None:

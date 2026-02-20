@@ -16,10 +16,10 @@ from backend.models.daw_state import MusicalContext
 logger = logging.getLogger(__name__)
 
 
-class MusicalContextAnalyzer:
+class MIDIAnalyzer:
     """
     Analyzes MIDI sequences to extract musical context
-    Key detection, complexity metrics, etc.
+    Key detection, scale detection, complexity metrics, etc.
     """
     
     # Major and minor key profiles (Krumhansl-Schmuckler)

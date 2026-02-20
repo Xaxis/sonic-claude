@@ -28,7 +28,7 @@ export class AudioInputService extends BaseAPIClient {
      * Set the audio input device for SuperCollider
      */
     async setInputDevice(deviceIndex: number, amp: number = 1.0): Promise<void> {
-        return this.post("/audio-engine/audio/input/device", {
+        return this.post("/api/audio/input/device", {
             device_index: deviceIndex,
             amp: amp,
         });
@@ -38,21 +38,21 @@ export class AudioInputService extends BaseAPIClient {
      * Stop audio input
      */
     async stopInput(): Promise<void> {
-        return this.post("/audio-engine/audio/input/stop");
+        return this.post("/api/audio/input/stop");
     }
 
     /**
      * Set input gain
      */
     async setInputGain(amp: number): Promise<void> {
-        return this.post("/audio-engine/audio/input/gain", { amp });
+        return this.post("/api/audio/input/gain", { amp });
     }
 
     /**
      * Get current audio input status
      */
     async getInputStatus(): Promise<AudioInputStatus> {
-        return this.get("/audio-engine/audio/input/status");
+        return this.get("/api/audio/input/status");
     }
 }
 

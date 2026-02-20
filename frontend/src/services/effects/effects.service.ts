@@ -26,7 +26,7 @@ export class EffectsService extends BaseAPIClient {
      * Get all available effect definitions
      */
     async getEffectDefinitions(): Promise<EffectDefinition[]> {
-        const response = await this.get<EffectListResponse>("/audio-engine/audio/effects/definitions");
+        const response = await this.get<EffectListResponse>("/api/effects/definitions");
         return response.effects;
     }
 
@@ -34,14 +34,14 @@ export class EffectsService extends BaseAPIClient {
      * Get all effect categories
      */
     async getEffectCategories(): Promise<string[]> {
-        return this.get<string[]>("/audio-engine/audio/effects/categories");
+        return this.get<string[]>("/api/effects/categories");
     }
 
     /**
      * Get effects by category
      */
     async getEffectsByCategory(category: string): Promise<EffectDefinition[]> {
-        const response = await this.get<EffectListResponse>(`/audio-engine/audio/effects/categories/${category}`);
+        const response = await this.get<EffectListResponse>(`/api/effects/categories/${category}`);
         return response.effects;
     }
 
@@ -53,49 +53,49 @@ export class EffectsService extends BaseAPIClient {
      * Get effect chain for a track
      */
     async getTrackEffectChain(trackId: string): Promise<TrackEffectChain> {
-        return this.get<TrackEffectChain>(`/audio-engine/audio/effects/track/${trackId}`);
+        return this.get<TrackEffectChain>(`/api/effects/track/${trackId}`);
     }
 
     /**
      * Create effect on track
      */
     async createEffect(trackId: string, request: CreateEffectRequest): Promise<EffectInstance> {
-        return this.post<EffectInstance>(`/audio-engine/audio/effects/track/${trackId}`, request);
+        return this.post<EffectInstance>(`/api/effects/track/${trackId}`, request);
     }
 
     /**
      * Get effect instance by ID
      */
     async getEffect(effectId: string): Promise<EffectInstance> {
-        return this.get<EffectInstance>(`/audio-engine/audio/effects/${effectId}`);
+        return this.get<EffectInstance>(`/api/effects/${effectId}`);
     }
 
     /**
      * Update effect parameters or state
      */
     async updateEffect(effectId: string, request: UpdateEffectRequest): Promise<EffectInstance> {
-        return this.patch<EffectInstance>(`/audio-engine/audio/effects/${effectId}`, request);
+        return this.patch<EffectInstance>(`/api/effects/${effectId}`, request);
     }
 
     /**
      * Delete effect
      */
     async deleteEffect(effectId: string): Promise<{ status: string; message: string }> {
-        return this.delete(`/audio-engine/audio/effects/${effectId}`);
+        return this.delete(`/api/effects/${effectId}`);
     }
 
     /**
      * Move effect to different slot
      */
     async moveEffect(effectId: string, request: MoveEffectRequest): Promise<EffectInstance> {
-        return this.post<EffectInstance>(`/audio-engine/audio/effects/${effectId}/move`, request);
+        return this.post<EffectInstance>(`/api/effects/${effectId}/move`, request);
     }
 
     /**
      * Clear all effects from track
      */
     async clearTrackEffects(trackId: string): Promise<{ status: string; message: string }> {
-        return this.delete(`/audio-engine/audio/effects/track/${trackId}/clear`);
+        return this.delete(`/api/effects/track/${trackId}/clear`);
     }
 
     // ========================================================================

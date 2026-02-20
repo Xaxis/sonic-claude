@@ -36,9 +36,9 @@ from backend.models.sample_analysis import (
 logger = logging.getLogger(__name__)
 
 
-class SampleAnalyzer:
+class SampleFileAnalyzer:
     """
-    Analyzes audio samples to extract features for AI understanding
+    Analyzes audio sample files to extract features for AI understanding
 
     Features extracted:
     - Spectral: centroid, rolloff, flux, flatness, bandwidth, frequency bands

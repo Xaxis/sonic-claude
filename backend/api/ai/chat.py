@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from backend.core.dependencies import get_ai_agent_service
-from backend.services.ai_agent_service import AIAgentService
+from backend.services.ai.agent_service import AIAgentService
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from typing import List
 
 from backend.models.effects import EffectListResponse
-from backend.services.effect_definitions import (
+from backend.services.daw.effect_definitions import (
     get_all_effect_definitions,
     get_effects_by_category,
     get_effect_categories

@@ -12,6 +12,7 @@
 
 import { useState, useEffect } from "react";
 import { Save, FolderOpen, Plus, Trash2, History, RotateCcw, Clock, Edit2, Check, X as XIcon, HardDrive } from "lucide-react";
+import { apiConfig } from "@/config/api.config";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -94,7 +95,7 @@ export function SequencerSequenceManager({
     const loadVersions = async (sequenceId: string) => {
         try {
             const response = await fetch(
-                `http://localhost:8000/api/compositions/${sequenceId}/history`
+                apiConfig.getURL(`/api/compositions/${sequenceId}/history`)
             );
             const data = await response.json();
             // Map history entries to version format
@@ -145,7 +146,7 @@ export function SequencerSequenceManager({
         try {
             console.log("💾 Saving composition:", currentSequenceId, "createVersion:", createVersion);
             const response = await fetch(
-                `http://localhost:8000/api/compositions/save`,
+                apiConfig.getURL("/api/compositions/save"),
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -228,7 +229,7 @@ export function SequencerSequenceManager({
         setIsLoading(true);
         try {
             const response = await fetch(
-                `http://localhost:8000/api/compositions/${currentSequenceId}/history/${versionToRestore}/restore`,
+                apiConfig.getURL(`/api/compositions/${currentSequenceId}/history/${versionToRestore}/restore`),
                 { method: "POST" }
             );
             const data = await response.json();
@@ -251,7 +252,7 @@ export function SequencerSequenceManager({
         setIsLoading(true);
         try {
             const response = await fetch(
-                `http://localhost:8000/api/compositions/${currentSequenceId}/recover`,
+                apiConfig.getURL(`/api/compositions/${currentSequenceId}/recover`),
                 { method: "POST" }
             );
             const data = await response.json();

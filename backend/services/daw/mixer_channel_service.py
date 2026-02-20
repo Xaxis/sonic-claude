@@ -13,9 +13,9 @@ from typing import Dict, Optional
 logger = logging.getLogger(__name__)
 
 
-class MixerChannelService:
+class MixerChannelSynthManager:
     """
-    Manages mixer channel synths for sequencer tracks
+    Manages mixer channel synths for sequencer tracks (low-level SC integration)
 
     Architecture:
     - One mixer channel synth per track

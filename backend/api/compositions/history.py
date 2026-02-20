@@ -12,10 +12,10 @@ from backend.core.dependencies import (
     get_mixer_service,
     get_track_effects_service,
 )
-from backend.services.composition_service import CompositionService
-from backend.services.sequencer_service import SequencerService
-from backend.services.mixer_service import MixerService
-from backend.services.track_effects_service import TrackEffectsService
+from backend.services.persistence.composition_service import CompositionService
+from backend.services.daw.sequencer_service import SequencerService
+from backend.services.daw.mixer_service import MixerService
+from backend.services.daw.effects_service import TrackEffectsService
 from backend.core.exceptions import ServiceError, ResourceNotFoundError
 
 logger = logging.getLogger(__name__)

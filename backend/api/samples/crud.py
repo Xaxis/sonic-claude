@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from backend.core.dependencies import get_settings, get_sequencer_service
 from backend.core.config import Settings
 from backend.core.exceptions import SampleNotFoundError, SampleInUseError, ServiceError
-from backend.services.sequencer_service import SequencerService
+from backend.services.daw.sequencer_service import SequencerService
 from .utils import get_samples_dir, get_metadata_file, load_metadata, save_metadata
 
 router = APIRouter()

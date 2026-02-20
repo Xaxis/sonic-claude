@@ -9,7 +9,7 @@ from backend.models.mixer import (
     CreateChannelRequest,
     UpdateChannelRequest,
 )
-from backend.services.mixer_service import MixerService
+from backend.services.daw.mixer_service import MixerService
 from backend.core.dependencies import get_mixer_service
 
 router = APIRouter()

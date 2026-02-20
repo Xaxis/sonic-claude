@@ -27,23 +27,35 @@ from fastapi import Depends
 
 from backend.core.config import Settings, get_settings
 from backend.core.engine_manager import AudioEngineManager
-from backend.services.audio_analyzer import AudioAnalyzerService
-from backend.services.audio_input_service import AudioInputService
-from backend.services.synthesis_service import SynthesisService
-from backend.services.sequencer_service import SequencerService
-from backend.services.websocket_manager import WebSocketManager
-from backend.services.buffer_manager import BufferManager
-from backend.services.mixer_service import MixerService
-from backend.services.track_meter_service import TrackMeterService
-from backend.services.audio_bus_manager import AudioBusManager
-from backend.services.mixer_channel_service import MixerChannelService
-from backend.services.track_effects_service import TrackEffectsService
-from backend.services.audio_feature_extractor import AudioFeatureExtractor
-from backend.services.musical_context_analyzer import MusicalContextAnalyzer
-from backend.services.daw_state_service import DAWStateService
-from backend.services.daw_action_service import DAWActionService
-from backend.services.ai_agent_service import AIAgentService
-from backend.services.composition_service import CompositionService
+
+# Audio services (core audio infrastructure)
+from backend.services.audio.realtime_analyzer_service import RealtimeAudioAnalyzer
+from backend.services.audio.input_service import AudioInputService
+from backend.services.audio.buffer_manager_service import BufferManager
+from backend.services.audio.bus_manager_service import AudioBusManager
+
+# Analysis services
+from backend.services.analysis.audio_features_service import AudioFeatureExtractor
+from backend.services.analysis.midi_analyzer_service import MIDIAnalyzer
+
+# DAW services
+from backend.services.daw.synthesis_service import SynthesisService
+from backend.services.daw.sequencer_service import SequencerService
+from backend.services.daw.mixer_service import MixerService
+from backend.services.daw.mixer_channel_service import MixerChannelSynthManager
+from backend.services.daw.track_meter_service import TrackMeterHandler
+from backend.services.daw.effects_service import TrackEffectsService
+
+# AI services
+from backend.services.ai.state_collector_service import DAWStateService
+from backend.services.ai.action_executor_service import DAWActionService
+from backend.services.ai.agent_service import AIAgentService
+
+# Persistence services
+from backend.services.persistence.composition_service import CompositionService
+
+# WebSocket services
+from backend.services.websocket import WebSocketManager
 
 logger = logging.getLogger(__name__)
 
@@ -53,19 +65,19 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 _engine_manager: Optional[AudioEngineManager] = None
-_audio_analyzer: Optional[AudioAnalyzerService] = None
+_audio_analyzer: Optional[RealtimeAudioAnalyzer] = None
 _audio_input_service: Optional[AudioInputService] = None
 _synthesis_service: Optional[SynthesisService] = None
 _sequencer_service: Optional[SequencerService] = None
 _ws_manager: Optional[WebSocketManager] = None
 _buffer_manager: Optional[BufferManager] = None
 _mixer_service: Optional[MixerService] = None
-_track_meter_service: Optional[TrackMeterService] = None
+_track_meter_service: Optional[TrackMeterHandler] = None
 _audio_bus_manager: Optional[AudioBusManager] = None
-_mixer_channel_service: Optional[MixerChannelService] = None
+_mixer_channel_service: Optional[MixerChannelSynthManager] = None
 _track_effects_service: Optional[TrackEffectsService] = None
 _audio_feature_extractor: Optional[AudioFeatureExtractor] = None
-_musical_context_analyzer: Optional[MusicalContextAnalyzer] = None
+_musical_context_analyzer: Optional[MIDIAnalyzer] = None
 _daw_state_service: Optional[DAWStateService] = None
 _daw_action_service: Optional[DAWActionService] = None
 _composition_service: Optional[CompositionService] = None
@@ -107,8 +119,8 @@ async def initialize_services(settings: Settings) -> None:
     # Step 3: Initialize per-track metering and effects services
     logger.info("🎚️ Initializing per-track metering and effects...")
     _audio_bus_manager = AudioBusManager()
-    _mixer_channel_service = MixerChannelService(_engine_manager, _audio_bus_manager)
-    _track_meter_service = TrackMeterService(_engine_manager, _mixer_channel_service)
+    _mixer_channel_service = MixerChannelSynthManager(_engine_manager, _audio_bus_manager)
+    _track_meter_service = TrackMeterHandler(_engine_manager, _mixer_channel_service)
     _track_effects_service = TrackEffectsService(_engine_manager, _audio_bus_manager, _mixer_channel_service)
 
     # Step 4: Initialize unified composition service FIRST (needed by other services)
@@ -120,7 +132,7 @@ async def initialize_services(settings: Settings) -> None:
 
     # Step 5: Initialize audio services (depend on engine_manager and metering services)
     logger.info("🎵 Initializing audio services...")
-    _audio_analyzer = AudioAnalyzerService(_engine_manager)
+    _audio_analyzer = RealtimeAudioAnalyzer(_engine_manager)
     _audio_input_service = AudioInputService(_engine_manager)
     _synthesis_service = SynthesisService(_engine_manager)
     _sequencer_service = SequencerService(
@@ -152,11 +164,11 @@ async def initialize_services(settings: Settings) -> None:
 
     # Create AI analysis services
     _audio_feature_extractor = AudioFeatureExtractor()
-    _musical_context_analyzer = MusicalContextAnalyzer()
+    _musical_context_analyzer = MIDIAnalyzer()
 
     # Create sample analyzer (shared between DAW state and AI agent)
-    from backend.services.sample_analyzer import SampleAnalyzer
-    _sample_analyzer = SampleAnalyzer(samples_dir=settings.storage.samples_dir)
+    from backend.services.analysis.sample_analyzer_service import SampleFileAnalyzer
+    _sample_analyzer = SampleFileAnalyzer(samples_dir=settings.storage.samples_dir)
 
     # Create DAW state and action services
     _daw_state_service = DAWStateService(
@@ -274,10 +286,10 @@ def get_engine_manager() -> AudioEngineManager:
     return _engine_manager
 
 
-def get_audio_analyzer() -> AudioAnalyzerService:
-    """Get AudioAnalyzerService instance"""
+def get_audio_analyzer() -> RealtimeAudioAnalyzer:
+    """Get RealtimeAudioAnalyzer instance"""
     if _audio_analyzer is None:
-        raise RuntimeError("AudioAnalyzerService not initialized")
+        raise RuntimeError("RealtimeAudioAnalyzer not initialized")
     return _audio_analyzer
 
 
@@ -323,10 +335,10 @@ def get_mixer_service() -> MixerService:
     return _mixer_service
 
 
-def get_track_meter_service() -> TrackMeterService:
-    """Get TrackMeterService instance"""
+def get_track_meter_service() -> TrackMeterHandler:
+    """Get TrackMeterHandler instance"""
     if _track_meter_service is None:
-        raise RuntimeError("TrackMeterService not initialized")
+        raise RuntimeError("TrackMeterHandler not initialized")
     return _track_meter_service
 
 
@@ -337,10 +349,10 @@ def get_audio_bus_manager() -> AudioBusManager:
     return _audio_bus_manager
 
 
-def get_mixer_channel_service() -> MixerChannelService:
-    """Get MixerChannelService instance"""
+def get_mixer_channel_service() -> MixerChannelSynthManager:
+    """Get MixerChannelSynthManager instance"""
     if _mixer_channel_service is None:
-        raise RuntimeError("MixerChannelService not initialized")
+        raise RuntimeError("MixerChannelSynthManager not initialized")
     return _mixer_channel_service
 
 
@@ -358,10 +370,10 @@ def get_audio_feature_extractor() -> AudioFeatureExtractor:
     return _audio_feature_extractor
 
 
-def get_musical_context_analyzer() -> MusicalContextAnalyzer:
-    """Get MusicalContextAnalyzer instance"""
+def get_musical_context_analyzer() -> MIDIAnalyzer:
+    """Get MIDIAnalyzer instance"""
     if _musical_context_analyzer is None:
-        raise RuntimeError("MusicalContextAnalyzer not initialized")
+        raise RuntimeError("MIDIAnalyzer not initialized")
     return _musical_context_analyzer
 
 

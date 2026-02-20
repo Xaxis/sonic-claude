@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.core.dependencies import get_daw_action_service
-from backend.services.daw_action_service import DAWActionService
+from backend.services.ai.action_executor_service import DAWActionService
 from backend.models.ai_actions import DAWAction, BatchActionRequest, BatchActionResponse
 
 logger = logging.getLogger(__name__)

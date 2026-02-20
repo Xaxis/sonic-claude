@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState, useRef } from "react";
+import { wsURLs } from "@/config/api.config";
 
 export interface MeterData {
     type: "meters";
@@ -39,7 +40,7 @@ export function useMeterWebSocket() {
             if (isCleaningUpRef.current) return;
 
             try {
-                const ws = new WebSocket("ws://localhost:8000/audio-engine/ws/meters");
+                const ws = new WebSocket(wsURLs.meters);
                 wsRef.current = ws;
 
                 ws.onopen = () => {

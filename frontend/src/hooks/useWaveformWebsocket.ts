@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState, useRef } from "react";
+import { wsURLs } from "@/config/api.config";
 
 export interface WaveformData {
     type: "waveform";
@@ -28,7 +29,7 @@ export function useWaveformWebSocket() {
             if (isCleaningUpRef.current) return;
 
             try {
-                const ws = new WebSocket("ws://localhost:8000/audio-engine/ws/waveform");
+                const ws = new WebSocket(wsURLs.waveform);
                 wsRef.current = ws;
 
                 ws.onopen = () => {

@@ -19,11 +19,11 @@ from backend.models.sequence import (
     UpdateClipRequest,
 )
 from backend.models.types import ActiveMIDINote, PlaybackState
-from backend.services.buffer_manager import BufferManager
+from backend.services.audio.buffer_manager_service import BufferManager
 from backend.core.engine_manager import AudioEngineManager
-from backend.services.websocket_manager import WebSocketManager
-from backend.services.audio_bus_manager import AudioBusManager
-from backend.services.mixer_channel_service import MixerChannelService
+from backend.services.websocket import WebSocketManager
+from backend.services.audio.bus_manager_service import AudioBusManager
+from backend.services.daw.mixer_channel_service import MixerChannelSynthManager
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class SequencerService:
         engine_manager: Optional[AudioEngineManager] = None,
         websocket_manager: Optional[WebSocketManager] = None,
         audio_bus_manager: Optional[AudioBusManager] = None,
-        mixer_channel_service: Optional[MixerChannelService] = None,
+        mixer_channel_service: Optional[MixerChannelSynthManager] = None,
         composition_service: Optional['CompositionService'] = None
     ) -> None:
         """

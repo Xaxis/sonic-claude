@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict
 
 from backend.core.dependencies import get_track_effects_service
-from backend.services.track_effects_service import TrackEffectsService
+from backend.services.daw.effects_service import TrackEffectsService
 from backend.models.effects import (
     EffectInstance,
     TrackEffectChainResponse,

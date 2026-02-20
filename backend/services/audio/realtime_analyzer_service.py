@@ -17,9 +17,9 @@ from backend.core.engine_manager import AudioEngineManager
 logger = logging.getLogger(__name__)
 
 
-class AudioAnalyzerService:
+class RealtimeAudioAnalyzer:
     """
-    Analyzes audio data received from SuperCollider
+    Analyzes real-time audio data received from SuperCollider
 
     Data flow:
     1. scsynth writes audio to buffer partitions (BufWr)

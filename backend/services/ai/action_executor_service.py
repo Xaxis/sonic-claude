@@ -34,9 +34,9 @@ from backend.models.sequence import (
     CreateSequenceRequest,
     Sequence
 )
-from backend.services.sequencer_service import SequencerService
-from backend.services.mixer_service import MixerService
-from backend.services.track_effects_service import TrackEffectsService
+from backend.services.daw.sequencer_service import SequencerService
+from backend.services.daw.mixer_service import MixerService
+from backend.services.daw.effects_service import TrackEffectsService
 
 logger = logging.getLogger(__name__)
 

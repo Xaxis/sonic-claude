@@ -10,8 +10,8 @@ from backend.core.dependencies import (
     get_ai_agent_service,
     get_daw_state_service
 )
-from backend.services.ai_agent_service import AIAgentService
-from backend.services.daw_state_service import DAWStateService
+from backend.services.ai.agent_service import AIAgentService
+from backend.services.ai.state_collector_service import DAWStateService
 from backend.models.daw_state import GetStateRequest, GetStateResponse, StateDetailLevel
 
 logger = logging.getLogger(__name__)

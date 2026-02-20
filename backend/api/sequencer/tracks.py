@@ -13,7 +13,7 @@ from backend.core.exceptions import (
     InvalidTrackTypeError,
     ServiceError,
 )
-from backend.services.sequencer_service import SequencerService
+from backend.services.daw.sequencer_service import SequencerService
 from backend.models.sequence import SequencerTrack
 
 router = APIRouter()

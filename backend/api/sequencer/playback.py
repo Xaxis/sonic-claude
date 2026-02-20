@@ -11,7 +11,7 @@ from backend.core.exceptions import (
     SequenceNotFoundError,
     ServiceError,
 )
-from backend.services.sequencer_service import SequencerService
+from backend.services.daw.sequencer_service import SequencerService
 from backend.models.sequence import SetTempoRequest, SeekRequest
 
 router = APIRouter()

@@ -27,7 +27,7 @@ from backend.core.exceptions import (
     ValidationError,
     ServiceError,
 )
-from backend.api import websocket_routes
+from backend.api import websocket
 from backend.api.audio import router as audio_router
 from backend.api.sequencer import router as sequencer_router
 from backend.api.mixer import router as mixer_router
@@ -199,18 +199,18 @@ async def sonic_claude_exception_handler(request: Request, exc: SonicClaudeExcep
 
 
 # ============================================================================
-# ROUTERS
+# ROUTERS - Consistent /api/* pattern
 # ============================================================================
 
-# Include routers
-app.include_router(audio_router, prefix="/audio-engine/audio")
-app.include_router(sequencer_router, prefix="/audio-engine/audio/sequencer")
-app.include_router(mixer_router, prefix="/audio-engine/audio/mixer")
-app.include_router(effects_router, prefix="/audio-engine/audio")
-app.include_router(websocket_routes.router, prefix="/audio-engine/ws", tags=["websocket"])
+# Include routers with consistent /api/* prefix
+app.include_router(sequencer_router, prefix="/api/sequencer")
+app.include_router(mixer_router, prefix="/api/mixer")
+app.include_router(effects_router, prefix="/api/effects")
+app.include_router(audio_router, prefix="/api/audio")
 app.include_router(samples_router, prefix="/api/samples")
 app.include_router(compositions_router, prefix="/api/compositions")
-app.include_router(ai_router, prefix="/api")
+app.include_router(ai_router, prefix="/api/ai")
+app.include_router(websocket.router, prefix="/api/ws", tags=["websocket"])
 
 
 @app.get("/")

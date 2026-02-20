@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState, useRef } from "react";
+import { wsURLs } from "@/config/api.config";
 
 export interface AnalyticsData {
     type: "analytics";
@@ -33,7 +34,7 @@ export function useAnalyticsWebSocket() {
             if (isCleaningUpRef.current) return;
 
             try {
-                const ws = new WebSocket("ws://localhost:8000/ws/analytics");
+                const ws = new WebSocket(wsURLs.analytics);
                 wsRef.current = ws;
 
                 ws.onopen = () => {

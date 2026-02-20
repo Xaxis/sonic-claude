@@ -16,7 +16,7 @@ from backend.models.mixer import (
     UpdateMasterRequest,
 )
 from backend.core.engine_manager import AudioEngineManager
-from backend.services.websocket_manager import WebSocketManager
+from backend.services.websocket import WebSocketManager
 
 logger = logging.getLogger(__name__)
 

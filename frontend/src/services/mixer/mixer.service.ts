@@ -1,10 +1,11 @@
 /**
  * Mixer Service - API client for mixer operations
- * 
+ *
  * Handles all HTTP requests to the mixer backend API.
  * Follows the same pattern as sequencer.service.ts
  */
 
+import { apiConfig } from "@/config/api.config";
 import type {
     MixerChannel,
     MasterChannel,
@@ -13,7 +14,7 @@ import type {
     UpdateMasterRequest,
 } from "@/modules/mixer/types";
 
-const BASE_URL = "http://localhost:8000/audio-engine/audio/mixer";
+const BASE_URL = apiConfig.getURL(apiConfig.endpoints.api.mixer);
 
 class MixerService {
     // ========================================================================

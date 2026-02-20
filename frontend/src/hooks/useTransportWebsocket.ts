@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState, useRef } from "react";
+import { wsURLs } from "@/config/api.config";
 
 export interface ActiveNote {
     clip_id: string;
@@ -49,7 +50,7 @@ export function useTransportWebSocket() {
             if (isCleaningUpRef.current) return;
 
             try {
-                const ws = new WebSocket("ws://localhost:8000/audio-engine/ws/transport");
+                const ws = new WebSocket(wsURLs.transport);
                 wsRef.current = ws;
 
                 ws.onopen = () => {

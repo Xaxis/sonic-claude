@@ -9,7 +9,7 @@ from backend.core.exceptions import (
     SequenceNotFoundError,
     ClipNotFoundError,
 )
-from backend.services.sequencer_service import SequencerService
+from backend.services.daw.sequencer_service import SequencerService
 from backend.models.sequence import Clip, AddClipRequest, UpdateClipRequest
 
 router = APIRouter()

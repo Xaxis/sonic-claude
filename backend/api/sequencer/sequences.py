@@ -10,7 +10,7 @@ from backend.core.exceptions import (
     VersionNotFoundError,
     ServiceError,
 )
-from backend.services.sequencer_service import SequencerService
+from backend.services.daw.sequencer_service import SequencerService
 from backend.models.sequence import Sequence, CreateSequenceRequest
 
 router = APIRouter()
