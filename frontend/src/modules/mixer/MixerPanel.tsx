@@ -14,7 +14,7 @@ import { useMixerHandlers } from "./hooks/useMixerHandlers";
 import { MixerProvider } from "./contexts/MixerContext";
 import { MixerToolbar } from "./components/Toolbar/MixerToolbar";
 import { MixerChannelList } from "./layouts/MixerChannelList";
-import { mixerService } from "@/services/mixer/mixer.service";
+import { api } from "@/services/api";
 import { useMeterWebSocket } from "@/hooks/useMeterWebsocket";
 
 export function MixerPanel() {
@@ -45,7 +45,7 @@ export function MixerPanel() {
     useEffect(() => {
         const loadMaster = async () => {
             try {
-                const master = await mixerService.getMaster();
+                const master = await api.mixer.getMaster();
                 actions.setMaster(master);
             } catch (error) {
                 console.error("Failed to load master channel:", error);

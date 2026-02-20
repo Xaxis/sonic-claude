@@ -15,13 +15,19 @@ import {
 } from "react";
 import { windowManager } from "@/services/window-manager";
 import { audioEngineService } from "@/services/audio-engine/audio-engine.service";
-import { wsURLs, apiConfig } from "@/config/api.config";
+import { api } from "@/services/api";
 import { toast } from "sonner";
 import type { AudioEngineStatus } from "@/types";
 import type { Synth } from "@/modules/synthesis";
 import type { Effect } from "@/modules/effects";
 import type { MixerTrack } from "@/modules/mixer";
 import type { Sequence } from "@/modules/sequencer";
+
+// Import refactored WebSocket hooks
+import { useTransportWebSocket } from "@/hooks/useTransportWebsocket";
+import { useSpectrumWebSocket } from "@/hooks/useSpectrumWebsocket";
+import { useWaveformWebSocket } from "@/hooks/useWaveformWebsocket";
+import { useMeterWebSocket } from "@/hooks/useMeterWebsocket";
 
 // Global composition change callback (set by CompositionContext)
 let compositionChangeCallback: (() => void) | null = null;
@@ -34,21 +40,6 @@ function notifyCompositionChanged() {
     if (compositionChangeCallback) {
         compositionChangeCallback();
     }
-}
-
-// WebSocket message types
-interface TransportWebSocketData {
-    type: "transport";
-    is_playing: boolean;
-    position_beats: number;
-    position_seconds: number;
-    tempo: number;
-    time_signature_num: number;
-    time_signature_den: number;
-    loop_enabled?: boolean;
-    loop_start?: number;
-    loop_end?: number;
-    metronome_enabled?: boolean;
 }
 
 interface AudioEngineState {
@@ -225,215 +216,59 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
     // NOTE: We do NOT listen for state updates from other windows because it causes
     // infinite loops. Each window maintains its own state and syncs via backend API.
 
-    // WebSocket integration for real-time data
-    const transportWsRef = useRef<WebSocket | null>(null);
-    const spectrumWsRef = useRef<WebSocket | null>(null);
-    const waveformWsRef = useRef<WebSocket | null>(null);
-    const metersWsRef = useRef<WebSocket | null>(null);
-    const reconnectTimeoutRef = useRef<number | undefined>(undefined);
-    const isCleaningUpRef = useRef(false);
+    // WebSocket integration for real-time data using refactored hooks
+    const { transport: transportData } = useTransportWebSocket();
+    const { spectrum: spectrumData } = useSpectrumWebSocket();
+    const { waveform: waveformData } = useWaveformWebSocket();
+    const { meters: metersData } = useMeterWebSocket();
+
+    // Sync WebSocket data from hooks to context state
+    useEffect(() => {
+        if (transportData) {
+            setState((prev) => ({
+                ...prev,
+                isPlaying: transportData.is_playing,
+                currentPosition: transportData.position_beats,
+                tempo: transportData.tempo,
+                metronomeEnabled: transportData.metronome_enabled ?? prev.metronomeEnabled,
+            }));
+        }
+    }, [transportData]);
 
     useEffect(() => {
-        isCleaningUpRef.current = false;
+        if (spectrumData && spectrumData.length > 0) {
+            setState((prev) => ({ ...prev, spectrum: spectrumData }));
+        }
+    }, [spectrumData]);
 
-        const connect = () => {
-            if (isCleaningUpRef.current) return;
+    useEffect(() => {
+        if (waveformData) {
+            setState((prev) => ({
+                ...prev,
+                waveform: {
+                    left: waveformData.samples_left || [],
+                    right: waveformData.samples_right || [],
+                },
+            }));
+        }
+    }, [waveformData]);
 
-            try {
-                // Transport WebSocket
-                const transportWs = new WebSocket(wsURLs.transport);
-                transportWsRef.current = transportWs;
-
-                transportWs.onopen = () => {
-                    if (!isCleaningUpRef.current) {
-                        console.log("🔌 Transport WebSocket connected");
-                    }
-                };
-
-                transportWs.onmessage = (event) => {
-                    if (isCleaningUpRef.current) return;
-                    try {
-                        const message: TransportWebSocketData = JSON.parse(event.data);
-                        if (message.type === "transport") {
-                            setState((prev) => ({
-                                ...prev,
-                                isPlaying: message.is_playing,
-                                currentPosition: message.position_beats,
-                                tempo: message.tempo,
-                                metronomeEnabled: message.metronome_enabled ?? prev.metronomeEnabled,
-                            }));
-                        }
-                    } catch (error) {
-                        console.error("Failed to parse transport message:", error);
-                    }
-                };
-
-                transportWs.onerror = () => {
-                    if (!isCleaningUpRef.current && transportWs.readyState !== WebSocket.CLOSED) {
-                        console.warn("⚠️ Transport WebSocket error, will retry...");
-                    }
-                };
-
-                transportWs.onclose = () => {
-                    if (isCleaningUpRef.current) return;
-                    reconnectTimeoutRef.current = window.setTimeout(() => {
-                        if (!isCleaningUpRef.current) {
-                            connect();
-                        }
-                    }, 2000);
-                };
-
-                // Spectrum WebSocket
-                const spectrumWs = new WebSocket(wsURLs.spectrum);
-                spectrumWsRef.current = spectrumWs;
-
-                spectrumWs.onopen = () => {
-                    if (!isCleaningUpRef.current) {
-                        console.log("🔌 Spectrum WebSocket connected");
-                    }
-                };
-
-                let spectrumMessageCount = 0;
-                spectrumWs.onmessage = (event) => {
-                    if (isCleaningUpRef.current) return;
-                    try {
-                        const message = JSON.parse(event.data);
-                        if (message.type === "spectrum" && Array.isArray(message.magnitudes)) {
-                            // Debug: Log first few messages
-                            if (spectrumMessageCount < 3) {
-                                console.log(`🔊 Spectrum message ${spectrumMessageCount + 1}:`, {
-                                    bins: message.magnitudes.length,
-                                    range: [Math.min(...message.magnitudes), Math.max(...message.magnitudes)],
-                                    sample: message.magnitudes.slice(0, 5)
-                                });
-                                spectrumMessageCount++;
-                            }
-                            setState((prev) => ({ ...prev, spectrum: message.magnitudes }));
-                        }
-                    } catch (error) {
-                        console.error("Failed to parse spectrum message:", error);
-                    }
-                };
-
-                spectrumWs.onerror = () => {
-                    if (!isCleaningUpRef.current && spectrumWs.readyState !== WebSocket.CLOSED) {
-                        console.warn("⚠️ Spectrum WebSocket error");
-                    }
-                };
-
-                // Waveform WebSocket
-                const waveformWs = new WebSocket(wsURLs.waveform);
-                waveformWsRef.current = waveformWs;
-
-                waveformWs.onopen = () => {
-                    if (!isCleaningUpRef.current) {
-                        console.log("🔌 Waveform WebSocket connected");
-                    }
-                };
-
-                let waveformMessageCount = 0;
-                waveformWs.onmessage = (event) => {
-                    if (isCleaningUpRef.current) return;
-                    try {
-                        const message = JSON.parse(event.data);
-                        if (message.type === "waveform") {
-                            // Debug: Log first few messages
-                            if (waveformMessageCount < 3) {
-                                console.log(`📊 Waveform message ${waveformMessageCount + 1}:`, {
-                                    leftSamples: message.samples_left?.length || 0,
-                                    rightSamples: message.samples_right?.length || 0
-                                });
-                                waveformMessageCount++;
-                            }
-                            setState((prev) => ({
-                                ...prev,
-                                waveform: {
-                                    left: message.samples_left || [],
-                                    right: message.samples_right || []
-                                }
-                            }));
-                        }
-                    } catch (error) {
-                        console.error("Failed to parse waveform message:", error);
-                    }
-                };
-
-                waveformWs.onerror = () => {
-                    if (!isCleaningUpRef.current && waveformWs.readyState !== WebSocket.CLOSED) {
-                        console.warn("⚠️ Waveform WebSocket error");
-                    }
-                };
-
-                // Meters WebSocket
-                const metersWs = new WebSocket(wsURLs.meters);
-                metersWsRef.current = metersWs;
-
-                metersWs.onopen = () => {
-                    if (!isCleaningUpRef.current) {
-                        console.log("🔌 Meters WebSocket connected");
-                    }
-                };
-
-                metersWs.onmessage = (event) => {
-                    if (isCleaningUpRef.current) return;
-                    try {
-                        const message = JSON.parse(event.data);
-                        if (message.type === "meters") {
-                            setState((prev) => ({
-                                ...prev,
-                                meters: {
-                                    ...prev.meters,
-                                    [message.track_id]: {
-                                        peakL: message.peak_left,
-                                        peakR: message.peak_right,
-                                        rmsL: message.rms_left,
-                                        rmsR: message.rms_right,
-                                    }
-                                }
-                            }));
-                        }
-                    } catch (error) {
-                        console.error("Failed to parse meters message:", error);
-                    }
-                };
-
-                metersWs.onerror = () => {
-                    if (!isCleaningUpRef.current && metersWs.readyState !== WebSocket.CLOSED) {
-                        console.warn("⚠️ Meters WebSocket error");
-                    }
-                };
-
-            } catch (error) {
-                if (!isCleaningUpRef.current) {
-                    console.error("Failed to create WebSocket connections:", error);
-                }
-            }
-        };
-
-        connect();
-
-        return () => {
-            isCleaningUpRef.current = true;
-
-            if (reconnectTimeoutRef.current) {
-                clearTimeout(reconnectTimeoutRef.current);
-            }
-
-            // Close all WebSocket connections
-            if (transportWsRef.current) {
-                transportWsRef.current.close();
-            }
-            if (spectrumWsRef.current) {
-                spectrumWsRef.current.close();
-            }
-            if (waveformWsRef.current) {
-                waveformWsRef.current.close();
-            }
-            if (metersWsRef.current) {
-                metersWsRef.current.close();
-            }
-        };
-    }, []);
+    useEffect(() => {
+        if (metersData && Object.keys(metersData).length > 0) {
+            setState((prev) => ({
+                ...prev,
+                meters: Object.entries(metersData).reduce((acc, [trackId, meter]) => {
+                    acc[trackId] = {
+                        peakL: meter.peakLeft,
+                        peakR: meter.peakRight,
+                        rmsL: meter.rmsLeft,
+                        rmsR: meter.rmsRight,
+                    };
+                    return acc;
+                }, {} as Record<string, { peakL: number; peakR: number; rmsL: number; rmsR: number }>),
+            }));
+        }
+    }, [metersData]);
 
     // Load ALL saved compositions on mount
     const hasInitializedRef = useRef(false);
@@ -449,16 +284,8 @@ export function AudioEngineProvider({ children }: { children: ReactNode }) {
                 console.log("🔄 Loading all saved compositions from disk...");
 
                 // Call backend to load ALL compositions into memory
-                const response = await fetch(apiConfig.getURL("/api/compositions/load-all"), {
-                    method: "POST",
-                });
-
-                if (!response.ok) {
-                    throw new Error("Failed to load compositions");
-                }
-
-                const data = await response.json();
-                console.log(`✅ Loaded ${data.loaded}/${data.total} compositions`);
+                const data = await api.compositions.loadAll();
+                console.log(`✅ Loaded ${data.loaded_count} compositions`);
 
                 // Now fetch sequences from in-memory services
                 const sequences = await audioEngineService.getSequences();

@@ -11,7 +11,7 @@
  */
 
 import { useCallback } from "react";
-import { effectsService } from "@/services/effects";
+import { api } from "@/services/api";
 import type { SequencerTrack } from "@/modules/sequencer/types";
 import { toast } from "sonner";
 
@@ -34,7 +34,7 @@ export function useEffectsHandlers(props: UseEffectsHandlersProps) {
         async (trackId: string, effectName: string) => {
             try {
                 // Find next available slot
-                const chain = await effectsService.getTrackEffectChain(trackId);
+                const chain = await api.effects.getTrackEffectChain(trackId);
                 const usedSlots = chain.effects.map(e => e.slot_index);
                 const nextSlot = Array.from({ length: 8 }, (_, i) => i).find(
                     slot => !usedSlots.includes(slot)
@@ -45,7 +45,8 @@ export function useEffectsHandlers(props: UseEffectsHandlersProps) {
                     return;
                 }
 
-                await effectsService.createEffect(trackId, {
+                await api.effects.addEffect({
+                    track_id: trackId,
                     effect_name: effectName,
                     slot_index: nextSlot,
                 });
@@ -62,7 +63,7 @@ export function useEffectsHandlers(props: UseEffectsHandlersProps) {
     const handleDeleteEffect = useCallback(
         async (effectId: string) => {
             try {
-                await effectsService.deleteEffect(effectId);
+                await api.effects.deleteEffect(effectId);
                 toast.success("Effect removed");
                 // Trigger refresh - we don't have trackId here, so refresh all
                 onEffectChainChanged?.("");
@@ -77,7 +78,7 @@ export function useEffectsHandlers(props: UseEffectsHandlersProps) {
     const handleMoveEffect = useCallback(
         async (effectId: string, newSlotIndex: number) => {
             try {
-                await effectsService.moveEffect(effectId, { new_slot_index: newSlotIndex });
+                await api.effects.moveEffect(effectId, { new_slot_index: newSlotIndex });
                 toast.success(`Moved to slot ${newSlotIndex + 1}`);
                 onEffectChainChanged?.("");
             } catch (error) {
@@ -95,7 +96,7 @@ export function useEffectsHandlers(props: UseEffectsHandlersProps) {
     const handleUpdateEffectParameter = useCallback(
         async (effectId: string, paramName: string, value: number) => {
             try {
-                await effectsService.updateEffectParameter(effectId, paramName, value);
+                await api.effects.updateEffect(effectId, { parameters: { [paramName]: value } });
                 // No toast for parameter changes (too noisy)
             } catch (error) {
                 console.error("Failed to update parameter:", error);
@@ -113,8 +114,8 @@ export function useEffectsHandlers(props: UseEffectsHandlersProps) {
         async (effectId: string) => {
             try {
                 // Get current effect to toggle bypass state
-                const effect = await effectsService.getEffect(effectId);
-                await effectsService.toggleEffectBypass(effectId, !effect.is_bypassed);
+                const effect = await api.effects.getEffect(effectId);
+                await api.effects.updateEffect(effectId, { bypassed: !effect.is_bypassed });
                 onEffectChainChanged?.("");
             } catch (error) {
                 console.error("Failed to toggle bypass:", error);

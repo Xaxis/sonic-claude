@@ -12,7 +12,7 @@
 
 import { useCallback } from "react";
 import { toast } from "sonner";
-import { aiService } from "@/services/ai/ai.service";
+import { api } from "@/services/api";
 import { useActivity } from "@/contexts/ActivityContext";
 import { useLayout } from "@/contexts/LayoutContext";
 import type { ChatMessage, AnalysisEvent } from "../types";
@@ -84,7 +84,7 @@ export function useAIHandlers(props: UseAIHandlersProps) {
 
                 // Send to backend
                 console.log("Sending message to AI backend:", message);
-                const response = await aiService.sendMessage(message);
+                const response = await api.ai.chat({ message });
                 console.log("Received response from AI backend:", response);
 
                 // Add assistant response to chat history
@@ -205,12 +205,12 @@ export function useAIHandlers(props: UseAIHandlersProps) {
             setIsLoadingState(true);
 
             // Fetch DAW state
-            const response = await aiService.getState();
+            const response = await api.ai.getState();
             setDawState(response.full_state);
 
             // Fetch AI context (what the LLM sees)
             try {
-                const contextResponse = await aiService.getAIContext();
+                const contextResponse = await api.ai.getContext();
                 setAIContext(contextResponse.context);
             } catch (error) {
                 console.error("Failed to fetch AI context:", error);

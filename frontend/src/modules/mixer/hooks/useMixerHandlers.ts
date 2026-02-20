@@ -11,7 +11,7 @@
  */
 
 import { useCallback } from "react";
-import { mixerService } from "@/services/mixer/mixer.service";
+import { api } from "@/services/api";
 import type { MasterChannel, UpdateMasterRequest } from "../types";
 import type { SequencerTrack } from "@/modules/sequencer/types";
 
@@ -50,8 +50,8 @@ export function useMixerHandlers(props: UseMixerHandlersProps) {
 
     const handleMasterFaderChange = useCallback(async (fader: number) => {
         try {
-            // Update master channel via mixer service
-            const updatedMaster = await mixerService.updateMaster({ fader });
+            // Update master channel via mixer provider
+            const updatedMaster = await api.mixer.updateMaster({ volume: fader });
             // Update local state
             setMaster(updatedMaster);
         } catch (error) {
@@ -109,7 +109,7 @@ export function useMixerHandlers(props: UseMixerHandlersProps) {
 
     const handleToggleLimiter = useCallback(async () => {
         try {
-            const updatedMaster = await mixerService.updateMaster({
+            const updatedMaster = await api.mixer.updateMaster({
                 limiter_enabled: !master.limiter_enabled,
             });
             setMaster(updatedMaster);
@@ -120,7 +120,7 @@ export function useMixerHandlers(props: UseMixerHandlersProps) {
 
     const handleLimiterThresholdChange = useCallback(async (threshold: number) => {
         try {
-            const updatedMaster = await mixerService.updateMaster({
+            const updatedMaster = await api.mixer.updateMaster({
                 limiter_threshold: threshold,
             });
             setMaster(updatedMaster);

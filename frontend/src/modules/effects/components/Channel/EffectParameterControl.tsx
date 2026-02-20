@@ -9,7 +9,7 @@
  */
 
 import { Slider } from "@/components/ui/slider";
-import type { EffectParameter } from "@/services/effects";
+import type { EffectParameter } from "@/services/api/providers";
 
 interface EffectParameterControlProps {
     parameter: EffectParameter;

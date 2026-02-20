@@ -8,7 +8,7 @@
 import { useState, useCallback } from "react";
 import { useSampleLibrary } from "../hooks/useSampleLibrary.ts";
 import { SampleLibraryBrowser } from "../components/SampleLibraryBrowser.tsx";
-import type { SampleMetadata } from "@/services/samples";
+import type { SampleMetadata } from "@/services/api/providers";
 
 interface SampleLibrarySectionProps {
     onSampleSelect?: (sample: SampleMetadata) => void;

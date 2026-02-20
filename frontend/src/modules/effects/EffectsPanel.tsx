@@ -19,8 +19,8 @@ import { useEffectsState } from "./hooks/useEffectsState";
 import { useEffectsHandlers } from "./hooks/useEffectsHandlers";
 import { EffectsProvider } from "./contexts/EffectsContext";
 import { EffectsChannelList } from "./layouts/EffectsChannelList";
-import { effectsService } from "@/services/effects";
-import type { TrackEffectChain, EffectDefinition } from "@/services/effects";
+import { api } from "@/services/api";
+import type { TrackEffectChain, EffectDefinition } from "@/services/api/providers";
 
 export function EffectsPanel() {
     // Get sequencer tracks from AudioEngine context
@@ -44,7 +44,7 @@ export function EffectsPanel() {
     useEffect(() => {
         const loadDefinitions = async () => {
             try {
-                const defs = await effectsService.getEffectDefinitions();
+                const defs = await api.effects.getDefinitions();
                 setEffectDefinitions(defs);
             } catch (error) {
                 console.error("Failed to load effect definitions:", error);
@@ -65,7 +65,7 @@ export function EffectsPanel() {
             await Promise.all(
                 sequencerTracks.map(async (track) => {
                     try {
-                        const chain = await effectsService.getTrackEffectChain(track.id);
+                        const chain = await api.effects.getTrackEffectChain(track.id);
                         chains[track.id] = chain;
                     } catch (error) {
                         console.error(`Failed to load effect chain for track ${track.id}:`, error);
@@ -93,7 +93,7 @@ export function EffectsPanel() {
             }
 
             try {
-                const chain = await effectsService.getTrackEffectChain(trackId);
+                const chain = await api.effects.getTrackEffectChain(trackId);
                 setEffectChains((prev) => ({
                     ...prev,
                     [trackId]: chain,

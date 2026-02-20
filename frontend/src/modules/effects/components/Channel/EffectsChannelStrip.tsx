@@ -18,7 +18,7 @@ import { useEffectsContext } from "../../contexts/EffectsContext";
 import { EffectSlot } from "./EffectSlot";
 import { EffectSelector } from "./EffectSelector";
 import type { SequencerTrack } from "@/modules/sequencer/types";
-import type { TrackEffectChain, EffectInstance } from "@/services/effects";
+import type { TrackEffectChain, EffectInstance } from "@/services/api/providers";
 
 interface EffectsChannelStripProps {
     track: SequencerTrack;

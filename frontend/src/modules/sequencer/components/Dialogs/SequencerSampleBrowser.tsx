@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { cn } from "@/lib/utils.ts";
 import { api } from "@/services/api";
-import type { SampleMetadata } from "@/services/samples";
+import type { SampleMetadata } from "@/services/api/providers";
 
 interface SequencerSampleBrowserProps {
     isOpen: boolean;

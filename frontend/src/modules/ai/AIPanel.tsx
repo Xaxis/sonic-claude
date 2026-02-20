@@ -15,7 +15,7 @@ import { AIProvider } from "./contexts/AIContext";
 import { ChatLayout } from "./layouts/ChatLayout";
 import { AnalysisLayout } from "./layouts/AnalysisLayout";
 import { StateLayout } from "./layouts/StateLayout";
-import { aiService } from "@/services/ai/ai.service";
+import { api } from "@/services/api";
 import { useAIEngine } from "@/contexts/AIEngineContext";
 import { useAudioEngine } from "@/contexts/AudioEngineContext";
 
@@ -68,14 +68,14 @@ export function AIPanel() {
                 console.log("AIPanel: Loading initial DAW state and AI context...");
 
                 // Load DAW state
-                const response = await aiService.getState();
+                const response = await api.ai.getState();
                 console.log("AIPanel: Received state response:", response);
                 setDawState(response.full_state || null);
                 console.log("AIPanel: Set dawState to:", response.full_state || null);
 
                 // Load AI context (what the LLM sees)
                 try {
-                    const contextResponse = await aiService.getAIContext();
+                    const contextResponse = await api.ai.getContext();
                     setAIContext(contextResponse.context);
                     console.log("AIPanel: Loaded AI context");
                 } catch (error) {

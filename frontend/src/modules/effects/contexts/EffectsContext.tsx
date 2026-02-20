@@ -13,7 +13,7 @@
 import React, { createContext, useContext, ReactNode } from "react";
 import type { EffectsState, EffectsActions } from "../hooks/useEffectsState";
 import type { SequencerTrack } from "@/modules/sequencer/types";
-import type { TrackEffectChain, EffectDefinition } from "@/services/effects";
+import type { TrackEffectChain, EffectDefinition } from "@/services/api/providers";
 
 interface EffectsContextValue {
     // UI State (from useEffectsState)

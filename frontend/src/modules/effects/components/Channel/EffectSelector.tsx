@@ -21,7 +21,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import type { EffectDefinition } from "@/services/effects";
+import type { EffectDefinition } from "@/services/api/providers";
 
 interface EffectSelectorProps {
     effectDefinitions: EffectDefinition[];

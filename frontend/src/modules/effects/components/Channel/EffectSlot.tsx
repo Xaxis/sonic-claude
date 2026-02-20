@@ -18,7 +18,7 @@ import { useState } from "react";
 import { ChevronDown, Trash2, GripVertical } from "lucide-react";
 import { EffectParameterControl } from "./EffectParameterControl";
 import { cn } from "@/lib/utils";
-import type { EffectInstance, EffectDefinition } from "@/services/effects";
+import type { EffectInstance, EffectDefinition } from "@/services/api/providers";
 
 interface EffectSlotProps {
     effect: EffectInstance;

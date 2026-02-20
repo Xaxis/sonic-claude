@@ -14,8 +14,8 @@
 import { useEffect, useState } from "react";
 import { EffectSlot } from "./EffectSlot.tsx";
 import { EffectSelector } from "./EffectSelector.tsx";
-import { effectsService } from "@/services/effects";
-import type { EffectInstance, EffectDefinition, TrackEffectChain } from "@/services/effects";
+import { api } from "@/services/api";
+import type { EffectInstance, EffectDefinition, TrackEffectChain } from "@/services/api/providers";
 
 interface EffectsChainProps {
     trackId: string;
@@ -43,7 +43,7 @@ export function EffectsChain({
     const loadEffectChain = async () => {
         try {
             setIsLoading(true);
-            const chain = await effectsService.getTrackEffectChain(trackId);
+            const chain = await api.effects.getTrackEffectChain(trackId);
             setEffectChain(chain);
         } catch (error) {
             console.error("Failed to load effect chain:", error);
@@ -60,7 +60,7 @@ export function EffectsChain({
 
     const loadEffectDefinitions = async () => {
         try {
-            const defs = await effectsService.getEffectDefinitions();
+            const defs = await api.effects.getDefinitions();
             setEffectDefinitions(defs);
         } catch (error) {
             console.error("Failed to load effect definitions:", error);
@@ -80,7 +80,8 @@ export function EffectsChain({
                 return;
             }
 
-            await effectsService.createEffect(trackId, {
+            await api.effects.addEffect({
+                track_id: trackId,
                 effect_name: effectName,
                 slot_index: nextSlot,
             });
@@ -99,7 +100,7 @@ export function EffectsChain({
         value: number
     ) => {
         try {
-            await effectsService.updateEffectParameter(effectId, parameterName, value);
+            await api.effects.updateEffect(effectId, { parameters: { [parameterName]: value } });
             // Update local state optimistically
             if (effectChain) {
                 setEffectChain({
@@ -119,7 +120,7 @@ export function EffectsChain({
 
     const handleToggleBypass = async (effectId: string, bypassed: boolean) => {
         try {
-            await effectsService.toggleEffectBypass(effectId, bypassed);
+            await api.effects.updateEffect(effectId, { bypassed });
             // Update local state optimistically
             if (effectChain) {
                 setEffectChain({
@@ -137,7 +138,7 @@ export function EffectsChain({
 
     const handleDelete = async (effectId: string) => {
         try {
-            await effectsService.deleteEffect(effectId);
+            await api.effects.deleteEffect(effectId);
             await loadEffectChain();
             onEffectRemoved?.();
         } catch (error) {
