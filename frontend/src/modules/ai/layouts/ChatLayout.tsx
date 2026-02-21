@@ -6,14 +6,23 @@
  */
 
 import { useState, useRef, useEffect } from "react";
-import { useAIContext } from "../contexts/AIContext";
+import { useAI } from "@/contexts/AIContext";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Send, Sparkles, Music, Zap, Info } from "lucide-react";
+import type { AIState } from "../hooks/useAIState";
 
-export function ChatLayout() {
-    const { chatHistory, handlers, state } = useAIContext();
+interface ChatLayoutProps {
+    state: AIState;
+    handlers: {
+        handleSendMessage: (message: string) => Promise<void>;
+        handleRefreshState: () => Promise<void>;
+    };
+}
+
+export function ChatLayout({ state, handlers }: ChatLayoutProps) {
+    const { chatHistory } = useAI();
     const [inputValue, setInputValue] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
 

@@ -3,15 +3,22 @@
  *
  * Displays a sequencer track as a vertical mixer channel strip
  * Follows professional DAW layout (top to bottom): name, meter, pan, fader, mute/solo
+ *
+ * ARCHITECTURE:
+ * - Tracks have mixer properties (volume, pan, is_muted, is_solo) directly on them
+ * - Updates go through Sequencer API (not a separate mixer API)
+ * - Real-time meters come from TelemetryContext
  */
 
 import { Fader } from "@/components/ui/fader.tsx";
 import { Knob } from "@/components/ui/knob.tsx";
 import { Meter } from "@/components/ui/meter.tsx";
-import { useMixerContext } from '@/contexts/MixerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
+import { useMixer } from '@/contexts/MixerContext';
 import { MixerButton } from "./MixerButton.tsx";
 import { volumeToDb, dbToVolume, formatDb } from "@/lib/audio-utils";
 import type { SequencerTrack } from "@/modules/sequencer/types";
+import { api } from "@/services/api";
 
 interface MixerChannelStripProps {
     track: SequencerTrack;
@@ -20,13 +27,11 @@ interface MixerChannelStripProps {
 }
 
 export function MixerChannelStrip({ track, showMeters, meterMode }: MixerChannelStripProps) {
-    const { handlers, meters } = useMixerContext();
-    const {
-        handleFaderChange,
-        handlePanChange,
-        handleToggleMute,
-        handleToggleSolo,
-    } = handlers;
+    // Get real-time meters from mixer context
+    const { meters } = useMixer();
+
+    // Get sequencer actions for updating track properties
+    const { updateTrackVolume, updateTrackPan, muteTrack, soloTrack } = useSequencer();
 
     const faderValue = volumeToDb(track.volume);
 
@@ -79,7 +84,7 @@ export function MixerChannelStrip({ track, showMeters, meterMode }: MixerChannel
             <div className="flex justify-center rounded-md bg-background/40 p-2 border border-border/30">
                 <Knob
                     value={track.pan}
-                    onChange={(value) => handlePanChange(track.id, value)}
+                    onChange={(value) => updateTrackPan(track.id, value)}
                     label="Pan"
                     min={-1}
                     max={1}
@@ -98,7 +103,7 @@ export function MixerChannelStrip({ track, showMeters, meterMode }: MixerChannel
                 <div className="flex flex-1 justify-center">
                     <Fader
                         value={faderValue}
-                        onChange={(db) => handleFaderChange(track.id, dbToVolume(db))}
+                        onChange={(db) => updateTrackVolume(track.id, dbToVolume(db))}
                         min={-60}
                         max={12}
                         className="flex-1"
@@ -111,13 +116,13 @@ export function MixerChannelStrip({ track, showMeters, meterMode }: MixerChannel
                 <MixerButton
                     variant="mute"
                     active={track.is_muted}
-                    onClick={() => handleToggleMute(track.id)}
+                    onClick={() => muteTrack(track.id, !track.is_muted)}
                     className="flex-1"
                 />
                 <MixerButton
                     variant="solo"
                     active={track.is_solo}
-                    onClick={() => handleToggleSolo(track.id)}
+                    onClick={() => soloTrack(track.id, !track.is_solo)}
                     className="flex-1"
                 />
             </div>

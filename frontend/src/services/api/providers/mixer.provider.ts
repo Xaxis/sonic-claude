@@ -25,15 +25,22 @@ export interface CreateChannelRequest {
 }
 
 export interface UpdateChannelRequest {
-    volume?: number;
+    name?: string;
+    color?: string;
+    input_gain?: number;
     pan?: number;
-    muted?: boolean;
-    soloed?: boolean;
+    fader?: number;
+    mute?: boolean;
+    solo?: boolean;
+    phase_invert?: boolean;
+    output_bus?: string;
 }
 
 export interface UpdateMasterRequest {
-    volume?: number;
-    muted?: boolean;
+    fader?: number;
+    mute?: boolean;
+    limiter_enabled?: boolean;
+    limiter_threshold?: number;
 }
 
 // ============================================================================

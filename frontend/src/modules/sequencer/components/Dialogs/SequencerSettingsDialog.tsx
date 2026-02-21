@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
-import type { Sequence } from "./types";
+import type { Sequence } from "../../types";
 
 interface SequenceSettingsDialogProps {
     isOpen: boolean;

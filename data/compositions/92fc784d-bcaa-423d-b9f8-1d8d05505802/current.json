@@ -1,0 +1,53 @@
+{
+  "id": "7b9477e0-81bf-467c-9480-6ca7dcc1aea6",
+  "name": "Comp 1",
+  "created_at": "2026-02-20T18:38:15.554379",
+  "sequence": {
+    "id": "92fc784d-bcaa-423d-b9f8-1d8d05505802",
+    "name": "Comp 1",
+    "tempo": 120.0,
+    "time_signature": "4/4",
+    "tracks": [],
+    "clips": [],
+    "is_playing": false,
+    "current_position": 0.0,
+    "loop_enabled": false,
+    "loop_start": 0.0,
+    "loop_end": 16.0,
+    "zoom": 0.5,
+    "snap_enabled": true,
+    "grid_size": 16,
+    "selected_clip_id": null,
+    "piano_roll_clip_id": null,
+    "sample_editor_clip_id": null,
+    "created_at": "2026-02-20T18:38:15.505499",
+    "updated_at": "2026-02-20T18:38:15.505505"
+  },
+  "mixer_state": {
+    "channels": [],
+    "master": {
+      "id": "master",
+      "name": "Master",
+      "color": "#ef4444",
+      "type": "master",
+      "fader": 0.0,
+      "mute": false,
+      "meter_peak_left": -60.0,
+      "meter_peak_right": -60.0,
+      "limiter_enabled": false,
+      "limiter_threshold": -1.0,
+      "sc_bus_index": 0,
+      "created_at": "2026-02-20T18:32:23.544654",
+      "updated_at": "2026-02-20T18:32:23.544655"
+    },
+    "show_meters": true,
+    "meter_mode": "peak",
+    "selected_channel_id": null
+  },
+  "track_effects": [],
+  "sample_assignments": {},
+  "chat_history": [],
+  "metadata": {
+    "source": "manual_create"
+  }
+}

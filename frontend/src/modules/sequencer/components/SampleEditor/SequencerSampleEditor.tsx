@@ -8,11 +8,10 @@
 import { useState, useEffect } from "react";
 import { X, Grid3x3 } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { SequencerSampleEditorSection } from "../../layouts/SequencerSampleEditorSection.tsx";
-import { useSequencerContext } from '@/contexts/SequencerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
 import { useWaveformData } from "../../hooks/useWaveformData.ts";
 
 interface SequencerSampleEditorProps {
@@ -55,7 +54,7 @@ export function SequencerSampleEditor({
     onLoopEndChange,
 }: SequencerSampleEditorProps) {
     // Get tempo from context
-    const { tempo } = useSequencerContext();
+    const { tempo } = useSequencer();
 
     // Local UI state
     const [localGain, setLocalGain] = useState(gain);

@@ -14,18 +14,18 @@
 
 import { useEffect } from "react";
 import { toast } from "sonner";
-import type { Clip } from "@/types/sequencer";
+import type { SequencerClip } from "../types";
 
 interface UseSequencerKeyboardProps {
     // State
     selectedClip: string | null;
-    clipboardClip: Clip | null;
+    clipboardClip: SequencerClip | null;
     activeSequenceId: string | null;
-    clips: Clip[];
-    
+    clips: SequencerClip[];
+
     // Actions
     setSelectedClip: (clipId: string | null) => void;
-    setClipboardClip: (clip: Clip | null) => void;
+    setClipboardClip: (clip: SequencerClip | null) => void;
     
     // Handlers
     handleDeleteClip: (clipId: string) => Promise<void>;

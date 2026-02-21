@@ -132,16 +132,16 @@ export function SynthesisProvider({ children }: { children: ReactNode }) {
         bus: number | null = null
     ): Promise<ActiveSynth> => {
         try {
-            const synth = await api.audio.createSynth({ synthdef, params, group, bus });
+            const synth = await api.audio.createSynth({ synthdef, params, group, bus: bus ?? undefined });
             const activeSynth: ActiveSynth = {
-                id: synth.id,
+                id: synth.synth_id,
                 synthdef: synth.synthdef,
-                parameters: synth.parameters,
+                parameters: params, // Backend doesn't return parameters, use what we sent
                 group: synth.group,
-                bus: synth.bus,
+                bus: synth.bus ?? null,
             };
             setState(prev => {
-                const newActiveSynths = { ...prev.activeSynths, [synth.id]: activeSynth };
+                const newActiveSynths = { ...prev.activeSynths, [synth.synth_id]: activeSynth };
                 broadcastUpdate('activeSynths', newActiveSynths);
                 return { ...prev, activeSynths: newActiveSynths };
             });
@@ -175,7 +175,7 @@ export function SynthesisProvider({ children }: { children: ReactNode }) {
 
     const releaseSynth = useCallback(async (synthId: number) => {
         try {
-            await api.audio.releaseSynth(synthId);
+            await api.audio.deleteSynth(synthId, true); // release=true
             // Note: Don't remove from activeSynths immediately - synth will release over time
             // Backend will handle cleanup
         } catch (error) {

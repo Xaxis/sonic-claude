@@ -19,41 +19,15 @@ import {
 import { windowManager } from "@/services/window-manager";
 import { api } from "@/services/api";
 import { toast } from "sonner";
+import type {
+    EffectDefinition,
+    EffectParameter,
+    EffectInstance,
+    TrackEffectChain
+} from "@/services/api/providers";
 
-// ============================================================================
-// TYPES (from effects provider)
-// ============================================================================
-
-export interface EffectParameter {
-    name: string;
-    value: number;
-    min: number;
-    max: number;
-    default: number;
-    unit?: string;
-}
-
-export interface EffectDefinition {
-    name: string;
-    display_name: string;
-    category: string;
-    description: string;
-    parameters: EffectParameter[];
-}
-
-export interface TrackEffect {
-    id: string;
-    track_id: string;
-    effect_name: string;
-    slot_index: number;
-    bypassed: boolean;
-    parameters: Record<string, number>;
-}
-
-export interface TrackEffectChain {
-    track_id: string;
-    effects: TrackEffect[];
-}
+// Re-export types for convenience
+export type { EffectDefinition, EffectParameter, EffectInstance, TrackEffectChain };
 
 // ============================================================================
 // STATE TYPES
@@ -81,7 +55,8 @@ interface EffectsContextValue extends EffectsState {
 
     // Effect Chain Management
     loadEffectChain: (trackId: string) => Promise<void>;
-    addEffect: (trackId: string, effectName: string, slotIndex: number) => Promise<void>;
+    loadEffectChains: (chains: TrackEffectChain[]) => Promise<void>; // Load all chains for composition
+    addEffect: (trackId: string, effectName: string, slotIndex?: number) => Promise<void>;
     deleteEffect: (effectId: string) => Promise<void>;
     moveEffect: (effectId: string, newSlotIndex: number) => Promise<void>;
     toggleEffectBypass: (effectId: string) => Promise<void>;
@@ -147,8 +122,7 @@ export function EffectsProvider({ children }: { children: ReactNode }) {
 
     const loadEffectChain = useCallback(async (trackId: string) => {
         try {
-            const effects = await api.effects.getTrackEffects(trackId);
-            const chain: TrackEffectChain = { track_id: trackId, effects: effects as any[] };
+            const chain = await api.effects.getTrackEffectChain(trackId);
             setState(prev => {
                 const newChains = { ...prev.effectChains, [trackId]: chain };
                 broadcastUpdate('effectChains', newChains);
@@ -160,7 +134,35 @@ export function EffectsProvider({ children }: { children: ReactNode }) {
         }
     }, [broadcastUpdate]);
 
-    const addEffect = useCallback(async (trackId: string, effectName: string, slotIndex: number) => {
+    /**
+     * Load all effect chains for a composition
+     * This is called by CompositionContext when loading a composition
+     */
+    const loadEffectChains = useCallback(async (chains: TrackEffectChain[]) => {
+        try {
+            // Convert array to Record<trackId, chain>
+            const chainsRecord: Record<string, TrackEffectChain> = {};
+            for (const chain of chains) {
+                chainsRecord[chain.track_id] = chain;
+            }
+
+            // Update state
+            setState(prev => ({
+                ...prev,
+                effectChains: chainsRecord,
+            }));
+
+            // Broadcast update
+            broadcastUpdate('effectChains', chainsRecord);
+
+        } catch (error) {
+            console.error("Failed to load effect chains:", error);
+            toast.error("Failed to load effect chains");
+            throw error;
+        }
+    }, [broadcastUpdate]);
+
+    const addEffect = useCallback(async (trackId: string, effectName: string, slotIndex?: number) => {
         try {
             const effect = await api.effects.addEffect({ track_id: trackId, effect_name: effectName, slot_index: slotIndex });
             setState(prev => {
@@ -201,7 +203,7 @@ export function EffectsProvider({ children }: { children: ReactNode }) {
 
     const moveEffect = useCallback(async (effectId: string, newSlotIndex: number) => {
         try {
-            await api.effects.updateEffect(effectId, { slot_index: newSlotIndex });
+            await api.effects.moveEffect(effectId, { new_slot_index: newSlotIndex });
             setState(prev => {
                 const newChains = { ...prev.effectChains };
                 Object.keys(newChains).forEach(trackId => {
@@ -226,7 +228,7 @@ export function EffectsProvider({ children }: { children: ReactNode }) {
             let currentBypass = false;
             Object.values(state.effectChains).forEach(chain => {
                 const effect = chain.effects.find(e => e.id === effectId);
-                if (effect) currentBypass = effect.bypassed;
+                if (effect) currentBypass = effect.is_bypassed;
             });
 
             await api.effects.updateEffect(effectId, { bypassed: !currentBypass });
@@ -236,7 +238,7 @@ export function EffectsProvider({ children }: { children: ReactNode }) {
                     newChains[trackId] = {
                         ...newChains[trackId],
                         effects: newChains[trackId].effects.map(e =>
-                            e.id === effectId ? { ...e, bypassed: !currentBypass } : e
+                            e.id === effectId ? { ...e, is_bypassed: !currentBypass } : e
                         ),
                     };
                 });
@@ -289,6 +291,7 @@ export function EffectsProvider({ children }: { children: ReactNode }) {
         ...state,
         loadEffectDefinitions,
         loadEffectChain,
+        loadEffectChains,
         addEffect,
         deleteEffect,
         moveEffect,

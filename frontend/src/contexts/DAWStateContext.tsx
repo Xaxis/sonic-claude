@@ -26,7 +26,6 @@ import {
     createContext,
     useContext,
     useState,
-    useCallback,
     ReactNode,
 } from "react";
 import type { AudioEngineStatus } from "@/types";

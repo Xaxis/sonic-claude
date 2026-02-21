@@ -56,7 +56,8 @@ export interface SetTempoRequest {
 }
 
 export interface SeekRequest {
-    position_beats: number;
+    position: number;
+    trigger_audio?: boolean;
 }
 
 export interface PlaySequenceRequest {
@@ -64,31 +65,38 @@ export interface PlaySequenceRequest {
 }
 
 export interface AddClipRequest {
-    sequence_id: string;
-    track_id: string;
-    start_beat: number;
-    duration_beats: number;
+    sequence_id: string;  // Used to construct URL, not sent in body
     clip_type: "midi" | "audio";
-    notes?: any[];
-    sample_path?: string;
+    track_id: string;
+    start_time: number;  // Backend uses start_time, not start_beat
+    duration: number;    // Backend uses duration, not duration_beats
+    midi_events?: any[];
+    audio_file_path?: string;
+    name?: string;
 }
 
 export interface UpdateClipRequest {
-    start_beat?: number;
-    duration_beats?: number;
-    notes?: any[];
+    start_time?: number;
+    duration?: number;
+    midi_events?: any[];
+    is_muted?: boolean;
+    is_looped?: boolean;
+    gain?: number;
+    audio_offset?: number;
 }
 
 export interface CreateTrackRequest {
     sequence_id: string;
     name: string;
-    track_type: "midi" | "audio";
-    synthdef?: string;
+    type: "midi" | "audio" | "sample";  // Backend uses 'type', not 'track_type'
+    instrument?: string;  // For MIDI tracks
 }
 
 export interface UpdateTrackRequest {
     name?: string;
-    synthdef?: string;
+    volume?: number;  // 0.0-2.0, 1.0 = unity
+    pan?: number;     // -1.0 to 1.0
+    instrument?: string;  // For MIDI tracks
 }
 
 export interface RenameTrackRequest {
@@ -171,7 +179,8 @@ export class SequencerProvider extends BaseAPIClient {
 
     // === CLIPS ===
     async addClip(request: AddClipRequest): Promise<any> {
-        return this.post("/api/sequencer/clips", request);
+        const { sequence_id, ...body } = request;
+        return this.post(`/api/sequencer/sequences/${sequence_id}/clips`, body);
     }
 
     async getClip(id: string): Promise<any> {
@@ -186,6 +195,10 @@ export class SequencerProvider extends BaseAPIClient {
         return this.delete(`/api/sequencer/clips/${id}`);
     }
 
+    async duplicateClip(sequenceId: string, clipId: string): Promise<any> {
+        return this.post(`/api/sequencer/sequences/${sequenceId}/clips/${clipId}/duplicate`, {});
+    }
+
     // === TRACKS ===
     async createTrack(request: CreateTrackRequest): Promise<any> {
         return this.post("/api/sequencer/tracks", request);
@@ -196,7 +209,7 @@ export class SequencerProvider extends BaseAPIClient {
     }
 
     async updateTrack(id: string, request: UpdateTrackRequest): Promise<any> {
-        return this.patch(`/api/sequencer/tracks/${id}`, request);
+        return this.put(`/api/sequencer/tracks/${id}`, request);
     }
 
     async renameTrack(id: string, request: RenameTrackRequest): Promise<any> {
@@ -209,6 +222,10 @@ export class SequencerProvider extends BaseAPIClient {
 
     async soloTrack(id: string, request: SoloTrackRequest): Promise<any> {
         return this.post(`/api/sequencer/tracks/${id}/solo`, request);
+    }
+
+    async deleteTrack(id: string): Promise<any> {
+        return this.delete(`/api/sequencer/tracks/${id}`);
     }
 
     // === SYNTHDEFS ===

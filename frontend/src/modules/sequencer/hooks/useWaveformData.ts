@@ -66,8 +66,8 @@ export function useWaveformData({
 
             try {
                 // Fetch sample metadata to get duration
-                const sampleMetadata = await api.samples.getById(sampleId);
-                const sampleDurationSeconds = sampleMetadata.duration;
+                const sampleResponse = await api.samples.getById(sampleId);
+                const sampleDurationSeconds = sampleResponse.sample?.duration ?? 0;
 
                 // Fetch audio file
                 const url = apiConfig.getURL(`/api/samples/${sampleId}/download`);

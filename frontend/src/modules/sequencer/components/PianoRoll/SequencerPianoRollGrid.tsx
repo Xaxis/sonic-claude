@@ -5,9 +5,9 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils.ts";
-import type { MIDIEvent } from "../types.ts";
-import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
+import { cn } from "@/lib/utils";
+import type { MIDIEvent } from "../../types";
+import type { ActiveNote } from "@/hooks/useTransportWebsocket";
 
 interface SequencerPianoRollGridProps {
     notes: MIDIEvent[];

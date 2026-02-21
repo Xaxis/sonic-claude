@@ -16,9 +16,9 @@ import { SequencerPianoRollKeyboard } from "../components/PianoRoll/SequencerPia
 import { SequencerPianoRollGrid } from "../components/PianoRoll/SequencerPianoRollGrid.tsx";
 import { SequencerPianoRollRuler } from "../components/PianoRoll/SequencerPianoRollRuler.tsx";
 import { SequencerTimelineLoopRegion } from "../components/Timeline/SequencerTimelineLoopRegion.tsx";
-import { useSequencerContext } from '@/contexts/SequencerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
 import { EditorGridLayout } from "@/components/layout/EditorGridLayout.tsx";
-import type { MIDIEvent } from "../types.ts";
+import type { MIDIEvent } from "../types";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
 interface SequencerPianoRollSectionProps {
@@ -91,9 +91,8 @@ export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps)
         onLoopEndChange,
     } = props;
 
-    // Get state from context
-    const { state } = useSequencerContext();
-    const { snapEnabled, gridSize, isLooping, loopStart, loopEnd, zoom } = state;
+    // Get state from global context
+    const { snapEnabled, gridSize, isLooping, loopStart, loopEnd, zoom } = useSequencer();
 
     // Calculate total width for ruler
     // Add extra width to ensure content extends beyond viewport for smooth scrolling

@@ -29,6 +29,7 @@ class CreateTrackRequest(BaseModel):
     sample_id: Optional[str] = None  # For sample-based tracks
     sample_name: Optional[str] = None  # Cached sample name
     sample_file_path: Optional[str] = None  # Cached file path
+    instrument: Optional[str] = None  # For MIDI tracks
 
 
 class UpdateTrackMuteRequest(BaseModel):
@@ -64,7 +65,8 @@ async def create_track(
             color=request.color,
             sample_id=request.sample_id,
             sample_name=request.sample_name,
-            sample_file_path=request.sample_file_path
+            sample_file_path=request.sample_file_path,
+            instrument=request.instrument
         )
         if not track:
             raise SequenceNotFoundError(request.sequence_id)

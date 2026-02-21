@@ -244,7 +244,7 @@ export function useAudioInput({ onRecordingComplete }: UseAudioInputProps = {}) 
             const scDeviceIndex = getSupercolliderDeviceIndex(deviceLabel);
             const ampLinear = Math.pow(10, gainRef.current / 20); // Convert dB to linear
 
-            await api.audioInput.setInputDevice(scDeviceIndex, ampLinear);
+            await api.audio.setInputDevice({ device_index: scDeviceIndex, amp: ampLinear });
             console.log(`✅ SuperCollider input set to device ${scDeviceIndex} (${deviceLabel})`);
         } catch (error) {
             // Silently ignore - backend may not be ready yet
@@ -255,7 +255,7 @@ export function useAudioInput({ onRecordingComplete }: UseAudioInputProps = {}) 
     // Stop SuperCollider input
     const stopSupercolliderInput = useCallback(async () => {
         try {
-            await api.audioInput.stopInput();
+            await api.audio.stopInput();
             console.log("🛑 SuperCollider input stopped");
         } catch (error) {
             console.warn("Failed to stop SuperCollider input:", error);
@@ -276,7 +276,7 @@ export function useAudioInput({ onRecordingComplete }: UseAudioInputProps = {}) 
         // Update SuperCollider gain
         if (isMonitoring && selectedInputDevice) {
             const ampLinear = Math.pow(10, newGain / 20);
-            api.audioInput.setInputGain(ampLinear).catch((error) => {
+            api.audio.setInputGain({ amp: ampLinear }).catch((error: any) => {
                 console.warn("Failed to update SuperCollider gain:", error);
             });
         }

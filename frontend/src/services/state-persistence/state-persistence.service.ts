@@ -20,14 +20,17 @@ export const STORAGE_KEYS = {
     // Layout & UI
     LAYOUT: "sonic-claude-layout-v2",
     WINDOW_STATE: "sonic-claude-window-state",
-    
+
     // Sequencer
     ACTIVE_SEQUENCE_ID: "sonic-claude-active-sequence",
     SEQUENCER_SPLIT_RATIO: "sonic-claude-sequencer-split",
-    
+
+    // Composition
+    ACTIVE_COMPOSITION_ID: "sonic-claude-active-composition",
+
     // Settings
     SETTINGS: "sonic-claude-settings",
-    
+
     // Session
     LAST_SESSION: "sonic-claude-last-session",
 } as const;
@@ -54,7 +57,7 @@ export interface SequencerUIState {
 // PERSISTENCE SERVICE
 // ============================================================================
 
-class StatePersistenceService {
+export class StatePersistenceService {
     /**
      * Get value from localStorage with type safety
      */
@@ -120,6 +123,22 @@ class StatePersistenceService {
             this.remove(STORAGE_KEYS.ACTIVE_SEQUENCE_ID);
         } else {
             this.set(STORAGE_KEYS.ACTIVE_SEQUENCE_ID, sequenceId);
+        }
+    }
+
+    // ========================================================================
+    // ACTIVE COMPOSITION
+    // ========================================================================
+
+    getActiveCompositionId(): string | null {
+        return this.get<string | null>(STORAGE_KEYS.ACTIVE_COMPOSITION_ID, null);
+    }
+
+    setActiveCompositionId(compositionId: string | null): void {
+        if (compositionId === null) {
+            this.remove(STORAGE_KEYS.ACTIVE_COMPOSITION_ID);
+        } else {
+            this.set(STORAGE_KEYS.ACTIVE_COMPOSITION_ID, compositionId);
         }
     }
 

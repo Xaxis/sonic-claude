@@ -31,9 +31,9 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
     // Load all samples from backend
     const loadSamples = useCallback(async () => {
         try {
-            const loadedSamples = await api.samples.getAll();
-            setSamples(loadedSamples);
-            console.log(`✅ Loaded ${loadedSamples.length} samples`);
+            const response = await api.samples.getAll();
+            setSamples(response.samples);
+            console.log(`✅ Loaded ${response.samples.length} samples`);
         } catch (error) {
             console.error("Failed to load samples:", error);
             toast.error("Failed to load samples");
@@ -49,16 +49,19 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
     const handleUploadSample = useCallback(async (file: File, name: string, category: string = "Uncategorized") => {
         setIsUploading(true);
         try {
-            const uploadedSample = await api.samples.upload(file, name, category);
+            const response = await api.samples.upload(file, name, category);
 
-            // Update duration after upload
-            const audio = new Audio(api.samples.getDownloadUrl(uploadedSample.id));
-            audio.addEventListener("loadedmetadata", async () => {
-                const duration = audio.duration;
-                await api.samples.updateDuration(uploadedSample.id, duration);
-                await loadSamples(); // Reload to get updated duration
-            });
-            
+            if (response.sample) {
+                // Update duration after upload
+                const downloadUrl = `/api/samples/${response.sample.id}/download`;
+                const audio = new Audio(downloadUrl);
+                audio.addEventListener("loadedmetadata", async () => {
+                    const duration = audio.duration;
+                    await api.samples.updateDuration(response.sample!.id, duration);
+                    await loadSamples(); // Reload to get updated duration
+                });
+            }
+
             toast.success(`Sample "${name}" uploaded successfully`);
             await loadSamples();
         } catch (error) {
@@ -89,7 +92,7 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
         if (!editingSampleId) return;
 
         try {
-            await api.samples.updateSample(editingSampleId, {
+            await api.samples.update(editingSampleId, {
                 name: editName,
                 category: editCategory,
             });
@@ -141,7 +144,7 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
             }
 
             // Fetch and decode audio
-            const url = api.samples.getDownloadUrl(sampleId);
+            const url = `/api/samples/${sampleId}/download`;
             const response = await fetch(url);
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);

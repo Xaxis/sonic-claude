@@ -28,16 +28,18 @@ export function AudioInputSection({
                 
                 // Upload to backend
                 toast.info("Saving recording...");
-                const metadata = await api.samples.upload(file, name, "Uncategorized");
+                const response = await api.samples.upload(file, name, "Uncategorized");
 
-                // Update duration on backend
-                await api.samples.updateDuration(metadata.id, duration);
+                if (response.sample) {
+                    // Update duration on backend
+                    await api.samples.updateDuration(response.sample.id, duration);
 
-                toast.success(`Recording saved: ${name}`);
+                    toast.success(`Recording saved: ${name}`);
 
-                // Notify parent
-                if (onRecordingComplete) {
-                    onRecordingComplete(metadata.id);
+                    // Notify parent
+                    if (onRecordingComplete) {
+                        onRecordingComplete(response.sample.id);
+                    }
                 }
 
                 // Switch to library tab to show the new recording

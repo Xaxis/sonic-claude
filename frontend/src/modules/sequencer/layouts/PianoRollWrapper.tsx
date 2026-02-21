@@ -11,13 +11,13 @@
 
 import { SequencerPianoRoll } from "../components/PianoRoll/SequencerPianoRoll.tsx";
 import { Music } from "lucide-react";
-import type { Clip, SequencerTrack } from "@/types/sequencer";
-import type { MIDIEvent } from "../types.ts";
+import type { SequencerClip, SequencerTrack } from "../types";
+import type { MIDIEvent } from "../types";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
 interface PianoRollWrapperProps {
     // Clip data
-    clip: Clip | undefined;
+    clip: SequencerClip | undefined;
     track: SequencerTrack | undefined; // Track for instrument info
 
     // Drag state (for real-time sync with timeline)

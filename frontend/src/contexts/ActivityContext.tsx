@@ -91,14 +91,11 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
 
     // Listen for state changes from other windows
     useEffect(() => {
-        const handleMessage = (event: MessageEvent) => {
-            if (event.data?.type === "state-update" && event.data?.key === "ai-activity") {
-                setState(event.data.value);
-            }
-        };
+        const unsubscribe = windowManager.subscribeToState("ai-activity", (value: any) => {
+            setState(value);
+        });
 
-        windowManager.channel.addEventListener("message", handleMessage);
-        return () => windowManager.channel.removeEventListener("message", handleMessage);
+        return unsubscribe;
     }, []);
 
     // Start a new activity

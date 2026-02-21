@@ -4,12 +4,9 @@
  *
  * Architecture:
  * - PROVIDERS (this file): Thin HTTP clients mapping 1:1 to backend routes
- * - SERVICES: Business logic that orchestrates multiple providers
- * - CONTEXTS: React state management that calls services
+ * - CONTEXTS: React state management that calls providers directly
  */
 
-import { SampleService } from "../samples/samples.service";
-import { AudioInputService } from "../audio-input/audio-input.service";
 import {
     CompositionsProvider,
     SequencerProvider,
@@ -47,11 +44,9 @@ import {
  *   const samples = await api.samples.getAll();
  *   await api.samples.upload(file, "Kick", "Drums");
  *
- *   // Audio Input (legacy - kept for backward compatibility)
- *   await api.audioInput.setInputDevice(0, 1.0);
  */
 export class APIClient {
-    // === NEW PROVIDERS (map 1:1 to backend API modules) ===
+    // === PROVIDERS (map 1:1 to backend API modules) ===
     public compositions: CompositionsProvider;
     public sequencer: SequencerProvider;
     public mixer: MixerProvider;
@@ -60,12 +55,8 @@ export class APIClient {
     public ai: AIProvider;
     public samples: SamplesProvider;
 
-    // === LEGACY SERVICES (kept for backward compatibility) ===
-    public audioInput: AudioInputService;
-    public samplesLegacy: SampleService;
-
     constructor(baseURL?: string) {
-        // New providers (7/7 backend API modules)
+        // Initialize all providers (7/7 backend API modules)
         this.compositions = new CompositionsProvider(baseURL);
         this.sequencer = new SequencerProvider(baseURL);
         this.mixer = new MixerProvider(baseURL);
@@ -73,10 +64,6 @@ export class APIClient {
         this.audio = new AudioProvider(baseURL);
         this.ai = new AIProvider(baseURL);
         this.samples = new SamplesProvider(baseURL);
-
-        // Legacy services (to be refactored)
-        this.audioInput = new AudioInputService(baseURL);
-        this.samplesLegacy = new SampleService(baseURL);
     }
 }
 
@@ -85,10 +72,6 @@ export const api = new APIClient();
 
 // Export providers for direct import if needed
 export * from "./providers";
-
-// Export legacy services for backward compatibility
-export { SampleService } from "../samples/samples.service";
-export { AudioInputService } from "../audio-input/audio-input.service";
 
 // Export base classes
 export { BaseAPIClient, APIError } from "./base";

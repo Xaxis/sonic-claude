@@ -51,7 +51,7 @@ export interface EditorGridLayoutProps {
     contentWidth: number; // Total width of scrollable content
 
     // Scroll handling
-    scrollRef: React.RefObject<HTMLDivElement>;
+    scrollRef: React.RefObject<HTMLDivElement | null>;
     onScroll: (e: React.UIEvent<HTMLDivElement>) => void;
 
     // Data attributes for scroll sync (optional, defaults provided)

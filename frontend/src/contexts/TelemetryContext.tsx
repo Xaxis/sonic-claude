@@ -24,6 +24,7 @@ import {
     createContext,
     useContext,
     ReactNode,
+    useEffect,
 } from "react";
 import { useSpectrumWebSocket } from "@/hooks/useSpectrumWebsocket";
 import { useWaveformWebSocket, type WaveformData } from "@/hooks/useWaveformWebsocket";
@@ -74,6 +75,7 @@ const TelemetryContext = createContext<TelemetryContextValue | undefined>(undefi
 
 export function TelemetryProvider({ children }: { children: ReactNode }) {
     // Connect to all WebSocket endpoints
+    // These connections are always active - consuming components decide whether to use the data
     const { spectrum, isConnected: spectrumConnected } = useSpectrumWebSocket();
     const { waveform, isConnected: waveformConnected } = useWaveformWebSocket();
     const { meters, isConnected: metersConnected } = useMeterWebSocket();
@@ -81,12 +83,13 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
     const { analytics, isConnected: analyticsConnected } = useAnalyticsWebSocket();
 
     // Check if all connections are active
-    const isFullyConnected =
+    const isFullyConnected = (
         spectrumConnected &&
         waveformConnected &&
         metersConnected &&
         transportConnected &&
-        analyticsConnected;
+        analyticsConnected
+    );
 
     const value: TelemetryContextValue = {
         // Spectrum

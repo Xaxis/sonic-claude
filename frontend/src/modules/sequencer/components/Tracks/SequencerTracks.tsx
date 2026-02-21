@@ -79,15 +79,16 @@ export function SequencerTracks({
     };
 
     const handleToggleExpand = (trackId: string) => {
-        setExpandedTracks((prev) => {
-            const next = new Set(prev);
+        if (typeof setExpandedTracks === 'function') {
+            const current = expandedTracks;
+            const next = new Set(current);
             if (next.has(trackId)) {
                 next.delete(trackId);
             } else {
                 next.add(trackId);
             }
-            return next;
-        });
+            setExpandedTracks(next);
+        }
     };
 
     return (

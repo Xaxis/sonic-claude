@@ -69,8 +69,10 @@ export function useMidiInput() {
 
             // Listen for MIDI messages
             input.onmidimessage = (event) => {
+                if (!event.data) return;
+
                 const [status, note, velocity] = event.data;
-                
+
                 // Show activity indicator
                 setMidiActivity(true);
                 setTimeout(() => setMidiActivity(false), 100);

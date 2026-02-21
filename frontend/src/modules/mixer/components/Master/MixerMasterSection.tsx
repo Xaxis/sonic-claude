@@ -7,11 +7,12 @@
 
 import { Fader } from "@/components/ui/fader.tsx";
 import { Meter } from "@/components/ui/meter.tsx";
-import { Toggle } from "@/components/ui/toggle.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
-import { useMixerContext } from '@/contexts/MixerContext';
+import { useMixer } from '@/contexts/MixerContext';
 import { formatDb } from "@/lib/audio-utils";
+import { cn } from "@/lib/utils";
 import type { MasterChannel } from "../../types.ts";
 
 interface MixerMasterSectionProps {
@@ -21,8 +22,7 @@ interface MixerMasterSectionProps {
 }
 
 export function MixerMasterSection({ master, showMeters, meterMode }: MixerMasterSectionProps) {
-    const { handlers, meters } = useMixerContext();
-    const { handleMasterFaderChange, handleToggleLimiter, handleLimiterThresholdChange } = handlers;
+    const { meters, updateMasterFader, toggleLimiter, setLimiterThreshold } = useMixer();
 
     // Get real-time meter data for master
     const masterMeter = meters["master"];
@@ -59,14 +59,17 @@ export function MixerMasterSection({ master, showMeters, meterMode }: MixerMaste
                     <Label className="text-[10px] font-black uppercase tracking-wider text-primary">
                         Limiter
                     </Label>
-                    <Toggle
-                        pressed={master.limiter_enabled}
-                        onPressedChange={handleToggleLimiter}
+                    <Button
+                        onClick={toggleLimiter}
+                        variant={master.limiter_enabled ? "default" : "outline"}
                         size="sm"
-                        className="h-6 px-2.5 text-[10px] font-bold"
+                        className={cn(
+                            "h-6 px-2.5 text-[10px] font-bold",
+                            master.limiter_enabled && "shadow-[0_0_10px_rgba(0,245,255,0.5)]"
+                        )}
                     >
                         {master.limiter_enabled ? "ON" : "OFF"}
-                    </Toggle>
+                    </Button>
                 </div>
                 {master.limiter_enabled && (
                     <div className="space-y-2">
@@ -76,7 +79,7 @@ export function MixerMasterSection({ master, showMeters, meterMode }: MixerMaste
                         <div className="flex items-center gap-2">
                             <Slider
                                 value={[master.limiter_threshold]}
-                                onValueChange={(values) => handleLimiterThresholdChange(values[0])}
+                                onValueChange={(values) => setLimiterThreshold(values[0])}
                                 min={-12}
                                 max={0}
                                 step={0.1}
@@ -101,7 +104,7 @@ export function MixerMasterSection({ master, showMeters, meterMode }: MixerMaste
                 <div className="flex flex-1 justify-center">
                     <Fader
                         value={master.fader}
-                        onChange={handleMasterFaderChange}
+                        onChange={updateMasterFader}
                         min={-60}
                         max={12}
                         className="flex-1"

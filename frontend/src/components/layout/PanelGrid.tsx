@@ -239,7 +239,7 @@ export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridPro
     /**
      * Handle drag start - track which panel is being dragged
      */
-    const handleDragStart = useCallback((layout: readonly GridLayoutItem[], oldItem: GridLayoutItem, newItem: GridLayoutItem) => {
+    const handleDragStart = useCallback((_layout: readonly GridLayoutItem[], _oldItem: GridLayoutItem, newItem: GridLayoutItem, _placeholder: GridLayoutItem, _e: MouseEvent, _element: HTMLElement) => {
         console.log('🎯 Drag started - panel:', newItem.i);
         setDraggingPanelId(newItem.i);
     }, []);
@@ -364,7 +364,7 @@ export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridPro
                 }}
                 compactor={verticalCompactor}
                 onLayoutChange={handleLayoutChange}
-                onDragStart={handleDragStart}
+                onDragStart={handleDragStart as any}
                 onDrag={handleDrag}
                 onDragStop={handleDragStop}
             >

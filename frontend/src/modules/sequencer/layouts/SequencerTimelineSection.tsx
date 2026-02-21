@@ -14,10 +14,9 @@ import React, { useState } from "react";
 import { SequencerTracks } from "../components/Tracks/SequencerTracks.tsx";
 import { SequencerTimeline } from "../components/Timeline/SequencerTimeline.tsx";
 import { SequencerTimelineRuler } from "../components/Timeline/SequencerTimelineRuler.tsx";
-import { useSequencerContext } from '@/contexts/SequencerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
 import { useTimelineCalculations } from "../hooks/useTimelineCalculations.ts";
 import { EditorGridLayout } from "@/components/layout/EditorGridLayout.tsx";
-import type { SequencerTrack, Clip } from "@/types/sequencer";
 
 interface SequencerTimelineSectionProps {
     // Scroll
@@ -76,11 +75,8 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
     } = props;
 
     // Get state from context
-    const { tracks, clips } = useSequencerContext();
-
     // Get state from context
-    const { state } = useSequencerContext();
-    const { zoom, snapEnabled, gridSize, isLooping, loopStart, loopEnd, selectedClip, pianoRollClipId, sampleEditorClipId } = state;
+    const { tracks, clips, zoom, snapEnabled, gridSize, isLooping, loopStart, loopEnd, selectedClipId, pianoRollClipId } = useSequencer();
 
     // Manage expanded tracks state
     const [expandedTracks, setExpandedTracks] = useState<Set<string>>(new Set());

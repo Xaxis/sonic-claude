@@ -7,7 +7,7 @@
 
 import { Activity, Sliders, Volume2 } from "lucide-react";
 import { Label } from "@/components/ui/label.tsx";
-import { Toggle } from "@/components/ui/toggle.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import {
     Select,
     SelectContent,
@@ -15,13 +15,17 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select.tsx";
-import { useMixerContext } from '@/contexts/MixerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
+import { useMixer } from '@/contexts/MixerContext';
 import { Badge } from "@/components/ui/badge.tsx";
+import { cn } from "@/lib/utils";
 
 export function MixerToolbar() {
-    const { state, actions, tracks, meters } = useMixerContext();
-    const { showMeters, meterMode } = state;
-    const { setShowMeters, setMeterMode } = actions;
+    // Get tracks from Sequencer (sequencer owns tracks)
+    const { tracks } = useSequencer();
+
+    // Get mixer state and actions
+    const { showMeters, meterMode, setShowMeters, setMeterMode } = useMixer();
 
     // Count active tracks (not muted)
     const activeTracks = tracks.filter(t => !t.is_muted).length;
@@ -53,16 +57,18 @@ export function MixerToolbar() {
 
             {/* Right: Meter Controls */}
             <div className="flex items-center gap-4">
-                <Toggle
-                    pressed={showMeters}
-                    onPressedChange={setShowMeters}
+                <Button
+                    onClick={() => setShowMeters(!showMeters)}
+                    variant={showMeters ? "default" : "outline"}
                     size="sm"
-                    aria-label="Toggle meters"
-                    className="gap-1.5"
+                    className={cn(
+                        "gap-1.5",
+                        showMeters && "shadow-[0_0_10px_rgba(0,245,255,0.5)]"
+                    )}
                 >
                     <Activity size={14} />
                     <span className="font-semibold">Meters</span>
-                </Toggle>
+                </Button>
 
                 {showMeters && (
                     <div className="flex items-center gap-2">

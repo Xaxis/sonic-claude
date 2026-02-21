@@ -28,3 +28,5 @@
 MAYBE:
 
 - Now look at SettingsContext .... I could be wrong but it looks old, and lits its maintaining responsibilities that should have been placed elsewhere... though I could be wrong, I might be completely wrong. You need to make sure there are no conflated responsibilities and redundancies and that we are collosing and developing consistent best practice patterns as we continue to refactor
+
+- Research "LLM music language", if midi or oscland or "life performance" language structures are right and building a proper "reference system" or whatever it takes to best suit LLMs to producing production quality music

@@ -9,7 +9,7 @@ import { useActivity } from "@/contexts/ActivityContext";
 import { ActivityIndicator } from "./ActivityIndicator";
 
 export function ActivityContainer() {
-    const { activities, completeActivity } = useActivity();
+    const { activities } = useActivity();
 
     if (activities.length === 0) return null;
 

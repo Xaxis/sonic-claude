@@ -16,7 +16,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select.tsx";
-import { useSequencerContext } from '@/contexts/SequencerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
 import type { Sequence } from "../../types.ts";
 
 interface SequencerToolbarProps {
@@ -38,10 +38,8 @@ export function SequencerToolbar({
     onSequenceSettings,
     onAddTrack,
 }: SequencerToolbarProps) {
-    // Get state and actions from context
-    const { state, actions } = useSequencerContext();
-    const { zoom, snapEnabled, gridSize } = state;
-    const { zoomIn, zoomOut, toggleSnap, setGridSize } = actions;
+    // Get state and actions from global context
+    const { zoom, snapEnabled, gridSize, setZoom, setSnapEnabled, setGridSize } = useSequencer();
 
     return (
         <div className="flex items-center justify-between gap-4">
@@ -96,7 +94,7 @@ export function SequencerToolbar({
                     <IconButton
                         icon={ZoomOut}
                         tooltip="Zoom out timeline"
-                        onClick={zoomOut}
+                        onClick={() => setZoom(Math.max(0.25, zoom - 0.25))}
                         variant="ghost"
                         size="icon-sm"
                         disabled={!activeSequenceId || zoom <= 0.25}
@@ -107,7 +105,7 @@ export function SequencerToolbar({
                     <IconButton
                         icon={ZoomIn}
                         tooltip="Zoom in timeline"
-                        onClick={zoomIn}
+                        onClick={() => setZoom(Math.min(4, zoom + 0.25))}
                         variant="ghost"
                         size="icon-sm"
                         disabled={!activeSequenceId || zoom >= 4}
@@ -116,7 +114,7 @@ export function SequencerToolbar({
                 <IconButton
                     icon={Grid3x3}
                     tooltip={snapEnabled ? "Snap to grid: ON" : "Snap to grid: OFF"}
-                    onClick={toggleSnap}
+                    onClick={() => setSnapEnabled(!snapEnabled)}
                     variant={snapEnabled ? "default" : "ghost"}
                     size="icon-sm"
                     className={snapEnabled ? "bg-primary/20 text-primary" : ""}

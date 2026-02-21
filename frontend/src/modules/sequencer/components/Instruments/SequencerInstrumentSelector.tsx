@@ -20,7 +20,6 @@ import {
     SelectItem,
     SelectLabel,
     SelectTrigger,
-    SelectValue,
 } from "@/components/ui/select.tsx";
 import { api } from "@/services/api";
 import type { SynthDefInfo } from "../../types.ts";

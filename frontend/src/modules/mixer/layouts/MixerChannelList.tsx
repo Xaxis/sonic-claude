@@ -2,16 +2,24 @@
  * MixerChannelList - Layout component for mixer channel strips
  *
  * Displays horizontal scrollable list of channel strips (from sequencer tracks) with master channel
- * Uses MixerContext for state management
+ *
+ * ARCHITECTURE:
+ * - Gets tracks from SequencerContext (sequencer owns tracks)
+ * - Gets mixer state from MixerContext (mixer owns channels/master)
+ * - Each track has a corresponding mixer channel (1:1 relationship)
  */
 
-import { useMixerContext } from '@/contexts/MixerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
+import { useMixer } from '@/contexts/MixerContext';
 import { MixerChannelStrip } from "../components/Channel/MixerChannelStrip.tsx";
 import { MixerMasterSection } from "../components/Master/MixerMasterSection.tsx";
 
 export function MixerChannelList() {
-    const { tracks, master, state } = useMixerContext();
-    const { showMeters, meterMode } = state;
+    // Get tracks from Sequencer (sequencer owns tracks)
+    const { tracks } = useSequencer();
+
+    // Get mixer state (mixer owns channels, master, UI state)
+    const { master, showMeters, meterMode } = useMixer();
 
     return (
         <div className="flex h-full gap-4 overflow-x-auto overflow-y-hidden bg-gradient-to-b from-background/50 to-background p-5">
@@ -46,11 +54,13 @@ export function MixerChannelList() {
             )}
 
             {/* Master Section - ALWAYS VISIBLE */}
-            <MixerMasterSection
-                master={master}
-                showMeters={showMeters}
-                meterMode={meterMode}
-            />
+            {master && (
+                <MixerMasterSection
+                    master={master}
+                    showMeters={showMeters}
+                    meterMode={meterMode}
+                />
+            )}
         </div>
     );
 }

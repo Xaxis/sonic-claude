@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useSequencerContext } from '@/contexts/SequencerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
 
 interface SequencerTimelinePlayheadProps {
     pixelsPerBeat: number;
@@ -21,9 +21,8 @@ export function SequencerTimelinePlayhead({
     pixelsPerBeat,
     onSeek,
 }: SequencerTimelinePlayheadProps) {
-    // Get state from context
-    const { state, currentPosition, isPlaying, tempo } = useSequencerContext();
-    const { zoom, snapEnabled, gridSize, isLooping, loopStart, loopEnd } = state;
+    // Get state from global context
+    const { currentPosition, isPlaying, tempo, zoom, snapEnabled, gridSize, isLooping, loopStart, loopEnd } = useSequencer();
 
     const loopEnabled = isLooping;  // Alias for compatibility
     const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);

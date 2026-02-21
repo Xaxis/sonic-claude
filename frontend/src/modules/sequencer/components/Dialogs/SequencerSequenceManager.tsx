@@ -118,7 +118,8 @@ export function SequencerSequenceManager({
             const sequence = await api.sequencer.createSequence({
                 name: newSequenceName,
                 tempo: 120,
-                time_signature: "4/4",
+                time_signature_num: 4,
+                time_signature_den: 4,
             });
             toast.success(`Created sequence: ${newSequenceName}`);
             setNewSequenceName("");

@@ -15,12 +15,12 @@ import { SequencerTimelineGrid } from "./SequencerTimelineGrid.tsx";
 import { SequencerTimelineLoopRegion } from "./SequencerTimelineLoopRegion.tsx";
 import { SequencerTimelinePlayhead } from "./SequencerTimelinePlayhead.tsx";
 import { SequencerTimelineTrackRow } from "./SequencerTimelineTrackRow.tsx";
-import { useSequencerContext } from '@/contexts/SequencerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
 import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
 
 interface SequencerTimelineProps {
     expandedTracks?: Set<string>; // Track header expansion state
-    onSelectClip: (clipId: string) => void;
+    onSelectClip: (clipId: string | null) => void;
     onDuplicateClip: (clipId: string) => void;
     onDeleteClip: (clipId: string) => void;
     onAddClipToTrack?: (trackId: string, startBeat: number) => void;
@@ -51,9 +51,8 @@ export function SequencerTimeline({
     onSeek,
     onClipDragStateChange,
 }: SequencerTimelineProps) {
-    // Get state from context
-    const { state, tracks, clips, currentPosition } = useSequencerContext();
-    const { snapEnabled, gridSize } = state;
+    // Get state from global context
+    const { tracks, clips, currentPosition, snapEnabled, gridSize } = useSequencer();
 
     // Get timeline calculations from shared hook
     const { pixelsPerBeat, totalWidth, rulerMarkers, zoom } = useTimelineCalculations();

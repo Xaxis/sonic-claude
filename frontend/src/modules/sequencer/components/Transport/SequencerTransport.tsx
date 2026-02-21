@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { cn } from "@/lib/utils.ts";
-import { useSequencerContext } from '@/contexts/SequencerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
 
 interface SequencerTransportProps {
     isPlaying: boolean;
@@ -31,6 +31,7 @@ interface SequencerTransportProps {
 export function SequencerTransport({
     isPlaying,
     metronomeEnabled,
+    tempo,
     hasTracksOrClips,
     onPlayPause,
     onStop,
@@ -41,12 +42,11 @@ export function SequencerTransport({
     onTempoBlur,
     onTempoKeyDown,
 }: SequencerTransportProps) {
-    // Get state from context
-    const { state } = useSequencerContext();
-    const { isPaused, isRecording, isLooping, tempoInput } = state;
+    // Get state from global context
+    const { isRecording, isLooping } = useSequencer();
     const canPlay = hasTracksOrClips;
     const playTooltip = canPlay
-        ? (isPlaying ? "Pause" : isPaused ? "Resume" : "Play")
+        ? (isPlaying ? "Pause" : "Play")
         : "Add tracks and clips to play";
 
     return (
@@ -104,7 +104,7 @@ export function SequencerTransport({
                     type="number"
                     min="20"
                     max="300"
-                    value={tempoInput}
+                    value={tempo}
                     onChange={(e) => onTempoChange(e.target.value)}
                     onBlur={onTempoBlur}
                     onKeyDown={onTempoKeyDown}

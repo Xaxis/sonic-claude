@@ -38,8 +38,8 @@ interface AudioStats {
 }
 
 export function LoopVisualizerPanel() {
-    const spectrum = useSpectrum();
-    const waveform = useWaveform();
+    const { spectrum, isConnected: spectrumConnected } = useSpectrum();
+    const { waveform, isConnected: waveformConnected } = useWaveform();
     const spectrumCanvasRef = useRef<HTMLCanvasElement>(null);
     const [stats, setStats] = useState<AudioStats>({
         peakFrequency: 0,
@@ -53,7 +53,7 @@ export function LoopVisualizerPanel() {
 
     // Calculate audio statistics from spectrum and waveform data
     useMemo(() => {
-        if (spectrum.length === 0 || waveform.left.length === 0) return;
+        if (spectrum.length === 0 || !waveform || waveform.samples_left.length === 0) return;
 
         let maxMagnitude = 0;
         let maxIndex = 0;
@@ -74,13 +74,13 @@ export function LoopVisualizerPanel() {
         });
         const centroid = magnitudeSum > 0 ? weightedSum / magnitudeSum : 0;
 
-        const peakL = Math.max(...waveform.left.map(Math.abs));
-        const peakR = Math.max(...waveform.right.map(Math.abs));
+        const peakL = Math.max(...waveform.samples_left.map(Math.abs));
+        const peakR = Math.max(...waveform.samples_right.map(Math.abs));
         const rmsL = Math.sqrt(
-            waveform.left.reduce((sum, val) => sum + val * val, 0) / waveform.left.length
+            waveform.samples_left.reduce((sum, val) => sum + val * val, 0) / waveform.samples_left.length
         );
         const rmsR = Math.sqrt(
-            waveform.right.reduce((sum, val) => sum + val * val, 0) / waveform.right.length
+            waveform.samples_right.reduce((sum, val) => sum + val * val, 0) / waveform.samples_right.length
         );
 
         const clipping = peakL > 0.95 || peakR > 0.95;
@@ -149,8 +149,8 @@ export function LoopVisualizerPanel() {
             <SubPanel title="WAVEFORM" className="flex-1" collapsible>
                 <div className="relative h-full w-full">
                     <WaveformDisplay
-                        data={waveform.left}
-                        rightData={waveform.right}
+                        data={waveform?.samples_left || []}
+                        rightData={waveform?.samples_right || []}
                         color={THEME_COLORS.primary}
                         rightColor={THEME_COLORS.secondary}
                         backgroundColor={THEME_COLORS.background}
@@ -212,7 +212,7 @@ export function LoopVisualizerPanel() {
                         <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">Samples</Label>
                             <Badge variant="outline" className="w-full justify-center">
-                                {waveform.left.length}
+                                {waveform?.samples_left.length || 0}
                             </Badge>
                         </div>
                     </div>

@@ -7,6 +7,7 @@
 import { Header } from "@/components/layout/Header";
 import { TabbedWrapper } from "@/components/layout/TabbedWrapper";
 import { ActivityContainer } from "@/components/activity";
+import { CompositionLoader } from "@/components/composition/CompositionLoader";
 import { useLayout } from "@/contexts/LayoutContext";
 import { useDAWState } from "@/contexts/DAWStateContext";
 import { useSynthesis } from "@/contexts/SynthesisContext";
@@ -20,6 +21,9 @@ export default function App() {
 
     return (
         <div className="bg-background flex h-screen w-screen flex-col overflow-hidden">
+            {/* Composition Loader - First-run experience */}
+            <CompositionLoader />
+
             {/* Header - Always visible */}
             <Header
                 isEngineRunning={isEngineRunning}

@@ -9,7 +9,7 @@
 import { useRef } from "react";
 import { SequencerClip } from "../Clips/SequencerClip.tsx";
 import { cn } from "@/lib/utils.ts";
-import { useSequencerContext } from '@/contexts/SequencerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
 
 interface Clip {
     id: string;
@@ -21,6 +21,8 @@ interface Clip {
     audio_file_path?: string;
     audio_offset?: number;
     gain: number;
+    is_muted: boolean;
+    is_looped: boolean;
 }
 
 interface Track {
@@ -34,7 +36,7 @@ interface SequencerTimelineTrackRowProps {
     clips: Clip[];
     pixelsPerBeat: number;
     isExpanded?: boolean; // Track header expansion state
-    onSelectClip: (clipId: string) => void;
+    onSelectClip: (clipId: string | null) => void;
     onDuplicateClip: (clipId: string) => void;
     onDeleteClip: (clipId: string) => void;
     onAddClipToTrack?: (trackId: string, startBeat: number) => void;
@@ -62,9 +64,8 @@ export function SequencerTimelineTrackRow({
     onOpenSampleEditor,
     onClipDragStateChange,
 }: SequencerTimelineTrackRowProps) {
-    // Get state from context
-    const { state } = useSequencerContext();
-    const { zoom, snapEnabled, gridSize, selectedClip, pianoRollClipId, sampleEditorClipId } = state;
+    // Get state from global context
+    const { zoom, snapEnabled, gridSize, selectedClipId, pianoRollClipId, showPianoRoll } = useSequencer();
 
     const mouseDownPosRef = useRef<{ x: number; y: number; target: EventTarget | null } | null>(null);
 
@@ -121,7 +122,7 @@ export function SequencerTimelineTrackRow({
                         clip={clip}
                         trackColor={track.color}
                         isEditingInPianoRoll={pianoRollClipId === clip.id}
-                        isEditingInSampleEditor={sampleEditorClipId === clip.id}
+                        isEditingInSampleEditor={false}
                         pixelsPerBeat={pixelsPerBeat}
                         isTrackExpanded={isExpanded}
                         onSelect={onSelectClip}

@@ -2,16 +2,12 @@
  * Sequencer Panel
  *
  * Main orchestrator component for the sequencer.
- * Uses extracted hooks and layout components for clean separation of concerns.
+ * Uses global SequencerContext directly for all state and actions.
  */
 
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSequencer } from '@/contexts/SequencerContext';
 import { useTransportWebSocket } from "@/hooks/useTransportWebsocket.ts";
-import { useSequencerState } from "./hooks/useSequencerState.ts";
-import { useSequencerHandlers } from "./hooks/useSequencerHandlers.ts";
-import { useSequencerClipHandlers } from "./hooks/useSequencerClipHandlers.ts";
-import { useSequencerKeyboard } from "./hooks/useSequencerKeyboard.ts";
 import { useSequencerScroll } from "./hooks/useSequencerScroll.ts";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { SequencerSampleBrowser } from "./components/Dialogs/SequencerSampleBrowser.tsx";
@@ -21,236 +17,264 @@ import { SequencerTrackTypeDialog } from "./components/Dialogs/SequencerTrackTyp
 import { SequencerEmptyState } from "./components/States/SequencerEmptyState.tsx";
 import { SequencerTransport } from "./components/Transport/SequencerTransport.tsx";
 import { SequencerToolbar } from "./components/Toolbar/SequencerToolbar.tsx";
-import { SequencerTimelineSection } from "./layouts/SequencerTimelineSection.tsx";
 import { SequencerSplitLayout } from "./layouts/SequencerSplitLayout.tsx";
 import { api } from "@/services/api";
 import { toast } from "sonner";
 
 export function SequencerPanel() {
-    // Sequencer Context
+    // Global Sequencer Context - SOURCE OF TRUTH
     const {
+        // Backend Data
         sequences,
         activeSequenceId,
-        tracks: sequencerTracks,
+        tracks,
+        clips,
+        // Playback State
         isPlaying,
         tempo,
         metronomeEnabled,
+        // UI State
+        isLooping,
+        loopStart,
+        loopEnd,
+        showSampleBrowser,
+        showSequenceManager,
+        showSequenceSettings,
+        // Sequence Management
         loadSequences,
         createSequence,
         deleteSequence,
-        loadTracks: loadSequencerTracks,
-        createTrack: createSequencerTrack,
-        deleteTrack: deleteSequencerTrack,
-        renameTrack: renameSequencerTrack,
-        updateTrack: updateSequencerTrack,
-        muteTrack: muteSequencerTrack,
-        soloTrack: soloSequencerTrack,
+        setActiveSequenceId,
+        // Playback Control
         playSequence,
         stopPlayback,
         pausePlayback,
         resumePlayback,
         setTempo,
         toggleMetronome,
-        setActiveSequenceId,
+        seekToPosition,
+        // Track Management
+        loadTracks,
+        createTrack,
+        deleteTrack,
+        renameTrack,
+        updateTrack,
+        muteTrack,
+        soloTrack,
+        // Clip Management
         addClip,
         updateClip,
         deleteClip,
         duplicateClip,
-    } = useAudioEngine();
+        // UI Actions
+        setSelectedClipId,
+        openPianoRoll,
+        closePianoRoll,
+        setShowSampleBrowser,
+        setShowSequenceManager,
+        setShowSequenceSettings,
+        // Loop Control
+        setIsLooping,
+        setLoopStart,
+        setLoopEnd,
+        toggleLoop,
+    } = useSequencer();
 
     // WebSocket for real-time transport updates
     const { transport, isConnected: isTransportConnected } = useTransportWebSocket();
 
-    // Sequencer UI State
-    const { state, actions } = useSequencerState(tempo);
+    // Local UI state (not in global context)
+    const [tempoInput, setTempoInput] = useState(tempo.toString());
+    const [isPaused, setIsPaused] = useState(false);
+    const [showTrackTypeDialog, setShowTrackTypeDialog] = useState(false);
 
-    // Use WebSocket data as source of truth when connected
-    const currentPosition = isTransportConnected ? transport.position_beats : 0;
-    const wsLoopEnabled = transport.loop_enabled ?? state.isLooping;
-    const wsLoopStart = transport.loop_start ?? state.loopStart;
-    const wsLoopEnd = transport.loop_end ?? state.loopEnd;
-    const activeNotes = transport.active_notes ?? [];
+    // Use WebSocket data for active notes
+    const activeNotes = transport?.active_notes ?? [];
 
     // Scroll synchronization (timeline + piano roll + sample editor)
     const { timelineScrollRef, pianoRollScrollRef, sampleEditorScrollRef, handleTimelineScroll, handlePianoRollScroll, handleSampleEditorScroll } = useSequencerScroll();
 
-    // Event handlers - Transport, Sequences, Tracks
-    const {
-        handlePlayPause,
-        handleStop,
-        handleRecord,
-        handleToggleLoop,
-        handleSeek,
-        handleTempoChange,
-        handleTempoBlur,
-        handleTempoKeyDown,
-        handleAddSequence,
-        handleSequenceChange,
-        handleAddTrack,
-        handleAddMIDITrack,
-        handleAddSampleTrack,
-        handleSampleSelected,
-        handleToggleMute,
-        handleToggleSolo,
-        handleUpdateTrack,
-    } = useSequencerHandlers({
-        isPlaying,
-        tempo,
-        sequences,
-        activeSequenceId,
-        sequencerTracks,
-        playSequence,
-        pausePlayback,
-        resumePlayback,
-        stopPlayback,
-        setTempo,
-        setActiveSequenceId,
-        createSequence,
-        loadSequencerTracks,
-        createSequencerTrack,
-        muteSequencerTrack,
-        soloSequencerTrack,
-        updateSequencerTrack,
-        addClip,
-        updateClip,
-        deleteClip,
-        duplicateClip,
-        state,
-        actions,
-    });
-
     // Load sequences and tracks on mount ONLY
     useEffect(() => {
         loadSequences();
-        loadSequencerTracks();
+        loadTracks();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Empty deps - only run on mount
 
     // Update tempo input when context tempo changes
     useEffect(() => {
-        actions.setTempoInput(tempo.toString());
-    }, [tempo, actions]);
+        setTempoInput(tempo.toString());
+    }, [tempo]);
 
-    // Get active sequence and prepare data (MUST be before useEffects that use it)
+    // Get active sequence
     const activeSequence = sequences.find((s) => s.id === activeSequenceId);
-    const clips = activeSequence?.clips || [];
-    const tracks = sequencerTracks || [];
 
     // Load tracks when active sequence changes
     useEffect(() => {
         if (activeSequenceId) {
-            loadSequencerTracks(activeSequenceId);
+            loadTracks(activeSequenceId);
         }
-    }, [activeSequenceId, loadSequencerTracks]);
+    }, [activeSequenceId, loadTracks]);
 
-    // Load UI settings from active sequence when it changes
-    useEffect(() => {
-        if (activeSequence) {
-            // Load persisted UI settings from sequence
-            // Only update if values are different to avoid infinite loop
-            if (state.zoom !== activeSequence.zoom) {
-                actions.setZoom(activeSequence.zoom);
-            }
-            if (state.snapEnabled !== activeSequence.snap_enabled) {
-                actions.setSnapEnabled(activeSequence.snap_enabled);
-            }
-            if (state.gridSize !== activeSequence.grid_size) {
-                actions.setGridSize(activeSequence.grid_size);
-            }
-            // Load loop settings from sequence
-            if (state.isLooping !== activeSequence.loop_enabled) {
-                actions.setIsLooping(activeSequence.loop_enabled);
-            }
-            if (state.loopStart !== activeSequence.loop_start) {
-                actions.setLoopStart(activeSequence.loop_start);
-            }
-            if (state.loopEnd !== activeSequence.loop_end) {
-                actions.setLoopEnd(activeSequence.loop_end);
-            }
-            // Load editor state from sequence
-            if (state.selectedClip !== activeSequence.selected_clip_id) {
-                actions.setSelectedClip(activeSequence.selected_clip_id || null);
-            }
-            if (activeSequence.piano_roll_clip_id && state.pianoRollClipId !== activeSequence.piano_roll_clip_id) {
-                actions.openPianoRoll(activeSequence.piano_roll_clip_id);
-            } else if (!activeSequence.piano_roll_clip_id && state.showPianoRoll) {
-                actions.closePianoRoll();
-            }
-            if (activeSequence.sample_editor_clip_id && state.sampleEditorClipId !== activeSequence.sample_editor_clip_id) {
-                actions.openSampleEditor(activeSequence.sample_editor_clip_id);
-            } else if (!activeSequence.sample_editor_clip_id && state.showSampleEditor) {
-                actions.closeSampleEditor();
-            }
-        }
-    }, [activeSequence?.id, activeSequence?.zoom, activeSequence?.snap_enabled, activeSequence?.grid_size, activeSequence?.loop_enabled, activeSequence?.loop_start, activeSequence?.loop_end, activeSequence?.selected_clip_id, activeSequence?.piano_roll_clip_id, activeSequence?.sample_editor_clip_id]); // Only when sequence ID or settings change
-
-    // Save UI settings when they change (debounced)
-    useEffect(() => {
+    // Transport handlers (inline - call global context methods directly)
+    const handlePlayPause = useCallback(async () => {
         if (!activeSequenceId) return;
-
-        const timeoutId = setTimeout(async () => {
-            try {
-                await api.sequencer.updateSequence(activeSequenceId, {
-                    zoom: state.zoom,
-                    snap_enabled: state.snapEnabled,
-                    grid_size: state.gridSize,
-                    loop_enabled: state.isLooping,
-                    loop_start: state.loopStart,
-                    loop_end: state.loopEnd,
-                    selected_clip_id: state.selectedClip,
-                    piano_roll_clip_id: state.pianoRollClipId,
-                    sample_editor_clip_id: state.sampleEditorClipId,
-                });
-            } catch (error) {
-                console.error("Failed to save UI settings:", error);
+        if (isPlaying) {
+            if (isPaused) {
+                await resumePlayback();
+                setIsPaused(false);
+            } else {
+                await pausePlayback();
+                setIsPaused(true);
             }
-        }, 500); // Debounce 500ms
+        } else {
+            await playSequence(activeSequenceId);
+            setIsPaused(false);
+        }
+    }, [isPlaying, isPaused, activeSequenceId, playSequence, pausePlayback, resumePlayback]);
 
-        return () => clearTimeout(timeoutId);
-    }, [activeSequenceId, state.zoom, state.snapEnabled, state.gridSize, state.isLooping, state.loopStart, state.loopEnd, state.selectedClip, state.pianoRollClipId, state.sampleEditorClipId]);
+    const handleStop = useCallback(async () => {
+        await stopPlayback();
+        setIsPaused(false);
+    }, [stopPlayback]);
 
-    // Event handlers - Clips
-    const {
-        handleAddClipToTrack,
-        handleDuplicateClip,
-        handlePasteClip,
-        handleOpenPianoRoll,
-        handleOpenSampleEditor,
-        handleUpdateMIDINotes,
-        handleDeleteClip,
-        handleMoveClip,
-        handleResizeClip,
-        handleUpdateClip,
-    } = useSequencerClipHandlers({
-        tempo,
-        sequences,
-        activeSequenceId,
-        sequencerTracks,
-        addClip,
-        updateClip,
-        deleteClip,
-        duplicateClip,
-        state: {
-            clipboardClip: state.clipboardClip,
-        },
-        actions: {
-            openPianoRoll: actions.openPianoRoll,
-            openSampleEditor: actions.openSampleEditor,
-        },
-    });
+    const handleRecord = useCallback(() => {
+        // Future feature: Recording functionality
+        toast.info("Recording not yet implemented");
+    }, []);
 
-    // Keyboard shortcuts
-    useSequencerKeyboard({
-        selectedClip: state.selectedClip,
-        clipboardClip: state.clipboardClip,
-        activeSequenceId,
-        clips,
-        setSelectedClip: actions.setSelectedClip,
-        setClipboardClip: actions.setClipboardClip,
-        handleDeleteClip,
-        handleDuplicateClip,
-        handlePasteClip,
-    });
+    const handleToggleLoop = useCallback(() => {
+        toggleLoop();
+    }, [toggleLoop]);
+
+    const handleSeek = useCallback(async (position: number, triggerAudio?: boolean) => {
+        await seekToPosition(position, triggerAudio);
+    }, [seekToPosition]);
+
+    const handleTempoChange = useCallback((value: string) => {
+        setTempoInput(value);
+    }, []);
+
+    const handleTempoBlur = useCallback(async () => {
+        const newTempo = parseFloat(tempoInput);
+        if (!isNaN(newTempo) && newTempo >= 20 && newTempo <= 300) {
+            await setTempo(newTempo);
+        } else {
+            setTempoInput(tempo.toString());
+        }
+    }, [tempoInput, tempo, setTempo]);
+
+    const handleTempoKeyDown = useCallback(async (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter") {
+            await handleTempoBlur();
+        }
+    }, [handleTempoBlur]);
+
+    // Sequence handlers
+    const handleAddSequence = useCallback(async () => {
+        const name = `Sequence ${sequences.length + 1}`;
+        await createSequence(name, tempo);
+    }, [sequences.length, tempo, createSequence]);
+
+    const handleSequenceChange = useCallback((sequenceId: string) => {
+        setActiveSequenceId(sequenceId);
+    }, [setActiveSequenceId]);
+
+    // Track handlers
+    const handleAddTrack = useCallback(() => {
+        setShowTrackTypeDialog(true);
+    }, []);
+
+    const handleAddMIDITrack = useCallback(async () => {
+        if (!activeSequenceId) return;
+        const name = `Track ${tracks.length + 1}`;
+
+        // @TODO - NO fully implement this!!!!
+        // Future enhancement: Let user select synthdef - for now use "sine" (first basic synthdef)
+        await createTrack(activeSequenceId, name, "midi", "sine");
+        setShowTrackTypeDialog(false);
+    }, [activeSequenceId, tracks.length, createTrack]);
+
+    const handleAddSampleTrack = useCallback(() => {
+        if (!activeSequenceId) return;
+        setShowTrackTypeDialog(false);
+        setShowSampleBrowser(true);
+    }, [activeSequenceId, setShowSampleBrowser]);
+
+    const handleSampleSelected = useCallback((sample: any) => {
+        if (!activeSequenceId) return;
+        const name = sample.name || `Track ${tracks.length + 1}`;
+        // Create audio track with sample metadata
+        createTrack(activeSequenceId, name, "audio");
+        setShowSampleBrowser(false);
+    }, [activeSequenceId, tracks.length, createTrack, setShowSampleBrowser]);
+
+    const handleToggleMute = useCallback(async (trackId: string) => {
+        const track = tracks.find(t => t.id === trackId);
+        if (track) {
+            await muteTrack(trackId, !track.is_muted);
+        }
+    }, [tracks, muteTrack]);
+
+    const handleToggleSolo = useCallback(async (trackId: string) => {
+        const track = tracks.find(t => t.id === trackId);
+        if (track) {
+            await soloTrack(trackId, !track.is_solo);
+        }
+    }, [tracks, soloTrack]);
+
+    const handleUpdateTrack = useCallback(async (trackId: string, updates: any) => {
+        await updateTrack(trackId, updates);
+    }, [updateTrack]);
+
+    // Clip handlers
+    const handleAddClipToTrack = useCallback(async (trackId: string, startTime: number) => {
+        if (!activeSequenceId) return;
+        const track = tracks.find(t => t.id === trackId);
+        if (!track) return;
+
+        const clipRequest = {
+            sequence_id: activeSequenceId,
+            clip_type: track.type === "midi" ? "midi" : "audio",
+            track_id: trackId,
+            start_time: startTime,
+            duration: 4.0, // Default 1 bar at 4/4
+        };
+        await addClip(clipRequest);
+    }, [activeSequenceId, tracks, addClip]);
+
+    const handleDuplicateClip = useCallback(async (clipId: string) => {
+        await duplicateClip(clipId);
+    }, [duplicateClip]);
+
+    const handleOpenPianoRoll = useCallback((clipId: string) => {
+        openPianoRoll(clipId);
+    }, [openPianoRoll]);
+
+    const handleOpenSampleEditor = useCallback((_clipId: string) => {
+        // Future feature: Sample editor functionality
+        toast.info("Sample editor not yet implemented");
+    }, []);
+
+    const handleUpdateMIDINotes = useCallback(async (clipId: string, notes: any[]) => {
+        await updateClip(clipId, { midi_events: notes });
+    }, [updateClip]);
+
+    const handleDeleteClip = useCallback(async (clipId: string) => {
+        await deleteClip(clipId);
+    }, [deleteClip]);
+
+    const handleMoveClip = useCallback(async (clipId: string, newStartTime: number) => {
+        await updateClip(clipId, { start_time: newStartTime });
+    }, [updateClip]);
+
+    const handleResizeClip = useCallback(async (clipId: string, newDuration: number) => {
+        await updateClip(clipId, { duration: newDuration });
+    }, [updateClip]);
+
+    const handleUpdateClip = useCallback(async (clipId: string, updates: any) => {
+        await updateClip(clipId, updates);
+    }, [updateClip]);
 
     // Check if we have content to play
     const hasTracksOrClips = tracks.length > 0 || clips.length > 0;
@@ -290,8 +314,8 @@ export function SequencerPanel() {
                             activeSequenceId={activeSequenceId}
                             onSequenceChange={handleSequenceChange}
                             onAddSequence={handleAddSequence}
-                            onManageSequences={() => actions.setShowSequenceManager(true)}
-                            onSequenceSettings={() => actions.setShowSequenceSettings(true)}
+                            onManageSequences={() => setShowSequenceManager(true)}
+                            onSequenceSettings={() => setShowSequenceSettings(true)}
                             onAddTrack={handleAddTrack}
                         />
                     </div>
@@ -300,7 +324,7 @@ export function SequencerPanel() {
                     {hasNoSequences ? (
                         <SequencerEmptyState
                             onCreateSequence={handleAddSequence}
-                            onOpenSequenceManager={() => actions.setShowSequenceManager(true)}
+                            onOpenSequenceManager={() => setShowSequenceManager(true)}
                         />
                     ) : (
                         // Flex container for split layout (ensures 50/50 height split)
@@ -315,10 +339,10 @@ export function SequencerPanel() {
                             onSampleEditorScroll={handleSampleEditorScroll}
                             onToggleMute={handleToggleMute}
                             onToggleSolo={handleToggleSolo}
-                            onDeleteTrack={deleteSequencerTrack}
-                            onRenameTrack={renameSequencerTrack}
+                            onDeleteTrack={deleteTrack}
+                            onRenameTrack={renameTrack}
                             onUpdateTrack={handleUpdateTrack}
-                            onSelectClip={actions.setSelectedClip}
+                            onSelectClip={setSelectedClipId}
                             onDuplicateClip={handleDuplicateClip}
                             onDeleteClip={handleDeleteClip}
                             onAddClipToTrack={handleAddClipToTrack}
@@ -327,11 +351,11 @@ export function SequencerPanel() {
                             onUpdateClip={handleUpdateClip}
                             onOpenPianoRoll={handleOpenPianoRoll}
                             onOpenSampleEditor={handleOpenSampleEditor}
-                            onLoopStartChange={actions.setLoopStart}
-                            onLoopEndChange={actions.setLoopEnd}
+                            onLoopStartChange={setLoopStart}
+                            onLoopEndChange={setLoopEnd}
                             onSeek={handleSeek}
-                            onClosePianoRoll={actions.closePianoRoll}
-                            onCloseSampleEditor={actions.closeSampleEditor}
+                            onClosePianoRoll={closePianoRoll}
+                            onCloseSampleEditor={() => {/* Sample editor not implemented yet */}}
                             onUpdateMIDINotes={handleUpdateMIDINotes}
                         />
                         </div>
@@ -341,15 +365,15 @@ export function SequencerPanel() {
 
             {/* Sample Browser */}
             <SequencerSampleBrowser
-                isOpen={state.showSampleBrowser}
-                onClose={() => actions.setShowSampleBrowser(false)}
+                isOpen={showSampleBrowser}
+                onClose={() => setShowSampleBrowser(false)}
                 onSelectSample={handleSampleSelected}
             />
 
             {/* Sequence Manager */}
             <SequencerSequenceManager
-                isOpen={state.showSequenceManager}
-                onClose={() => actions.setShowSequenceManager(false)}
+                isOpen={showSequenceManager}
+                onClose={() => setShowSequenceManager(false)}
                 currentSequenceId={activeSequenceId}
                 onSequenceChange={handleSequenceChange}
                 onDeleteSequence={deleteSequence}
@@ -358,16 +382,20 @@ export function SequencerPanel() {
             {/* Sequence Settings Dialog */}
             {activeSequence && (
                 <SequencerSettingsDialog
-                    isOpen={state.showSequenceSettings}
-                    onClose={() => actions.setShowSequenceSettings(false)}
+                    isOpen={showSequenceSettings}
+                    onClose={() => setShowSequenceSettings(false)}
                     sequence={activeSequence}
                     onSave={async (settings) => {
                         try {
+                            // Parse time signature (e.g., "4/4" -> num=4, den=4)
+                            const [num, den] = settings.time_signature.split('/').map(Number);
+
                             // Update sequence settings via API
                             await api.sequencer.updateSequence(activeSequence.id, {
                                 name: settings.name,
                                 tempo: settings.tempo,
-                                time_signature: settings.time_signature,
+                                time_signature_num: num,
+                                time_signature_den: den,
                             });
 
                             // Update local state
@@ -375,13 +403,13 @@ export function SequencerPanel() {
                                 await setTempo(settings.tempo);
                             }
 
-                            // Update loop settings
-                            actions.setIsLooping(settings.loop_enabled);
-                            actions.setLoopStart(settings.loop_start);
-                            actions.setLoopEnd(settings.loop_end);
+                            // Update loop settings in global context
+                            setIsLooping(settings.loop_enabled);
+                            setLoopStart(settings.loop_start);
+                            setLoopEnd(settings.loop_end);
 
                             toast.success("Sequence settings updated");
-                            actions.setShowSequenceSettings(false);
+                            setShowSequenceSettings(false);
                         } catch (error) {
                             console.error("Failed to update sequence settings:", error);
                             toast.error("Failed to update sequence settings");
@@ -392,8 +420,8 @@ export function SequencerPanel() {
 
             {/* Track Type Selection Dialog */}
             <SequencerTrackTypeDialog
-                isOpen={state.showTrackTypeDialog}
-                onClose={() => actions.setShowTrackTypeDialog(false)}
+                isOpen={showTrackTypeDialog}
+                onClose={() => setShowTrackTypeDialog(false)}
                 onSelectMIDI={handleAddMIDITrack}
                 onSelectSample={handleAddSampleTrack}
             />

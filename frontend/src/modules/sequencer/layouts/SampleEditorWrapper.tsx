@@ -11,11 +11,11 @@
 
 import { SequencerSampleEditor } from "../components/SampleEditor/SequencerSampleEditor.tsx";
 import { Music } from "lucide-react";
-import type { Clip } from "@/types/sequencer";
+import type { SequencerClip } from "../types";
 
 interface SampleEditorWrapperProps {
     // Clip data
-    clip: Clip | undefined;
+    clip: SequencerClip | undefined;
 
     // Drag state (for real-time sync with timeline)
     clipDragState?: { startTime: number; duration: number } | null;

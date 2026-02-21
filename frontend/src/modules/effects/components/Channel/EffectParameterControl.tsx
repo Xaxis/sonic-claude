@@ -55,7 +55,9 @@ export function EffectParameterControl({
 
     // Calculate step size based on range
     const getStepSize = (): number => {
-        const range = parameter.max - parameter.min;
+        const min = parameter.min ?? 0;
+        const max = parameter.max ?? 1;
+        const range = max - min;
         if (range > 1000) return 10;
         if (range > 100) return 1;
         if (range > 10) return 0.1;

@@ -16,7 +16,7 @@ import React from "react";
 import { SampleEditorRuler } from "../components/SampleEditor/SampleEditorRuler.tsx";
 import { WaveformDisplay } from "../components/Shared/WaveformDisplay.tsx";
 import { SequencerTimelineLoopRegion } from "../components/Timeline/SequencerTimelineLoopRegion.tsx";
-import { useSequencerContext } from '@/contexts/SequencerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
 import { EditorGridLayout } from "@/components/layout/EditorGridLayout.tsx";
 
 interface SequencerSampleEditorSectionProps {
@@ -60,8 +60,7 @@ export function SequencerSampleEditorSection({
     onLoopEndChange,
 }: SequencerSampleEditorSectionProps) {
     // Get state from context
-    const { state } = useSequencerContext();
-    const { zoom, snapEnabled, gridSize, isLooping, loopStart, loopEnd } = state;
+    const { zoom, snapEnabled, gridSize, isLooping, loopStart, loopEnd } = useSequencer();
 
     const beatWidth = pixelsPerBeat * zoom;
     // Add extra width to ensure content extends beyond viewport for smooth scrolling

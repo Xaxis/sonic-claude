@@ -6,12 +6,14 @@
  * Follows the exact pattern from MixerChannelList.
  */
 
-import { useEffectsContext } from '@/contexts/EffectsContext';
+import { useEffects } from '@/contexts/EffectsContext';
 import { EffectsChannelStrip } from "../components/Channel/EffectsChannelStrip";
 import { EffectsMasterSection } from "../components/Master/EffectsMasterSection";
 
 export function EffectsChannelList() {
-    const { tracks, effectChains } = useEffectsContext();
+    const { effectChains } = useEffects();
+    // TODO: Get tracks from SequencerContext instead
+    const tracks: any[] = [];
 
     return (
         <div className="flex h-full gap-4 overflow-x-auto overflow-y-hidden bg-gradient-to-b from-background/50 to-background p-5">

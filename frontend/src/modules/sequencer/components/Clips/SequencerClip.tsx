@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider.tsx";
 import { cn } from "@/lib/utils.ts";
 import type { MIDIEvent, SequencerClip } from "../../types.ts";
 import { WaveformDisplay } from "../Shared/WaveformDisplay.tsx";
-import { useSequencerContext } from '@/contexts/SequencerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
 import { useWaveformData } from "../../hooks/useWaveformData.ts";
 
 interface SequencerClipProps {
@@ -50,14 +50,13 @@ export function SequencerClip({
     onOpenSampleEditor,
     onClipDragStateChange,
 }: SequencerClipProps) {
-    // Get state from context
-    const { state, tempo } = useSequencerContext();
-    const { zoom, snapEnabled, gridSize, selectedClip } = state;
-    const isSelected = selectedClip === clip.id;
+    // Get state from global context
+    const { tempo, zoom, snapEnabled, gridSize, selectedClipId } = useSequencer();
+    const isSelected = selectedClipId === clip.id;
 
     // Load waveform data using hook (200 samples for clip preview)
     const { leftData: waveformData } = useWaveformData({
-        sampleId: clip.type === "audio" ? clip.audio_file_path : null,
+        sampleId: clip.type === "audio" ? (clip.audio_file_path ?? null) : null,
         clipDuration: clip.duration,
         tempo,
         samplesPerLoop: 200,

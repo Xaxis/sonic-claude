@@ -1,4 +1,5 @@
 import { Music, Activity } from "lucide-react";
+import { CompositionSwitcher } from "@/components/composition/CompositionSwitcher";
 
 interface HeaderProps {
     isEngineRunning?: boolean;
@@ -9,14 +10,17 @@ interface HeaderProps {
 export function Header({ isEngineRunning = false, cpuUsage = 0, activeSynths = 0 }: HeaderProps) {
     return (
         <header className="bg-card border-border flex h-[60px] items-center justify-between border-b-2 px-6 py-2">
-            {/* Left: Logo */}
-            <div className="flex items-center gap-3">
-                <Music className="text-primary h-7 w-7" />
-                <div>
-                    <h1 className="text-primary text-glow-cyan text-lg font-bold tracking-[0.3em]">
-                        SONIC CLAUDE
-                    </h1>
+            {/* Left: Logo + Composition Switcher */}
+            <div className="flex items-center gap-6">
+                <div className="flex items-center gap-3">
+                    <Music className="text-primary h-7 w-7" />
+                    <div>
+                        <h1 className="text-primary text-glow-cyan text-lg font-bold tracking-[0.3em]">
+                            SONIC CLAUDE
+                        </h1>
+                    </div>
                 </div>
+                <CompositionSwitcher />
             </div>
 
             {/* Right: Status Indicators */}

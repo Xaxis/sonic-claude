@@ -35,8 +35,8 @@ export function SequencerSampleBrowser({ isOpen, onClose, onSelectSample }: Sequ
 
     const loadSamples = async () => {
         try {
-            const samplesData = await api.samples.getAll();
-            setSamples(samplesData);
+            const response = await api.samples.getAll();
+            setSamples(response.samples);
         } catch (error) {
             console.error("Failed to load samples:", error);
         }
@@ -47,7 +47,7 @@ export function SequencerSampleBrowser({ isOpen, onClose, onSelectSample }: Sequ
         sample.category.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const handlePlaySample = (sample: sampleApi.SampleMetadata) => {
+    const handlePlaySample = (sample: SampleMetadata) => {
         if (playingSampleId === sample.id) {
             // Stop playing
             audioElement?.pause();
@@ -57,7 +57,7 @@ export function SequencerSampleBrowser({ isOpen, onClose, onSelectSample }: Sequ
             if (audioElement) {
                 audioElement.pause();
             }
-            const audio = new Audio(sampleApi.getSampleDownloadUrl(sample.id));
+            const audio = new Audio(`/api/samples/${sample.id}/download`);
             audio.play();
             audio.onended = () => setPlayingSampleId(null);
             setAudioElement(audio);

@@ -10,7 +10,7 @@ import { X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { SequencerPianoRollSection } from "../../layouts/SequencerPianoRollSection.tsx";
-import { useSequencerContext } from '@/contexts/SequencerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
 import type { MIDIEvent } from "../../types.ts";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 import { api } from "@/services/api";
@@ -56,9 +56,8 @@ export function SequencerPianoRoll({
     onLoopStartChange,
     onLoopEndChange,
 }: SequencerPianoRollProps) {
-    // Get state from context
-    const { state, actions } = useSequencerContext();
-    const { snapEnabled, gridSize, zoom, isLooping, loopStart, loopEnd } = state;
+    // Get state from global context
+    const { snapEnabled, gridSize, zoom, isLooping, loopStart, loopEnd } = useSequencer();
 
     // Local UI state only (not persisted)
     const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());

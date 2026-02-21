@@ -8,119 +8,45 @@
  * Architecture:
  * - Follows MixerPanel pattern exactly (horizontal scrollable layout)
  * - One column per track (same width as mixer channels: w-36)
- * - Uses EffectsProvider context for state management
- * - Uses effectsService for API calls
+ * - Uses global EffectsContext for state management
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect } from "react";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { useSequencer } from "@/contexts/SequencerContext";
-import { useEffectsState } from "./hooks/useEffectsState";
-import { useEffectsHandlers } from "./hooks/useEffectsHandlers";
+import { useEffects } from "@/contexts/EffectsContext";
 import { EffectsChannelList } from "./layouts/EffectsChannelList";
-import { api } from "@/services/api";
-import type { TrackEffectChain, EffectDefinition } from "@/services/api/providers";
 
 export function EffectsPanel() {
-    // Get sequencer tracks from Sequencer context
-    const { tracks: sequencerTracks, activeSequenceId, loadTracks: loadSequencerTracks } = useSequencer();
+    // Get sequencer state from global Sequencer context
+    const { activeSequenceId, loadTracks } = useSequencer();
 
-    // UI State
-    const { state, actions } = useEffectsState();
-
-    // Backend Data State
-    const [effectChains, setEffectChains] = useState<Record<string, TrackEffectChain>>({});
-    const [effectDefinitions, setEffectDefinitions] = useState<EffectDefinition[]>([]);
+    // Get effects methods from global Effects context
+    const { loadEffectDefinitions } = useEffects();
 
     // Load tracks when active sequence changes
     useEffect(() => {
         if (activeSequenceId) {
-            loadSequencerTracks(activeSequenceId);
+            loadTracks(activeSequenceId);
         }
-    }, [activeSequenceId, loadSequencerTracks]);
+    }, [activeSequenceId, loadTracks]);
 
     // Load effect definitions on mount
     useEffect(() => {
-        const loadDefinitions = async () => {
-            try {
-                const defs = await api.effects.getDefinitions();
-                setEffectDefinitions(defs);
-            } catch (error) {
-                console.error("Failed to load effect definitions:", error);
-            }
-        };
-        loadDefinitions();
-    }, []);
-
-    // Load effect chains for all tracks
-    const loadEffectChains = useCallback(async () => {
-        if (!sequencerTracks || sequencerTracks.length === 0) {
-            setEffectChains({});
-            return;
-        }
-
-        try {
-            const chains: Record<string, TrackEffectChain> = {};
-            await Promise.all(
-                sequencerTracks.map(async (track) => {
-                    try {
-                        const chain = await api.effects.getTrackEffectChain(track.id);
-                        chains[track.id] = chain;
-                    } catch (error) {
-                        console.error(`Failed to load effect chain for track ${track.id}:`, error);
-                    }
-                })
-            );
-            setEffectChains(chains);
-        } catch (error) {
-            console.error("Failed to load effect chains:", error);
-        }
-    }, [sequencerTracks]);
-
-    // Load effect chains when tracks change
-    useEffect(() => {
-        loadEffectChains();
-    }, [loadEffectChains]);
-
-    // Callback for when effect chain changes (used by handlers)
-    const handleEffectChainChanged = useCallback(
-        async (trackId: string) => {
-            // If trackId is empty, reload all chains
-            if (!trackId) {
-                await loadEffectChains();
-                return;
-            }
-
-            try {
-                const chain = await api.effects.getTrackEffectChain(trackId);
-                setEffectChains((prev) => ({
-                    ...prev,
-                    [trackId]: chain,
-                }));
-            } catch (error) {
-                console.error(`Failed to reload effect chain for track ${trackId}:`, error);
-            }
-        },
-        [loadEffectChains]
-    );
-
-    // Event handlers
-    const handlers = useEffectsHandlers({
-        tracks: sequencerTracks || [],
-        onEffectChainChanged: handleEffectChainChanged,
-    });
+        loadEffectDefinitions();
+    }, [loadEffectDefinitions]);
 
     return (
         <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
-                {/* Effects Content - Flexible, takes all space */}
-                <div className="flex-1 min-h-0 flex flex-col">
-                    <SubPanel title="EFFECTS" showHeader={false} contentOverflow="hidden">
-                        {/* Channel List - Flexible */}
-                        <div className="flex-1 overflow-hidden bg-gradient-to-b from-background to-background/95">
-                            <EffectsChannelList />
-                        </div>
-                    </SubPanel>
-                </div>
+            {/* Effects Content - Flexible, takes all space */}
+            <div className="flex-1 min-h-0 flex flex-col">
+                <SubPanel title="EFFECTS" showHeader={false} contentOverflow="hidden">
+                    {/* Channel List - Flexible */}
+                    <div className="flex-1 overflow-hidden bg-gradient-to-b from-background to-background/95">
+                        <EffectsChannelList />
+                    </div>
+                </SubPanel>
             </div>
+        </div>
     );
 }

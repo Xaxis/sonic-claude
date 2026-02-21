@@ -3,66 +3,31 @@
  *
  * Professional mixing console for sequencer tracks.
  * Displays sequencer tracks as mixer channels with faders, pan, mute/solo.
- * Follows the same pattern as SequencerPanel and InputPanel.
+ *
+ * ARCHITECTURE:
+ * - Uses global MixerContext for mixer state (channels, master, meters)
+ * - Uses global SequencerContext for track data
+ * - MixerContext manages channels (1:1 with sequencer tracks)
  */
 
 import { useEffect } from "react";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { useSequencer } from "@/contexts/SequencerContext";
-import { useMixerState } from "./hooks/useMixerState";
-import { useMixerHandlers } from "./hooks/useMixerHandlers";
+import { useMixer } from "@/contexts/MixerContext";
 import { MixerToolbar } from "./components/Toolbar/MixerToolbar";
 import { MixerChannelList } from "./layouts/MixerChannelList";
-import { api } from "@/services/api";
-import { useMeterWebSocket } from "@/hooks/useMeterWebsocket";
 
 export function MixerPanel() {
-    // Get sequencer tracks from Sequencer context
-    const {
-        tracks: sequencerTracks,
-        activeSequenceId,
-        loadTracks: loadSequencerTracks,
-        updateTrack: updateSequencerTrack,
-        muteTrack: muteSequencerTrack,
-        soloTrack: soloSequencerTrack,
-    } = useSequencer();
+    // Get sequencer state
+    const { activeSequenceId } = useSequencer();
 
-    // UI State
-    const { state, actions } = useMixerState();
+    // Get mixer state and actions from global context
+    const { loadMaster } = useMixer();
 
-    // Real-time metering via WebSocket
-    const { meters, isConnected: meterConnected } = useMeterWebSocket();
-
-    // Load tracks when active sequence changes
+    // Load master channel when component mounts
     useEffect(() => {
-        if (activeSequenceId) {
-            loadSequencerTracks(activeSequenceId);
-        }
-    }, [activeSequenceId, loadSequencerTracks]);
-
-    // Load master channel from backend ONCE on mount
-    useEffect(() => {
-        const loadMaster = async () => {
-            try {
-                const master = await api.mixer.getMaster();
-                actions.setMaster(master);
-            } catch (error) {
-                console.error("Failed to load master channel:", error);
-            }
-        };
         loadMaster();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Only run once on mount
-
-    // Event handlers
-    const handlers = useMixerHandlers({
-        tracks: sequencerTracks || [],
-        master: state.master,
-        updateSequencerTrack,
-        muteSequencerTrack,
-        soloSequencerTrack,
-        setMaster: actions.setMaster,
-    });
+    }, [loadMaster]);
 
     return (
         <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">

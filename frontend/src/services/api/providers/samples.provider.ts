@@ -63,7 +63,7 @@ export class SamplesProvider extends BaseAPIClient {
         formData.append("category", category);
 
         // Use fetch directly for FormData (BaseAPIClient doesn't handle it)
-        const response = await fetch(this.getURL("/api/samples/upload"), {
+        const response = await fetch(`${this.baseURL}/api/samples/upload`, {
             method: "POST",
             body: formData,
         });
@@ -86,7 +86,7 @@ export class SamplesProvider extends BaseAPIClient {
 
     async download(sampleId: string): Promise<Blob> {
         // Use fetch directly for blob response
-        const response = await fetch(this.getURL(`/api/samples/${sampleId}/download`));
+        const response = await fetch(`${this.baseURL}/api/samples/${sampleId}/download`);
         if (!response.ok) {
             throw new Error("Download failed");
         }
@@ -102,8 +102,8 @@ export class SamplesProvider extends BaseAPIClient {
         return this.patch(`/api/samples/${sampleId}?${params.toString()}`, {});
     }
 
-    async delete(sampleId: string): Promise<{ success: boolean; message: string }> {
-        return this.delete(`/api/samples/${sampleId}`);
+    async deleteSample(sampleId: string): Promise<{ success: boolean; message: string }> {
+        return super.delete(`/api/samples/${sampleId}`);
     }
 
     // === METADATA ===
@@ -112,7 +112,7 @@ export class SamplesProvider extends BaseAPIClient {
         formData.append("duration", duration.toString());
 
         // Use fetch directly for FormData
-        const response = await fetch(this.getURL(`/api/samples/${sampleId}/duration`), {
+        const response = await fetch(`${this.baseURL}/api/samples/${sampleId}/duration`, {
             method: "POST",
             body: formData,
         });

@@ -14,7 +14,7 @@
  */
 
 import { useState } from "react";
-import { useEffectsContext } from '@/contexts/EffectsContext';
+import { useEffects } from '@/contexts/EffectsContext';
 import { EffectSlot } from "./EffectSlot";
 import { EffectSelector } from "./EffectSelector";
 import type { SequencerTrack } from "@/modules/sequencer/types";
@@ -26,14 +26,7 @@ interface EffectsChannelStripProps {
 }
 
 export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripProps) {
-    const { handlers, effectDefinitions } = useEffectsContext();
-    const {
-        handleAddEffect,
-        handleUpdateEffectParameter,
-        handleToggleEffectBypass,
-        handleDeleteEffect,
-        handleMoveEffect,
-    } = handlers;
+    const { effectDefinitions, addEffect, updateEffectParameter, toggleEffectBypass, deleteEffect, moveEffect } = useEffects();
 
     // Get effects sorted by slot index
     const effects = effectChain?.effects || [];
@@ -97,9 +90,9 @@ export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripP
                                 key={effect.id}
                                 effect={effect}
                                 effectDefinition={effectDef}
-                                onParameterChange={handleUpdateEffectParameter}
-                                onToggleBypass={handleToggleEffectBypass}
-                                onDelete={handleDeleteEffect}
+                                onParameterChange={updateEffectParameter}
+                                onToggleBypass={toggleEffectBypass}
+                                onDelete={deleteEffect}
                                 isDragging={draggingEffectId === effect.id}
                                 isDragOver={dragOverEffectId === effect.id}
                                 onDragStart={() => setDraggingEffectId(effect.id)}
@@ -114,7 +107,7 @@ export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripP
                                         // Find the target effect's slot index
                                         const targetEffect = sortedEffects.find(e => e.id === targetEffectId);
                                         if (targetEffect) {
-                                            handleMoveEffect(draggingEffectId, targetEffect.slot_index);
+                                            moveEffect(draggingEffectId, targetEffect.slot_index);
                                         }
                                     }
                                     setDraggingEffectId(null);
@@ -130,7 +123,7 @@ export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripP
             {canAddMore && (
                 <EffectSelector
                     effectDefinitions={effectDefinitions}
-                    onEffectSelected={(effectName) => handleAddEffect(track.id, effectName)}
+                    onEffectSelected={(effectName) => addEffect(track.id, effectName)}
                     disabled={!canAddMore}
                 />
             )}

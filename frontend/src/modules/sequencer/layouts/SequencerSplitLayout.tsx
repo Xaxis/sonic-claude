@@ -10,9 +10,9 @@ import React, { useState, useCallback, useEffect } from "react";
 import { SequencerTimelineSection } from "./SequencerTimelineSection.tsx";
 import { PianoRollWrapper } from "./PianoRollWrapper.tsx";
 import { SampleEditorWrapper } from "./SampleEditorWrapper.tsx";
-import { useSequencerContext } from '@/contexts/SequencerContext';
+import { useSequencer } from '@/contexts/SequencerContext';
 import { statePersistence } from "@/services/state-persistence/state-persistence.service";
-import type { MIDIEvent } from "../types.ts";
+import type { MIDIEvent } from "../types";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
 interface SequencerSplitLayoutProps {
@@ -74,10 +74,9 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
     } = props;
 
     // Get state from context
-    const { state, tracks, clips, currentPosition, isPlaying } = useSequencerContext();
-    const { zoom, snapEnabled, gridSize, pianoRollClipId, sampleEditorClipId } = state;
+    const { tracks, clips, currentPosition, isPlaying, zoom, snapEnabled, gridSize, pianoRollClipId } = useSequencer();
     const showPianoRoll = pianoRollClipId !== null;
-    const showSampleEditor = sampleEditorClipId !== null;
+    const showSampleEditor = false; // TODO: Implement sample editor
 
     // Resizable split state - percentage of height for timeline (0-100)
     const [timelineHeightPercent, setTimelineHeightPercent] = useState(() => {
@@ -153,12 +152,8 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
     // Find the track for the clip (to get instrument)
     const pianoRollTrack = pianoRollClip ? tracks.find(t => t.id === pianoRollClip.track_id) : undefined;
 
-    // Find the clip for sample editor
-    const sampleEditorClip = clips.find(c => c.id === sampleEditorClipId);
-
     // Get drag state for active editor clips (if being dragged)
     const pianoRollClipDragState = pianoRollClipId ? clipDragStates.get(pianoRollClipId) : null;
-    const sampleEditorClipDragState = sampleEditorClipId ? clipDragStates.get(sampleEditorClipId) : null;
 
     // Calculate totalBeats (same as timeline)
     const minBeats = 64; // Minimum 16 measures
@@ -177,6 +172,8 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                 <SequencerTimelineSection
                     {...timelineSectionProps}
                     timelineScrollRef={timelineScrollRef}
+                    onUpdateClip={onUpdateClip}
+                    onSeek={onSeek}
                     onClipDragStateChange={handleClipDragStateChange}
                 />
             </div>
@@ -216,23 +213,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                             onLoopEndChange={props.onLoopEndChange}
                         />
                     )}
-                    {showSampleEditor && (
-                        <SampleEditorWrapper
-                            clip={sampleEditorClip}
-                            clipDragState={sampleEditorClipDragState}
-                            totalBeats={totalBeats}
-                            currentPosition={currentPosition}
-                            isPlaying={isPlaying ?? false}
-                            timelineScrollRef={timelineScrollRef}
-                            sampleEditorScrollRef={sampleEditorScrollRef}
-                            onSampleEditorScroll={onSampleEditorScroll}
-                            onClose={onCloseSampleEditor}
-                            onUpdateClip={onUpdateClip}
-                            onSeek={onSeek}
-                            onLoopStartChange={props.onLoopStartChange}
-                            onLoopEndChange={props.onLoopEndChange}
-                        />
-                    )}
+                    {/* TODO: Implement sample editor */}
                 </div>
             </div>
         </div>

@@ -71,6 +71,7 @@ interface SequencerState {
 interface SequencerContextValue extends SequencerState {
     // Sequence Management
     loadSequences: () => Promise<void>;
+    loadSequence: (sequence: any) => Promise<void>; // Load complete sequence + UI state
     createSequence: (name: string, tempo?: number) => Promise<void>;
     deleteSequence: (id: string) => Promise<void>;
     setActiveSequenceId: (id: string | null) => void;
@@ -82,12 +83,16 @@ interface SequencerContextValue extends SequencerState {
     resumePlayback: () => Promise<void>;
     setTempo: (tempo: number) => Promise<void>;
     toggleMetronome: () => Promise<void>;
+    seekToPosition: (position: number, triggerAudio?: boolean) => Promise<void>;
 
     // Track Management
     loadTracks: (sequenceId?: string) => Promise<void>;
-    createTrack: (sequenceId: string, name: string, type: string, synthdef?: string) => Promise<void>;
+    createTrack: (sequenceId: string, name: string, type: string, instrument?: string) => Promise<void>;
     deleteTrack: (trackId: string) => Promise<void>;
     renameTrack: (trackId: string, name: string) => Promise<void>;
+    updateTrack: (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => Promise<void>;
+    updateTrackVolume: (trackId: string, volume: number) => Promise<void>;
+    updateTrackPan: (trackId: string, pan: number) => Promise<void>;
     muteTrack: (trackId: string, muted: boolean) => Promise<void>;
     soloTrack: (trackId: string, soloed: boolean) => Promise<void>;
 
@@ -95,6 +100,7 @@ interface SequencerContextValue extends SequencerState {
     addClip: (request: any) => Promise<void>;
     updateClip: (clipId: string, request: any) => Promise<void>;
     deleteClip: (clipId: string) => Promise<void>;
+    duplicateClip: (clipId: string) => Promise<void>;
 
     // UI Actions
     setZoom: (zoom: number) => void;
@@ -106,6 +112,12 @@ interface SequencerContextValue extends SequencerState {
     setShowSampleBrowser: (show: boolean) => void;
     setShowSequenceManager: (show: boolean) => void;
     setShowSequenceSettings: (show: boolean) => void;
+
+    // Loop Control
+    setIsLooping: (enabled: boolean) => void;
+    setLoopStart: (start: number) => void;
+    setLoopEnd: (end: number) => void;
+    toggleLoop: () => void;
 
     // Dragging state
     setDraggingClip: (clipId: string, position: { start_time: number; duration: number } | null) => void;
@@ -165,6 +177,22 @@ export function SequencerProvider({ children }: { children: ReactNode }) {
         return () => unsubscribers.forEach(unsub => unsub());
     }, []);
 
+    // Load all compositions from disk into backend memory on mount
+    useEffect(() => {
+        const initializeCompositions = async () => {
+            try {
+                await api.compositions.loadAll();
+                console.log("✅ Loaded all compositions from disk into backend memory");
+                // Then load sequences into frontend state
+                await loadSequences();
+            } catch (error) {
+                console.error("Failed to load compositions from disk:", error);
+                toast.error("Failed to load saved compositions");
+            }
+        };
+        initializeCompositions();
+    }, []);
+
     // ========================================================================
     // SEQUENCE MANAGEMENT
     // ========================================================================
@@ -177,6 +205,67 @@ export function SequencerProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             console.error("Failed to load sequences:", error);
             toast.error("Failed to load sequences");
+        }
+    }, [broadcastUpdate]);
+
+    /**
+     * Load a complete sequence and extract UI state
+     * This is called by CompositionContext when loading a composition
+     *
+     * NOTE: Sequence object includes tracks and clips as nested fields
+     */
+    const loadSequence = useCallback(async (sequence: any) => {
+        try {
+            // Extract tracks and clips from sequence object
+            const tracks = sequence.tracks || [];
+            const clips = sequence.clips || [];
+
+            // Extract UI state from sequence model
+            const uiState = {
+                zoom: sequence.zoom || 0.5,
+                snapEnabled: sequence.snap_enabled !== undefined ? sequence.snap_enabled : true,
+                gridSize: sequence.grid_size || 16,
+                isLooping: sequence.loop_enabled !== undefined ? sequence.loop_enabled : true,
+                loopStart: sequence.loop_start || 0,
+                loopEnd: sequence.loop_end || 16,
+                selectedClipId: sequence.selected_clip_id || null,
+                pianoRollClipId: sequence.piano_roll_clip_id || null,
+            };
+
+            // Update state with sequence data + UI state
+            setState(prev => ({
+                ...prev,
+                activeSequenceId: sequence.id,
+                tracks: tracks as any[],
+                clips: clips as any[],
+                tempo: sequence.tempo,
+                isPlaying: sequence.is_playing || false,
+                currentPosition: sequence.current_position || 0,
+                // UI state from sequence
+                zoom: uiState.zoom,
+                snapEnabled: uiState.snapEnabled,
+                gridSize: uiState.gridSize,
+                isLooping: uiState.isLooping,
+                loopStart: uiState.loopStart,
+                loopEnd: uiState.loopEnd,
+                selectedClipId: uiState.selectedClipId,
+                pianoRollClipId: uiState.pianoRollClipId,
+                showPianoRoll: !!uiState.pianoRollClipId,
+            }));
+
+            // Broadcast updates
+            broadcastUpdate('activeSequenceId', sequence.id);
+            broadcastUpdate('tracks', tracks);
+            broadcastUpdate('clips', clips);
+            broadcastUpdate('tempo', sequence.tempo);
+            broadcastUpdate('zoom', uiState.zoom);
+            broadcastUpdate('snapEnabled', uiState.snapEnabled);
+            broadcastUpdate('gridSize', uiState.gridSize);
+
+        } catch (error) {
+            console.error("Failed to load sequence:", error);
+            toast.error("Failed to load sequence");
+            throw error;
         }
     }, [broadcastUpdate]);
 
@@ -299,6 +388,18 @@ export function SequencerProvider({ children }: { children: ReactNode }) {
         }
     }, [broadcastUpdate]);
 
+    const seekToPosition = useCallback(async (position: number, triggerAudio: boolean = true) => {
+        if (!state.activeSequenceId) return;
+        try {
+            await api.sequencer.seek(state.activeSequenceId, { position, trigger_audio: triggerAudio });
+            setState(prev => ({ ...prev, currentPosition: position }));
+            broadcastUpdate('currentPosition', position);
+        } catch (error) {
+            console.error("Failed to seek:", error);
+            toast.error("Failed to seek");
+        }
+    }, [state.activeSequenceId, broadcastUpdate]);
+
     // ========================================================================
     // TRACK MANAGEMENT
     // ========================================================================
@@ -316,13 +417,13 @@ export function SequencerProvider({ children }: { children: ReactNode }) {
         }
     }, [state.activeSequenceId, broadcastUpdate]);
 
-    const createTrack = useCallback(async (sequenceId: string, name: string, type: string, synthdef?: string) => {
+    const createTrack = useCallback(async (sequenceId: string, name: string, type: string, instrument?: string) => {
         try {
             const track = await api.sequencer.createTrack({
                 sequence_id: sequenceId,
                 name,
-                track_type: type as "midi" | "audio",
-                synthdef,
+                type: type as "midi" | "audio" | "sample",
+                instrument,
             });
             setState(prev => {
                 const newTracks = [...prev.tracks, track as any];
@@ -338,8 +439,7 @@ export function SequencerProvider({ children }: { children: ReactNode }) {
 
     const deleteTrack = useCallback(async (trackId: string) => {
         try {
-            // Note: Backend route doesn't exist yet - this is a placeholder
-            // await api.sequencer.deleteTrack(trackId);
+            await api.sequencer.deleteTrack(trackId);
             setState(prev => {
                 const newTracks = prev.tracks.filter(t => t.id !== trackId);
                 broadcastUpdate('tracks', newTracks);
@@ -362,6 +462,48 @@ export function SequencerProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             console.error("Failed to rename track:", error);
             toast.error("Failed to rename track");
+        }
+    }, []);
+
+    const updateTrackVolume = useCallback(async (trackId: string, volume: number) => {
+        try {
+            await api.sequencer.updateTrack(trackId, { volume });
+            setState(prev => ({
+                ...prev,
+                tracks: prev.tracks.map(t => t.id === trackId ? { ...t, volume } : t),
+            }));
+        } catch (error) {
+            console.error("Failed to update track volume:", error);
+            toast.error("Failed to update track volume");
+        }
+    }, []);
+
+    const updateTrackPan = useCallback(async (trackId: string, pan: number) => {
+        try {
+            await api.sequencer.updateTrack(trackId, { pan });
+            setState(prev => ({
+                ...prev,
+                tracks: prev.tracks.map(t => t.id === trackId ? { ...t, pan } : t),
+            }));
+        } catch (error) {
+            console.error("Failed to update track pan:", error);
+            toast.error("Failed to update track pan");
+        }
+    }, []);
+
+    const updateTrack = useCallback(async (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => {
+        try {
+            await api.sequencer.updateTrack(trackId, updates);
+            setState(prev => ({
+                ...prev,
+                tracks: prev.tracks.map(t => t.id === trackId ? { ...t, ...updates } : t),
+            }));
+            if (updates.instrument) {
+                toast.success(`Instrument updated to ${updates.instrument}`);
+            }
+        } catch (error) {
+            console.error("Failed to update track:", error);
+            toast.error("Failed to update track");
         }
     }, []);
 
@@ -436,6 +578,22 @@ export function SequencerProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
+    const duplicateClip = useCallback(async (clipId: string) => {
+        if (!state.activeSequenceId) return;
+        try {
+            const newClip = await api.sequencer.duplicateClip(state.activeSequenceId, clipId);
+            setState(prev => ({
+                ...prev,
+                clips: [...prev.clips, newClip as any],
+            }));
+            broadcastUpdate('clips', [...state.clips, newClip]);
+            toast.success("Clip duplicated");
+        } catch (error) {
+            console.error("Failed to duplicate clip:", error);
+            toast.error("Failed to duplicate clip");
+        }
+    }, [state.activeSequenceId, state.clips, broadcastUpdate]);
+
     // ========================================================================
     // UI ACTIONS
     // ========================================================================
@@ -489,12 +647,40 @@ export function SequencerProvider({ children }: { children: ReactNode }) {
     }, []);
 
     // ========================================================================
+    // LOOP CONTROL
+    // ========================================================================
+
+    const setIsLooping = useCallback((enabled: boolean) => {
+        setState(prev => ({ ...prev, isLooping: enabled }));
+        broadcastUpdate('isLooping', enabled);
+    }, [broadcastUpdate]);
+
+    const setLoopStart = useCallback((start: number) => {
+        setState(prev => ({ ...prev, loopStart: start }));
+        broadcastUpdate('loopStart', start);
+    }, [broadcastUpdate]);
+
+    const setLoopEnd = useCallback((end: number) => {
+        setState(prev => ({ ...prev, loopEnd: end }));
+        broadcastUpdate('loopEnd', end);
+    }, [broadcastUpdate]);
+
+    const toggleLoop = useCallback(() => {
+        setState(prev => {
+            const newIsLooping = !prev.isLooping;
+            broadcastUpdate('isLooping', newIsLooping);
+            return { ...prev, isLooping: newIsLooping };
+        });
+    }, [broadcastUpdate]);
+
+    // ========================================================================
     // CONTEXT VALUE
     // ========================================================================
 
     const value: SequencerContextValue = {
         ...state,
         loadSequences,
+        loadSequence,
         createSequence,
         deleteSequence,
         setActiveSequenceId,
@@ -504,15 +690,20 @@ export function SequencerProvider({ children }: { children: ReactNode }) {
         resumePlayback,
         setTempo,
         toggleMetronome,
+        seekToPosition,
         loadTracks,
         createTrack,
         deleteTrack,
         renameTrack,
+        updateTrack,
+        updateTrackVolume,
+        updateTrackPan,
         muteTrack,
         soloTrack,
         addClip,
         updateClip,
         deleteClip,
+        duplicateClip,
         setZoom,
         setSnapEnabled,
         setGridSize,
@@ -522,6 +713,10 @@ export function SequencerProvider({ children }: { children: ReactNode }) {
         setShowSampleBrowser,
         setShowSequenceManager,
         setShowSequenceSettings,
+        setIsLooping,
+        setLoopStart,
+        setLoopEnd,
+        toggleLoop,
         setDraggingClip,
     };
 

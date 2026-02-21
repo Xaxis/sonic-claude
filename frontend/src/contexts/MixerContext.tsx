@@ -54,6 +54,7 @@ interface MixerState {
 interface MixerContextValue extends MixerState {
     // Channel Actions
     loadChannels: (sequenceId: string) => Promise<void>;
+    loadMixerState: (mixerState: any) => Promise<void>; // Load complete mixer state + UI state
     updateChannelVolume: (channelId: string, volume: number) => Promise<void>;
     updateChannelPan: (channelId: string, pan: number) => Promise<void>;
     toggleChannelMute: (channelId: string) => Promise<void>;
@@ -122,7 +123,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
     // CHANNEL ACTIONS
     // ========================================================================
 
-    const loadChannels = useCallback(async (sequenceId: string) => {
+    const loadChannels = useCallback(async (_sequenceId: string) => {
         try {
             const channels = await api.mixer.getChannels();
             setState(prev => ({ ...prev, channels: channels as any[] }));
@@ -130,6 +131,43 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             console.error("Failed to load mixer channels:", error);
             toast.error("Failed to load mixer channels");
+        }
+    }, [broadcastUpdate]);
+
+    /**
+     * Load complete mixer state (channels + master + UI state)
+     * This is called by CompositionContext when loading a composition
+     */
+    const loadMixerState = useCallback(async (mixerState: any) => {
+        try {
+            // Extract UI state from mixer state model
+            const uiState = {
+                showMeters: mixerState.show_meters !== undefined ? mixerState.show_meters : true,
+                meterMode: mixerState.meter_mode || "both",
+                selectedChannelId: mixerState.selected_channel_id || null,
+            };
+
+            // Update state with mixer data + UI state
+            setState(prev => ({
+                ...prev,
+                channels: mixerState.channels || [],
+                master: mixerState.master || null,
+                // UI state from mixer state
+                showMeters: uiState.showMeters,
+                meterMode: uiState.meterMode as "peak" | "rms" | "both",
+                selectedChannelId: uiState.selectedChannelId,
+            }));
+
+            // Broadcast updates
+            broadcastUpdate('channels', mixerState.channels);
+            broadcastUpdate('master', mixerState.master);
+            broadcastUpdate('showMeters', uiState.showMeters);
+            broadcastUpdate('meterMode', uiState.meterMode);
+
+        } catch (error) {
+            console.error("Failed to load mixer state:", error);
+            toast.error("Failed to load mixer state");
+            throw error;
         }
     }, [broadcastUpdate]);
 
@@ -222,7 +260,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
     const toggleMasterMute = useCallback(async () => {
         if (!state.master) return;
         try {
-            const updated = await api.mixer.updateMaster({ muted: !state.master.mute });
+            const updated = await api.mixer.updateMaster({ mute: !state.master.mute });
             setState(prev => ({ ...prev, master: updated as any }));
             broadcastUpdate('master', updated);
         } catch (error) {
@@ -277,6 +315,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
     const value: MixerContextValue = {
         ...state,
         loadChannels,
+        loadMixerState,
         updateChannelVolume,
         updateChannelPan,
         toggleChannelMute,
