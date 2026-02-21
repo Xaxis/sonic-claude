@@ -14,11 +14,11 @@
  */
 
 import { useState } from "react";
-import { useEffects } from '@/contexts/EffectsContext';
+import { useDAWStore } from '@/stores/dawStore';
 import { EffectSlot } from "./EffectSlot";
 import { EffectSelector } from "./EffectSelector";
 import type { SequencerTrack } from "@/modules/sequencer/types";
-import type { TrackEffectChain, EffectInstance } from "@/services/api/providers";
+import type { TrackEffectChain } from "@/services/api/providers";
 
 interface EffectsChannelStripProps {
     track: SequencerTrack;
@@ -26,7 +26,12 @@ interface EffectsChannelStripProps {
 }
 
 export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripProps) {
-    const { effectDefinitions, addEffect, updateEffectParameter, toggleEffectBypass, deleteEffect, moveEffect } = useEffects();
+    const effectDefinitions = useDAWStore(state => state.effectDefinitions);
+    const addEffect = useDAWStore(state => state.addEffect);
+    const updateEffectParameter = useDAWStore(state => state.updateEffectParameter);
+    const toggleEffectBypass = useDAWStore(state => state.toggleEffectBypass);
+    const deleteEffect = useDAWStore(state => state.deleteEffect);
+    const moveEffect = useDAWStore(state => state.moveEffect);
 
     // Get effects sorted by slot index
     const effects = effectChain?.effects || [];

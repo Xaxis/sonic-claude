@@ -10,7 +10,6 @@
  * Updates continuously to show what the AI sees.
  */
 
-import { useAI } from "@/contexts/AIContext";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Music } from "lucide-react";
@@ -19,11 +18,11 @@ import type { AIState, AIActions } from "../hooks/useAIState";
 interface AnalysisLayoutProps {
     state: AIState;
     actions: AIActions;
+    dawState: any;
+    aiContext: string | null;
 }
 
-export function AnalysisLayout({ state, actions }: AnalysisLayoutProps) {
-    const { dawState, aiContext } = useAI();
-
+export function AnalysisLayout({ state, actions, dawState, aiContext }: AnalysisLayoutProps) {
     // Determine display content
     const displayContent = (() => {
         if (!dawState) {

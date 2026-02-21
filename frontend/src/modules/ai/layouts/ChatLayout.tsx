@@ -6,12 +6,13 @@
  */
 
 import { useState, useRef, useEffect } from "react";
-import { useAI } from "@/contexts/AIContext";
+import { useDAWStore } from "@/stores/dawStore";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Send, Sparkles, Music, Zap, Info } from "lucide-react";
 import type { AIState } from "../hooks/useAIState";
+import type { ChatMessage } from "../types";
 
 interface ChatLayoutProps {
     state: AIState;
@@ -22,7 +23,8 @@ interface ChatLayoutProps {
 }
 
 export function ChatLayout({ state, handlers }: ChatLayoutProps) {
-    const { chatHistory } = useAI();
+    // Get chat history from Zustand store
+    const chatHistory = useDAWStore(state => state.chatHistory);
     const [inputValue, setInputValue] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -96,7 +98,7 @@ export function ChatLayout({ state, handlers }: ChatLayoutProps) {
                     </div>
                 ) : (
                     <>
-                        {chatHistory.map((message, idx) => (
+                        {chatHistory.map((message: ChatMessage, idx: number) => (
                             <div
                                 key={idx}
                                 className={`flex ${message.role === "user" ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-2 duration-300`}
@@ -116,7 +118,7 @@ export function ChatLayout({ state, handlers }: ChatLayoutProps) {
                                             <div className="text-sm whitespace-pre-wrap">{message.content}</div>
                                             {message.actions_executed && message.actions_executed.length > 0 && (
                                                 <div className="mt-2 flex flex-wrap gap-1">
-                                                    {message.actions_executed.map((action, actionIdx) => (
+                                                    {message.actions_executed.map((action: any, actionIdx: number) => (
                                                         <Badge
                                                             key={actionIdx}
                                                             variant={action.success ? "default" : "destructive"}

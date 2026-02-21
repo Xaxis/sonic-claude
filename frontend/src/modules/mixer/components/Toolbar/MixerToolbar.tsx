@@ -5,7 +5,7 @@
  * Uses MixerContext for state management
  */
 
-import { Activity, Sliders, Volume2 } from "lucide-react";
+import { Activity, Sliders } from "lucide-react";
 import { Label } from "@/components/ui/label.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -15,17 +15,17 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select.tsx";
-import { useSequencer } from '@/contexts/SequencerContext';
-import { useMixer } from '@/contexts/MixerContext';
+import { useDAWStore } from '@/stores/dawStore';
 import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils";
 
 export function MixerToolbar() {
-    // Get tracks from Sequencer (sequencer owns tracks)
-    const { tracks } = useSequencer();
-
-    // Get mixer state and actions
-    const { showMeters, meterMode, setShowMeters, setMeterMode } = useMixer();
+    // Get tracks and UI state from Zustand store
+    const tracks = useDAWStore(state => state.tracks);
+    const showMeters = useDAWStore(state => state.showMeters);
+    const meterMode = useDAWStore(state => state.meterMode);
+    const setShowMeters = useDAWStore(state => state.setShowMeters);
+    const setMeterMode = useDAWStore(state => state.setMeterMode);
 
     // Count active tracks (not muted)
     const activeTracks = tracks.filter(t => !t.is_muted).length;

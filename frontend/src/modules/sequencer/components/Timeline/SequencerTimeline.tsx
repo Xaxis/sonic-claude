@@ -15,7 +15,7 @@ import { SequencerTimelineGrid } from "./SequencerTimelineGrid.tsx";
 import { SequencerTimelineLoopRegion } from "./SequencerTimelineLoopRegion.tsx";
 import { SequencerTimelinePlayhead } from "./SequencerTimelinePlayhead.tsx";
 import { SequencerTimelineTrackRow } from "./SequencerTimelineTrackRow.tsx";
-import { useSequencer } from '@/contexts/SequencerContext';
+import { useDAWStore } from '@/stores/dawStore';
 import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
 
 interface SequencerTimelineProps {
@@ -51,8 +51,11 @@ export function SequencerTimeline({
     onSeek,
     onClipDragStateChange,
 }: SequencerTimelineProps) {
-    // Get state from global context
-    const { tracks, clips, currentPosition, snapEnabled, gridSize } = useSequencer();
+    // Get state from Zustand store
+    const tracks = useDAWStore(state => state.tracks);
+    const clips = useDAWStore(state => state.clips);
+    const transport = useDAWStore(state => state.transport);
+    const currentPosition = transport?.position_beats ?? 0;
 
     // Get timeline calculations from shared hook
     const { pixelsPerBeat, totalWidth, rulerMarkers, zoom } = useTimelineCalculations();

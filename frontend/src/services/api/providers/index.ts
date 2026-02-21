@@ -15,10 +15,13 @@ export { SamplesProvider } from "./samples.provider";
 
 // Re-export types
 export type {
-    SaveCompositionRequest,
-    SaveCompositionResponse,
+    CreateCompositionRequest,
+    UpdateCompositionRequest,
     CompositionMetadata,
-    ListCompositionsResponse,
+    CompositionListResponse,
+    CompositionCreatedResponse,
+    CompositionSavedResponse,
+    CompositionDeletedResponse,
     LoadAllCompositionsResponse,
     CompositionHistoryEntry,
     ListHistoryResponse,

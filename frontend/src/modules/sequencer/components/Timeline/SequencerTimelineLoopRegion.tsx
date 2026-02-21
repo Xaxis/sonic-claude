@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useSequencer } from '@/contexts/SequencerContext';
+import { useDAWStore } from '@/stores/dawStore';
 
 interface SequencerTimelineLoopRegionProps {
     pixelsPerBeat: number;
@@ -19,8 +19,13 @@ export function SequencerTimelineLoopRegion({
     onLoopStartChange,
     onLoopEndChange,
 }: SequencerTimelineLoopRegionProps) {
-    // Get state from global context
-    const { isLooping, loopStart, loopEnd, zoom, snapEnabled, gridSize } = useSequencer();
+    // Get state from Zustand store
+    const isLooping = useDAWStore(state => state.isLooping);
+    const loopStart = useDAWStore(state => state.loopStart);
+    const loopEnd = useDAWStore(state => state.loopEnd);
+    const zoom = useDAWStore(state => state.zoom);
+    const snapEnabled = useDAWStore(state => state.snapEnabled);
+    const gridSize = useDAWStore(state => state.gridSize);
     const [isDraggingLoopStart, setIsDraggingLoopStart] = useState(false);
     const [isDraggingLoopEnd, setIsDraggingLoopEnd] = useState(false);
     const dragStartXRef = useRef<number>(0);

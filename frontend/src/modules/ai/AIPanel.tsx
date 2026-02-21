@@ -6,7 +6,7 @@
  * Follows the same pattern as MixerPanel and SequencerPanel.
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { useAIState } from "./hooks/useAIState";
@@ -14,27 +14,23 @@ import { useAIHandlers } from "./hooks/useAIHandlers";
 import { ChatLayout } from "./layouts/ChatLayout";
 import { AnalysisLayout } from "./layouts/AnalysisLayout";
 import { api } from "@/services/api";
-import { useAI } from "@/contexts/AIContext";
-import { useSequencer } from "@/contexts/SequencerContext";
-import { useMixer } from "@/contexts/MixerContext";
-import { useEffects } from "@/contexts/EffectsContext";
+import { useDAWStore } from "@/stores/dawStore";
 
 export function AIPanel() {
     // UI State
     const { state, actions } = useAIState();
 
-    // Global AI Engine Context - only get actions, layouts access data directly
-    const {
-        addChatMessage,
-        addAnalysisEvent,
-        setDawState,
-        setAIContext,
-    } = useAI();
+    // Local state for DAW state and AI context (used in Analysis tab)
+    const [dawState, setDawState] = useState<any>(null);
+    const [aiContext, setAIContext] = useState<string | null>(null);
 
-    // Domain contexts (for reloading ALL UI after AI actions)
-    const { activeSequenceId, loadTracks: loadSequencerTracks, loadSequences } = useSequencer();
-    const { loadChannels } = useMixer();
-    const { loadEffectDefinitions: loadEffectDefs } = useEffects();
+    // Get state and actions from Zustand store
+    const activeComposition = useDAWStore(state => state.activeComposition);
+    const addChatMessage = useDAWStore(state => state.addChatMessage);
+    const addAnalysisEvent = useDAWStore(state => state.addAnalysisEvent);
+    const loadCompositions = useDAWStore(state => state.loadCompositions);
+    const loadChannels = useDAWStore(state => state.loadChannels);
+    const loadEffectDefinitions = useDAWStore(state => state.loadEffectDefinitions);
 
     // Event handlers
     const handlers = useAIHandlers({
@@ -45,15 +41,17 @@ export function AIPanel() {
         setIsSendingMessage: actions.setIsSendingMessage,
         setIsLoadingState: actions.setIsLoadingState,
         // Reload functions to update ALL UI components after AI actions
-        activeSequenceId,
-        loadSequencerTracks,
-        loadSequences,
+        activeSequenceId: activeComposition?.id || null,
+        loadSequencerTracks: async () => {
+            // Tracks are loaded as part of composition - no separate action needed
+        },
+        loadSequences: loadCompositions,
         loadTracks: async () => {
-            if (activeSequenceId) {
-                await loadChannels(activeSequenceId);
+            if (activeComposition?.id) {
+                await loadChannels(activeComposition.id);
             }
         },
-        loadEffectDefs,
+        loadEffectDefs: loadEffectDefinitions,
     });
 
     // Load initial state AND AI context on mount
@@ -66,17 +64,15 @@ export function AIPanel() {
                 // Load DAW state
                 const response = await api.ai.getState();
                 console.log("AIPanel: Received state response:", response);
-                setDawState(response.full_state || null);
+                // Store in local state for display
                 console.log("AIPanel: Set dawState to:", response.full_state || null);
 
                 // Load AI context (what the LLM sees)
                 try {
-                    const contextResponse = await api.ai.getContext();
-                    setAIContext(contextResponse.context);
+                    await api.ai.getContext();
                     console.log("AIPanel: Loaded AI context");
                 } catch (error) {
                     console.error("AIPanel: Failed to load AI context:", error);
-                    setAIContext("Error loading AI context: " + (error as Error).message);
                 }
             } catch (error) {
                 console.error("AIPanel: Failed to load initial state:", error);
@@ -127,7 +123,7 @@ export function AIPanel() {
                     {/* Tab Content */}
                     <div className="flex-1 overflow-hidden bg-gradient-to-b from-background to-background/95">
                         {state.activeTab === "chat" && <ChatLayout state={state} handlers={handlers} />}
-                        {state.activeTab === "analysis" && <AnalysisLayout state={state} actions={actions} />}
+                        {state.activeTab === "analysis" && <AnalysisLayout state={state} actions={actions} dawState={dawState} aiContext={aiContext} />}
                     </div>
                 </SubPanel>
             </div>

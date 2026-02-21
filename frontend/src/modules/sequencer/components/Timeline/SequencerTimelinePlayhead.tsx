@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useSequencer } from '@/contexts/SequencerContext';
+import { useDAWStore } from '@/stores/dawStore';
 
 interface SequencerTimelinePlayheadProps {
     pixelsPerBeat: number;
@@ -21,10 +21,18 @@ export function SequencerTimelinePlayhead({
     pixelsPerBeat,
     onSeek,
 }: SequencerTimelinePlayheadProps) {
-    // Get state from global context
-    const { currentPosition, isPlaying, tempo, zoom, snapEnabled, gridSize, isLooping, loopStart, loopEnd } = useSequencer();
+    // Get state from Zustand store
+    const transport = useDAWStore(state => state.transport);
+    const activeComposition = useDAWStore(state => state.activeComposition);
 
-    const loopEnabled = isLooping;  // Alias for compatibility
+    const currentPosition = transport?.position_beats ?? 0;
+    const isPlaying = transport?.is_playing ?? false;
+    const tempo = activeComposition?.sequence.tempo ?? 120;
+    const zoom = useDAWStore(state => state.zoom);
+    const snapEnabled = useDAWStore(state => state.snapEnabled);
+    const gridSize = useDAWStore(state => state.gridSize);
+    const loopEnabled = useDAWStore(state => state.isLooping);
+    const loopEnd = useDAWStore(state => state.loopEnd);
     const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
     const [draggedPlayheadPosition, setDraggedPlayheadPosition] = useState<number | null>(null);
     const dragStartXRef = useRef<number>(0);

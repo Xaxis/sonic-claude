@@ -5,11 +5,12 @@
  * Positioned in the center of the screen with stacked animations.
  */
 
-import { useActivity } from "@/contexts/ActivityContext";
+import { useDAWStore } from "@/stores/dawStore";
 import { ActivityIndicator } from "./ActivityIndicator";
 
 export function ActivityContainer() {
-    const { activities } = useActivity();
+    // Get activities from Zustand store
+    const activities = useDAWStore(state => state.activities);
 
     if (activities.length === 0) return null;
 

@@ -13,7 +13,7 @@
 import { useCallback } from "react";
 import { toast } from "sonner";
 import { api } from "@/services/api";
-import { useActivity } from "@/contexts/ActivityContext";
+import { useDAWStore } from "@/stores/dawStore";
 import { useLayout } from "@/contexts/LayoutContext";
 import type { ChatMessage, AnalysisEvent } from "../types";
 
@@ -51,8 +51,9 @@ export function useAIHandlers(props: UseAIHandlersProps) {
         loadEffectDefs,
     } = props;
 
-    // Activity tracking for animations
-    const { startActivity, completeActivity } = useActivity();
+    // Activity tracking for animations from Zustand
+    const startActivity = useDAWStore(state => state.startActivity);
+    const completeActivity = useDAWStore(state => state.completeActivity);
     const { activeTab } = useLayout();
 
     // ========================================================================

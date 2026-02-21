@@ -9,17 +9,15 @@
  * - Each track has a corresponding mixer channel (1:1 relationship)
  */
 
-import { useSequencer } from '@/contexts/SequencerContext';
-import { useMixer } from '@/contexts/MixerContext';
+import { useDAWStore } from '@/stores/dawStore';
 import { MixerChannelStrip } from "../components/Channel/MixerChannelStrip.tsx";
 import { MixerMasterSection } from "../components/Master/MixerMasterSection.tsx";
 
 export function MixerChannelList() {
-    // Get tracks from Sequencer (sequencer owns tracks)
-    const { tracks } = useSequencer();
-
-    // Get mixer state (mixer owns channels, master, UI state)
-    const { master, showMeters, meterMode } = useMixer();
+    // Get tracks, master, and UI state from Zustand store
+    const tracks = useDAWStore(state => state.tracks);
+    const master = useDAWStore(state => state.master);
+    const showMeters = useDAWStore(state => state.showMeters);
 
     return (
         <div className="flex h-full gap-4 overflow-x-auto overflow-y-hidden bg-gradient-to-b from-background/50 to-background p-5">
@@ -42,7 +40,6 @@ export function MixerChannelList() {
                     key={track.id}
                     track={track}
                     showMeters={showMeters}
-                    meterMode={meterMode}
                 />
             ))}
 
@@ -58,7 +55,6 @@ export function MixerChannelList() {
                 <MixerMasterSection
                     master={master}
                     showMeters={showMeters}
-                    meterMode={meterMode}
                 />
             )}
         </div>

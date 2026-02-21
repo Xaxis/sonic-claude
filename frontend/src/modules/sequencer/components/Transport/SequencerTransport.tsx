@@ -2,7 +2,7 @@
  * SequencerTransport - Transport controls for sequencer
  *
  * Handles play/pause/stop/record/loop controls and tempo
- * Uses SequencerContext for state management
+ * Receives all state and actions via props (parent uses Zustand)
  */
 
 import { Play, Pause, SkipBack, Circle, Repeat, Music } from "lucide-react";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { cn } from "@/lib/utils.ts";
-import { useSequencer } from '@/contexts/SequencerContext';
+import { useDAWStore } from '@/stores/dawStore';
 
 interface SequencerTransportProps {
     isPlaying: boolean;
@@ -42,8 +42,10 @@ export function SequencerTransport({
     onTempoBlur,
     onTempoKeyDown,
 }: SequencerTransportProps) {
-    // Get state from global context
-    const { isRecording, isLooping } = useSequencer();
+    // Get state from Zustand store (fine-grained subscriptions)
+    // Note: is_recording is not yet implemented in TransportMessage
+    const isRecording = false; // TODO: Add is_recording to TransportMessage when backend supports it
+    const isLooping = useDAWStore((state) => state.isLooping);
     const canPlay = hasTracksOrClips;
     const playTooltip = canPlay
         ? (isPlaying ? "Pause" : "Play")

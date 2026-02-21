@@ -27,7 +27,6 @@ export function SampleLibrarySection({ onSampleSelect }: SampleLibrarySectionPro
         editName,
         editCategory,
         handleUploadSample,
-        handleSelectSample,
         handleStartEdit,
         handleSaveEdit,
         handleCancelEdit,

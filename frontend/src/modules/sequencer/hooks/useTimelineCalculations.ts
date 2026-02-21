@@ -5,10 +5,11 @@
  * Used by both SequencerTimeline and SequencerTimelineSection to ensure consistency.
  */
 
-import { useSequencer } from '@/contexts/SequencerContext';
+import { useDAWStore } from '@/stores/dawStore';
 
 export function useTimelineCalculations() {
-    const { clips, zoom } = useSequencer();
+    const clips = useDAWStore(state => state.clips);
+    const zoom = useDAWStore(state => state.zoom);
     
     const pixelsPerBeat = 40;
     const beatsPerMeasure = 4;

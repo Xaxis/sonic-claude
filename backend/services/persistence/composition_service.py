@@ -27,6 +27,7 @@ from backend.models.composition_snapshot import (
     AIIteration,
     IterationHistory,
 )
+from backend.models.composition import CompositionMetadata
 from backend.models.sequence import Sequence
 from backend.models.mixer import MixerState
 from backend.models.effects import TrackEffectChain
@@ -285,12 +286,12 @@ class CompositionService:
             logger.error(f"❌ Failed to delete composition {composition_id}: {e}")
             return False
 
-    def list_compositions(self) -> List[Dict[str, Any]]:
+    def list_compositions(self) -> List[CompositionMetadata]:
         """
         List all compositions
 
         Returns:
-            List of composition metadata
+            List of CompositionMetadata objects (lightweight info for browsing)
         """
         compositions = []
 
@@ -306,16 +307,58 @@ class CompositionService:
                 with open(current_file, 'r') as f:
                     data = json.load(f)
 
-                compositions.append({
-                    "id": comp_dir.name,
-                    "name": data.get("name", "Untitled"),
-                    "created_at": data.get("created_at"),
-                    "updated_at": data.get("metadata", {}).get("updated_at")
-                })
+                # Extract sequence data for stats
+                sequence_data = data.get("sequence", {})
+                tracks = sequence_data.get("tracks", [])
+
+                # Count total clips across all tracks
+                clip_count = sum(len(track.get("clips", [])) for track in tracks)
+
+                # Calculate duration (max end position of all clips)
+                duration_beats = 0.0
+                for track in tracks:
+                    for clip in track.get("clips", []):
+                        clip_end = clip.get("start_beat", 0) + clip.get("duration_beats", 0)
+                        duration_beats = max(duration_beats, clip_end)
+
+                # Check for autosave
+                autosave_file = comp_dir / "autosave.json"
+                has_autosave = autosave_file.exists()
+
+                # Get file size
+                file_size_bytes = current_file.stat().st_size if current_file.exists() else None
+
+                # Parse timestamps
+                created_at = data.get("created_at")
+                if isinstance(created_at, str):
+                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                elif not isinstance(created_at, datetime):
+                    created_at = datetime.now()
+
+                updated_at = data.get("metadata", {}).get("updated_at")
+                if isinstance(updated_at, str):
+                    updated_at = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+                elif not isinstance(updated_at, datetime):
+                    updated_at = created_at
+
+                compositions.append(CompositionMetadata(
+                    id=comp_dir.name,
+                    name=data.get("name", "Untitled"),
+                    tempo=sequence_data.get("tempo", 120.0),
+                    time_signature=sequence_data.get("time_signature", "4/4"),
+                    created_at=created_at,
+                    updated_at=updated_at,
+                    track_count=len(tracks),
+                    clip_count=clip_count,
+                    duration_beats=duration_beats,
+                    file_size_bytes=file_size_bytes,
+                    has_autosave=has_autosave
+                ))
             except Exception as e:
                 logger.error(f"❌ Failed to read composition {comp_dir.name}: {e}")
 
-        return sorted(compositions, key=lambda x: x.get("updated_at", ""), reverse=True)
+        # Sort by updated_at (most recent first)
+        return sorted(compositions, key=lambda x: x.updated_at, reverse=True)
 
     # ========================================================================
     # SNAPSHOT BUILDING HELPERS

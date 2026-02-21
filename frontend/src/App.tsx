@@ -9,15 +9,19 @@ import { TabbedWrapper } from "@/components/layout/TabbedWrapper";
 import { ActivityContainer } from "@/components/activity";
 import { CompositionLoader } from "@/components/composition/CompositionLoader";
 import { useLayout } from "@/contexts/LayoutContext";
-import { useDAWState } from "@/contexts/DAWStateContext";
-import { useSynthesis } from "@/contexts/SynthesisContext";
+import { useDAWStore } from "@/stores/dawStore";
 import { DEFAULT_PANELS } from "@/config/layout.config";
 
 export default function App() {
     const { tabs, activeTab, setActiveTab, createTab, deleteTab, popoutTab } = useLayout();
 
-    const { isEngineRunning, engineStatus } = useDAWState();
-    const { activeSynths } = useSynthesis();
+    // Get state from Zustand store
+    const analytics = useDAWStore(state => state.analytics);
+    const activeSynths = useDAWStore(state => state.activeSynths);
+
+    const isEngineRunning = analytics !== null;
+    const cpuUsage = analytics?.cpu_usage || 0;
+    const activeSynthsCount = Object.keys(activeSynths).length;
 
     return (
         <div className="bg-background flex h-screen w-screen flex-col overflow-hidden">
@@ -27,8 +31,8 @@ export default function App() {
             {/* Header - Always visible */}
             <Header
                 isEngineRunning={isEngineRunning}
-                cpuUsage={engineStatus?.cpu_usage || 0}
-                activeSynths={Object.keys(activeSynths).length}
+                cpuUsage={cpuUsage}
+                activeSynths={activeSynthsCount}
             />
 
             {/* Main Content - Tabbed Layout */}

@@ -49,7 +49,6 @@ export function SequencerPianoRollGrid({
     onAddNote,
     onMoveNote,
     onResizeNote,
-    onUpdateVelocity,
     onDeleteNote,
     onSelectNote,
     onToggleSelectNote,
@@ -72,11 +71,6 @@ export function SequencerPianoRollGrid({
     // Clip region boundaries (for visual highlight)
     const clipStartX = clipStartTime * beatWidth;
     const clipEndX = (clipStartTime + clipDuration) * beatWidth;
-
-    const isBlackKey = (pitch: number): boolean => {
-        const note = pitch % 12;
-        return [1, 3, 6, 8, 10].includes(note);
-    };
 
     const pixelsToPitch = (y: number): number => {
         const pitchIndex = Math.floor(y / noteHeight);

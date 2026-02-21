@@ -1,42 +1,36 @@
 """
-Sequence Routes - CRUD operations and version management for sequences
+Sequence Routes - INTERNAL operations for sequences within compositions
+
+Sequences are INTERNAL to compositions. They are NOT exposed as a public API.
+
+Use the Composition API instead:
+- POST /api/compositions - Create new composition (creates sequence internally)
+- GET /api/compositions - List all compositions
+- GET /api/compositions/{id} - Load composition (loads sequence + all state)
+- PUT /api/compositions/{id} - Update composition metadata
+- DELETE /api/compositions/{id} - Delete composition
+
+These endpoints are for INTERNAL operations only (updating sequence settings
+within an existing composition, like loop points, zoom, grid, etc).
 """
 import logging
 from fastapi import APIRouter, Depends
 
-from backend.core.dependencies import get_sequencer_service, get_composition_service
-from backend.core.exceptions import (
-    SequenceNotFoundError,
-    VersionNotFoundError,
-    ServiceError,
-)
+from backend.core.dependencies import get_sequencer_service
+from backend.core.exceptions import SequenceNotFoundError, ServiceError
 from backend.services.daw.sequencer_service import SequencerService
-from backend.models.sequence import Sequence, CreateSequenceRequest
+from backend.models.sequence import Sequence
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/sequences", response_model=Sequence)
-async def create_sequence(
-    request: CreateSequenceRequest,
-    sequencer_service: SequencerService = Depends(get_sequencer_service)
-):
-    """Create a new sequence"""
-    try:
-        sequence = sequencer_service.create_sequence(request)
-        return sequence
-    except Exception as e:
-        logger.error(f"❌ Failed to create sequence: {e}")
-        raise ServiceError(f"Failed to create sequence: {str(e)}")
-
-
-@router.get("/sequences", response_model=list[Sequence])
-async def get_sequences(
-    sequencer_service: SequencerService = Depends(get_sequencer_service)
-):
-    """Get all sequences"""
-    return sequencer_service.get_sequences()
+# ============================================================================
+# REMOVED: Public sequence creation/deletion
+# ============================================================================
+# Sequences are created/deleted ONLY through the Composition API.
+# Use POST /api/compositions to create a new composition (which creates a sequence internally).
+# Use DELETE /api/compositions/{id} to delete a composition (which deletes the sequence).
 
 
 @router.get("/sequences/{sequence_id}", response_model=Sequence)
@@ -44,7 +38,12 @@ async def get_sequence(
     sequence_id: str,
     sequencer_service: SequencerService = Depends(get_sequencer_service)
 ):
-    """Get sequence by ID"""
+    """
+    Get sequence by ID (INTERNAL USE)
+
+    This is for internal use only. Frontend should use GET /api/compositions/{id}
+    to load the complete composition (sequence + mixer + effects).
+    """
     sequence = sequencer_service.get_sequence(sequence_id)
     if not sequence:
         raise SequenceNotFoundError(sequence_id)
@@ -57,18 +56,18 @@ async def update_sequence(
     request: dict,
     sequencer_service: SequencerService = Depends(get_sequencer_service)
 ):
-    """Update sequence properties (name, tempo, time_signature, loop settings)"""
+    """
+    Update sequence properties (INTERNAL USE)
+
+    Updates loop settings and UI state within an existing composition.
+    For updating composition metadata (name, tempo, time signature),
+    use PUT /api/compositions/{id} instead.
+    """
     sequence = sequencer_service.get_sequence(sequence_id)
     if not sequence:
         raise SequenceNotFoundError(sequence_id)
 
-    # Update fields
-    if "name" in request:
-        sequence.name = request["name"]
-    if "tempo" in request:
-        sequence.tempo = request["tempo"]
-    if "time_signature" in request:
-        sequence.time_signature = request["time_signature"]
+    # Loop settings (internal to sequence)
     if "loop_enabled" in request:
         sequence.loop_enabled = request["loop_enabled"]
     if "loop_start" in request:
@@ -76,7 +75,7 @@ async def update_sequence(
     if "loop_end" in request:
         sequence.loop_end = request["loop_end"]
 
-    # UI settings
+    # UI settings (internal to sequence)
     if "zoom" in request:
         sequence.zoom = request["zoom"]
     if "snap_enabled" in request:
@@ -90,63 +89,6 @@ async def update_sequence(
     if "sample_editor_clip_id" in request:
         sequence.sample_editor_clip_id = request["sample_editor_clip_id"]
 
-    # NOTE: Composition auto-save handled by CompositionService
-    # No need to manually save sequences anymore
+    logger.info(f"✅ Updated sequence {sequence_id} settings")
 
     return sequence
-
-
-@router.delete("/sequences/{sequence_id}")
-async def delete_sequence(
-    sequence_id: str,
-    sequencer_service: SequencerService = Depends(get_sequencer_service),
-    composition_service = Depends(get_composition_service)
-):
-    """Delete a sequence and its associated composition files"""
-    # Delete from memory
-    success = sequencer_service.delete_sequence(sequence_id)
-    if not success:
-        raise SequenceNotFoundError(sequence_id)
-
-    # Delete composition files from disk
-    composition_service.delete_composition(sequence_id)
-
-    return {"status": "ok", "message": f"Sequence {sequence_id} deleted"}
-
-
-@router.post("/sequences/{sequence_id}/save")
-async def save_sequence(
-    sequence_id: str,
-    create_version: bool = False,
-    sequencer_service: SequencerService = Depends(get_sequencer_service)
-):
-    """Save composition - moved to composition API"""
-    raise ServiceError("Sequence save moved to composition API - use /api/compositions/{id}/save")
-
-
-@router.get("/sequences/{sequence_id}/versions")
-async def list_versions(
-    sequence_id: str,
-    sequencer_service: SequencerService = Depends(get_sequencer_service)
-):
-    """List composition versions - moved to composition API"""
-    raise ServiceError("Version listing moved to composition API - use /api/compositions/{id}/history")
-
-
-@router.post("/sequences/{sequence_id}/versions/{version_num}/restore")
-async def restore_version(
-    sequence_id: str,
-    version_num: int,
-    sequencer_service: SequencerService = Depends(get_sequencer_service)
-):
-    """Restore composition version - moved to composition API"""
-    raise ServiceError("Version restore moved to composition API - use /api/compositions/{id}/history/{version}/restore")
-
-
-@router.post("/sequences/{sequence_id}/recover")
-async def recover_from_autosave(
-    sequence_id: str,
-    sequencer_service: SequencerService = Depends(get_sequencer_service)
-):
-    """Recover composition from autosave - moved to composition API"""
-    raise ServiceError("Autosave recovery moved to composition API - use /api/compositions/{id}/recover")

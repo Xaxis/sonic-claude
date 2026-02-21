@@ -6,7 +6,7 @@
  */
 
 import { useState } from "react";
-import { useComposition } from "@/contexts/CompositionContext";
+import { useDAWStore } from "@/stores/dawStore";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -21,29 +21,31 @@ import { Music, ChevronDown, Save, Clock } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 
 export function CompositionSwitcher() {
-    const {
-        activeCompositionId,
-        compositions,
-        loadComposition,
-        saveComposition,
-        hasUnsavedChanges,
-        isSaving,
-    } = useComposition();
+    // Get state and actions from Zustand store
+    const activeComposition = useDAWStore(state => state.activeComposition);
+    const compositions = useDAWStore(state => state.compositions);
+    const loadComposition = useDAWStore(state => state.loadComposition);
+    const saveComposition = useDAWStore(state => state.saveComposition);
+    const hasUnsavedChanges = useDAWStore(state => state.hasUnsavedChanges);
 
     const [isOpen, setIsOpen] = useState(false);
-
-    const activeComposition = compositions.find((c) => c.id === activeCompositionId);
+    const [isSaving, setIsSaving] = useState(false);
 
     const handleSwitch = async (compositionId: string) => {
-        if (compositionId === activeCompositionId) return;
+        if (compositionId === activeComposition?.id) return;
         await loadComposition(compositionId);
         setIsOpen(false);
     };
 
     const handleSave = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (activeCompositionId) {
-            await saveComposition();
+        if (activeComposition) {
+            setIsSaving(true);
+            try {
+                await saveComposition();
+            } finally {
+                setIsSaving(false);
+            }
         }
     };
 
@@ -106,7 +108,7 @@ export function CompositionSwitcher() {
                         </div>
                         <div className="text-xs text-muted-foreground flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {formatDate(activeComposition.updated_at)}
+                            {formatDate(activeComposition.created_at)}
                         </div>
                     </div>
                 </DropdownMenuItem>
@@ -115,7 +117,7 @@ export function CompositionSwitcher() {
 
                 {/* Other Compositions */}
                 {compositions
-                    .filter((c) => c.id !== activeCompositionId)
+                    .filter((c) => c.id !== activeComposition?.id)
                     .map((comp) => (
                         <DropdownMenuItem
                             key={comp.id}

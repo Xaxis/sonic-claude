@@ -9,8 +9,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { SequencerTimelineSection } from "./SequencerTimelineSection.tsx";
 import { PianoRollWrapper } from "./PianoRollWrapper.tsx";
-import { SampleEditorWrapper } from "./SampleEditorWrapper.tsx";
-import { useSequencer } from '@/contexts/SequencerContext';
+import { useDAWStore } from '@/stores/dawStore';
 import { statePersistence } from "@/services/state-persistence/state-persistence.service";
 import type { MIDIEvent } from "../types";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
@@ -73,10 +72,16 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
         ...timelineSectionProps
     } = props;
 
-    // Get state from context
-    const { tracks, clips, currentPosition, isPlaying, zoom, snapEnabled, gridSize, pianoRollClipId } = useSequencer();
-    const showPianoRoll = pianoRollClipId !== null;
-    const showSampleEditor = false; // TODO: Implement sample editor
+    // Get state from Zustand store
+    const tracks = useDAWStore(state => state.tracks);
+    const clips = useDAWStore(state => state.clips);
+    const transport = useDAWStore(state => state.transport);
+    const currentPosition = transport?.position_beats ?? 0;
+    const isPlaying = transport?.is_playing ?? false;
+
+    // Get UI state from Zustand store
+    const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
+    const showPianoRoll = useDAWStore(state => state.showPianoRoll);
 
     // Resizable split state - percentage of height for timeline (0-100)
     const [timelineHeightPercent, setTimelineHeightPercent] = useState(() => {

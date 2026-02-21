@@ -19,7 +19,6 @@ import {
     SelectItem,
     SelectLabel,
     SelectTrigger,
-    SelectValue,
 } from "@/components/ui/select";
 import type { EffectDefinition } from "@/services/api/providers";
 

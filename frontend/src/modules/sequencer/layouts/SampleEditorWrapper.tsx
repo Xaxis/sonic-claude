@@ -45,7 +45,6 @@ export function SampleEditorWrapper(props: SampleEditorWrapperProps) {
         totalBeats,
         currentPosition,
         isPlaying,
-        timelineScrollRef,
         sampleEditorScrollRef,
         onSampleEditorScroll,
         onClose,

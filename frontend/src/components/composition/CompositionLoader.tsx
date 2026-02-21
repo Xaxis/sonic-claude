@@ -1,12 +1,13 @@
 /**
  * Composition Loader Dialog
- * 
+ *
  * First-run experience: "Create or Load Composition"
  * Shows when no composition is active
  */
 
-import { useState } from "react";
-import { useComposition } from "@/contexts/CompositionContext";
+import { useState, useEffect } from "react";
+import { useDAWStore } from "@/stores/dawStore";
+import { statePersistence } from "@/services/state-persistence";
 import {
     Dialog,
     DialogContent,
@@ -21,19 +22,44 @@ import { Music, Plus, FolderOpen, Clock } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
 export function CompositionLoader() {
-    const {
-        activeCompositionId,
-        compositions,
-        loadComposition,
-        createComposition,
-        isLoading,
-    } = useComposition();
+    // Get state and actions from Zustand store
+    const activeComposition = useDAWStore(state => state.activeComposition);
+    const compositions = useDAWStore(state => state.compositions);
+    const loadComposition = useDAWStore(state => state.loadComposition);
+    const loadCompositions = useDAWStore(state => state.loadCompositions);
+    const createComposition = useDAWStore(state => state.createComposition);
 
     const [newCompositionName, setNewCompositionName] = useState("");
     const [isCreating, setIsCreating] = useState(false);
+    const [isInitializing, setIsInitializing] = useState(true);
 
-    // Dialog is open when no composition is active
-    const isOpen = !activeCompositionId && !isLoading;
+    // Initialize: Load compositions list and auto-load last active composition
+    useEffect(() => {
+        const initialize = async () => {
+            try {
+                // Load list of all compositions
+                await loadCompositions();
+
+                // Check if there's a last active composition in localStorage
+                const lastActiveId = statePersistence.getActiveSequenceId();
+
+                if (lastActiveId) {
+                    // Auto-load the last active composition
+                    console.log(`Auto-loading last active composition: ${lastActiveId}`);
+                    await loadComposition(lastActiveId);
+                }
+            } catch (error) {
+                console.error("Failed to initialize compositions:", error);
+            } finally {
+                setIsInitializing(false);
+            }
+        };
+
+        initialize();
+    }, []); // Run once on mount
+
+    // Dialog is open when no composition is active AND not initializing
+    const isOpen = !activeComposition && !isInitializing;
 
     const handleCreate = async () => {
         if (!newCompositionName.trim()) return;

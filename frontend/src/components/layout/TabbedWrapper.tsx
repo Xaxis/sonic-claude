@@ -12,11 +12,11 @@
  */
 
 import { useState, useEffect } from "react";
-import { Plus, X, ExternalLink, Scan, Layers } from "lucide-react";
+import { Plus, X, ExternalLink, Scan } from "lucide-react";
 import { PanelGrid, type PanelConfig } from "./PanelGrid";
 import { ActivityBadge } from "@/components/activity";
 import { useLayout } from "@/contexts/LayoutContext";
-import { useActivity } from "@/contexts/ActivityContext";
+import { useDAWStore } from "@/stores/dawStore";
 import { IconButton } from "@/components/ui/icon-button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -59,7 +59,14 @@ export function TabbedWrapper({
         setXrayOpacity,
     } = useLayout();
 
-    const { getActivitiesForTab } = useActivity();
+    // Get activities from Zustand store
+    const activities = useDAWStore(state => state.activities);
+
+    // Helper to get activities for a specific tab
+    const getActivitiesForTab = () => {
+        // For now, return all activities (can be filtered by tab later if needed)
+        return activities;
+    };
 
     // Use controlled or local state
     const activeTab = controlledActiveTab ?? localActiveTab;
@@ -144,7 +151,7 @@ export function TabbedWrapper({
                     const isPoppedOut = poppedOutTabs.has(tab.id);
                     const isXrayTarget = xrayEnabled && tab.id === xrayTargetTab;
                     const isXraySource = xrayEnabled && tab.id === xraySourceTab;
-                    const tabActivities = getActivitiesForTab(tab.id);
+                    const tabActivities = getActivitiesForTab();
 
                     return (
                         <div

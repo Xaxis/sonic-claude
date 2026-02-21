@@ -6,14 +6,13 @@
  * Follows the exact pattern from MixerChannelList.
  */
 
-import { useEffects } from '@/contexts/EffectsContext';
+import { useDAWStore } from '@/stores/dawStore';
 import { EffectsChannelStrip } from "../components/Channel/EffectsChannelStrip";
 import { EffectsMasterSection } from "../components/Master/EffectsMasterSection";
 
 export function EffectsChannelList() {
-    const { effectChains } = useEffects();
-    // TODO: Get tracks from SequencerContext instead
-    const tracks: any[] = [];
+    const effectChains = useDAWStore(state => state.effectChains);
+    const tracks = useDAWStore(state => state.tracks);
 
     return (
         <div className="flex h-full gap-4 overflow-x-auto overflow-y-hidden bg-gradient-to-b from-background/50 to-background p-5">

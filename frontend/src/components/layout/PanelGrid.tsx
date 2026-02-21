@@ -15,7 +15,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { GridLayout } from "react-grid-layout";
 import { Panel } from "@/components/ui/panel";
 import { GRID_CONFIG } from "@/config/layout.config";
-import type { GridLayoutItem, PanelSnapTarget, PanelAttachment, SnapZone, PanelEdge } from "@/types/grid-layout";
+import type { GridLayoutItem, PanelSnapTarget, PanelAttachment, SnapZone } from "@/types/grid-layout";
 import { verticalCompactor } from "react-grid-layout";
 import { useLayout } from "@/contexts/LayoutContext";
 

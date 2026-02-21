@@ -52,7 +52,6 @@ export function PianoRollWrapper(props: PianoRollWrapperProps) {
         totalBeats,
         currentPosition,
         isPlaying,
-        timelineScrollRef,
         pianoRollScrollRef,
         onPianoRollScroll,
         onClose,

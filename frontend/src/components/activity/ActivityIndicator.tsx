@@ -19,7 +19,7 @@ import {
     Square,
     Loader2,
 } from "lucide-react";
-import type { AIActivity } from "@/contexts/ActivityContext";
+import type { AIActivity } from "@/stores/dawStore";
 
 // Action type to visual mapping
 const ACTION_STYLES = {

@@ -14,7 +14,7 @@ import React, { useState } from "react";
 import { SequencerTracks } from "../components/Tracks/SequencerTracks.tsx";
 import { SequencerTimeline } from "../components/Timeline/SequencerTimeline.tsx";
 import { SequencerTimelineRuler } from "../components/Timeline/SequencerTimelineRuler.tsx";
-import { useSequencer } from '@/contexts/SequencerContext';
+import { useDAWStore } from '@/stores/dawStore';
 import { useTimelineCalculations } from "../hooks/useTimelineCalculations.ts";
 import { EditorGridLayout } from "@/components/layout/EditorGridLayout.tsx";
 
@@ -74,9 +74,11 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
         onClipDragStateChange,
     } = props;
 
-    // Get state from context
-    // Get state from context
-    const { tracks, clips, zoom, snapEnabled, gridSize, isLooping, loopStart, loopEnd, selectedClipId, pianoRollClipId } = useSequencer();
+    // Get state from Zustand store
+    const tracks = useDAWStore(state => state.tracks);
+    const zoom = useDAWStore(state => state.zoom);
+    const snapEnabled = useDAWStore(state => state.snapEnabled);
+    const gridSize = useDAWStore(state => state.gridSize);
 
     // Manage expanded tracks state
     const [expandedTracks, setExpandedTracks] = useState<Set<string>>(new Set());

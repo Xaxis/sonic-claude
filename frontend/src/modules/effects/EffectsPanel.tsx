@@ -13,25 +13,14 @@
 
 import { useEffect } from "react";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
-import { useSequencer } from "@/contexts/SequencerContext";
-import { useEffects } from "@/contexts/EffectsContext";
+import { useDAWStore } from "@/stores/dawStore";
 import { EffectsChannelList } from "./layouts/EffectsChannelList";
 
 export function EffectsPanel() {
-    // Get sequencer state from global Sequencer context
-    const { activeSequenceId, loadTracks } = useSequencer();
+    // Get state and actions from Zustand store
+    const loadEffectDefinitions = useDAWStore(state => state.loadEffectDefinitions);
 
-    // Get effects methods from global Effects context
-    const { loadEffectDefinitions } = useEffects();
-
-    // Load tracks when active sequence changes
-    useEffect(() => {
-        if (activeSequenceId) {
-            loadTracks(activeSequenceId);
-        }
-    }, [activeSequenceId, loadTracks]);
-
-    // Load effect definitions on mount
+    // Load effect definitions when panel mounts
     useEffect(() => {
         loadEffectDefinitions();
     }, [loadEffectDefinitions]);

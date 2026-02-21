@@ -9,7 +9,7 @@
 import { useRef } from "react";
 import { SequencerClip } from "../Clips/SequencerClip.tsx";
 import { cn } from "@/lib/utils.ts";
-import { useSequencer } from '@/contexts/SequencerContext';
+import { useDAWStore } from '@/stores/dawStore';
 
 interface Clip {
     id: string;
@@ -64,8 +64,11 @@ export function SequencerTimelineTrackRow({
     onOpenSampleEditor,
     onClipDragStateChange,
 }: SequencerTimelineTrackRowProps) {
-    // Get state from global context
-    const { zoom, snapEnabled, gridSize, selectedClipId, pianoRollClipId, showPianoRoll } = useSequencer();
+    // Get state from Zustand store
+    const zoom = useDAWStore(state => state.zoom);
+    const snapEnabled = useDAWStore(state => state.snapEnabled);
+    const gridSize = useDAWStore(state => state.gridSize);
+    const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
 
     const mouseDownPosRef = useRef<{ x: number; y: number; target: EventTarget | null } | null>(null);
 

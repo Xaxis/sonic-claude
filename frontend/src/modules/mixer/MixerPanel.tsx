@@ -12,17 +12,13 @@
 
 import { useEffect } from "react";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
-import { useSequencer } from "@/contexts/SequencerContext";
-import { useMixer } from "@/contexts/MixerContext";
+import { useDAWStore } from "@/stores/dawStore";
 import { MixerToolbar } from "./components/Toolbar/MixerToolbar";
 import { MixerChannelList } from "./layouts/MixerChannelList";
 
 export function MixerPanel() {
-    // Get sequencer state
-    const { activeSequenceId } = useSequencer();
-
-    // Get mixer state and actions from global context
-    const { loadMaster } = useMixer();
+    // Get mixer actions from Zustand store
+    const loadMaster = useDAWStore(state => state.loadMaster);
 
     // Load master channel when component mounts
     useEffect(() => {

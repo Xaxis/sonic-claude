@@ -5,13 +5,13 @@
  * Displays as a bottom panel in the sequencer (like Ableton's clip view for audio).
  */
 
-import { useState, useEffect } from "react";
-import { X, Grid3x3 } from "lucide-react";
+import { useState } from "react";
+import { X } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { SequencerSampleEditorSection } from "../../layouts/SequencerSampleEditorSection.tsx";
-import { useSequencer } from '@/contexts/SequencerContext';
+import { useDAWStore } from '@/stores/dawStore';
 import { useWaveformData } from "../../hooks/useWaveformData.ts";
 
 interface SequencerSampleEditorProps {
@@ -40,7 +40,6 @@ export function SequencerSampleEditor({
     clipDuration,
     clipStartTime,
     audioFilePath,
-    audioOffset = 0,
     gain,
     totalBeats,
     currentPosition,
@@ -53,8 +52,9 @@ export function SequencerSampleEditor({
     onLoopStartChange,
     onLoopEndChange,
 }: SequencerSampleEditorProps) {
-    // Get tempo from context
-    const { tempo } = useSequencer();
+    // Get tempo from Zustand store
+    const activeComposition = useDAWStore(state => state.activeComposition);
+    const tempo = activeComposition?.sequence.tempo ?? 120;
 
     // Local UI state
     const [localGain, setLocalGain] = useState(gain);

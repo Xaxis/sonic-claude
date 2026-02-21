@@ -16,7 +16,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select.tsx";
-import { useSequencer } from '@/contexts/SequencerContext';
+import { useDAWStore } from '@/stores/dawStore';
 import type { Sequence } from "../../types.ts";
 
 interface SequencerToolbarProps {
@@ -38,8 +38,13 @@ export function SequencerToolbar({
     onSequenceSettings,
     onAddTrack,
 }: SequencerToolbarProps) {
-    // Get state and actions from global context
-    const { zoom, snapEnabled, gridSize, setZoom, setSnapEnabled, setGridSize } = useSequencer();
+    // Get UI state and actions from Zustand store
+    const zoom = useDAWStore(state => state.zoom);
+    const snapEnabled = useDAWStore(state => state.snapEnabled);
+    const gridSize = useDAWStore(state => state.gridSize);
+    const setZoom = useDAWStore(state => state.setZoom);
+    const setSnapEnabled = useDAWStore(state => state.setSnapEnabled);
+    const setGridSize = useDAWStore(state => state.setGridSize);
 
     return (
         <div className="flex items-center justify-between gap-4">

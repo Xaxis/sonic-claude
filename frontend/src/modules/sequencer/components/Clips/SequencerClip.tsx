@@ -5,14 +5,14 @@
  * Uses SequencerContext for state management
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Copy, Trash2, Volume2, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { cn } from "@/lib/utils.ts";
 import type { MIDIEvent, SequencerClip } from "../../types.ts";
 import { WaveformDisplay } from "../Shared/WaveformDisplay.tsx";
-import { useSequencer } from '@/contexts/SequencerContext';
+import { useDAWStore } from '@/stores/dawStore';
 import { useWaveformData } from "../../hooks/useWaveformData.ts";
 
 interface SequencerClipProps {
@@ -50,8 +50,13 @@ export function SequencerClip({
     onOpenSampleEditor,
     onClipDragStateChange,
 }: SequencerClipProps) {
-    // Get state from global context
-    const { tempo, zoom, snapEnabled, gridSize, selectedClipId } = useSequencer();
+    // Get state from Zustand store
+    const activeComposition = useDAWStore(state => state.activeComposition);
+    const tempo = activeComposition?.sequence.tempo ?? 120;
+    const zoom = useDAWStore(state => state.zoom);
+    const snapEnabled = useDAWStore(state => state.snapEnabled);
+    const gridSize = useDAWStore(state => state.gridSize);
+    const selectedClipId = useDAWStore(state => state.selectedClipId);
     const isSelected = selectedClipId === clip.id;
 
     // Load waveform data using hook (200 samples for clip preview)

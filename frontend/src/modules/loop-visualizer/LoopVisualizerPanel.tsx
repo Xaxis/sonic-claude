@@ -13,7 +13,7 @@ import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { useEffect, useRef, useState, useMemo } from "react";
-import { useSpectrum, useWaveform } from "@/contexts/TelemetryContext";
+import { useDAWStore } from "@/stores/dawStore";
 import { Activity, Waves, BarChart3, AlertTriangle } from "lucide-react";
 import { WaveformDisplay } from "../sequencer/components/Shared/WaveformDisplay.tsx";
 
@@ -38,8 +38,9 @@ interface AudioStats {
 }
 
 export function LoopVisualizerPanel() {
-    const { spectrum, isConnected: spectrumConnected } = useSpectrum();
-    const { waveform, isConnected: waveformConnected } = useWaveform();
+    // Get spectrum and waveform from Zustand store
+    const spectrum = useDAWStore(state => state.spectrum);
+    const waveform = useDAWStore(state => state.waveform);
     const spectrumCanvasRef = useRef<HTMLCanvasElement>(null);
     const [stats, setStats] = useState<AudioStats>({
         peakFrequency: 0,
@@ -53,11 +54,11 @@ export function LoopVisualizerPanel() {
 
     // Calculate audio statistics from spectrum and waveform data
     useMemo(() => {
-        if (spectrum.length === 0 || !waveform || waveform.samples_left.length === 0) return;
+        if (!spectrum || spectrum.length === 0 || !waveform || waveform.samples_left.length === 0) return;
 
         let maxMagnitude = 0;
         let maxIndex = 0;
-        spectrum.forEach((mag, idx) => {
+        spectrum.forEach((mag: number, idx: number) => {
             if (mag > maxMagnitude) {
                 maxMagnitude = mag;
                 maxIndex = idx;
@@ -67,7 +68,7 @@ export function LoopVisualizerPanel() {
 
         let weightedSum = 0;
         let magnitudeSum = 0;
-        spectrum.forEach((mag, idx) => {
+        spectrum.forEach((mag: number, idx: number) => {
             const freq = (idx / spectrum.length) * 24000;
             weightedSum += freq * mag;
             magnitudeSum += mag;
@@ -77,10 +78,10 @@ export function LoopVisualizerPanel() {
         const peakL = Math.max(...waveform.samples_left.map(Math.abs));
         const peakR = Math.max(...waveform.samples_right.map(Math.abs));
         const rmsL = Math.sqrt(
-            waveform.samples_left.reduce((sum, val) => sum + val * val, 0) / waveform.samples_left.length
+            waveform.samples_left.reduce((sum: number, val: number) => sum + val * val, 0) / waveform.samples_left.length
         );
         const rmsR = Math.sqrt(
-            waveform.samples_right.reduce((sum, val) => sum + val * val, 0) / waveform.samples_right.length
+            waveform.samples_right.reduce((sum: number, val: number) => sum + val * val, 0) / waveform.samples_right.length
         );
 
         const clipping = peakL > 0.95 || peakR > 0.95;

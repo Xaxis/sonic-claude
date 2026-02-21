@@ -142,15 +142,7 @@ export function SequencerSequenceManager({
         setIsLoading(true);
         try {
             console.log("💾 Saving composition:", currentSequenceId, "createVersion:", createVersion);
-            const data = await api.compositions.save({
-                sequence_id: currentSequenceId,
-                create_history: createVersion,
-                is_autosave: false,
-                metadata: {
-                    source: "manual_save",
-                    timestamp: new Date().toISOString()
-                }
-            });
+            const data = await api.compositions.save(currentSequenceId, createVersion, false);
             console.log("💾 Save response:", data);
 
             if (createVersion) {

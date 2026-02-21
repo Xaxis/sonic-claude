@@ -10,7 +10,7 @@ import { Meter } from "@/components/ui/meter.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
-import { useMixer } from '@/contexts/MixerContext';
+import { useDAWStore } from '@/stores/dawStore';
 import { formatDb } from "@/lib/audio-utils";
 import { cn } from "@/lib/utils";
 import type { MasterChannel } from "../../types.ts";
@@ -18,11 +18,13 @@ import type { MasterChannel } from "../../types.ts";
 interface MixerMasterSectionProps {
     master: MasterChannel;
     showMeters: boolean;
-    meterMode: "peak" | "rms" | "both";
 }
 
-export function MixerMasterSection({ master, showMeters, meterMode }: MixerMasterSectionProps) {
-    const { meters, updateMasterFader, toggleLimiter, setLimiterThreshold } = useMixer();
+export function MixerMasterSection({ master, showMeters }: MixerMasterSectionProps) {
+    const meters = useDAWStore(state => state.meters);
+    const updateMasterFader = useDAWStore(state => state.updateMasterFader);
+    const toggleLimiter = useDAWStore(state => state.toggleLimiter);
+    const setLimiterThreshold = useDAWStore(state => state.setLimiterThreshold);
 
     // Get real-time meter data for master
     const masterMeter = meters["master"];

@@ -49,6 +49,9 @@ export interface UpdateSequenceRequest {
     tempo?: number;
     time_signature_num?: number;
     time_signature_den?: number;
+    loop_enabled?: boolean;
+    loop_start?: number;
+    loop_end?: number;
 }
 
 export interface SetTempoRequest {

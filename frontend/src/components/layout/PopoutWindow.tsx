@@ -10,8 +10,7 @@ import { useSearchParams } from "react-router-dom";
 import { PanelGrid } from "./PanelGrid";
 import { Header } from "./Header";
 import { useLayout } from "@/contexts/LayoutContext";
-import { useDAWState } from "@/contexts/DAWStateContext";
-import { useSynthesis } from "@/contexts/SynthesisContext";
+import { useDAWStore } from "@/stores/dawStore";
 import { DEFAULT_PANELS } from "@/config/layout.config";
 import { BROADCAST_KEYS } from "@/config/layout.config";
 
@@ -21,8 +20,14 @@ export function PopoutWindow() {
     const panelIdsParam = searchParams.get("panels");
 
     const { tabs, updateTabLayout, closePopout, popoutTab } = useLayout();
-    const { isEngineRunning, engineStatus } = useDAWState();
-    const { activeSynths } = useSynthesis();
+
+    // Get state from Zustand store
+    const analytics = useDAWStore(state => state.analytics);
+    const activeSynths = useDAWStore(state => state.activeSynths);
+
+    const isEngineRunning = analytics !== null;
+    const cpuUsage = analytics?.cpu_usage || 0;
+    const activeSynthsCount = Object.keys(activeSynths).length;
 
     // Parse panel IDs from URL
     const panelIds = panelIdsParam ? panelIdsParam.split(",") : [];
@@ -95,8 +100,8 @@ export function PopoutWindow() {
             {/* Header - Same as main window */}
             <Header
                 isEngineRunning={isEngineRunning}
-                cpuUsage={engineStatus?.cpu_usage || 0}
-                activeSynths={Object.keys(activeSynths).length}
+                cpuUsage={cpuUsage}
+                activeSynths={activeSynthsCount}
             />
 
             {/* Panel Grid */}

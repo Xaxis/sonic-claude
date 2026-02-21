@@ -24,7 +24,7 @@ const toastStyles = {
     warning: "border-yellow-500/50 bg-yellow-500/10 text-yellow-500",
 };
 
-export function Toast({ id, type = "info", message, onClose }: ToastProps) {
+export function Toast({ type = "info", message, onClose }: ToastProps) {
     const Icon = toastIcons[type];
 
     return (

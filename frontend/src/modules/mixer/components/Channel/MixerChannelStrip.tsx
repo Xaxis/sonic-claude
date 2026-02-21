@@ -13,25 +13,25 @@
 import { Fader } from "@/components/ui/fader.tsx";
 import { Knob } from "@/components/ui/knob.tsx";
 import { Meter } from "@/components/ui/meter.tsx";
-import { useSequencer } from '@/contexts/SequencerContext';
-import { useMixer } from '@/contexts/MixerContext';
+import { useDAWStore } from '@/stores/dawStore';
 import { MixerButton } from "./MixerButton.tsx";
 import { volumeToDb, dbToVolume, formatDb } from "@/lib/audio-utils";
 import type { SequencerTrack } from "@/modules/sequencer/types";
-import { api } from "@/services/api";
 
 interface MixerChannelStripProps {
     track: SequencerTrack;
     showMeters: boolean;
-    meterMode: "peak" | "rms" | "both";
 }
 
-export function MixerChannelStrip({ track, showMeters, meterMode }: MixerChannelStripProps) {
-    // Get real-time meters from mixer context
-    const { meters } = useMixer();
+export function MixerChannelStrip({ track, showMeters }: MixerChannelStripProps) {
+    // Get real-time meters from Zustand store
+    const meters = useDAWStore(state => state.meters);
 
-    // Get sequencer actions for updating track properties
-    const { updateTrackVolume, updateTrackPan, muteTrack, soloTrack } = useSequencer();
+    // Get sequencer actions from Zustand store
+    const updateTrackVolume = useDAWStore(state => state.updateTrackVolume);
+    const updateTrackPan = useDAWStore(state => state.updateTrackPan);
+    const muteTrack = useDAWStore(state => state.muteTrack);
+    const soloTrack = useDAWStore(state => state.soloTrack);
 
     const faderValue = volumeToDb(track.volume);
 

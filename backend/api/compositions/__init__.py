@@ -13,7 +13,7 @@ from . import crud, history, startup
 # Create main router
 router = APIRouter()
 
-# Include all sub-routers
+# Include all sub-routers (no prefix needed - they define their own paths)
 router.include_router(crud.router, tags=["compositions"])
 router.include_router(history.router, tags=["compositions"])
 router.include_router(startup.router, tags=["compositions"])

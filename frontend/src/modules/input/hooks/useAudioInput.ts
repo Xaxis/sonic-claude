@@ -48,7 +48,6 @@ export function useAudioInput({ onRecordingComplete }: UseAudioInputProps = {}) 
     // Refs to track latest values without causing re-renders
     const audioInputDevicesRef = useRef<AudioDeviceInfo[]>([]);
     const gainRef = useRef<number>(0);
-    const isInitialMountRef = useRef<boolean>(true);
 
     // Map device label to SuperCollider device index
     const getSupercolliderDeviceIndex = useCallback((deviceLabel: string): number => {
