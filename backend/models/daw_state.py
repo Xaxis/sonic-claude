@@ -54,14 +54,18 @@ class CompactTrack(BaseModel):
     solo: bool = False
 
 
-class CompactSequence(BaseModel):
-    """Minimal sequence representation"""
+class CompactComposition(BaseModel):
+    """Minimal composition representation"""
     id: str
     name: str
     tempo: float
     time_sig: str = Field(default="4/4")
     tracks: List[CompactTrack]
     clips: List[CompactClip]
+
+
+# Backwards compatibility alias - DEPRECATED, use CompactComposition instead
+CompactSequence = CompactComposition
 
 
 class AudioFeatures(BaseModel):

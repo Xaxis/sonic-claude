@@ -1,5 +1,8 @@
 """
-Sequencer Models - Pydantic models for sequences, clips, and MIDI events
+Track and Clip Models - Pydantic models for tracks, clips, and MIDI events
+
+NOTE: This file will be renamed to track.py in a future refactor.
+For now, keeping the name for backwards compatibility during migration.
 """
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
@@ -72,11 +75,11 @@ class Clip(BaseModel):
 # TRACKS
 # ============================================================================
 
-class SequencerTrack(BaseModel):
-    """Sequencer track"""
+class Track(BaseModel):
+    """Track in a composition"""
     id: str
     name: str
-    sequence_id: str  # Parent sequence ID
+    composition_id: str  # Parent composition ID
     type: Literal["midi", "audio", "sample"] = "sample"  # Track type
     color: str = "#3b82f6"
     is_muted: bool = False
@@ -97,47 +100,15 @@ class SequencerTrack(BaseModel):
     sample_file_path: Optional[str] = None  # Cached file path
 
 
-# ============================================================================
-# SEQUENCES
-# ============================================================================
-
-class Sequence(BaseModel):
-    """Complete sequence with tracks and clips"""
-    id: str
-    name: str
-    tempo: float = Field(default=120.0, gt=0, le=300)
-    time_signature: str = Field(default="4/4", pattern=r"^\d+/\d+$")
-    tracks: List[SequencerTrack] = Field(default_factory=list)  # Tracks belong to sequence
-    clips: List[Clip] = Field(default_factory=list)
-    is_playing: bool = False
-    current_position: float = Field(default=0.0, ge=0, description="Playhead position in beats")
-
-    # Loop settings
-    loop_enabled: bool = False
-    loop_start: float = Field(default=0.0, ge=0)
-    loop_end: float = Field(default=16.0, gt=0)
-
-    # UI settings (per-sequence)
-    zoom: float = Field(default=0.5, gt=0, le=4.0, description="Timeline zoom level")
-    snap_enabled: bool = Field(default=True, description="Grid snapping enabled")
-    grid_size: int = Field(default=16, gt=0, description="Grid size (1/16 note = 16)")
-    selected_clip_id: Optional[str] = Field(default=None, description="Currently selected clip ID")
-    piano_roll_clip_id: Optional[str] = Field(default=None, description="Clip ID with piano roll open")
-    sample_editor_clip_id: Optional[str] = Field(default=None, description="Clip ID with sample editor open")
-
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+# Backwards compatibility alias - DEPRECATED, use Track instead
+SequencerTrack = Track
 
 
 # ============================================================================
 # REQUEST MODELS
 # ============================================================================
-
-class CreateSequenceRequest(BaseModel):
-    """Request to create a new sequence"""
-    name: str
-    tempo: Optional[float] = Field(default=120.0, gt=0, le=300)
-    time_signature: Optional[str] = Field(default="4/4", pattern=r"^\d+/\d+$")
+# NOTE: Sequence and CreateSequenceRequest have been DELETED.
+# We use Composition (from composition.py) instead.
 
 
 class AddClipRequest(BaseModel):

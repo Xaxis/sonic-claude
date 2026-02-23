@@ -24,7 +24,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from backend.services.persistence.composition_service import CompositionService
-    from backend.services.daw.sequencer_service import SequencerService
     from backend.services.daw.mixer_service import MixerService
     from backend.services.daw.effects_service import TrackEffectsService
 
@@ -291,29 +290,29 @@ Call ALL the tools needed to complete ALL steps. Don't stop after one tool call.
         """Save composition as AI iteration after actions are executed"""
         try:
             # Check if we have all required services
-            if not all([self.composition_service, self.action_service.sequencer,
+            if not all([self.composition_service, self.action_service.composition_state,
                        self.action_service.mixer, self.action_service.effects]):
                 logger.warning("⚠️ Cannot save AI iteration: missing required services")
                 return
 
-            # Get current sequence ID
-            sequence_id = self.action_service.sequencer.current_sequence_id
-            if not sequence_id:
-                logger.warning("⚠️ Cannot save AI iteration: no active sequence")
+            # Get current composition ID
+            composition_id = self.action_service.composition_state.current_composition_id
+            if not composition_id:
+                logger.warning("⚠️ Cannot save AI iteration: no active composition")
                 return
 
-            # Get sequence
-            sequence = self.action_service.sequencer.get_sequence(sequence_id)
-            if not sequence:
-                logger.warning(f"⚠️ Cannot save AI iteration: sequence {sequence_id} not found")
+            # Get composition
+            composition = self.action_service.composition_state.get_composition(composition_id)
+            if not composition:
+                logger.warning(f"⚠️ Cannot save AI iteration: composition {composition_id} not found")
                 return
 
             # Get or initialize chat history for this composition
-            if sequence_id not in self.chat_histories:
-                self.chat_histories[sequence_id] = []
+            if composition_id not in self.chat_histories:
+                self.chat_histories[composition_id] = []
 
             # Add user message to chat history
-            self.chat_histories[sequence_id].append({
+            self.chat_histories[composition_id].append({
                 "role": "user",
                 "content": user_message,
                 "timestamp": datetime.now().isoformat(),
@@ -321,7 +320,7 @@ Call ALL the tools needed to complete ALL steps. Don't stop after one tool call.
             })
 
             # Add assistant response to chat history
-            self.chat_histories[sequence_id].append({
+            self.chat_histories[composition_id].append({
                 "role": "assistant",
                 "content": assistant_response,
                 "timestamp": datetime.now().isoformat(),
@@ -336,35 +335,39 @@ Call ALL the tools needed to complete ALL steps. Don't stop after one tool call.
                 ]
             })
 
-            # Build snapshot
-            snapshot = self.composition_service.build_snapshot_from_services(
-                sequencer_service=self.action_service.sequencer,
+            # Capture current composition state from services
+            captured_composition = self.composition_service.capture_composition_from_services(
+                composition_state_service=self.action_service.composition_state,
                 mixer_service=self.action_service.mixer,
                 effects_service=self.action_service.effects,
-                sequence_id=sequence_id,
-                name=sequence.name,
-                metadata={
-                    "source": "ai_iteration",
-                    "user_message": user_message,
-                    "actions_count": len(actions_executed),
-                    "timestamp": datetime.now().isoformat()
-                },
-                chat_history=self.chat_histories[sequence_id]  # Pass chat history
+                composition_id=composition_id
             )
 
-            if not snapshot:
-                logger.error("❌ Failed to build snapshot for AI iteration")
+            if not captured_composition:
+                logger.error("❌ Failed to capture composition for AI iteration")
                 return
+
+            # Update metadata
+            if not captured_composition.metadata:
+                captured_composition.metadata = {}
+            captured_composition.metadata.update({
+                "source": "ai_iteration",
+                "user_message": user_message,
+                "actions_count": len(actions_executed),
+                "timestamp": datetime.now().isoformat()
+            })
+
+            # Update chat history
+            captured_composition.chat_history = self.chat_histories[composition_id]
 
             # Save with history
             self.composition_service.save_composition(
-                composition_id=sequence_id,
-                snapshot=snapshot,
+                composition=captured_composition,
                 create_history=True,  # Create history entry for AI iteration
                 is_autosave=False
             )
 
-            logger.info(f"💾 Saved AI iteration for sequence {sequence_id} with {len(self.chat_histories[sequence_id])} chat messages")
+            logger.info(f"💾 Saved AI iteration for composition {composition_id} with {len(self.chat_histories[composition_id])} chat messages")
 
         except Exception as e:
             logger.error(f"❌ Failed to save AI iteration: {e}", exc_info=True)
@@ -618,7 +621,7 @@ AVAILABLE TOOLS
 - set_track_parameter: Adjust track volume, pan, mute, solo
 - add_effect: Add effects to tracks
 - set_tempo: Change global tempo
-- play_sequence/stop_playback: Control playback
+- play_composition/stop_playback: Control playback
 
 ═══════════════════════════════════════════════════════════════════════════════
 MIDI NOTE FORMAT (COMPACT)
@@ -1101,12 +1104,12 @@ Keep suggestions simple and musical. Explain your reasoning briefly."""
                 }
             },
             {
-                "name": "play_sequence",
+                "name": "play_composition",
                 "description": "Start playback",
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "sequence_id": {"type": "string", "description": "Sequence ID (optional, uses current)"}
+                        "composition_id": {"type": "string", "description": "Composition ID (optional, uses current)"}
                     }
                 }
             },

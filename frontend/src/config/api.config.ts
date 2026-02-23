@@ -31,15 +31,16 @@ export const apiConfig = {
     endpoints: {
         // Audio Engine
         audioEngine: "/audio-engine",
-        
+
         // REST API endpoints
         api: {
-            sequencer: "/api/sequencer",
+            // NOTE: /api/sequencer/* routes have been removed - use /api/compositions/* instead
             mixer: "/api/mixer",
             effects: "/api/effects",
             audio: "/api/audio",
             samples: "/api/samples",
             compositions: "/api/compositions",
+            playback: "/api/playback",
             ai: "/api/ai",
         },
 

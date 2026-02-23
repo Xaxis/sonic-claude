@@ -10,7 +10,8 @@ import logging
 from typing import List, Optional, Dict
 from collections import Counter
 
-from backend.models.sequence import Sequence, MIDINote
+from backend.models.sequence import MIDINote
+from backend.models.composition import Composition
 from backend.models.daw_state import MusicalContext
 
 logger = logging.getLogger(__name__)
@@ -32,13 +33,13 @@ class MIDIAnalyzer:
         self._cached_context: Optional[MusicalContext] = None
         self._last_sequence_hash: Optional[int] = None
     
-    def analyze_sequence(self, sequence: Sequence) -> MusicalContext:
+    def analyze_sequence(self, sequence: Composition) -> MusicalContext:
         """
-        Analyze sequence to extract musical context
-        
+        Analyze composition to extract musical context
+
         Args:
-            sequence: Sequence to analyze
-        
+            sequence: Composition to analyze
+
         Returns:
             MusicalContext with key, scale, complexity, etc.
         """
@@ -207,8 +208,8 @@ class MIDIAnalyzer:
         return numerator / denominator
     
     @staticmethod
-    def _compute_sequence_hash(sequence: Sequence) -> int:
-        """Compute hash of sequence for cache invalidation"""
+    def _compute_sequence_hash(sequence: Composition) -> int:
+        """Compute hash of composition for cache invalidation"""
         # Hash based on clip count and total notes
         clip_count = len(sequence.clips)
         note_count = sum(

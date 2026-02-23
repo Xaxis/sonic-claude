@@ -91,7 +91,7 @@ export function SequencerPianoRoll({
 
         // Preview the note
         try {
-            await api.sequencer.previewNote({
+            await api.audio.previewNote({
                 note: pitch,
                 velocity: 100,
                 duration: 0.5,
@@ -116,7 +116,7 @@ export function SequencerPianoRoll({
         // Preview the note only if pitch changed
         if (newPitch !== oldPitch) {
             try {
-                await api.sequencer.previewNote({
+                await api.audio.previewNote({
                     note: newPitch,
                     velocity: updatedNotes[index].velocity,
                     duration: 0.5,

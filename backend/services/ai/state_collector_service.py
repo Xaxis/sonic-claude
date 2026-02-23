@@ -25,7 +25,7 @@ from backend.models.daw_state import (
     StateDetailLevel,
     GetStateResponse
 )
-from backend.services.daw.sequencer_service import SequencerService
+from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.mixer_service import MixerService
 from backend.core.engine_manager import AudioEngineManager
 
@@ -37,17 +37,17 @@ class DAWStateService:
     Aggregates DAW state from multiple services
     Provides efficient serialization and change detection
     """
-    
+
     def __init__(
         self,
-        sequencer_service: SequencerService,
+        composition_state_service: CompositionStateService,
         mixer_service: MixerService,
         engine_manager: AudioEngineManager,
         audio_feature_extractor=None,
         musical_context_analyzer=None,
         sample_analyzer=None
     ):
-        self.sequencer = sequencer_service
+        self.composition_state = composition_state_service
         self.mixer = mixer_service
         self.sample_analyzer = sample_analyzer
         self.engine = engine_manager
@@ -75,10 +75,10 @@ class DAWStateService:
         if not self.musical_context_analyzer:
             return
 
-        if self.sequencer.current_sequence_id:
-            sequence = self.sequencer.sequences.get(self.sequencer.current_sequence_id)
-            if sequence:
-                context = self.musical_context_analyzer.analyze_sequence(sequence)
+        if self.composition_state.current_composition_id:
+            composition = self.composition_state.compositions.get(self.composition_state.current_composition_id)
+            if composition:
+                context = self.musical_context_analyzer.analyze_sequence(composition)
                 self.update_musical_context(context)
 
     def get_state(
@@ -137,7 +137,7 @@ class DAWStateService:
     def _build_snapshot(self, detail: StateDetailLevel) -> DAWStateSnapshot:
         """Build state snapshot from current services"""
         # Get playback state
-        playback = self.sequencer.get_playback_state()
+        playback = self.composition_state.get_playback_state()
 
         # Get current sequence (if any)
         # Priority: 1) Currently playing sequence, 2) Most recently modified, 3) First available
@@ -147,11 +147,11 @@ class DAWStateService:
         if playback["current_sequence"]:
             # Use currently playing sequence
             sequence_id = playback["current_sequence"]
-        elif self.sequencer.sequences:
+        elif self.composition_state.sequences:
             # Not playing - get most recently modified sequence
             # Sort by updated_at timestamp (most recent first)
             sorted_sequences = sorted(
-                self.sequencer.sequences.items(),
+                self.composition_state.sequences.items(),
                 key=lambda x: x[1].updated_at if hasattr(x[1], 'updated_at') else datetime.min,
                 reverse=True
             )
@@ -159,9 +159,9 @@ class DAWStateService:
                 sequence_id = sorted_sequences[0][0]
 
         if sequence_id:
-            seq_data = self.sequencer.sequences.get(sequence_id)
-            if seq_data:
-                sequence = self._convert_sequence(seq_data, detail)
+            comp_data = self.composition_state.compositions.get(sequence_id)
+            if comp_data:
+                sequence = self._convert_sequence(comp_data, detail)
 
         # Build snapshot
         snapshot = DAWStateSnapshot(

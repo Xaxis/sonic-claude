@@ -45,7 +45,7 @@ export function SequencerInstrumentSelector({
         const loadSynthDefs = async () => {
             try {
                 setIsLoading(true);
-                const defs = await api.sequencer.getSynthDefs();
+                const defs = await api.audio.getSynthDefs();
                 setSynthDefs(defs);
             } catch (error) {
                 console.error("Failed to load SynthDefs:", error);

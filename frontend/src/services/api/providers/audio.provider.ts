@@ -1,7 +1,7 @@
 /**
  * Audio API Provider
  * Thin HTTP client mapping to /api/audio/* routes
- * 
+ *
  * Backend routes:
  * - POST   /api/audio/synthesis/synths                  (synthesis.py)
  * - GET    /api/audio/synthesis/synths                  (synthesis.py)
@@ -9,6 +9,8 @@
  * - PUT    /api/audio/synthesis/synths/{synth_id}       (synthesis.py)
  * - DELETE /api/audio/synthesis/synths/{synth_id}       (synthesis.py)
  * - DELETE /api/audio/synthesis/synths                  (synthesis.py)
+ * - POST   /api/audio/preview                           (synthesis.py)
+ * - GET    /api/audio/synthdefs                         (synthesis.py)
  * - POST   /api/audio/input/device                      (input.py)
  * - POST   /api/audio/input/stop                        (input.py)
  * - POST   /api/audio/input/gain                        (input.py)
@@ -42,6 +44,13 @@ export interface SetInputGainRequest {
     amp: number;
 }
 
+export interface PreviewNoteRequest {
+    note: number;
+    velocity?: number;
+    duration?: number;
+    synthdef?: string;
+}
+
 export interface SynthInfo {
     synth_id: number;
     synthdef: string;
@@ -52,6 +61,13 @@ export interface SynthInfo {
 export interface InputStatus {
     is_active: boolean;
     current_device: number | null;
+}
+
+export interface SynthDefInfo {
+    name: string;
+    display_name: string;
+    description: string;
+    category: string;
 }
 
 // ============================================================================
@@ -82,6 +98,16 @@ export class AudioProvider extends BaseAPIClient {
 
     async deleteAllSynths(): Promise<any> {
         return this.delete("/api/audio/synthesis/synths");
+    }
+
+    async previewNote(request: PreviewNoteRequest): Promise<any> {
+        return this.post("/api/audio/preview", request);
+    }
+
+    async getSynthDefs(): Promise<SynthDefInfo[]> {
+        const response = await this.get("/api/audio/synthdefs");
+        // Backend returns array of SynthDefInfo objects directly
+        return Array.isArray(response) ? response : [];
     }
 
     // === INPUT ===

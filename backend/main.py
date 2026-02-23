@@ -29,7 +29,7 @@ from backend.core.exceptions import (
 )
 from backend.api import websocket
 from backend.api.audio import router as audio_router
-from backend.api.sequencer import router as sequencer_router
+from backend.api.playback import router as playback_router
 from backend.api.mixer import router as mixer_router
 from backend.api.effects import router as effects_router
 from backend.api.ai import router as ai_router
@@ -199,16 +199,30 @@ async def sonic_claude_exception_handler(request: Request, exc: SonicClaudeExcep
 
 
 # ============================================================================
-# ROUTERS - Consistent /api/* pattern
+# ROUTERS - Consistent REST API Architecture
+# ============================================================================
+# Entity Resources (REST CRUD):
+#   - /api/compositions/* - Composition management (includes tracks, clips)
+#   - /api/samples/* - Sample management
+#
+# Service Operations (RPC-style):
+#   - /api/playback/* - Transport control (play, stop, seek)
+#   - /api/mixer/* - Mixer operations
+#   - /api/effects/* - Effects operations
+#   - /api/audio/* - Audio synthesis and metronome
+#   - /api/ai/* - AI chat and actions
+#   - /api/ws/* - WebSocket streams
 # ============================================================================
 
-# Include routers with consistent /api/* prefix
-app.include_router(sequencer_router, prefix="/api/sequencer")
+# Entity resources
+app.include_router(compositions_router, prefix="/api/compositions")
+app.include_router(samples_router, prefix="/api/samples")
+
+# Service operations
+app.include_router(playback_router, prefix="/api/playback")
 app.include_router(mixer_router, prefix="/api/mixer")
 app.include_router(effects_router, prefix="/api/effects")
 app.include_router(audio_router, prefix="/api/audio")
-app.include_router(samples_router, prefix="/api/samples")
-app.include_router(compositions_router, prefix="/api/compositions")
 app.include_router(ai_router, prefix="/api/ai")
 app.include_router(websocket.router, prefix="/api/ws", tags=["websocket"])
 

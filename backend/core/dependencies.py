@@ -40,7 +40,8 @@ from backend.services.analysis.midi_analyzer_service import MIDIAnalyzer
 
 # DAW services
 from backend.services.daw.synthesis_service import SynthesisService
-from backend.services.daw.sequencer_service import SequencerService
+from backend.services.daw.composition_state_service import CompositionStateService
+from backend.services.daw.playback_engine_service import PlaybackEngineService
 from backend.services.daw.mixer_service import MixerService
 from backend.services.daw.mixer_channel_service import MixerChannelSynthManager
 from backend.services.daw.track_meter_service import TrackMeterHandler
@@ -68,7 +69,8 @@ _engine_manager: Optional[AudioEngineManager] = None
 _audio_analyzer: Optional[RealtimeAudioAnalyzer] = None
 _audio_input_service: Optional[AudioInputService] = None
 _synthesis_service: Optional[SynthesisService] = None
-_sequencer_service: Optional[SequencerService] = None
+_composition_state_service: Optional[CompositionStateService] = None
+_playback_engine_service: Optional[PlaybackEngineService] = None
 _ws_manager: Optional[WebSocketManager] = None
 _buffer_manager: Optional[BufferManager] = None
 _mixer_service: Optional[MixerService] = None
@@ -100,7 +102,8 @@ async def initialize_services(settings: Settings) -> None:
         settings: Application settings
     """
     global _engine_manager, _audio_analyzer, _audio_input_service
-    global _synthesis_service, _sequencer_service, _ws_manager, _buffer_manager, _mixer_service
+    global _synthesis_service, _composition_state_service, _playback_engine_service
+    global _ws_manager, _buffer_manager, _mixer_service
     global _track_meter_service, _audio_bus_manager, _mixer_channel_service, _track_effects_service
     global _audio_feature_extractor, _musical_context_analyzer, _daw_state_service
     global _daw_action_service, _composition_service, _ai_agent_service
@@ -135,13 +138,23 @@ async def initialize_services(settings: Settings) -> None:
     _audio_analyzer = RealtimeAudioAnalyzer(_engine_manager)
     _audio_input_service = AudioInputService(_engine_manager)
     _synthesis_service = SynthesisService(_engine_manager)
-    _sequencer_service = SequencerService(
+
+    # Initialize composition state service (no dependencies)
+    logger.info("📦 Initializing composition state service...")
+    _composition_state_service = CompositionStateService()
+
+    # Initialize playback engine service (depends on composition state service)
+    logger.info("▶️  Initializing playback engine service...")
+    _playback_engine_service = PlaybackEngineService(
+        composition_state_service=_composition_state_service,
         engine_manager=_engine_manager,
         websocket_manager=_ws_manager,
         audio_bus_manager=_audio_bus_manager,
-        mixer_channel_service=_mixer_channel_service,
-        composition_service=_composition_service
+        mixer_channel_service=_mixer_channel_service
     )
+
+
+
     _buffer_manager = BufferManager(_engine_manager)
     _mixer_service = MixerService(_engine_manager, _ws_manager, _audio_analyzer)
 
@@ -172,7 +185,7 @@ async def initialize_services(settings: Settings) -> None:
 
     # Create DAW state and action services
     _daw_state_service = DAWStateService(
-        sequencer_service=_sequencer_service,
+        composition_state_service=_composition_state_service,
         mixer_service=_mixer_service,
         engine_manager=_engine_manager,
         audio_feature_extractor=_audio_feature_extractor,
@@ -181,7 +194,8 @@ async def initialize_services(settings: Settings) -> None:
     )
 
     _daw_action_service = DAWActionService(
-        sequencer_service=_sequencer_service,
+        composition_state_service=_composition_state_service,
+        playback_engine_service=_playback_engine_service,
         mixer_service=_mixer_service,
         track_effects_service=_track_effects_service
     )
@@ -214,7 +228,7 @@ async def initialize_services(settings: Settings) -> None:
                 spectrum=spectrum_data.get("spectrum", []),
                 peak_db=spectrum_data.get("peak_db"),
                 rms_db=spectrum_data.get("rms_db"),
-                is_playing=_sequencer_service.is_playing if _sequencer_service else False
+                is_playing=_playback_engine_service.is_playing if _playback_engine_service else False
             )
             _daw_state_service.update_audio_features(features)
         except Exception as e:
@@ -233,7 +247,7 @@ async def initialize_services(settings: Settings) -> None:
 
     # Wire up musical context analysis
     # Triggered automatically when MIDI content changes (add/update/delete clip)
-    _sequencer_service.on_sequence_changed = _daw_state_service.analyze_current_sequence
+    _composition_state_service.on_composition_changed = _daw_state_service.analyze_current_sequence
 
     logger.info("✅ AI services initialized")
 
@@ -248,7 +262,7 @@ async def shutdown_services() -> None:
     It ensures proper cleanup of resources.
     """
     global _engine_manager, _audio_analyzer, _audio_input_service
-    global _synthesis_service, _sequencer_service, _ws_manager, _buffer_manager, _mixer_service
+    global _synthesis_service, _ws_manager, _buffer_manager, _mixer_service
     global _track_meter_service, _audio_bus_manager, _mixer_channel_service
 
     logger.info("🛑 Shutting down services...")
@@ -307,11 +321,18 @@ def get_synthesis_service() -> SynthesisService:
     return _synthesis_service
 
 
-def get_sequencer_service() -> SequencerService:
-    """Get SequencerService instance"""
-    if _sequencer_service is None:
-        raise RuntimeError("SequencerService not initialized")
-    return _sequencer_service
+def get_composition_state_service() -> CompositionStateService:
+    """Get CompositionStateService instance"""
+    if _composition_state_service is None:
+        raise RuntimeError("CompositionStateService not initialized")
+    return _composition_state_service
+
+
+def get_playback_engine_service() -> PlaybackEngineService:
+    """Get PlaybackEngineService instance"""
+    if _playback_engine_service is None:
+        raise RuntimeError("PlaybackEngineService not initialized")
+    return _playback_engine_service
 
 
 def get_ws_manager() -> WebSocketManager:

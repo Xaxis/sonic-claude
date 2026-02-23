@@ -2,56 +2,92 @@
 Composition Models - The PRIMARY and ONLY entity in the DAW
 
 A Composition IS a PROJECT (like .als in Ableton, .logicx in Logic Pro).
-It contains the TIMELINE DATA:
-- Tracks and clips (the timeline)
-- Tempo, time signature, loop settings
-- Playback state (is_playing, current_position)
-- Metadata (name, created/updated timestamps)
+It contains EVERYTHING needed to recreate the exact state:
+- Timeline: tracks, clips, tempo, time signature, loop settings
+- Playback state: is_playing, current_position
+- Audio: mixer_state, track_effects, sample_assignments
+- AI Context: chat_history, metadata
+- Timestamps: created_at, updated_at
 
-NOTE: Mixer state and Effects are stored GLOBALLY in their respective services,
-NOT in the Composition model. When saving, CompositionSnapshot captures a snapshot
-of the global mixer/effects state along with the composition timeline data.
+This is the COMPLETE project state. There is no separate "Snapshot" model.
+For versioning/history, we simply save multiple versions of Composition.
 
 Key Concepts:
-- Composition = The ONLY entity (no separate "Sequence")
+- Composition = The COMPLETE project (no separate "Sequence" or "Snapshot")
 - ONE ID = composition_id
-- Composition is stored in SequencerService.compositions dict
-- CompositionService handles persistence only
+- Composition is stored in CompositionStateService.compositions dict
+- CompositionService handles persistence (save/load Composition directly)
+- For history: save multiple versions of the same Composition
 """
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
-from backend.models.sequence import SequencerTrack, Clip
+from backend.models.sequence import Track, Clip
+from backend.models.mixer import MixerState
+from backend.models.effects import TrackEffectChain
+
+
+class ChatMessage(BaseModel):
+    """A single chat message in the conversation history"""
+    role: str = Field(description="Message role: 'user' or 'assistant'")
+    content: str = Field(description="Message content")
+    timestamp: datetime = Field(default_factory=datetime.now)
+    actions_executed: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Actions executed (for assistant messages)"
+    )
 
 
 class Composition(BaseModel):
     """
-    Complete composition - THE primary entity in the DAW
+    Complete composition - THE COMPLETE project state
 
-    This is the ONLY entity. There is no separate "Sequence".
-    A composition contains everything needed for a project.
+    This is the ONLY entity. There is no separate "Sequence" or "Snapshot".
+    A composition contains EVERYTHING needed to recreate the exact state.
     """
+    # === IDENTITY ===
     id: str = Field(description="Unique composition ID")
     name: str = Field(description="Composition name")
+
+    # === TIMELINE ===
     tempo: float = Field(default=120.0, gt=0, le=300, description="Tempo in BPM")
     time_signature: str = Field(default="4/4", pattern=r"^\d+/\d+$", description="Time signature")
-
-    # Timeline data
-    tracks: List[SequencerTrack] = Field(default_factory=list, description="All tracks in composition")
+    tracks: List[Track] = Field(default_factory=list, description="All tracks in composition")
     clips: List[Clip] = Field(default_factory=list, description="All clips in composition")
 
-    # Playback state
+    # === PLAYBACK STATE ===
     is_playing: bool = Field(default=False, description="Whether composition is playing")
     current_position: float = Field(default=0.0, ge=0, description="Playhead position in beats")
 
-    # Loop settings
+    # === LOOP SETTINGS ===
     loop_enabled: bool = Field(default=False, description="Whether looping is enabled")
     loop_start: float = Field(default=0.0, ge=0, description="Loop start position in beats")
     loop_end: float = Field(default=16.0, gt=0, description="Loop end position in beats")
 
-    # Timestamps
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    # === AUDIO STATE ===
+    mixer_state: MixerState = Field(default_factory=MixerState, description="Complete mixer state")
+    track_effects: List[TrackEffectChain] = Field(
+        default_factory=list,
+        description="All track effect chains"
+    )
+    sample_assignments: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Sample file assignments for sample tracks (track_id -> sample_path)"
+    )
+
+    # === AI CONTEXT ===
+    chat_history: List[ChatMessage] = Field(
+        default_factory=list,
+        description="Complete conversation history with AI"
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional metadata (e.g., AI prompt, user notes, tags)"
+    )
+
+    # === TIMESTAMPS ===
+    created_at: datetime = Field(default_factory=datetime.now, description="When composition was created")
+    updated_at: datetime = Field(default_factory=datetime.now, description="When composition was last updated")
 
 
 class CompositionMetadata(BaseModel):

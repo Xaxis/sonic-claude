@@ -9,7 +9,7 @@
 
 import {
     CompositionsProvider,
-    SequencerProvider,
+    PlaybackProvider,
     MixerProvider,
     EffectsProvider,
     AudioProvider,
@@ -27,10 +27,12 @@ import {
  *   // Compositions
  *   await api.compositions.loadAll();
  *   await api.compositions.saveComposition(compositionId, createHistory, isAutosave);
+ *   await api.compositions.createTrack({ composition_id: "123", name: "Track 1", type: "midi" });
  *
- *   // Sequencer
- *   const sequences = await api.sequencer.getSequences();
- *   await api.sequencer.play(sequenceId);
+ *   // Playback
+ *   await api.playback.play({ position: 0.0 });
+ *   await api.playback.stop();
+ *   await api.playback.setTempo({ tempo: 120 });
  *
  *   // Mixer
  *   const channels = await api.mixer.getChannels();
@@ -48,7 +50,7 @@ import {
 export class APIClient {
     // === PROVIDERS (map 1:1 to backend API modules) ===
     public compositions: CompositionsProvider;
-    public sequencer: SequencerProvider;
+    public playback: PlaybackProvider;
     public mixer: MixerProvider;
     public effects: EffectsProvider;
     public audio: AudioProvider;
@@ -58,7 +60,7 @@ export class APIClient {
     constructor(baseURL?: string) {
         // Initialize all providers (7/7 backend API modules)
         this.compositions = new CompositionsProvider(baseURL);
-        this.sequencer = new SequencerProvider(baseURL);
+        this.playback = new PlaybackProvider(baseURL);
         this.mixer = new MixerProvider(baseURL);
         this.effects = new EffectsProvider(baseURL);
         this.audio = new AudioProvider(baseURL);

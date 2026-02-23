@@ -1,27 +1,22 @@
 """
-Sequencer Service - Manages compositions, clips, tracks, and playback
+Playback Engine Service - Manages playback execution and audio triggering
 
 ARCHITECTURE:
-- SequencerService stores compositions in memory (self.compositions dict)
-- CompositionService handles persistence to disk
-- ONE ID: composition_id (no separate sequence_id)
-- Composition contains tracks, clips, tempo, time signature, loop settings
+- PlaybackEngineService handles playback execution (play/pause/stop/seek)
+- Depends on CompositionStateService to access compositions
+- Coordinates with SuperCollider for audio playback
+- Manages playback state (is_playing, position, tempo)
+- Does NOT manage composition state (that's CompositionStateService)
 """
 import logging
 import uuid
 import asyncio
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from datetime import datetime
 
 from backend.models.composition import Composition
-from backend.models.sequence import (
-    Clip,
-    SequencerTrack,
-    MIDINote,
-    AddClipRequest,
-    UpdateClipRequest,
-)
+from backend.models.sequence import Clip, Track, MIDINote
 from backend.models.types import ActiveMIDINote, PlaybackState
 from backend.services.audio.buffer_manager_service import BufferManager
 from backend.core.engine_manager import AudioEngineManager
@@ -32,43 +27,40 @@ from backend.services.daw.mixer_channel_service import MixerChannelSynthManager
 logger = logging.getLogger(__name__)
 
 
-class SequencerService:
+class PlaybackEngineService:
     """
-    Manages composition state and playback
+    Manages playback execution and audio triggering
 
     Responsibilities:
-    - Store compositions in memory (self.compositions dict)
-    - Manage playback state (play/pause/stop/seek)
-    - Handle tempo and time signature
-    - Coordinate with SuperCollider for audio playback
-    - Persistence handled by CompositionService
+    - Execute playback (play/pause/stop/seek)
+    - Advance playhead and trigger clips
+    - Coordinate with SuperCollider for audio
+    - Manage playback state (is_playing, position, tempo)
+    - Composition state managed by CompositionStateService
     """
 
     def __init__(
         self,
+        composition_state_service: 'CompositionStateService',
         engine_manager: Optional[AudioEngineManager] = None,
         websocket_manager: Optional[WebSocketManager] = None,
         audio_bus_manager: Optional[AudioBusManager] = None,
-        mixer_channel_service: Optional[MixerChannelSynthManager] = None,
-        composition_service: Optional['CompositionService'] = None
+        mixer_channel_service: Optional[MixerChannelSynthManager] = None
     ) -> None:
-        """Initialize sequencer service"""
+        """Initialize playback engine service"""
+        # Dependencies
+        self.composition_state_service = composition_state_service
         self.engine_manager = engine_manager
         self.websocket_manager = websocket_manager
         self.audio_bus_manager = audio_bus_manager
         self.mixer_channel_service = mixer_channel_service
-        self.composition_service = composition_service
 
         # Buffer manager for sample playback
         self.buffer_manager = BufferManager(engine_manager) if engine_manager else None
 
-        # State storage (in-memory ONLY - persistence handled by CompositionService)
-        self.compositions: Dict[str, Composition] = {}  # composition_id -> Composition
-
-        # Global playback state
+        # Playback state
         self.is_playing = False
         self.is_paused = False
-        self.current_composition_id: Optional[str] = None  # Active composition
         self.playhead_position = 0.0  # beats
         self.tempo = 120.0  # BPM
 
@@ -84,271 +76,7 @@ class SequencerService:
         # Active MIDI notes (for visual feedback in piano roll)
         self.active_midi_notes: Dict[int, ActiveMIDINote] = {}
 
-        # Callback for composition changes (for AI musical context analysis)
-        self.on_composition_changed: Optional[callable] = None
-
-        logger.info("✅ SequencerService initialized")
-
-    # ========================================================================
-    # COMPOSITION MANAGEMENT
-    # ========================================================================
-
-    def create_composition(self, name: str, tempo: float = 120.0, time_signature: str = "4/4") -> Composition:
-        """
-        Create a new composition
-
-        NOTE: This is typically called by the compositions API, not directly.
-        The API handles persistence via CompositionService.
-        """
-        composition_id = str(uuid.uuid4())
-        composition = Composition(
-            id=composition_id,
-            name=name,
-            tempo=tempo,
-            time_signature=time_signature,
-            tracks=[],
-            clips=[],
-            is_playing=False,
-            current_position=0.0,
-            loop_enabled=False,
-            loop_start=0.0,
-            loop_end=16.0,
-        )
-        self.compositions[composition_id] = composition
-        logger.info(f"✅ Created composition: {name} (ID: {composition_id})")
-        return composition
-
-    def get_composition(self, composition_id: str) -> Optional[Composition]:
-        """Get composition by ID"""
-        return self.compositions.get(composition_id)
-
-    def get_all_compositions(self) -> List[Composition]:
-        """Get all compositions"""
-        return list(self.compositions.values())
-
-    def delete_composition(self, composition_id: str) -> bool:
-        """Delete composition from memory"""
-        if composition_id in self.compositions:
-            del self.compositions[composition_id]
-            if self.current_composition_id == composition_id:
-                self.current_composition_id = None
-            logger.info(f"🗑️ Deleted composition: {composition_id}")
-            return True
-        return False
-
-
-
-
-    # ========================================================================
-    # TRACK MANAGEMENT
-    # ========================================================================
-
-    def create_track(
-        self,
-        composition_id: str,
-        name: str,
-        track_type: str = "sample",
-        color: str = "#3b82f6",
-        sample_id: Optional[str] = None,
-        sample_name: Optional[str] = None,
-        sample_file_path: Optional[str] = None,
-        instrument: Optional[str] = None
-    ) -> Optional[SequencerTrack]:
-        """Create a new track in a composition"""
-        composition = self.compositions.get(composition_id)
-        if not composition:
-            logger.error(f"❌ Composition {composition_id} not found")
-            return None
-
-        track_id = str(uuid.uuid4())
-        track = SequencerTrack(
-            id=track_id,
-            name=name,
-            sequence_id=composition_id,  # For backwards compatibility with track model
-            type=track_type,
-            color=color,
-            is_muted=False,
-            is_solo=False,
-            is_armed=False,
-            volume=1.0,
-            pan=0.0,
-            sample_id=sample_id,
-            sample_name=sample_name,
-            sample_file_path=sample_file_path,
-            instrument=instrument
-        )
-
-        # Add track to composition
-        composition.tracks.append(track)
-        composition.updated_at = datetime.now()
-
-        logger.info(f"✅ Created track: {name} (ID: {track_id}) in composition {composition_id}")
-        return track
-
-    def get_tracks(self, composition_id: Optional[str] = None) -> List[SequencerTrack]:
-        """Get all tracks, optionally filtered by composition"""
-        if composition_id:
-            composition = self.compositions.get(composition_id)
-            return composition.tracks if composition else []
-
-        # Return all tracks from all compositions
-        all_tracks = []
-        for composition in self.compositions.values():
-            all_tracks.extend(composition.tracks)
-        return all_tracks
-
-    def get_track(self, track_id: str) -> Optional[SequencerTrack]:
-        """Get track by ID (searches all compositions)"""
-        for composition in self.compositions.values():
-            for track in composition.tracks:
-                if track.id == track_id:
-                    return track
-        return None
-
-    def delete_track(self, track_id: str) -> bool:
-        """Delete track from its composition"""
-        for composition in self.compositions.values():
-            for i, track in enumerate(composition.tracks):
-                if track.id == track_id:
-                    # Delete all clips on this track
-                    composition.clips = [c for c in composition.clips if c.track_id != track_id]
-                    # Delete the track
-                    composition.tracks.pop(i)
-                    composition.updated_at = datetime.now()
-                    logger.info(f"🗑️ Deleted track: {track_id}")
-                    return True
-        return False
-
-    def update_sample_references(self, sample_id: str, new_name: str) -> int:
-        """Update sample references across all tracks"""
-        count = 0
-        for composition in self.compositions.values():
-            for track in composition.tracks:
-                if hasattr(track, 'sample_id') and track.sample_id == sample_id:
-                    track.sample_name = new_name
-                    count += 1
-        if count > 0:
-            logger.info(f"📝 Updated {count} sample references for sample {sample_id}")
-        return count
-
-    def check_sample_in_use(self, sample_id: str) -> Tuple[bool, List[str]]:
-        """Check if sample is used in any tracks"""
-        track_names = []
-        for composition in self.compositions.values():
-            for track in composition.tracks:
-                if hasattr(track, 'sample_id') and track.sample_id == sample_id:
-                    track_names.append(f"{track.name} (in {composition.name})")
-        return len(track_names) > 0, track_names
-
-
-    # ========================================================================
-    # CLIP MANAGEMENT
-    # ========================================================================
-
-    def add_clip(self, composition_id: str, request: AddClipRequest) -> Optional[Clip]:
-        """Add a clip to a composition"""
-        composition = self.compositions.get(composition_id)
-        if not composition:
-            logger.error(f"❌ Composition {composition_id} not found")
-            return None
-
-        clip_id = str(uuid.uuid4())
-        clip = Clip(
-            id=clip_id,
-            name=request.name or f"{request.clip_type.upper()} Clip",
-            type=request.clip_type,
-            track_id=request.track_id,
-            start_time=request.start_time,
-            duration=request.duration,
-            is_muted=False,
-            is_looped=False,
-            gain=1.0,
-            midi_events=request.midi_events if request.clip_type == "midi" else None,
-            audio_file_path=request.audio_file_path if request.clip_type == "audio" else None,
-            audio_offset=0.0 if request.clip_type == "audio" else None,
-        )
-
-        composition.clips.append(clip)
-        composition.updated_at = datetime.now()
-
-        logger.info(f"✅ Added {request.clip_type} clip to composition {composition_id}")
-        return clip
-
-    def get_clips(self, composition_id: str) -> Optional[List[Clip]]:
-        """Get all clips in a composition"""
-        composition = self.compositions.get(composition_id)
-        return composition.clips if composition else None
-
-    def update_clip(
-        self,
-        composition_id: str,
-        clip_id: str,
-        request: UpdateClipRequest
-    ) -> Optional[Clip]:
-        """Update a clip"""
-        composition = self.compositions.get(composition_id)
-        if not composition:
-            return None
-
-        for clip in composition.clips:
-            if clip.id == clip_id:
-                if request.name is not None:
-                    clip.name = request.name
-                if request.start_time is not None:
-                    clip.start_time = request.start_time
-                if request.duration is not None:
-                    clip.duration = request.duration
-                if request.is_muted is not None:
-                    clip.is_muted = request.is_muted
-                if request.is_looped is not None:
-                    clip.is_looped = request.is_looped
-                if request.gain is not None:
-                    clip.gain = request.gain
-                if request.midi_events is not None:
-                    clip.midi_events = request.midi_events
-
-                composition.updated_at = datetime.now()
-                logger.info(f"📝 Updated clip {clip_id}")
-                return clip
-
-        return None
-
-    def delete_clip(self, composition_id: str, clip_id: str) -> bool:
-        """Delete a clip"""
-        composition = self.compositions.get(composition_id)
-        if not composition:
-            return False
-
-        for i, clip in enumerate(composition.clips):
-            if clip.id == clip_id:
-                composition.clips.pop(i)
-                composition.updated_at = datetime.now()
-                logger.info(f"🗑️ Deleted clip {clip_id}")
-                return True
-
-        return False
-
-    def duplicate_clip(self, composition_id: str, clip_id: str) -> Optional[Clip]:
-        """Duplicate a clip"""
-        composition = self.compositions.get(composition_id)
-        if not composition:
-            return None
-
-        for clip in composition.clips:
-            if clip.id == clip_id:
-                new_clip_id = str(uuid.uuid4())
-                new_clip = clip.model_copy(update={
-                    "id": new_clip_id,
-                    "name": f"{clip.name} (Copy)",
-                    "start_time": clip.start_time + clip.duration  # Place after original
-                })
-                composition.clips.append(new_clip)
-                composition.updated_at = datetime.now()
-                logger.info(f"📋 Duplicated clip {clip_id} -> {new_clip_id}")
-                return new_clip
-
-        return None
-
+        logger.info("✅ PlaybackEngineService initialized")
 
     # ========================================================================
     # PLAYBACK CONTROL
@@ -356,7 +84,7 @@ class SequencerService:
 
     async def play_composition(self, composition_id: str, position: float = 0.0):
         """Start playing a composition"""
-        composition = self.compositions.get(composition_id)
+        composition = self.composition_state_service.get_composition(composition_id)
         if not composition:
             raise ValueError(f"Composition {composition_id} not found")
 
@@ -370,7 +98,6 @@ class SequencerService:
         logger.info(f"   Tempo: {composition.tempo} BPM, Position: {position} beats")
         logger.info(f"   Loop: {'enabled' if composition.loop_enabled else 'disabled'} ({composition.loop_start} - {composition.loop_end} beats)")
 
-        self.current_composition_id = composition_id
         self.is_playing = True
         self.is_paused = False
         self.playhead_position = position
@@ -380,18 +107,14 @@ class SequencerService:
         composition.current_position = position
 
         # Start playback loop task
-        self.playback_task = asyncio.create_task(self._playback_loop())
+        self.playback_task = asyncio.create_task(self._playback_loop(composition_id))
         logger.info("✅ Playback started successfully")
 
-    async def _playback_loop(self) -> None:
+    async def _playback_loop(self, composition_id: str) -> None:
         """Background task that advances playhead and triggers clips"""
-        if not self.current_composition_id:
-            logger.error("❌ Playback loop: No current_composition_id!")
-            return
-
-        composition = self.compositions.get(self.current_composition_id)
+        composition = self.composition_state_service.get_composition(composition_id)
         if not composition:
-            logger.error(f"❌ Playback loop: Composition {self.current_composition_id} not found!")
+            logger.error(f"❌ Playback loop: Composition {composition_id} not found!")
             return
 
         logger.info(f"🎵 Starting playback loop for composition {composition.name}")
@@ -565,7 +288,7 @@ class SequencerService:
                     logger.info(f"🎯 Triggering clip {clip.id} at position {position:.2f} (clip range: {clip_start:.2f}-{clip_end:.2f})")
                     await self._trigger_clip(clip, track, offset)
 
-    async def _trigger_clip(self, clip: Clip, track: SequencerTrack, offset: float = 0.0) -> None:
+    async def _trigger_clip(self, clip: Clip, track: Track, offset: float = 0.0) -> None:
         """
         Trigger a clip to start playing
 
@@ -600,7 +323,7 @@ class SequencerService:
 
                 # If not found, search in data/samples/ directory
                 if not sample_path:
-                    # Go from backend/services/daw/sequencer_service.py -> backend/services/daw -> backend/services -> backend -> project_root
+                    # Go from backend/services/daw/playback_engine_service.py -> backend/services/daw -> backend/services -> backend -> project_root
                     samples_dir = Path(__file__).parent.parent.parent / "data" / "samples"
                     logger.info(f"   Searching in: {samples_dir}")
 
@@ -678,7 +401,6 @@ class SequencerService:
                 # If it's just a sample ID (UUID), construct path to data/samples/
                 if not audio_file_path.endswith(('.wav', '.mp3', '.webm', '.ogg', '.flac')):
                     # Assume it's a sample ID, construct full path
-                    # Go from backend/services/daw/sequencer_service.py -> backend/services/daw -> backend/services -> backend -> project_root
                     samples_dir = Path(__file__).parent.parent.parent / "data" / "samples"
 
                     # Try to find the file with any extension
@@ -842,13 +564,13 @@ class SequencerService:
         except Exception as e:
             logger.error(f"❌ Failed to trigger clip {clip.id}: {e}")
 
-
-
-
     async def stop_playback(self):
         """Stop playback"""
-        if self.current_composition_id:
-            composition = self.compositions.get(self.current_composition_id)
+        # Get current composition to update its state
+        if self.composition_state_service.current_composition_id:
+            composition = self.composition_state_service.get_composition(
+                self.composition_state_service.current_composition_id
+            )
             if composition:
                 composition.is_playing = False
                 composition.current_position = 0.0
@@ -900,8 +622,10 @@ class SequencerService:
     async def seek(self, position: float, trigger_audio: bool = True):
         """Seek to position"""
         self.playhead_position = position
-        if self.current_composition_id:
-            composition = self.compositions.get(self.current_composition_id)
+        if self.composition_state_service.current_composition_id:
+            composition = self.composition_state_service.get_composition(
+                self.composition_state_service.current_composition_id
+            )
             if composition:
                 composition.current_position = position
 
@@ -911,7 +635,7 @@ class SequencerService:
         """Get current playback state"""
         return {
             "is_playing": self.is_playing,
-            "current_sequence": self.current_composition_id,  # Keep key name for backwards compatibility
+            "current_sequence": self.composition_state_service.current_composition_id,  # Keep key name for backwards compatibility
             "playhead_position": self.playhead_position,
             "tempo": self.tempo,
             "is_paused": self.is_paused,
@@ -932,3 +656,42 @@ class SequencerService:
         """Set metronome volume (0.0 to 1.0)"""
         self.metronome_volume = max(0.0, min(1.0, volume))
         logger.info(f"🔊 Metronome volume set to {self.metronome_volume:.2f}")
+
+    # ========================================================================
+    # COMPOSITION SETTINGS (Tempo/Loop)
+    # ========================================================================
+
+    async def set_tempo(self, composition_id: str, tempo: float) -> None:
+        """Set tempo for a composition"""
+        composition = self.composition_state_service.get_composition(composition_id)
+        if not composition:
+            logger.error(f"❌ Composition {composition_id} not found")
+            return
+
+        composition.tempo = tempo
+        self.tempo = tempo  # Update global tempo for playback
+        composition.updated_at = datetime.now()
+        logger.info(f"🎵 Set tempo to {tempo} BPM for composition {composition_id}")
+
+    async def set_loop(
+        self,
+        composition_id: str,
+        enabled: bool,
+        start: Optional[float] = None,
+        end: Optional[float] = None
+    ) -> None:
+        """Set loop settings for a composition"""
+        composition = self.composition_state_service.get_composition(composition_id)
+        if not composition:
+            logger.error(f"❌ Composition {composition_id} not found")
+            return
+
+        composition.loop_enabled = enabled
+        if start is not None:
+            composition.loop_start = start
+        if end is not None:
+            composition.loop_end = end
+
+        composition.updated_at = datetime.now()
+        logger.info(f"🔁 Set loop: enabled={enabled}, start={composition.loop_start}, end={composition.loop_end}")
+

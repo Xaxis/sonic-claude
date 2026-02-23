@@ -23,12 +23,12 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
-import type { CompositionSnapshot } from "@/stores/dawStore";
+import type { Composition } from "@/stores/dawStore";
 
 interface SequenceSettingsDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    composition: CompositionSnapshot | null;
+    composition: Composition | null;
     onSave: (settings: SequenceSettings) => void;
 }
 

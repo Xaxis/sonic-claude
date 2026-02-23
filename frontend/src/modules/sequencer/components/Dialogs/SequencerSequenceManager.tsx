@@ -83,11 +83,11 @@ export function SequencerSequenceManager({
 
     const loadSequences = async () => {
         try {
-            const seqs = await api.sequencer.getSequences();
-            setSequences(seqs as any[]);
+            const response = await api.compositions.list();
+            setSequences(response.compositions as any[]);
         } catch (error) {
-            console.error("Failed to load sequences:", error);
-            toast.error("Failed to load sequences");
+            console.error("Failed to load compositions:", error);
+            toast.error("Failed to load compositions");
         }
     };
 
@@ -109,25 +109,24 @@ export function SequencerSequenceManager({
 
     const handleCreateSequence = async () => {
         if (!newSequenceName.trim()) {
-            toast.error("Please enter a sequence name");
+            toast.error("Please enter a composition name");
             return;
         }
 
         setIsLoading(true);
         try {
-            const sequence = await api.sequencer.createSequence({
+            const response = await api.compositions.create({
                 name: newSequenceName,
                 tempo: 120,
-                time_signature_num: 4,
-                time_signature_den: 4,
+                time_signature: "4/4",
             });
-            toast.success(`Created sequence: ${newSequenceName}`);
+            toast.success(`Created composition: ${newSequenceName}`);
             setNewSequenceName("");
             await loadSequences();
-            onSequenceChange(sequence.id);
+            onSequenceChange(response.composition_id);
         } catch (error) {
-            console.error("Failed to create sequence:", error);
-            toast.error("Failed to create sequence");
+            console.error("Failed to create composition:", error);
+            toast.error("Failed to create composition");
         } finally {
             setIsLoading(false);
         }
@@ -167,13 +166,13 @@ export function SequencerSequenceManager({
 
         setIsLoading(true);
         try {
-            await api.sequencer.updateSequence(sequenceId, { name: newName });
-            toast.success("Sequence renamed");
+            await api.compositions.update(sequenceId, { name: newName });
+            toast.success("Composition renamed");
             await loadSequences();
             setEditingSequenceId(null);
         } catch (error) {
-            console.error("Failed to rename sequence:", error);
-            toast.error("Failed to rename sequence");
+            console.error("Failed to rename composition:", error);
+            toast.error("Failed to rename composition");
         } finally {
             setIsLoading(false);
         }

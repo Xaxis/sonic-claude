@@ -43,7 +43,7 @@ export function SequencerPianoRollKeyboard({
         setTimeout(() => setActiveKey(null), 300);
 
         try {
-            await api.sequencer.previewNote({
+            await api.audio.previewNote({
                 note: pitch,
                 velocity: 100,
                 duration: 0.5,

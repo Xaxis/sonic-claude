@@ -8,13 +8,13 @@ from fastapi import APIRouter, Depends
 
 from backend.core.dependencies import (
     get_composition_service,
-    get_sequencer_service,
+    get_composition_state_service,
     get_mixer_service,
     get_track_effects_service,
     get_ai_agent_service,
 )
 from backend.services.persistence.composition_service import CompositionService
-from backend.services.daw.sequencer_service import SequencerService
+from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.mixer_service import MixerService
 from backend.services.daw.effects_service import TrackEffectsService
 from backend.services.ai.agent_service import AIAgentService
@@ -32,7 +32,7 @@ router = APIRouter()
 @router.post("/load-all")
 async def load_all_compositions(
     composition_service: CompositionService = Depends(get_composition_service),
-    sequencer_service: SequencerService = Depends(get_sequencer_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
     mixer_service: MixerService = Depends(get_mixer_service),
     effects_service: TrackEffectsService = Depends(get_track_effects_service),
     ai_agent_service: AIAgentService = Depends(get_ai_agent_service),
@@ -65,7 +65,7 @@ async def load_all_compositions(
             # This allows all compositions to be loaded without overwriting each other
             success = composition_service.restore_snapshot_to_services(
                 snapshot=snapshot,
-                sequencer_service=sequencer_service,
+                composition_state_service=composition_state_service,
                 mixer_service=mixer_service,
                 effects_service=effects_service,
                 set_as_current=False  # Don't set as current during bulk load
@@ -84,7 +84,7 @@ async def load_all_compositions(
 
         # Set first sequence as current (if any were loaded)
         if first_sequence_id:
-            sequencer_service.current_sequence_id = first_sequence_id
+            composition_state_service.current_composition_id = first_sequence_id
             logger.info(f"📌 Set first sequence as current: {first_sequence_id}")
 
         logger.info(f"🎵 Loaded {loaded_count}/{len(compositions)} compositions into memory")

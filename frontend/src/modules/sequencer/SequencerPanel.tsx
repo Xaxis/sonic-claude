@@ -6,15 +6,25 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import { Plus, ZoomIn, ZoomOut, Grid3x3 } from "lucide-react";
 import { useDAWStore } from '@/stores/dawStore';
 import { useSequencerScroll } from "./hooks/useSequencerScroll.ts";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { IconButton } from "@/components/ui/icon-button.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select.tsx";
 import { SequencerSampleBrowser } from "./components/Dialogs/SequencerSampleBrowser.tsx";
 import { SequencerSettingsDialog } from "./components/Dialogs/SequencerSettingsDialog.tsx";
 import { SequencerTrackTypeDialog } from "./components/Dialogs/SequencerTrackTypeDialog.tsx";
 import { SequencerEmptyState } from "./components/States/SequencerEmptyState.tsx";
 import { SequencerTransport } from "./components/Transport/SequencerTransport.tsx";
-import { SequencerToolbar } from "./components/Toolbar/SequencerToolbar.tsx";
 import { SequencerSplitLayout } from "./layouts/SequencerSplitLayout.tsx";
 import { toast } from "sonner";
 
@@ -24,6 +34,11 @@ export function SequencerPanel() {
     const tracks = useDAWStore(state => state.tracks);
     const clips = useDAWStore(state => state.clips);
     const transport = useDAWStore(state => state.transport);
+
+    // UI State
+    const zoom = useDAWStore(state => state.zoom);
+    const snapEnabled = useDAWStore(state => state.snapEnabled);
+    const gridSize = useDAWStore(state => state.gridSize);
 
     // Actions
     const play = useDAWStore(state => state.play);
@@ -35,6 +50,9 @@ export function SequencerPanel() {
     const seek = useDAWStore(state => state.seek);
     const setLoopStart = useDAWStore(state => state.setLoopStart);
     const setLoopEnd = useDAWStore(state => state.setLoopEnd);
+    const setZoom = useDAWStore(state => state.setZoom);
+    const setSnapEnabled = useDAWStore(state => state.setSnapEnabled);
+    const setGridSize = useDAWStore(state => state.setGridSize);
     const createTrack = useDAWStore(state => state.createTrack);
     const deleteTrack = useDAWStore(state => state.deleteTrack);
     const renameTrack = useDAWStore(state => state.renameTrack);
@@ -240,10 +258,11 @@ export function SequencerPanel() {
 
     return (
         <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
-            {/* Transport Controls */}
+            {/* Combined Transport and Toolbar */}
             <div className="flex-shrink-0">
                 <SubPanel title="TRANSPORT" showHeader={false}>
-                    <div className="px-4 py-3 bg-gradient-to-r from-muted/20 to-muted/10">
+                    <div className="px-4 py-3 bg-gradient-to-r from-muted/20 to-muted/10 flex items-center justify-between">
+                        {/* Left: Transport Controls */}
                         <SequencerTransport
                             isPlaying={isPlaying}
                             metronomeEnabled={metronomeEnabled}
@@ -258,17 +277,67 @@ export function SequencerPanel() {
                             onTempoBlur={handleTempoBlur}
                             onTempoKeyDown={handleTempoKeyDown}
                         />
-                    </div>
-                </SubPanel>
-            </div>
 
-            {/* Toolbar */}
-            <div className="flex-shrink-0">
-                <SubPanel title="TOOLBAR" showHeader={false}>
-                    <SequencerToolbar
-                        activeSequenceId={activeComposition?.id || null}
-                        onAddTrack={handleAddTrack}
-                    />
+                        {/* Right: Tools (Add Track, Snap, Zoom) */}
+                        <div className="flex items-center gap-2">
+                            <Button onClick={handleAddTrack} size="sm" variant="default" disabled={!activeComposition}>
+                                <Plus size={14} className="mr-1" />
+                                Track
+                            </Button>
+                            <div className="flex items-center gap-1">
+                                <IconButton
+                                    icon={ZoomOut}
+                                    tooltip="Zoom out timeline"
+                                    onClick={() => setZoom(Math.max(0.25, zoom - 0.25))}
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    disabled={!activeComposition || zoom <= 0.25}
+                                />
+                                <span className="text-xs text-muted-foreground w-12 text-center">
+                                    {Math.round(zoom * 100)}%
+                                </span>
+                                <IconButton
+                                    icon={ZoomIn}
+                                    tooltip="Zoom in timeline"
+                                    onClick={() => setZoom(Math.min(4, zoom + 0.25))}
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    disabled={!activeComposition || zoom >= 4}
+                                />
+                            </div>
+                            <IconButton
+                                icon={Grid3x3}
+                                tooltip={snapEnabled ? "Snap to grid: ON" : "Snap to grid: OFF"}
+                                onClick={() => setSnapEnabled(!snapEnabled)}
+                                variant={snapEnabled ? "default" : "ghost"}
+                                size="icon-sm"
+                                className={snapEnabled ? "bg-primary/20 text-primary" : ""}
+                                disabled={!activeComposition}
+                            />
+                            <div className="flex items-center gap-1">
+                                <Label htmlFor="grid-size-select" className="text-xs text-muted-foreground">
+                                    Grid
+                                </Label>
+                                <Select
+                                    value={gridSize.toString()}
+                                    onValueChange={(value) => setGridSize(parseInt(value))}
+                                    disabled={!activeComposition || !snapEnabled}
+                                >
+                                    <SelectTrigger id="grid-size-select" className="w-20 h-7 text-sm">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1">1/1</SelectItem>
+                                        <SelectItem value="2">1/2</SelectItem>
+                                        <SelectItem value="4">1/4</SelectItem>
+                                        <SelectItem value="8">1/8</SelectItem>
+                                        <SelectItem value="16">1/16</SelectItem>
+                                        <SelectItem value="32">1/32</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    </div>
                 </SubPanel>
             </div>
 

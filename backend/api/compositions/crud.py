@@ -18,13 +18,13 @@ from fastapi import APIRouter, Depends
 
 from backend.core.dependencies import (
     get_composition_service,
-    get_sequencer_service,
+    get_composition_state_service,
     get_mixer_service,
     get_track_effects_service,
     get_ai_agent_service,
 )
 from backend.services.persistence.composition_service import CompositionService
-from backend.services.daw.sequencer_service import SequencerService
+from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.mixer_service import MixerService
 from backend.services.daw.effects_service import TrackEffectsService
 from backend.services.ai.agent_service import AIAgentService
@@ -53,7 +53,7 @@ router = APIRouter()
 async def create_composition(
     request: CreateCompositionRequest,
     composition_service: CompositionService = Depends(get_composition_service),
-    sequencer_service: SequencerService = Depends(get_sequencer_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
     mixer_service: MixerService = Depends(get_mixer_service),
     effects_service: TrackEffectsService = Depends(get_track_effects_service),
 ):
@@ -63,34 +63,34 @@ async def create_composition(
     This is the PRIMARY way to create a new project. It:
     1. Creates a new composition with unique ID
     2. Initializes mixer state
-    3. Saves initial composition snapshot to disk
+    3. Saves initial composition to disk
     4. Returns composition ID
     """
     try:
         # Create composition in sequencer service
-        composition = sequencer_service.create_composition(
+        composition = composition_state_service.create_composition(
             name=request.name,
             tempo=request.tempo or 120.0,
             time_signature=request.time_signature or "4/4"
         )
 
-        # Build initial snapshot
-        snapshot = composition_service.build_snapshot_from_services(
-            sequencer_service=sequencer_service,
+        # Capture current state into composition
+        composition = composition_service.capture_composition_from_services(
+            composition_state_service=composition_state_service,
             mixer_service=mixer_service,
             effects_service=effects_service,
-            composition_id=composition.id,
-            name=request.name,
-            metadata={"source": "create_composition", "initial": True}
+            composition_id=composition.id
         )
 
-        if not snapshot:
-            raise ServiceError(f"Failed to build initial snapshot for composition {composition.id}")
+        if not composition:
+            raise ServiceError(f"Failed to capture composition state for {composition.id}")
+
+        # Add initial metadata
+        composition.metadata = {"source": "create_composition", "initial": True}
 
         # Save initial composition to disk
         composition_service.save_composition(
-            composition_id=composition.id,
-            snapshot=snapshot,
+            composition=composition,
             create_history=True,  # Create initial history entry
             is_autosave=False
         )
@@ -113,39 +113,34 @@ async def save_composition(
     composition_id: str,
     request: SaveCompositionRequest,
     composition_service: CompositionService = Depends(get_composition_service),
-    sequencer_service: SequencerService = Depends(get_sequencer_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
     mixer_service: MixerService = Depends(get_mixer_service),
     effects_service: TrackEffectsService = Depends(get_track_effects_service),
 ):
     """
     Save composition to disk
 
-    This creates a complete snapshot of the current state and saves it.
+    This captures the complete current state and saves it.
     Optionally creates a history entry for versioning.
     """
     try:
-        # Get composition
-        composition = sequencer_service.get_composition(composition_id)
+        # Capture current state into composition
+        composition = composition_service.capture_composition_from_services(
+            composition_state_service=composition_state_service,
+            mixer_service=mixer_service,
+            effects_service=effects_service,
+            composition_id=composition_id
+        )
+
         if not composition:
             raise ResourceNotFoundError(f"Composition {composition_id} not found")
 
-        # Build complete snapshot
-        snapshot = composition_service.build_snapshot_from_services(
-            sequencer_service=sequencer_service,
-            mixer_service=mixer_service,
-            effects_service=effects_service,
-            composition_id=composition_id,
-            name=composition.name,
-            metadata=request.metadata or {"source": "manual_save" if not request.is_autosave else "autosave"}
-        )
-
-        if not snapshot:
-            raise ServiceError(f"Failed to build snapshot for composition {composition_id}")
+        # Add metadata
+        composition.metadata = request.metadata or {"source": "manual_save" if not request.is_autosave else "autosave"}
 
         # Save composition
         composition_service.save_composition(
-            composition_id=composition_id,
-            snapshot=snapshot,
+            composition=composition,
             create_history=request.create_history,
             is_autosave=request.is_autosave
         )
@@ -190,7 +185,7 @@ async def get_composition(
     composition_id: str,
     use_autosave: bool = False,
     composition_service: CompositionService = Depends(get_composition_service),
-    sequencer_service: SequencerService = Depends(get_sequencer_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
     mixer_service: MixerService = Depends(get_mixer_service),
     effects_service: TrackEffectsService = Depends(get_track_effects_service),
 ):
@@ -198,22 +193,22 @@ async def get_composition(
     Load composition by ID
 
     This:
-    1. Loads the composition snapshot from disk
+    1. Loads the composition from disk
     2. Restores it to all backend services (sequencer, mixer, effects)
     3. Sets it as the current active composition
-    4. Returns the complete snapshot to the frontend
+    4. Returns the complete composition to the frontend
 
     This is what you call to "open" a composition.
     """
     try:
-        snapshot = composition_service.load_composition(composition_id, use_autosave=use_autosave)
-        if not snapshot:
+        composition = composition_service.load_composition(composition_id, use_autosave=use_autosave)
+        if not composition:
             raise ResourceNotFoundError(f"Composition {composition_id} not found")
 
         # Restore the composition to backend services
-        success = composition_service.restore_snapshot_to_services(
-            snapshot=snapshot,
-            sequencer_service=sequencer_service,
+        success = composition_service.restore_composition_to_services(
+            composition=composition,
+            composition_state_service=composition_state_service,
             mixer_service=mixer_service,
             effects_service=effects_service,
             set_as_current=True  # Set as current active composition
@@ -222,9 +217,9 @@ async def get_composition(
         if not success:
             raise ServiceError(f"Failed to restore composition {composition_id} to services")
 
-        logger.info(f"✅ Loaded and activated composition: {snapshot.name} (ID: {composition_id})")
+        logger.info(f"✅ Loaded and activated composition: {composition.name} (ID: {composition_id})")
 
-        return snapshot
+        return composition
     except ResourceNotFoundError:
         raise
     except Exception as e:
@@ -236,17 +231,19 @@ async def get_composition(
 async def update_composition(
     composition_id: str,
     request: UpdateCompositionRequest,
-    sequencer_service: SequencerService = Depends(get_sequencer_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
+    composition_service: CompositionService = Depends(get_composition_service),
+    mixer_service: MixerService = Depends(get_mixer_service),
+    effects_service: TrackEffectsService = Depends(get_track_effects_service)
 ):
     """
     Update composition metadata (name, tempo, time signature)
 
-    This updates the composition's properties without saving to disk.
-    Call /save to persist changes.
+    This updates the composition's properties and auto-persists to disk.
     """
     try:
         # Get composition
-        composition = sequencer_service.get_composition(composition_id)
+        composition = composition_state_service.get_composition(composition_id)
         if not composition:
             raise ResourceNotFoundError(f"Composition {composition_id} not found")
 
@@ -257,6 +254,14 @@ async def update_composition(
             composition.tempo = request.tempo
         if request.time_signature is not None:
             composition.time_signature = request.time_signature
+
+        # AUTO-PERSIST: Keep current.json in sync with memory
+        composition_service.auto_persist_composition(
+            composition_id=composition_id,
+            composition_state_service=composition_state_service,
+            mixer_service=mixer_service,
+            effects_service=effects_service
+        )
 
         logger.info(f"✅ Updated composition {composition_id} metadata")
 
@@ -276,7 +281,7 @@ async def update_composition(
 @router.delete("/{composition_id}", response_model=CompositionDeletedResponse)
 async def delete_composition(
     composition_id: str,
-    sequencer_service: SequencerService = Depends(get_sequencer_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
     composition_service: CompositionService = Depends(get_composition_service)
 ):
     """
@@ -287,7 +292,7 @@ async def delete_composition(
     """
     try:
         # Delete from memory
-        success = sequencer_service.delete_composition(composition_id)
+        success = composition_state_service.delete_composition(composition_id)
         if not success:
             raise ResourceNotFoundError(f"Composition {composition_id} not found")
 

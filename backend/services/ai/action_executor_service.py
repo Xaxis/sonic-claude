@@ -31,10 +31,9 @@ from backend.models.sequence import (
     AddClipRequest,
     UpdateClipRequest,
     MIDINote,
-    CreateSequenceRequest,
-    Sequence
 )
-from backend.services.daw.sequencer_service import SequencerService
+from backend.services.daw.composition_state_service import CompositionStateService
+from backend.services.daw.playback_engine_service import PlaybackEngineService
 from backend.services.daw.mixer_service import MixerService
 from backend.services.daw.effects_service import TrackEffectsService
 
@@ -46,14 +45,16 @@ class DAWActionService:
     Executes structured actions from AI agent
     Maps high-level actions to service calls
     """
-    
+
     def __init__(
         self,
-        sequencer_service: SequencerService,
+        composition_state_service: CompositionStateService,
+        playback_engine_service: PlaybackEngineService,
         mixer_service: MixerService,
         track_effects_service: TrackEffectsService
     ):
-        self.sequencer = sequencer_service
+        self.composition_state = composition_state_service
+        self.playback_engine = playback_engine_service
         self.mixer = mixer_service
         self.effects = track_effects_service
     
@@ -87,8 +88,8 @@ class DAWActionService:
                 return await self._add_effect(params)
             elif action_type == "set_effect_parameter":
                 return await self._set_effect_parameter(params)
-            elif action_type == "play_sequence":
-                return await self._play_sequence(params)
+            elif action_type == "play_composition":
+                return await self._play_composition(params)
             elif action_type == "stop_playback":
                 return await self._stop_playback(params)
             else:
@@ -161,7 +162,7 @@ class DAWActionService:
             )
             
             # Get current sequence
-            if not self.sequencer.current_sequence_id:
+            if not self.composition_state.current_composition_id:
                 return ActionResult(
                     success=False,
                     action="create_midi_clip",
@@ -170,8 +171,8 @@ class DAWActionService:
                 )
             
             # Add clip (NOT async - remove await)
-            clip = self.sequencer.add_clip(
-                self.sequencer.current_sequence_id,
+            clip = self.composition_state.add_clip(
+                self.composition_state.current_composition_id,
                 clip_request
             )
 
@@ -225,7 +226,7 @@ class DAWActionService:
                     notes.append(midi_note)
                 update_request.midi_events = notes
 
-            if not self.sequencer.current_sequence_id:
+            if not self.composition_state.current_composition_id:
                 return ActionResult(
                     success=False,
                     action="modify_clip",
@@ -233,8 +234,8 @@ class DAWActionService:
                     error="NO_SEQUENCE"
                 )
 
-            clip = self.sequencer.update_clip(
-                self.sequencer.current_sequence_id,
+            clip = self.composition_state.update_clip(
+                self.composition_state.current_composition_id,
                 clip_id,
                 update_request
             )
@@ -261,8 +262,8 @@ class DAWActionService:
     async def _delete_clip(self, params: Dict[str, Any]) -> ActionResult:
         """Delete clip"""
         try:
-            await self.sequencer.delete_clip(
-                self.sequencer.current_sequence_id,
+            await self.composition_state.delete_clip(
+                self.composition_state.current_composition_id,
                 params["clip_id"]
             )
             return ActionResult(
@@ -277,7 +278,7 @@ class DAWActionService:
     async def _create_track(self, params: Dict[str, Any]) -> ActionResult:
         """Create new track"""
         try:
-            if not self.sequencer.current_sequence_id:
+            if not self.composition_state.current_composition_id:
                 return ActionResult(
                     success=False,
                     action="create_track",
@@ -285,8 +286,8 @@ class DAWActionService:
                     error="NO_SEQUENCE"
                 )
 
-            track = self.sequencer.create_track(
-                sequence_id=self.sequencer.current_sequence_id,
+            track = self.composition_state.create_track(
+                sequence_id=self.composition_state.current_composition_id,
                 name=params.get("name", "AI Track"),
                 track_type=params.get("type", "midi"),
                 color=params.get("color", "#3b82f6"),
@@ -325,13 +326,13 @@ class DAWActionService:
             value = params["value"]
 
             if parameter == "volume":
-                await self.sequencer.update_track(track_id, volume=value)
+                await self.composition_state.update_track(track_id, volume=value)
             elif parameter == "pan":
-                await self.sequencer.update_track(track_id, pan=value)
+                await self.composition_state.update_track(track_id, pan=value)
             elif parameter == "mute":
-                await self.sequencer.update_track_mute(track_id, value)
+                await self.composition_state.update_track_mute(track_id, value)
             elif parameter == "solo":
-                await self.sequencer.update_track_solo(track_id, value)
+                await self.composition_state.update_track_solo(track_id, value)
             else:
                 return ActionResult(
                     success=False,
@@ -352,7 +353,7 @@ class DAWActionService:
     async def _set_tempo(self, params: Dict[str, Any]) -> ActionResult:
         """Set global tempo"""
         try:
-            await self.sequencer.set_tempo(params["tempo"])
+            await self.playback_engine.set_tempo(params["tempo"])
             return ActionResult(
                 success=True,
                 action="set_tempo",
@@ -403,23 +404,23 @@ class DAWActionService:
             logger.error(f"Failed to set effect parameter: {e}")
             raise
 
-    async def _play_sequence(self, params: Dict[str, Any]) -> ActionResult:
+    async def _play_composition(self, params: Dict[str, Any]) -> ActionResult:
         """Start playback"""
         try:
-            sequence_id = params.get("sequence_id") or self.sequencer.current_sequence_id
-            if not sequence_id:
+            composition_id = params.get("composition_id") or self.composition_state.current_composition_id
+            if not composition_id:
                 return ActionResult(
                     success=False,
-                    action="play_sequence",
-                    message="No sequence specified or active",
-                    error="NO_SEQUENCE"
+                    action="play_composition",
+                    message="No composition specified or active",
+                    error="NO_COMPOSITION"
                 )
 
-            await self.sequencer.play_sequence(sequence_id)
+            await self.playback_engine.play_composition(composition_id)
             return ActionResult(
                 success=True,
-                action="play_sequence",
-                message=f"Started playback of sequence {sequence_id}"
+                action="play_composition",
+                message=f"Started playback of composition {composition_id}"
             )
         except Exception as e:
             logger.error(f"Failed to play sequence: {e}")
@@ -428,7 +429,7 @@ class DAWActionService:
     async def _stop_playback(self, params: Dict[str, Any]) -> ActionResult:
         """Stop playback"""
         try:
-            await self.sequencer.stop_playback()
+            await self.playback_engine.stop_playback()
             return ActionResult(
                 success=True,
                 action="stop_playback",

@@ -14,10 +14,19 @@ from fastapi import APIRouter, UploadFile, File, Form, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from backend.core.dependencies import get_settings, get_sequencer_service
+from backend.core.dependencies import (
+    get_settings,
+    get_composition_state_service,
+    get_composition_service,
+    get_mixer_service,
+    get_track_effects_service
+)
 from backend.core.config import Settings
 from backend.core.exceptions import SampleNotFoundError, SampleInUseError, ServiceError
-from backend.services.daw.sequencer_service import SequencerService
+from backend.services.daw.composition_state_service import CompositionStateService
+from backend.services.persistence.composition_service import CompositionService
+from backend.services.daw.mixer_service import MixerService
+from backend.services.daw.effects_service import TrackEffectsService
 from .utils import get_samples_dir, get_metadata_file, load_metadata, save_metadata
 
 router = APIRouter()
@@ -224,7 +233,10 @@ async def update_sample(
     name: Optional[str] = None,
     category: Optional[str] = None,
     metadata_file: str = Depends(get_metadata_file),
-    sequencer_service: SequencerService = Depends(get_sequencer_service)
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
+    composition_service: CompositionService = Depends(get_composition_service),
+    mixer_service: MixerService = Depends(get_mixer_service),
+    effects_service: TrackEffectsService = Depends(get_track_effects_service)
 ):
     """Update sample metadata and propagate changes to sequencer tracks"""
     try:
@@ -242,8 +254,18 @@ async def update_sample(
 
         # Propagate sample name changes to all sequencer tracks using this sample
         if name is not None:
-            updated_count = sequencer_service.update_sample_references(sample_id, name)
+            updated_count = composition_state_service.update_sample_references(sample_id, name)
             logger.info(f"📝 Updated sample name in {updated_count} sequencer tracks")
+
+            # AUTO-PERSIST: Sample name changes affect track state in compositions
+            # Persist all compositions that might have been affected
+            for composition in composition_state_service.compositions.values():
+                composition_service.auto_persist_composition(
+                    composition_id=composition.id,
+                    composition_state_service=composition_state_service,
+                    mixer_service=mixer_service,
+                    effects_service=effects_service
+                )
 
         return SampleResponse(
             success=True,
@@ -260,7 +282,7 @@ async def delete_sample(
     sample_id: str,
     samples_dir: str = Depends(get_samples_dir),
     metadata_file: str = Depends(get_metadata_file),
-    sequencer_service: SequencerService = Depends(get_sequencer_service)
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service)
 ):
     """Delete a sample (only if not in use by sequencer tracks)"""
     try:
@@ -269,7 +291,7 @@ async def delete_sample(
             raise SampleNotFoundError(sample_id)
 
         # Check if sample is being used in any sequencer tracks
-        is_in_use, track_names = sequencer_service.check_sample_in_use(sample_id)
+        is_in_use, track_names = composition_state_service.check_sample_in_use(sample_id)
         if is_in_use:
             raise SampleInUseError(sample_id, len(track_names), track_names)
 

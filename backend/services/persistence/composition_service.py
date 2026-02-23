@@ -1,18 +1,16 @@
 """
 Unified Composition Service - Single source of truth for ALL composition storage
 
-This service replaces:
-- sequence_storage.py (sequences only)
-- iteration_service.py (AI iterations only)
-- mixer state storage (mixer only)
-- effects storage (effects only)
-
-Features:
-- Stores COMPLETE compositions (sequence + mixer + effects + samples)
-- Handles both manual saves AND AI iterations in ONE system
-- Unified versioning/history for ALL changes
-- Single, consistent directory structure
+This service handles:
+- Saving/loading complete compositions (all state in one model)
+- Versioning/history (saving multiple versions of compositions)
+- Autosave functionality
 - Atomic writes to prevent corruption
+
+Key Concepts:
+- Composition contains EVERYTHING (no separate snapshot model)
+- History = multiple saved versions of the same Composition
+- Simple save/load operations (no conversion needed)
 """
 import logging
 import json
@@ -22,14 +20,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid
 
-from backend.models.composition_snapshot import (
-    CompositionSnapshot,
-    AIIteration,
-    IterationHistory,
-)
 from backend.models.composition import Composition, CompositionMetadata
-from backend.models.mixer import MixerState
-from backend.models.effects import TrackEffectChain
 
 logger = logging.getLogger(__name__)
 
@@ -87,8 +78,7 @@ class CompositionService:
 
     def save_composition(
         self,
-        composition_id: str,
-        snapshot: CompositionSnapshot,
+        composition: Composition,
         create_history: bool = True,
         is_autosave: bool = False
     ) -> None:
@@ -96,12 +86,14 @@ class CompositionService:
         Save complete composition state
 
         Args:
-            composition_id: Composition ID
-            snapshot: Complete composition snapshot
+            composition: Complete composition to save
             create_history: Whether to create a history entry
             is_autosave: Whether this is an autosave
         """
-        comp_dir = self._get_composition_dir(composition_id, create=True)
+        comp_dir = self._get_composition_dir(composition.id, create=True)
+
+        # Update timestamp
+        composition.updated_at = datetime.now()
 
         # Save current state
         if is_autosave:
@@ -109,17 +101,17 @@ class CompositionService:
         else:
             target_file = comp_dir / "current.json"
 
-        self._atomic_write(target_file, snapshot.model_dump(mode='json'))
+        self._atomic_write(target_file, composition.model_dump(mode='json'))
 
         # Create history entry if requested
         if create_history and not is_autosave:
-            self._create_history_entry(composition_id, snapshot)
+            self._create_history_entry(composition)
 
-        logger.info(f"💾 Saved composition {composition_id} ({'autosave' if is_autosave else 'manual'})")
+        logger.info(f"💾 Saved composition {composition.id} ({'autosave' if is_autosave else 'manual'})")
 
-    def _create_history_entry(self, composition_id: str, snapshot: CompositionSnapshot) -> None:
+    def _create_history_entry(self, composition: Composition) -> None:
         """Create a history entry for this save"""
-        comp_dir = self._get_composition_dir(composition_id, create=True)
+        comp_dir = self._get_composition_dir(composition.id, create=True)
         history_dir = comp_dir / "history"
 
         # Find next version number
@@ -130,7 +122,7 @@ class CompositionService:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{next_num:03d}_{timestamp}.json"
 
-        self._atomic_write(history_dir / filename, snapshot.model_dump(mode='json'))
+        self._atomic_write(history_dir / filename, composition.model_dump(mode='json'))
         logger.info(f"📝 Created history entry: {filename}")
 
     def _atomic_write(self, path: Path, data: Dict[str, Any]) -> None:
@@ -147,7 +139,7 @@ class CompositionService:
 
 
 
-    def load_composition(self, composition_id: str, use_autosave: bool = False) -> Optional[CompositionSnapshot]:
+    def load_composition(self, composition_id: str, use_autosave: bool = False) -> Optional[Composition]:
         """
         Load complete composition state
 
@@ -156,7 +148,7 @@ class CompositionService:
             use_autosave: Load from autosave instead of current
 
         Returns:
-            Complete composition snapshot or None if not found
+            Complete composition or None if not found
         """
         comp_dir = self._get_composition_dir(composition_id)
 
@@ -181,7 +173,7 @@ class CompositionService:
         try:
             with open(source_file, 'r') as f:
                 data = json.load(f)
-            return CompositionSnapshot(**data)
+            return Composition(**data)
         except Exception as e:
             logger.error(f"❌ Failed to load composition {composition_id}: {e}")
             return None
@@ -215,7 +207,7 @@ class CompositionService:
 
         return history
 
-    def load_history_version(self, composition_id: str, version: int) -> Optional[CompositionSnapshot]:
+    def load_history_version(self, composition_id: str, version: int) -> Optional[Composition]:
         """
         Load a specific version from history
 
@@ -224,7 +216,7 @@ class CompositionService:
             version: Version number (0 = original, 1 = first save, etc.)
 
         Returns:
-            Complete composition snapshot or None if not found
+            Complete composition or None if not found
         """
         comp_dir = self._get_composition_dir(composition_id)
         history_dir = comp_dir / "history"
@@ -240,7 +232,7 @@ class CompositionService:
         try:
             with open(matches[0], 'r') as f:
                 data = json.load(f)
-            return CompositionSnapshot(**data)
+            return Composition(**data)
         except Exception as e:
             logger.error(f"❌ Failed to load version {version}: {e}")
             return None
@@ -259,12 +251,12 @@ class CompositionService:
         Returns:
             True if successful, False otherwise
         """
-        snapshot = self.load_history_version(composition_id, version)
-        if not snapshot:
+        composition = self.load_history_version(composition_id, version)
+        if not composition:
             return False
 
         # Save as current (this creates a new history entry)
-        self.save_composition(composition_id, snapshot, create_history=True)
+        self.save_composition(composition, create_history=True)
         logger.info(f"♻️ Restored composition {composition_id} to version {version}")
         return True
 
@@ -370,39 +362,35 @@ class CompositionService:
     # SNAPSHOT BUILDING HELPERS
     # ========================================================================
 
-    def build_snapshot_from_services(
+    def capture_composition_from_services(
         self,
-        sequencer_service: 'SequencerService',
+        composition_state_service: 'CompositionStateService',
         mixer_service: 'MixerService',
         effects_service: 'TrackEffectsService',
-        composition_id: str,
-        name: str = "Snapshot",
-        metadata: Optional[Dict[str, Any]] = None,
-        chat_history: Optional[List[Dict[str, Any]]] = None
-    ) -> Optional[CompositionSnapshot]:
+        composition_id: str
+    ) -> Optional[Composition]:
         """
-        Build a complete composition snapshot from current service states
+        Capture complete composition state from current service states
+
+        This updates the composition with current global mixer/effects state.
 
         Args:
-            sequencer_service: SequencerService instance
+            composition_state_service: CompositionStateService instance
             mixer_service: MixerService instance
             effects_service: TrackEffectsService instance
-            composition_id: ID of the composition to snapshot
-            name: Name for the snapshot
-            metadata: Additional metadata
-            chat_history: Chat conversation history
+            composition_id: ID of the composition to capture
 
         Returns:
-            Complete composition snapshot or None if composition not found
+            Complete composition with updated state or None if composition not found
         """
         # Get composition
-        composition = sequencer_service.get_composition(composition_id)
+        composition = composition_state_service.get_composition(composition_id)
         if not composition:
             logger.error(f"❌ Composition {composition_id} not found")
             return None
 
-        # Get mixer state
-        mixer_state = mixer_service.state
+        # Update composition with current global state
+        composition.mixer_state = mixer_service.state
 
         # Get all track effects
         track_effects = []
@@ -410,56 +398,91 @@ class CompositionService:
             effect_chain = effects_service.get_track_effect_chain(track.id)
             if effect_chain and effect_chain.effects:  # Only include if there are effects
                 track_effects.append(effect_chain)
+        composition.track_effects = track_effects
 
         # Get sample assignments (from sample tracks)
         sample_assignments = {}
         for track in composition.tracks:
             if track.type == "sample" and hasattr(track, 'sample_path') and track.sample_path:
                 sample_assignments[track.id] = track.sample_path
+        composition.sample_assignments = sample_assignments
 
-        # Build snapshot (flatten composition fields at top level)
-        snapshot = CompositionSnapshot(
-            # Composition fields (flattened)
-            id=composition.id,
-            name=composition.name,
-            tempo=composition.tempo,
-            time_signature=composition.time_signature,
-            tracks=composition.tracks,
-            clips=composition.clips,
-            is_playing=composition.is_playing,
-            current_position=composition.current_position,
-            loop_enabled=composition.loop_enabled,
-            loop_start=composition.loop_start,
-            loop_end=composition.loop_end,
-            created_at=composition.created_at,
-            updated_at=composition.updated_at,
+        # Update timestamp
+        composition.updated_at = datetime.now()
 
-            # Additional state
-            mixer_state=mixer_state,
-            track_effects=track_effects,
-            sample_assignments=sample_assignments,
-            chat_history=chat_history or [],
-            metadata=metadata or {}
-        )
+        return composition
 
-        return snapshot
-
-    def restore_snapshot_to_services(
+    def auto_persist_composition(
         self,
-        snapshot: CompositionSnapshot,
-        sequencer_service: 'SequencerService',
+        composition_id: str,
+        composition_state_service: 'CompositionStateService',
+        mixer_service: 'MixerService',
+        effects_service: 'TrackEffectsService'
+    ) -> bool:
+        """
+        Auto-persist composition after mutation (keeps current.json in sync)
+
+        This is called automatically after every mutation (create/update/delete track/clip/etc).
+        It updates current.json but does NOT create history entries.
+        History entries are only created on explicit user "Save" actions.
+
+        This ensures:
+        - current.json always reflects latest in-memory state
+        - Page reload always shows latest changes
+        - History only contains user-initiated savepoints (for undo/redo)
+
+        Args:
+            composition_id: ID of the composition to persist
+            composition_state_service: CompositionStateService instance
+            mixer_service: MixerService instance
+            effects_service: TrackEffectsService instance
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Capture current state
+            composition = self.capture_composition_from_services(
+                composition_state_service=composition_state_service,
+                mixer_service=mixer_service,
+                effects_service=effects_service,
+                composition_id=composition_id
+            )
+
+            if not composition:
+                logger.error(f"❌ Failed to capture composition {composition_id} for auto-persist")
+                return False
+
+            # Save to current.json (NO history entry)
+            self.save_composition(
+                composition=composition,
+                create_history=False,  # Don't spam history with every mutation
+                is_autosave=False      # This is sync, not autosave
+            )
+
+            logger.debug(f"🔄 Auto-persisted composition {composition_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Failed to auto-persist composition {composition_id}: {e}")
+            return False
+
+    def restore_composition_to_services(
+        self,
+        composition: Composition,
+        composition_state_service: 'CompositionStateService',
         mixer_service: 'MixerService',
         effects_service: 'TrackEffectsService',
         set_as_current: bool = True
     ) -> bool:
         """
-        Restore a composition snapshot to the services
+        Restore a composition to the services
 
-        This updates all services to match the snapshot state.
+        This updates all services to match the composition state.
 
         Args:
-            snapshot: Composition snapshot to restore
-            sequencer_service: SequencerService instance
+            composition: Composition to restore
+            composition_state_service: CompositionStateService instance
             mixer_service: MixerService instance
             effects_service: TrackEffectsService instance
             set_as_current: Whether to set this composition as the current composition (default: True)
@@ -468,49 +491,31 @@ class CompositionService:
             True if successful, False otherwise
         """
         try:
-            # Reconstruct Composition from flattened snapshot fields
-            from backend.models.composition import Composition
-
-            composition = Composition(
-                id=snapshot.id,
-                name=snapshot.name,
-                tempo=snapshot.tempo,
-                time_signature=snapshot.time_signature,
-                tracks=snapshot.tracks,
-                clips=snapshot.clips,
-                is_playing=snapshot.is_playing,
-                current_position=snapshot.current_position,
-                loop_enabled=snapshot.loop_enabled,
-                loop_start=snapshot.loop_start,
-                loop_end=snapshot.loop_end,
-                created_at=snapshot.created_at,
-                updated_at=snapshot.updated_at
-            )
-
-            # Store composition in sequencer service
-            sequencer_service.compositions[composition.id] = composition
+            # Store composition in composition state service
+            composition_state_service.compositions[composition.id] = composition
 
             # Set as current composition (only if requested)
             if set_as_current:
-                sequencer_service.current_composition_id = composition.id
+                composition_state_service.current_composition_id = composition.id
                 # Restore mixer state (only for current composition)
-                mixer_service.state = snapshot.mixer_state
+                mixer_service.state = composition.mixer_state
 
-            # Restore effects
-            for effect_chain in snapshot.track_effects:
-                effects_service.track_effects[effect_chain.track_id] = effect_chain
+                # Restore effects
+                effects_service.track_effect_chains = {}
+                for effect_chain in composition.track_effects:
+                    effects_service.track_effect_chains[effect_chain.track_id] = effect_chain
 
-            # Restore sample assignments
-            for track_id, sample_path in snapshot.sample_assignments.items():
-                # Find track in composition
-                track = next((t for t in composition.tracks if t.id == track_id), None)
-                if track and hasattr(track, 'sample_path'):
-                    track.sample_path = sample_path
+                # Restore sample assignments
+                for track_id, sample_path in composition.sample_assignments.items():
+                    # Find track in composition
+                    track = next((t for t in composition.tracks if t.id == track_id), None)
+                    if track and hasattr(track, 'sample_path'):
+                        track.sample_path = sample_path
 
-            logger.info(f"✅ Restored composition snapshot: {snapshot.name} (set_as_current={set_as_current})")
+            logger.info(f"✅ Restored composition: {composition.name} (set_as_current={set_as_current})")
             return True
 
         except Exception as e:
-            logger.error(f"❌ Failed to restore snapshot: {e}")
+            logger.error(f"❌ Failed to restore composition: {e}")
             return False
 

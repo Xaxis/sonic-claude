@@ -4,7 +4,7 @@ Synthesis Routes - Control synth creation and parameters
 import logging
 from typing import Optional, Dict
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.core.dependencies import get_synthesis_service
 from backend.core.exceptions import SynthNotFoundError, ServiceError
@@ -26,6 +26,20 @@ class SetParamRequest(BaseModel):
     """Request model for setting a synth parameter"""
     param: str
     value: float
+
+
+class PreviewNoteRequest(BaseModel):
+    """Request model for previewing a note"""
+    note: int = Field(ge=0, le=127, description="MIDI note number")
+    velocity: Optional[int] = Field(default=100, ge=1, le=127, description="Note velocity")
+    duration: Optional[float] = Field(default=1.0, gt=0, description="Note duration in seconds")
+    synthdef: Optional[str] = Field(default="default", description="Synth definition to use")
+
+
+class UpdateMetronomeRequest(BaseModel):
+    """Request model for updating metronome"""
+    enabled: Optional[bool] = Field(default=None, description="Enable/disable metronome")
+    volume: Optional[float] = Field(default=None, ge=0, le=1, description="Metronome volume")
 
 
 @router.post("/synthesis/synths")
@@ -118,3 +132,86 @@ async def delete_all_synths(
         logger.error(f"❌ Failed to delete all synths: {e}")
         raise ServiceError(f"Failed to delete all synths: {str(e)}")
 
+
+
+# ============================================================================
+# PREVIEW AND METRONOME
+# ============================================================================
+
+@router.post("/preview")
+async def preview_note(
+    request: PreviewNoteRequest,
+    synthesis_service: SynthesisService = Depends(get_synthesis_service)
+):
+    """Preview a note by playing it briefly"""
+    import asyncio
+
+    try:
+        # Create a temporary synth to preview the note
+        synth_info = await synthesis_service.create_synth(
+            synthdef=request.synthdef or "default",
+            params={
+                "freq": 440 * (2 ** ((request.note - 69) / 12)),  # Convert MIDI note to frequency
+                "amp": request.velocity / 127.0 if request.velocity else 0.8,
+                "gate": 1
+            },
+            group=1,
+            bus=None
+        )
+
+        synth_id = synth_info.get("id")
+        duration = request.duration or 1.0
+
+        # Schedule the synth to be released after the duration
+        async def release_after_duration():
+            await asyncio.sleep(duration)
+            try:
+                await synthesis_service.release_synth(synth_id)
+                logger.debug(f"🔇 Auto-released preview synth {synth_id} after {duration}s")
+            except Exception as e:
+                logger.warning(f"Failed to auto-release preview synth {synth_id}: {e}")
+
+        # Fire and forget - don't wait for the release
+        asyncio.create_task(release_after_duration())
+
+        return {
+            "status": "ok",
+            "synth_id": synth_id,
+            "note": request.note,
+            "duration": duration
+        }
+    except Exception as e:
+        logger.error(f"❌ Failed to preview note: {e}")
+        raise ServiceError(f"Failed to preview note: {str(e)}")
+
+
+@router.put("/metronome")
+async def update_metronome(
+    request: UpdateMetronomeRequest,
+    synthesis_service: SynthesisService = Depends(get_synthesis_service)
+):
+    """Update metronome settings"""
+    try:
+        # TODO: Implement metronome service
+        # For now, just return success
+        return {
+            "status": "ok",
+            "enabled": request.enabled,
+            "volume": request.volume
+        }
+    except Exception as e:
+        logger.error(f"❌ Failed to update metronome: {e}")
+        raise ServiceError(f"Failed to update metronome: {str(e)}")
+
+
+@router.get("/synthdefs")
+async def get_synthdefs(
+    synthesis_service: SynthesisService = Depends(get_synthesis_service)
+):
+    """Get list of available synth definitions"""
+    try:
+        from backend.services.daw.synthdef_registry import get_all_synthdefs
+        return get_all_synthdefs()
+    except Exception as e:
+        logger.error(f"❌ Failed to get synthdefs: {e}")
+        raise ServiceError(f"Failed to get synthdefs: {str(e)}")

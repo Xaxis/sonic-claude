@@ -8,12 +8,12 @@ from fastapi import APIRouter, Depends
 
 from backend.core.dependencies import (
     get_composition_service,
-    get_sequencer_service,
+    get_composition_state_service,
     get_mixer_service,
     get_track_effects_service,
 )
 from backend.services.persistence.composition_service import CompositionService
-from backend.services.daw.sequencer_service import SequencerService
+from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.mixer_service import MixerService
 from backend.services.daw.effects_service import TrackEffectsService
 from backend.core.exceptions import ServiceError, ResourceNotFoundError
@@ -52,10 +52,10 @@ async def get_history_version(
 ):
     """Get a specific version from history"""
     try:
-        snapshot = composition_service.load_history_version(composition_id, version)
-        if not snapshot:
+        composition = composition_service.load_history_version(composition_id, version)
+        if not composition:
             raise ResourceNotFoundError(f"Version {version} not found for composition {composition_id}")
-        return snapshot
+        return composition
     except ResourceNotFoundError:
         raise
     except Exception as e:
@@ -68,7 +68,7 @@ async def restore_version(
     composition_id: str,
     version: int,
     composition_service: CompositionService = Depends(get_composition_service),
-    sequencer_service: SequencerService = Depends(get_sequencer_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
     mixer_service: MixerService = Depends(get_mixer_service),
     effects_service: TrackEffectsService = Depends(get_track_effects_service),
 ):
@@ -87,7 +87,7 @@ async def restore_version(
         # Restore to services
         success = composition_service.restore_snapshot_to_services(
             snapshot=snapshot,
-            sequencer_service=sequencer_service,
+            composition_state_service=composition_state_service,
             mixer_service=mixer_service,
             effects_service=effects_service
         )
@@ -123,7 +123,7 @@ async def restore_version(
 async def recover_from_autosave(
     composition_id: str,
     composition_service: CompositionService = Depends(get_composition_service),
-    sequencer_service: SequencerService = Depends(get_sequencer_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
     mixer_service: MixerService = Depends(get_mixer_service),
     effects_service: TrackEffectsService = Depends(get_track_effects_service),
 ):
@@ -141,7 +141,7 @@ async def recover_from_autosave(
         # Restore to services
         success = composition_service.restore_snapshot_to_services(
             snapshot=snapshot,
-            sequencer_service=sequencer_service,
+            composition_state_service=composition_state_service,
             mixer_service=mixer_service,
             effects_service=effects_service
         )

@@ -1,29 +1,29 @@
 """Data models"""
 from .sequence import (
-    Sequence,
+    Track,
     Clip,
     MIDIClip,
     AudioClip,
     MIDINote,
-    SequencerTrack,
-    CreateSequenceRequest,
     AddClipRequest,
     UpdateClipRequest,
     SetTempoRequest,
     SeekRequest,
+    # Backwards compatibility - DEPRECATED
+    SequencerTrack,
 )
 
 __all__ = [
-    "Sequence",
+    "Track",
     "Clip",
     "MIDIClip",
     "AudioClip",
     "MIDINote",
-    "SequencerTrack",
-    "CreateSequenceRequest",
     "AddClipRequest",
     "UpdateClipRequest",
     "SetTempoRequest",
     "SeekRequest",
+    # Backwards compatibility - DEPRECATED
+    "SequencerTrack",
 ]
 

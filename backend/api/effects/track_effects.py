@@ -1,12 +1,23 @@
 """
 Track Effects Routes - Per-track insert effect chains
+
+NOTE: Effect chains are part of composition state.
+All effect mutations should auto-persist the composition.
 """
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict
 
-from backend.core.dependencies import get_track_effects_service
+from backend.core.dependencies import (
+    get_track_effects_service,
+    get_composition_service,
+    get_composition_state_service,
+    get_mixer_service
+)
 from backend.services.daw.effects_service import TrackEffectsService
+from backend.services.persistence.composition_service import CompositionService
+from backend.services.daw.composition_state_service import CompositionStateService
+from backend.services.daw.mixer_service import MixerService
 from backend.models.effects import (
     EffectInstance,
     TrackEffectChainResponse,
@@ -44,7 +55,10 @@ async def get_track_effect_chain(
 async def create_effect(
     track_id: str,
     request: CreateEffectRequest,
-    effects_service: TrackEffectsService = Depends(get_track_effects_service)
+    effects_service: TrackEffectsService = Depends(get_track_effects_service),
+    composition_service: CompositionService = Depends(get_composition_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
+    mixer_service: MixerService = Depends(get_mixer_service)
 ):
     """
     Create a new effect on a track
@@ -63,6 +77,16 @@ async def create_effect(
             slot_index=request.slot_index,
             display_name=request.display_name
         )
+
+        # AUTO-PERSIST: Effect chains are part of composition
+        if composition_state_service.current_composition_id:
+            composition_service.auto_persist_composition(
+                composition_id=composition_state_service.current_composition_id,
+                composition_state_service=composition_state_service,
+                mixer_service=mixer_service,
+                effects_service=effects_service
+            )
+
         return effect
     except ValueError as e:
         logger.error(f"❌ Invalid effect creation request: {e}")
@@ -94,7 +118,10 @@ async def get_effect(
 async def update_effect(
     effect_id: str,
     request: UpdateEffectRequest,
-    effects_service: TrackEffectsService = Depends(get_track_effects_service)
+    effects_service: TrackEffectsService = Depends(get_track_effects_service),
+    composition_service: CompositionService = Depends(get_composition_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
+    mixer_service: MixerService = Depends(get_mixer_service)
 ):
     """
     Update effect parameters or state
@@ -122,6 +149,15 @@ async def update_effect(
         if request.display_name is not None:
             effect.display_name = request.display_name
 
+        # AUTO-PERSIST: Effect chains are part of composition
+        if composition_state_service.current_composition_id:
+            composition_service.auto_persist_composition(
+                composition_id=composition_state_service.current_composition_id,
+                composition_state_service=composition_state_service,
+                mixer_service=mixer_service,
+                effects_service=effects_service
+            )
+
         return effect
 
     except HTTPException:
@@ -137,11 +173,24 @@ async def update_effect(
 @router.delete("/{effect_id}")
 async def delete_effect(
     effect_id: str,
-    effects_service: TrackEffectsService = Depends(get_track_effects_service)
+    effects_service: TrackEffectsService = Depends(get_track_effects_service),
+    composition_service: CompositionService = Depends(get_composition_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
+    mixer_service: MixerService = Depends(get_mixer_service)
 ):
     """Delete an effect instance"""
     try:
         await effects_service.delete_effect(effect_id)
+
+        # AUTO-PERSIST: Effect chains are part of composition
+        if composition_state_service.current_composition_id:
+            composition_service.auto_persist_composition(
+                composition_id=composition_state_service.current_composition_id,
+                composition_state_service=composition_state_service,
+                mixer_service=mixer_service,
+                effects_service=effects_service
+            )
+
         return {"status": "success", "message": f"Effect {effect_id} deleted"}
     except ValueError as e:
         logger.error(f"❌ Effect not found: {e}")
@@ -155,7 +204,10 @@ async def delete_effect(
 async def move_effect(
     effect_id: str,
     request: MoveEffectRequest,
-    effects_service: TrackEffectsService = Depends(get_track_effects_service)
+    effects_service: TrackEffectsService = Depends(get_track_effects_service),
+    composition_service: CompositionService = Depends(get_composition_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
+    mixer_service: MixerService = Depends(get_mixer_service)
 ):
     """
     Move effect to a different slot
@@ -169,6 +221,16 @@ async def move_effect(
     """
     try:
         effect = await effects_service.move_effect(effect_id, request.new_slot_index)
+
+        # AUTO-PERSIST: Effect chains are part of composition
+        if composition_state_service.current_composition_id:
+            composition_service.auto_persist_composition(
+                composition_id=composition_state_service.current_composition_id,
+                composition_state_service=composition_state_service,
+                mixer_service=mixer_service,
+                effects_service=effects_service
+            )
+
         return effect
     except ValueError as e:
         logger.error(f"❌ Invalid move request: {e}")
@@ -181,11 +243,24 @@ async def move_effect(
 @router.delete("/track/{track_id}/clear")
 async def clear_track_effects(
     track_id: str,
-    effects_service: TrackEffectsService = Depends(get_track_effects_service)
+    effects_service: TrackEffectsService = Depends(get_track_effects_service),
+    composition_service: CompositionService = Depends(get_composition_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
+    mixer_service: MixerService = Depends(get_mixer_service)
 ):
     """Remove all effects from a track"""
     try:
         await effects_service.clear_track_effects(track_id)
+
+        # AUTO-PERSIST: Effect chains are part of composition
+        if composition_state_service.current_composition_id:
+            composition_service.auto_persist_composition(
+                composition_id=composition_state_service.current_composition_id,
+                composition_state_service=composition_state_service,
+                mixer_service=mixer_service,
+                effects_service=effects_service
+            )
+
         return {"status": "success", "message": f"Cleared all effects from track {track_id}"}
     except Exception as e:
         logger.error(f"❌ Failed to clear track effects: {e}")

@@ -6,7 +6,7 @@
  */
 
 export { CompositionsProvider } from "./compositions.provider";
-export { SequencerProvider } from "./sequencer.provider";
+export { PlaybackProvider } from "./playback.provider";
 export { MixerProvider } from "./mixer.provider";
 export { EffectsProvider } from "./effects.provider";
 export { AudioProvider } from "./audio.provider";
@@ -27,24 +27,22 @@ export type {
     ListHistoryResponse,
     ChatMessage,
     ChatHistoryResponse,
+    // Track/Clip types
+    CreateTrackRequest,
+    UpdateTrackRequest,
+    MuteTrackRequest,
+    SoloTrackRequest,
+    AddClipRequest,
+    UpdateClipRequest,
 } from "./compositions.provider";
 
 export type {
-    CreateSequenceRequest,
-    UpdateSequenceRequest,
-    SetTempoRequest,
+    PlayRequest,
+    StopRequest,
     SeekRequest,
-    PlaySequenceRequest,
-    AddClipRequest,
-    UpdateClipRequest,
-    CreateTrackRequest,
-    UpdateTrackRequest,
-    RenameTrackRequest,
-    MuteTrackRequest,
-    SoloTrackRequest,
-    MetronomeVolumeRequest,
-    PreviewNoteRequest,
-} from "./sequencer.provider";
+    SetTempoRequest,
+    SetLoopRequest,
+} from "./playback.provider";
 
 export type {
     CreateChannelRequest,

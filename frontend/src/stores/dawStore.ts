@@ -34,35 +34,39 @@ import type { EffectDefinition, TrackEffectChain } from '@/services/api/provider
 import type { SampleMetadata } from '@/services/api/providers/samples.provider';
 import type { CompositionMetadata } from '@/services/api/providers/compositions.provider';
 
-// Composition Snapshot (complete state)
-// NOTE: Composition IS the project - no separate "Sequence" entity
-export interface CompositionSnapshot {
+// Composition (complete project state)
+// NOTE: Composition IS the project - no separate "Sequence" or "Snapshot" entity
+// This contains EVERYTHING needed to recreate the exact state
+export interface Composition {
+    // === IDENTITY ===
     id: string;
     name: string;
+
+    // === TIMELINE ===
     tempo: number;
     time_signature: string;
-
-    // Timeline data (directly on composition, not nested in sequence)
     tracks: SequencerTrack[];
     clips: SequencerClip[];
 
-    // Playback state
+    // === PLAYBACK STATE ===
     is_playing: boolean;
     current_position: number;
 
-    // Loop settings
+    // === LOOP SETTINGS ===
     loop_enabled: boolean;
     loop_start: number;
     loop_end: number;
 
-    // Additional state
+    // === AUDIO STATE ===
     mixer_state: any;
     track_effects: TrackEffectChain[];
     sample_assignments: Record<string, string>;
+
+    // === AI CONTEXT ===
     chat_history: any[];
     metadata: Record<string, any>;
 
-    // Timestamps
+    // === TIMESTAMPS ===
     created_at: string;
     updated_at: string;
 }
@@ -113,7 +117,7 @@ interface DAWStore {
 
     // Compositions (PRIMARY - this is what users think about)
     // A composition = project file (contains tracks, clips, and all state)
-    activeComposition: CompositionSnapshot | null;  // Currently loaded composition
+    activeComposition: Composition | null;  // Currently loaded composition
     compositions: CompositionMetadata[];             // List of all compositions (for browsing)
     hasUnsavedChanges: boolean;
 
@@ -422,7 +426,7 @@ export const useDAWStore = create<DAWStore>()(
                     toast.error("No active composition");
                     return;
                 }
-                await api.sequencer.play(activeComposition.id, {});
+                await api.playback.play({ position: 0.0 });
                 // Transport state will be updated via WebSocket
             } catch (error) {
                 console.error("Failed to play:", error);
@@ -434,7 +438,7 @@ export const useDAWStore = create<DAWStore>()(
             try {
                 const { activeComposition } = get();
                 if (activeComposition) {
-                    await api.sequencer.stop(activeComposition.id);
+                    await api.playback.stop();
                 }
             } catch (error) {
                 console.error("Failed to stop playback:", error);
@@ -444,10 +448,8 @@ export const useDAWStore = create<DAWStore>()(
 
         pause: async () => {
             try {
-                const { activeComposition } = get();
-                if (activeComposition) {
-                    await api.sequencer.pause(activeComposition.id);
-                }
+                // Pause not supported in new API - use stop instead
+                await get().stop();
             } catch (error) {
                 console.error("Failed to pause playback:", error);
                 toast.error("Failed to pause playback");
@@ -456,10 +458,8 @@ export const useDAWStore = create<DAWStore>()(
 
         resume: async () => {
             try {
-                const { activeComposition } = get();
-                if (activeComposition) {
-                    await api.sequencer.resume(activeComposition.id);
-                }
+                // Resume not supported in new API - use play instead
+                await get().play();
             } catch (error) {
                 console.error("Failed to resume playback:", error);
                 toast.error("Failed to resume playback");
@@ -470,15 +470,15 @@ export const useDAWStore = create<DAWStore>()(
             try {
                 const { activeComposition } = get();
                 if (activeComposition) {
-                    await api.sequencer.setTempo(activeComposition.id, { tempo });
+                    await api.playback.setTempo({ tempo });
 
                     // Update local state
+                    // Backend auto-persists, so just update local state
                     set((state) => ({
                         activeComposition: state.activeComposition ? {
                             ...state.activeComposition,
                             tempo
                         } : null,
-                        hasUnsavedChanges: true,
                     }));
 
                 }
@@ -490,7 +490,8 @@ export const useDAWStore = create<DAWStore>()(
 
         toggleMetronome: async () => {
             try {
-                await api.sequencer.toggleMetronome();
+                // Toggle metronome - backend will handle state
+                await api.audio.updateMetronome(undefined, undefined);
             } catch (error) {
                 console.error("Failed to toggle metronome:", error);
                 toast.error("Failed to toggle metronome");
@@ -504,11 +505,7 @@ export const useDAWStore = create<DAWStore>()(
                     return;
                 }
 
-                // ALWAYS use composition ID (composition ID = sequence ID)
-                await api.sequencer.seek(activeComposition.id, {
-                    position: position,
-                    trigger_audio: triggerAudio,
-                });
+                await api.playback.seek({ position, trigger_audio: triggerAudio });
             } catch (error) {
                 console.error("Failed to seek:", error);
                 toast.error("Failed to seek");
@@ -527,17 +524,16 @@ export const useDAWStore = create<DAWStore>()(
                     return;
                 }
 
-                // ALWAYS use composition ID (composition ID = sequence ID)
-                const track = await api.sequencer.createTrack({
-                    sequence_id: activeComposition.id,
+                const track = await api.compositions.createTrack({
+                    composition_id: activeComposition.id,
                     name,
                     type: type as "midi" | "audio" | "sample",
                     instrument,
                 });
 
+                // Backend auto-persists, so just update local state
                 set((state) => ({
                     tracks: [...state.tracks, track],
-                    hasUnsavedChanges: true,
                 }));
 
                 windowManager.broadcastState('tracks', get().tracks);
@@ -550,12 +546,18 @@ export const useDAWStore = create<DAWStore>()(
 
         deleteTrack: async (trackId) => {
             try {
-                await api.sequencer.deleteTrack(trackId);
+                const { activeComposition } = get();
+                if (!activeComposition) {
+                    toast.error("No active composition");
+                    return;
+                }
 
+                await api.compositions.deleteTrack(activeComposition.id, trackId);
+
+                // Backend auto-persists, so just update local state
                 set((state) => ({
                     tracks: state.tracks.filter(t => t.id !== trackId),
                     clips: state.clips.filter(c => c.track_id !== trackId),
-                    hasUnsavedChanges: true,
                 }));
 
                 windowManager.broadcastState('tracks', get().tracks);
@@ -569,11 +571,14 @@ export const useDAWStore = create<DAWStore>()(
 
         renameTrack: async (trackId, name) => {
             try {
-                await api.sequencer.updateTrack(trackId, { name });
+                const { activeComposition } = get();
+                if (!activeComposition) return;
 
+                await api.compositions.updateTrack(activeComposition.id, trackId, { name });
+
+                // Backend auto-persists, so just update local state
                 set((state) => ({
                     tracks: state.tracks.map(t => t.id === trackId ? { ...t, name } : t),
-                    hasUnsavedChanges: true,
                 }));
 
             } catch (error) {
@@ -584,11 +589,14 @@ export const useDAWStore = create<DAWStore>()(
 
         updateTrack: async (trackId, updates) => {
             try {
-                await api.sequencer.updateTrack(trackId, updates);
+                const { activeComposition } = get();
+                if (!activeComposition) return;
 
+                await api.compositions.updateTrack(activeComposition.id, trackId, updates);
+
+                // Backend auto-persists, so just update local state
                 set((state) => ({
                     tracks: state.tracks.map(t => t.id === trackId ? { ...t, ...updates } : t),
-                    hasUnsavedChanges: true,
                 }));
 
             } catch (error) {
@@ -599,11 +607,14 @@ export const useDAWStore = create<DAWStore>()(
 
         updateTrackVolume: async (trackId, volume) => {
             try {
-                await api.sequencer.updateTrack(trackId, { volume });
+                const { activeComposition } = get();
+                if (!activeComposition) return;
 
+                await api.compositions.updateTrack(activeComposition.id, trackId, { volume });
+
+                // Backend auto-persists, so just update local state
                 set((state) => ({
                     tracks: state.tracks.map(t => t.id === trackId ? { ...t, volume } : t),
-                    hasUnsavedChanges: true,
                 }));
             } catch (error) {
                 console.error("Failed to update track volume:", error);
@@ -613,11 +624,14 @@ export const useDAWStore = create<DAWStore>()(
 
         updateTrackPan: async (trackId, pan) => {
             try {
-                await api.sequencer.updateTrack(trackId, { pan });
+                const { activeComposition } = get();
+                if (!activeComposition) return;
 
+                await api.compositions.updateTrack(activeComposition.id, trackId, { pan });
+
+                // Backend auto-persists, so just update local state
                 set((state) => ({
                     tracks: state.tracks.map(t => t.id === trackId ? { ...t, pan } : t),
-                    hasUnsavedChanges: true,
                 }));
             } catch (error) {
                 console.error("Failed to update track pan:", error);
@@ -627,11 +641,18 @@ export const useDAWStore = create<DAWStore>()(
 
         muteTrack: async (trackId, muted) => {
             try {
-                await api.sequencer.muteTrack(trackId, { muted });
+                const { activeComposition } = get();
+                if (!activeComposition) return;
 
+                await api.compositions.muteTrack({
+                    composition_id: activeComposition.id,
+                    track_id: trackId,
+                    is_muted: muted,
+                });
+
+                // Backend auto-persists, so just update local state
                 set((state) => ({
                     tracks: state.tracks.map(t => t.id === trackId ? { ...t, is_muted: muted } : t),
-                    hasUnsavedChanges: true,
                 }));
             } catch (error) {
                 console.error("Failed to mute track:", error);
@@ -641,11 +662,18 @@ export const useDAWStore = create<DAWStore>()(
 
         soloTrack: async (trackId, soloed) => {
             try {
-                await api.sequencer.soloTrack(trackId, { soloed });
+                const { activeComposition } = get();
+                if (!activeComposition) return;
 
+                await api.compositions.soloTrack({
+                    composition_id: activeComposition.id,
+                    track_id: trackId,
+                    is_solo: soloed,
+                });
+
+                // Backend auto-persists, so just update local state
                 set((state) => ({
                     tracks: state.tracks.map(t => t.id === trackId ? { ...t, is_solo: soloed } : t),
-                    hasUnsavedChanges: true,
                 }));
             } catch (error) {
                 console.error("Failed to solo track:", error);
@@ -659,8 +687,9 @@ export const useDAWStore = create<DAWStore>()(
 
         addClip: async (request) => {
             try {
-                const clip = await api.sequencer.addClip(request);
+                const clip = await api.compositions.addClip(request);
 
+                // Backend auto-persists, so just update local state
                 set((state) => ({
                     clips: [...state.clips, clip],
                 }));
@@ -674,8 +703,12 @@ export const useDAWStore = create<DAWStore>()(
 
         updateClip: async (clipId, request) => {
             try {
-                const updatedClip = await api.sequencer.updateClip(clipId, request);
+                const { activeComposition } = get();
+                if (!activeComposition) return;
 
+                const updatedClip = await api.compositions.updateClip(activeComposition.id, clipId, request);
+
+                // Backend auto-persists, so just update local state
                 set((state) => ({
                     clips: state.clips.map(c => c.id === clipId ? updatedClip : c),
                 }));
@@ -689,8 +722,12 @@ export const useDAWStore = create<DAWStore>()(
 
         deleteClip: async (clipId) => {
             try {
-                await api.sequencer.deleteClip(clipId);
+                const { activeComposition } = get();
+                if (!activeComposition) return;
 
+                await api.compositions.deleteClip(activeComposition.id, clipId);
+
+                // Backend auto-persists, so just update local state
                 set((state) => ({
                     clips: state.clips.filter(c => c.id !== clipId),
                 }));
@@ -704,7 +741,23 @@ export const useDAWStore = create<DAWStore>()(
 
         duplicateClip: async (sequenceId, clipId) => {
             try {
-                const newClip = await api.sequencer.duplicateClip(sequenceId, clipId);
+                // Duplicate not supported in new API - get clip and create new one
+                const clip = get().clips.find(c => c.id === clipId);
+                if (!clip) {
+                    toast.error("Clip not found");
+                    return;
+                }
+
+                const newClip = await api.compositions.addClip({
+                    sequence_id: sequenceId,
+                    clip_type: clip.type,
+                    track_id: clip.track_id,
+                    start_time: clip.start_time + clip.duration, // Place after original
+                    duration: clip.duration,
+                    midi_events: clip.midi_events,
+                    audio_file_path: clip.audio_file_path,
+                    name: clip.name ? `${clip.name} (copy)` : undefined,
+                });
 
                 set((state) => ({
                     clips: [...state.clips, newClip],
@@ -724,7 +777,7 @@ export const useDAWStore = create<DAWStore>()(
 
         loadSynthDefs: async () => {
             try {
-                const synthDefs = await api.sequencer.getSynthDefs();
+                const synthDefs = await api.audio.getSynthDefs();
                 set({ synthDefs });
             } catch (error) {
                 console.error("Failed to load synth defs:", error);
@@ -1219,7 +1272,7 @@ export const useDAWStore = create<DAWStore>()(
 
         previewNote: async (note, velocity = 100, duration = 1.0, instrument = "default") => {
             try {
-                await api.sequencer.previewNote({
+                await api.audio.previewNote({
                     note,
                     velocity,
                     duration,
@@ -1373,9 +1426,9 @@ export const useDAWStore = create<DAWStore>()(
                 if (tempo) updatedComposition.tempo = tempo;
                 if (timeSignature) updatedComposition.time_signature = timeSignature;
 
+                // Backend auto-persists, so just update local state
                 set({
                     activeComposition: updatedComposition,
-                    hasUnsavedChanges: true,
                 });
 
                 toast.success("Composition updated");
@@ -1430,17 +1483,18 @@ export const useDAWStore = create<DAWStore>()(
         setGridSize: (size) => set({ gridSize: size }),
         setIsLooping: async (looping) => {
             set({ isLooping: looping });
-            const { activeComposition } = get();
+            const { activeComposition, loopStart, loopEnd } = get();
             if (activeComposition) {
                 // Update composition directly (no nested sequence)
                 const updatedComposition = {
                     ...activeComposition,
                     loop_enabled: looping,
                 };
-                set({ activeComposition: updatedComposition, hasUnsavedChanges: true });
+                // Backend auto-persists, so just update local state
+                set({ activeComposition: updatedComposition });
                 // Send to backend
                 try {
-                    await api.sequencer.updateSequence(activeComposition.id, { loop_enabled: looping });
+                    await api.playback.setLoop(looping, loopStart, loopEnd);
                 } catch (error) {
                     console.error("Failed to update loop enabled:", error);
                 }
@@ -1448,17 +1502,18 @@ export const useDAWStore = create<DAWStore>()(
         },
         setLoopStart: async (start) => {
             set({ loopStart: start });
-            const { activeComposition } = get();
+            const { activeComposition, isLooping, loopEnd } = get();
             if (activeComposition) {
                 // Update composition directly (no nested sequence)
                 const updatedComposition = {
                     ...activeComposition,
                     loop_start: start,
                 };
-                set({ activeComposition: updatedComposition, hasUnsavedChanges: true });
+                // Backend auto-persists, so just update local state
+                set({ activeComposition: updatedComposition });
                 // Send to backend
                 try {
-                    await api.sequencer.updateSequence(activeComposition.id, { loop_start: start });
+                    await api.playback.setLoop(isLooping, start, loopEnd);
                 } catch (error) {
                     console.error("Failed to update loop start:", error);
                 }
@@ -1466,17 +1521,18 @@ export const useDAWStore = create<DAWStore>()(
         },
         setLoopEnd: async (end) => {
             set({ loopEnd: end });
-            const { activeComposition } = get();
+            const { activeComposition, isLooping, loopStart } = get();
             if (activeComposition) {
                 // Update composition directly (no nested sequence)
                 const updatedComposition = {
                     ...activeComposition,
                     loop_end: end,
                 };
-                set({ activeComposition: updatedComposition, hasUnsavedChanges: true });
+                // Backend auto-persists, so just update local state
+                set({ activeComposition: updatedComposition });
                 // Send to backend
                 try {
-                    await api.sequencer.updateSequence(activeComposition.id, { loop_end: end });
+                    await api.playback.setLoop(isLooping, loopStart, end);
                 } catch (error) {
                     console.error("Failed to update loop end:", error);
                 }
