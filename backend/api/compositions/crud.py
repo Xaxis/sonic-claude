@@ -78,10 +78,16 @@ async def create_composition(
             tempo=request.tempo or 120.0,
             time_signature=request.time_signature or "4/4"
         )
-        sequence = sequencer_service.create_sequence(sequence_request)
+        temp_sequence = sequencer_service.create_sequence(sequence_request)
 
         # Override sequence ID with composition ID (they're the same)
-        sequence.id = composition_id
+        # Pydantic models are immutable, so we need to create a new object with model_copy()
+        old_sequence_id = temp_sequence.id
+        sequence = temp_sequence.model_copy(update={"id": composition_id})
+
+        # Remove old sequence from dict and add with new ID
+        if old_sequence_id in sequencer_service.sequences:
+            del sequencer_service.sequences[old_sequence_id]
         sequencer_service.sequences[composition_id] = sequence
 
         # Mixer is already initialized in MixerService.__init__

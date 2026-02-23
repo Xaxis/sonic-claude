@@ -26,7 +26,7 @@ import {
  *
  *   // Compositions
  *   await api.compositions.loadAll();
- *   await api.compositions.save({ sequence_id: "123", name: "My Song" });
+ *   await api.compositions.saveComposition(compositionId, createHistory, isAutosave);
  *
  *   // Sequencer
  *   const sequences = await api.sequencer.getSequences();

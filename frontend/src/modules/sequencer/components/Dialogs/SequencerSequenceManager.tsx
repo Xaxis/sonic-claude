@@ -142,7 +142,7 @@ export function SequencerSequenceManager({
         setIsLoading(true);
         try {
             console.log("💾 Saving composition:", currentSequenceId, "createVersion:", createVersion);
-            const data = await api.compositions.save(currentSequenceId, createVersion, false);
+            const data = await api.compositions.saveComposition(currentSequenceId, createVersion, false);
             console.log("💾 Save response:", data);
 
             if (createVersion) {

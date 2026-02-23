@@ -72,11 +72,18 @@ class CompositionService:
 
         logger.info(f"✅ CompositionService initialized at {self.storage_dir}")
 
-    def _get_composition_dir(self, composition_id: str) -> Path:
-        """Get storage directory for a composition"""
+    def _get_composition_dir(self, composition_id: str, create: bool = False) -> Path:
+        """
+        Get storage directory for a composition
+
+        Args:
+            composition_id: Composition ID
+            create: Whether to create the directory if it doesn't exist
+        """
         comp_dir = self.storage_dir / composition_id
-        comp_dir.mkdir(exist_ok=True)
-        (comp_dir / "history").mkdir(exist_ok=True)
+        if create:
+            comp_dir.mkdir(exist_ok=True)
+            (comp_dir / "history").mkdir(exist_ok=True)
         return comp_dir
 
     def save_composition(
@@ -95,7 +102,7 @@ class CompositionService:
             create_history: Whether to create a history entry
             is_autosave: Whether this is an autosave
         """
-        comp_dir = self._get_composition_dir(composition_id)
+        comp_dir = self._get_composition_dir(composition_id, create=True)
 
         # Save current state
         if is_autosave:
@@ -113,7 +120,7 @@ class CompositionService:
 
     def _create_history_entry(self, composition_id: str, snapshot: CompositionSnapshot) -> None:
         """Create a history entry for this save"""
-        comp_dir = self._get_composition_dir(composition_id)
+        comp_dir = self._get_composition_dir(composition_id, create=True)
         history_dir = comp_dir / "history"
 
         # Find next version number

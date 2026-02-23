@@ -32,6 +32,9 @@ export function SequencerPanel() {
     const resume = useDAWStore(state => state.resume);
     const setTempo = useDAWStore(state => state.setTempo);
     const toggleMetronome = useDAWStore(state => state.toggleMetronome);
+    const seek = useDAWStore(state => state.seek);
+    const setLoopStart = useDAWStore(state => state.setLoopStart);
+    const setLoopEnd = useDAWStore(state => state.setLoopEnd);
     const createTrack = useDAWStore(state => state.createTrack);
     const deleteTrack = useDAWStore(state => state.deleteTrack);
     const renameTrack = useDAWStore(state => state.renameTrack);
@@ -263,12 +266,7 @@ export function SequencerPanel() {
             <div className="flex-shrink-0">
                 <SubPanel title="TOOLBAR" showHeader={false}>
                     <SequencerToolbar
-                        sequences={activeComposition ? [activeComposition.sequence] : []}
                         activeSequenceId={activeComposition?.id || null}
-                        onSequenceChange={() => {}}
-                        onAddSequence={() => toast.info("Use File > New to create a new composition")}
-                        onManageSequences={() => toast.info("Use File menu to manage compositions")}
-                        onSequenceSettings={() => setShowSequenceSettings(true)}
                         onAddTrack={handleAddTrack}
                     />
                 </SubPanel>
@@ -293,9 +291,9 @@ export function SequencerPanel() {
                         onUpdateClip={handleUpdateClip}
                         onOpenPianoRoll={handleOpenPianoRoll}
                         onOpenSampleEditor={handleOpenSampleEditor}
-                        onLoopStartChange={() => {}}
-                        onLoopEndChange={() => {}}
-                        onSeek={async () => {}}
+                        onLoopStartChange={setLoopStart}
+                        onLoopEndChange={setLoopEnd}
+                        onSeek={seek}
                         onClosePianoRoll={handleClosePianoRoll}
                         onUpdateMIDINotes={handleUpdateMIDINotes}
                         onCloseSampleEditor={() => {}}

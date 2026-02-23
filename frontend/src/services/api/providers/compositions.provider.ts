@@ -144,7 +144,7 @@ export class CompositionsProvider extends BaseAPIClient {
      * Save composition to disk
      * POST /api/compositions/{composition_id}/save
      */
-    async save(compositionId: string, createHistory: boolean = true, isAutosave: boolean = false, metadata?: any): Promise<CompositionSavedResponse> {
+    async saveComposition(compositionId: string, createHistory: boolean = true, isAutosave: boolean = false, metadata?: any): Promise<CompositionSavedResponse> {
         return this.post(`/api/compositions/${compositionId}/save`, {
             composition_id: compositionId,
             create_history: createHistory,

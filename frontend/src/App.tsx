@@ -10,10 +10,14 @@ import { ActivityContainer } from "@/components/activity";
 import { CompositionLoader } from "@/components/composition/CompositionLoader";
 import { useLayout } from "@/contexts/LayoutContext";
 import { useDAWStore } from "@/stores/dawStore";
+import { useAutosave } from "@/hooks/useAutosave";
 import { DEFAULT_PANELS } from "@/config/layout.config";
 
 export default function App() {
     const { tabs, activeTab, setActiveTab, createTab, deleteTab, popoutTab } = useLayout();
+
+    // Enable autosave
+    useAutosave();
 
     // Get state from Zustand store
     const analytics = useDAWStore(state => state.analytics);

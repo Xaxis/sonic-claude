@@ -1,10 +1,10 @@
 {
-  "id": "e1c284a4-af8d-4fc0-a1da-d5df5fc0c0ba",
-  "name": "TEST22",
-  "created_at": "2026-02-20T23:09:17.587765",
+  "id": "1b88e150-a058-4e6d-85a4-b9daf2a1c419",
+  "name": "TEST1",
+  "created_at": "2026-02-23T06:17:16.555484",
   "sequence": {
-    "id": "53fb2570-5c74-435f-88d5-84ebb2dc092e",
-    "name": "TEST22",
+    "id": "ba2ea689-0cc1-4844-b090-903191b4e808",
+    "name": "TEST1",
     "tempo": 120.0,
     "time_signature": "4/4",
     "tracks": [],
@@ -20,8 +20,8 @@
     "selected_clip_id": null,
     "piano_roll_clip_id": null,
     "sample_editor_clip_id": null,
-    "created_at": "2026-02-20T23:09:17.587512",
-    "updated_at": "2026-02-20T23:09:17.587520"
+    "created_at": "2026-02-23T06:17:16.555278",
+    "updated_at": "2026-02-23T06:17:16.555287"
   },
   "mixer_state": {
     "channels": [],
@@ -37,8 +37,8 @@
       "limiter_enabled": false,
       "limiter_threshold": -1.0,
       "sc_bus_index": 0,
-      "created_at": "2026-02-20T23:04:52.245834",
-      "updated_at": "2026-02-20T23:04:52.245835"
+      "created_at": "2026-02-23T06:16:44.190388",
+      "updated_at": "2026-02-23T06:16:44.190388"
     },
     "show_meters": true,
     "meter_mode": "peak",

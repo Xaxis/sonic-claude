@@ -190,6 +190,7 @@ interface DAWStore {
     resume: () => Promise<void>;
     setTempo: (tempo: number) => Promise<void>;
     toggleMetronome: () => Promise<void>;
+    seek: (position: number, triggerAudio?: boolean) => Promise<void>;
 
     // Tracks (operate on active composition)
     createTrack: (name: string, type: string, instrument?: string) => Promise<void>;
@@ -473,6 +474,23 @@ export const useDAWStore = create<DAWStore>()(
             } catch (error) {
                 console.error("Failed to toggle metronome:", error);
                 toast.error("Failed to toggle metronome");
+            }
+        },
+
+        seek: async (position, triggerAudio = false) => {
+            try {
+                const { activeComposition } = get();
+                if (!activeComposition) {
+                    return;
+                }
+
+                await api.sequencer.seek(activeComposition.sequence.id, {
+                    position: position,
+                    trigger_audio: triggerAudio,
+                });
+            } catch (error) {
+                console.error("Failed to seek:", error);
+                toast.error("Failed to seek");
             }
         },
 
@@ -1292,7 +1310,7 @@ export const useDAWStore = create<DAWStore>()(
                     throw new Error("No active composition to save");
                 }
 
-                await api.compositions.save(
+                await api.compositions.saveComposition(
                     activeComposition.id,
                     createHistory,
                     isAutosave
