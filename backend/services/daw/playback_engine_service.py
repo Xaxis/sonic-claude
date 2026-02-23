@@ -197,13 +197,14 @@ class PlaybackEngineService:
 
                     # Build active notes list for visual feedback
                     active_notes_list = [
-                        {"clip_id": note_data["clip_id"], "note": note_data["note"]}
+                        {"clip_id": note_data["clip_id"], "note": note_data["note"], "start_time": note_data["start_time"]}
                         for note_data in self.active_midi_notes.values()
                     ]
 
                     transport_data = {
                         "type": "transport",
                         "is_playing": self.is_playing,
+                        "is_paused": self.is_paused,
                         "position_beats": self.playhead_position,
                         "position_seconds": self.playhead_position * (60.0 / self.tempo),
                         "tempo": self.tempo,
@@ -541,7 +542,8 @@ class PlaybackEngineService:
                                 self.active_midi_notes[nid] = {
                                     "clip_id": clip_id_val,
                                     "note": note_pitch,
-                                    "start_time": time.time()
+                                    "start_time": note.start_time,  # Position in clip (beats)
+                                    "wall_time": time.time()  # Wall clock time for debugging
                                 }
                                 # Schedule release
                                 note_duration = dur_beats * (60.0 / self.tempo)
@@ -594,6 +596,33 @@ class PlaybackEngineService:
                 self.engine_manager.send_message("/n_free", node_id)
         self.active_synths.clear()
 
+        # Broadcast stopped state via WebSocket
+        if self.websocket_manager and self.composition_state_service.current_composition_id:
+            composition = self.composition_state_service.get_composition(
+                self.composition_state_service.current_composition_id
+            )
+            if composition:
+                time_sig_parts = composition.time_signature.split("/")
+                time_sig_num = int(time_sig_parts[0]) if len(time_sig_parts) > 0 else 4
+                time_sig_den = int(time_sig_parts[1]) if len(time_sig_parts) > 1 else 4
+
+                transport_data = {
+                    "type": "transport",
+                    "is_playing": False,
+                    "is_paused": False,
+                    "position_beats": 0.0,
+                    "position_seconds": 0.0,
+                    "tempo": self.tempo,
+                    "time_signature_num": time_sig_num,
+                    "time_signature_den": time_sig_den,
+                    "loop_enabled": composition.loop_enabled,
+                    "loop_start": composition.loop_start,
+                    "loop_end": composition.loop_end,
+                    "metronome_enabled": self.metronome_enabled,
+                    "active_notes": [],
+                }
+                await self.websocket_manager.broadcast_transport(transport_data)
+
         logger.info("⏹️  Stopped playback")
 
     async def pause_playback(self):
@@ -616,6 +645,33 @@ class PlaybackEngineService:
                 for node_id in self.active_synths.values():
                     self.engine_manager.send_message("/n_free", node_id)
             self.active_synths.clear()
+
+            # Broadcast paused state via WebSocket
+            if self.websocket_manager and self.composition_state_service.current_composition_id:
+                composition = self.composition_state_service.get_composition(
+                    self.composition_state_service.current_composition_id
+                )
+                if composition:
+                    time_sig_parts = composition.time_signature.split("/")
+                    time_sig_num = int(time_sig_parts[0]) if len(time_sig_parts) > 0 else 4
+                    time_sig_den = int(time_sig_parts[1]) if len(time_sig_parts) > 1 else 4
+
+                    transport_data = {
+                        "type": "transport",
+                        "is_playing": False,
+                        "is_paused": True,
+                        "position_beats": self.playhead_position,
+                        "position_seconds": self.playhead_position * (60.0 / self.tempo),
+                        "tempo": self.tempo,
+                        "time_signature_num": time_sig_num,
+                        "time_signature_den": time_sig_den,
+                        "loop_enabled": composition.loop_enabled,
+                        "loop_start": composition.loop_start,
+                        "loop_end": composition.loop_end,
+                        "metronome_enabled": self.metronome_enabled,
+                        "active_notes": [],
+                    }
+                    await self.websocket_manager.broadcast_transport(transport_data)
 
             logger.info("⏸️  Paused playback")
 

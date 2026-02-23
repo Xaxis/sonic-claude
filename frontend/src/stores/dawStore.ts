@@ -35,7 +35,6 @@ import type { SampleMetadata } from '@/services/api/providers/samples.provider';
 import type { CompositionMetadata } from '@/services/api/providers/compositions.provider';
 
 // Composition (complete project state)
-// NOTE: Composition IS the project - no separate "Sequence" or "Snapshot" entity
 // This contains EVERYTHING needed to recreate the exact state
 export interface Composition {
     // === IDENTITY ===
@@ -284,8 +283,6 @@ interface DAWStore {
     freeAllSynths: () => Promise<void>;
     previewNote: (note: number, velocity?: number, duration?: number, instrument?: string) => Promise<void>;
 
-
-
     // ========================================================================
     // UI ACTIONS
     // ========================================================================
@@ -448,8 +445,11 @@ export const useDAWStore = create<DAWStore>()(
 
         pause: async () => {
             try {
-                // Pause not supported in new API - use stop instead
-                await get().stop();
+                const { activeComposition } = get();
+                if (activeComposition) {
+                    await api.playback.pause();
+                    // Transport state will be updated via WebSocket
+                }
             } catch (error) {
                 console.error("Failed to pause playback:", error);
                 toast.error("Failed to pause playback");
@@ -458,8 +458,11 @@ export const useDAWStore = create<DAWStore>()(
 
         resume: async () => {
             try {
-                // Resume not supported in new API - use play instead
-                await get().play();
+                const { activeComposition } = get();
+                if (activeComposition) {
+                    await api.playback.resume();
+                    // Transport state will be updated via WebSocket
+                }
             } catch (error) {
                 console.error("Failed to resume playback:", error);
                 toast.error("Failed to resume playback");

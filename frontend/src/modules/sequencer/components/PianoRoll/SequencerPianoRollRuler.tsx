@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { useDAWStore } from '@/stores/dawStore';
 
 interface RulerMarker {
     beat: number;
@@ -37,6 +38,10 @@ export function SequencerPianoRollRuler({
     gridSize,
     onSeek,
 }: SequencerPianoRollRulerProps) {
+    // Get isPaused from transport WebSocket state
+    const transport = useDAWStore(state => state.transport);
+    const isPaused = transport?.is_paused ?? false;
+
     const playheadRef = useRef<HTMLDivElement>(null);
     const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
     const [draggedPlayheadPosition, setDraggedPlayheadPosition] = useState<number | null>(null);
@@ -66,26 +71,43 @@ export function SequencerPianoRollRuler({
     const displayPosition = draggedPlayheadPosition !== null ? draggedPlayheadPosition : currentPosition;
     const playheadX = displayPosition * beatWidth;
 
+    // Store latest values in refs to avoid animation loop restarts
+    const currentPositionRef = useRef(currentPosition);
+    const pixelsPerBeatRef = useRef(pixelsPerBeat);
+    const zoomRef = useRef(zoom);
+
+    useEffect(() => {
+        currentPositionRef.current = currentPosition;
+        pixelsPerBeatRef.current = pixelsPerBeat;
+        zoomRef.current = zoom;
+    }, [currentPosition, pixelsPerBeat, zoom]);
+
     // Smooth playhead animation using requestAnimationFrame
     useEffect(() => {
-        if (!playheadRef.current || !isPlaying || isDraggingPlayhead) return;
+        if (!playheadRef.current || !isPlaying || isPaused || isDraggingPlayhead) {
+            // Not playing, paused, or dragging - just use exact position
+            if (playheadRef.current) {
+                const x = (draggedPlayheadPosition ?? currentPositionRef.current) * pixelsPerBeatRef.current * zoomRef.current;
+                playheadRef.current.style.transform = `translateX(${x}px)`;
+            }
+            return;
+        }
 
-        let animationFrameId: number;
+        // Animation loop for smooth playback
         const animate = () => {
             if (playheadRef.current) {
-                playheadRef.current.style.transform = `translateX(${playheadX}px)`;
+                const x = currentPositionRef.current * pixelsPerBeatRef.current * zoomRef.current;
+                playheadRef.current.style.transform = `translateX(${x}px)`;
             }
-            animationFrameId = requestAnimationFrame(animate);
+            requestAnimationFrame(animate);
         };
 
-        animationFrameId = requestAnimationFrame(animate);
+        const animationFrameId = requestAnimationFrame(animate);
 
         return () => {
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-            }
+            cancelAnimationFrame(animationFrameId);
         };
-    }, [isPlaying, playheadX, isDraggingPlayhead]);
+    }, [isPlaying, isPaused, isDraggingPlayhead, draggedPlayheadPosition]);
 
     const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (!onSeek || isDraggingPlayhead) return;

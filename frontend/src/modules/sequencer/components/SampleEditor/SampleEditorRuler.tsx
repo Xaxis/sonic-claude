@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { useDAWStore } from '@/stores/dawStore';
 
 interface RulerMarker {
     beat: number;
@@ -41,6 +42,10 @@ export function SampleEditorRuler({
     gridSize,
     onSeek,
 }: SampleEditorRulerProps) {
+    // Get isPaused from transport WebSocket state
+    const transport = useDAWStore(state => state.transport);
+    const isPaused = transport?.is_paused ?? false;
+
     const playheadRef = useRef<HTMLDivElement>(null);
     const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
     const [draggedPlayheadPosition, setDraggedPlayheadPosition] = useState<number | null>(null);
@@ -72,26 +77,51 @@ export function SampleEditorRuler({
     const isPlayheadInClip = relativePosition >= 0 && relativePosition <= clipDuration;
     const playheadX = relativePosition * beatWidth;
 
+    // Store latest values in refs to avoid animation loop restarts
+    const currentPositionRef = useRef(currentPosition);
+    const clipStartTimeRef = useRef(clipStartTime);
+    const clipDurationRef = useRef(clipDuration);
+    const pixelsPerBeatRef = useRef(pixelsPerBeat);
+    const zoomRef = useRef(zoom);
+
+    useEffect(() => {
+        currentPositionRef.current = currentPosition;
+        clipStartTimeRef.current = clipStartTime;
+        clipDurationRef.current = clipDuration;
+        pixelsPerBeatRef.current = pixelsPerBeat;
+        zoomRef.current = zoom;
+    }, [currentPosition, clipStartTime, clipDuration, pixelsPerBeat, zoom]);
+
     // Smooth playhead animation using requestAnimationFrame
     useEffect(() => {
-        if (!playheadRef.current || !isPlaying || !isPlayheadInClip || isDraggingPlayhead) return;
+        const relativePos = currentPositionRef.current - clipStartTimeRef.current;
+        const isInClip = relativePos >= 0 && relativePos <= clipDurationRef.current;
 
-        let animationFrameId: number;
+        if (!playheadRef.current || !isPlaying || isPaused || !isInClip || isDraggingPlayhead) {
+            // Not playing, paused, not in clip, or dragging - just use exact position
+            if (playheadRef.current && isInClip) {
+                const x = (draggedPlayheadPosition !== null ? draggedPlayheadPosition - clipStartTimeRef.current : relativePos) * pixelsPerBeatRef.current * zoomRef.current;
+                playheadRef.current.style.transform = `translateX(${x}px)`;
+            }
+            return;
+        }
+
+        // Animation loop for smooth playback
         const animate = () => {
             if (playheadRef.current) {
-                playheadRef.current.style.transform = `translateX(${playheadX}px)`;
+                const relPos = currentPositionRef.current - clipStartTimeRef.current;
+                const x = relPos * pixelsPerBeatRef.current * zoomRef.current;
+                playheadRef.current.style.transform = `translateX(${x}px)`;
             }
-            animationFrameId = requestAnimationFrame(animate);
+            requestAnimationFrame(animate);
         };
 
-        animationFrameId = requestAnimationFrame(animate);
+        const animationFrameId = requestAnimationFrame(animate);
 
         return () => {
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-            }
+            cancelAnimationFrame(animationFrameId);
         };
-    }, [isPlaying, playheadX, isPlayheadInClip, isDraggingPlayhead]);
+    }, [isPlaying, isPaused, isDraggingPlayhead, draggedPlayheadPosition]);
 
     const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (!onSeek || isDraggingPlayhead) return;

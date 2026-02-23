@@ -1,10 +1,12 @@
 /**
  * SequencerToolbar - Toolbar for sequencer operations
  *
- * Handles sequence selection, track management, and zoom controls
- * Uses SequencerContext for state management
+ * Handles track management, zoom controls, and grid settings
+ * Uses Zustand store for state management
+ * Owns its own dialog state for track creation
  */
 
+import { useState, useCallback } from "react";
 import { Plus, ZoomIn, ZoomOut, Grid3x3 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { IconButton } from "@/components/ui/icon-button.tsx";
@@ -17,29 +19,55 @@ import {
     SelectValue,
 } from "@/components/ui/select.tsx";
 import { useDAWStore } from '@/stores/dawStore';
+import { SequencerTrackTypeDialog } from "../Dialogs/SequencerTrackTypeDialog.tsx";
+import { SequencerSampleBrowser } from "../Dialogs/SequencerSampleBrowser.tsx";
 
-interface SequencerToolbarProps {
-    activeSequenceId: string | null;
-    onAddTrack: () => void;
-}
-
-export function SequencerToolbar({
-    activeSequenceId,
-    onAddTrack,
-}: SequencerToolbarProps) {
-    // Get UI state and actions from Zustand store
+export function SequencerToolbar() {
+    // Get state and actions from Zustand store
+    const activeComposition = useDAWStore(state => state.activeComposition);
+    const tracks = useDAWStore(state => state.tracks);
     const zoom = useDAWStore(state => state.zoom);
     const snapEnabled = useDAWStore(state => state.snapEnabled);
     const gridSize = useDAWStore(state => state.gridSize);
     const setZoom = useDAWStore(state => state.setZoom);
     const setSnapEnabled = useDAWStore(state => state.setSnapEnabled);
     const setGridSize = useDAWStore(state => state.setGridSize);
+    const createTrack = useDAWStore(state => state.createTrack);
+
+    // Local dialog state
+    const [showTrackTypeDialog, setShowTrackTypeDialog] = useState(false);
+    const [showSampleBrowser, setShowSampleBrowser] = useState(false);
+
+    const hasComposition = !!activeComposition;
+
+    const handleAddTrack = useCallback(() => {
+        setShowTrackTypeDialog(true);
+    }, []);
+
+    const handleAddMIDITrack = useCallback(async () => {
+        if (!activeComposition) return;
+        const name = `Track ${tracks.length + 1}`;
+        await createTrack(name, "midi", "sine");
+        setShowTrackTypeDialog(false);
+    }, [activeComposition, tracks.length, createTrack]);
+
+    const handleAddSampleTrack = useCallback(() => {
+        if (!activeComposition) return;
+        setShowTrackTypeDialog(false);
+        setShowSampleBrowser(true);
+    }, [activeComposition]);
+
+    const handleSampleSelected = useCallback((sample: any) => {
+        if (!activeComposition) return;
+        const name = sample.name || `Track ${tracks.length + 1}`;
+        createTrack(name, "audio");
+        setShowSampleBrowser(false);
+    }, [activeComposition, tracks.length, createTrack]);
 
     return (
-        <div className="flex items-center justify-between gap-4">
-            {/* Track and Zoom Controls */}
+        <>
             <div className="flex items-center gap-2">
-                <Button onClick={onAddTrack} size="sm" variant="default" disabled={!activeSequenceId}>
+                <Button onClick={handleAddTrack} size="sm" variant="default" disabled={!hasComposition}>
                     <Plus size={14} className="mr-1" />
                     Track
                 </Button>
@@ -50,7 +78,7 @@ export function SequencerToolbar({
                         onClick={() => setZoom(Math.max(0.25, zoom - 0.25))}
                         variant="ghost"
                         size="icon-sm"
-                        disabled={!activeSequenceId || zoom <= 0.25}
+                        disabled={!hasComposition || zoom <= 0.25}
                     />
                     <span className="text-xs text-muted-foreground w-12 text-center">
                         {Math.round(zoom * 100)}%
@@ -61,7 +89,7 @@ export function SequencerToolbar({
                         onClick={() => setZoom(Math.min(4, zoom + 0.25))}
                         variant="ghost"
                         size="icon-sm"
-                        disabled={!activeSequenceId || zoom >= 4}
+                        disabled={!hasComposition || zoom >= 4}
                     />
                 </div>
                 <IconButton
@@ -71,7 +99,7 @@ export function SequencerToolbar({
                     variant={snapEnabled ? "default" : "ghost"}
                     size="icon-sm"
                     className={snapEnabled ? "bg-primary/20 text-primary" : ""}
-                    disabled={!activeSequenceId}
+                    disabled={!hasComposition}
                 />
                 <div className="flex items-center gap-1">
                     <Label htmlFor="grid-size-select" className="text-xs text-muted-foreground">
@@ -80,7 +108,7 @@ export function SequencerToolbar({
                     <Select
                         value={gridSize.toString()}
                         onValueChange={(value) => setGridSize(parseInt(value))}
-                        disabled={!activeSequenceId || !snapEnabled}
+                        disabled={!hasComposition || !snapEnabled}
                     >
                         <SelectTrigger id="grid-size-select" className="w-20 h-7 text-sm">
                             <SelectValue />
@@ -96,7 +124,21 @@ export function SequencerToolbar({
                     </Select>
                 </div>
             </div>
-        </div>
+
+            {/* Dialogs owned by toolbar */}
+            <SequencerTrackTypeDialog
+                isOpen={showTrackTypeDialog}
+                onClose={() => setShowTrackTypeDialog(false)}
+                onSelectMIDI={handleAddMIDITrack}
+                onSelectSample={handleAddSampleTrack}
+            />
+
+            <SequencerSampleBrowser
+                isOpen={showSampleBrowser}
+                onClose={() => setShowSampleBrowser(false)}
+                onSelectSample={handleSampleSelected}
+            />
+        </>
     );
 }
 

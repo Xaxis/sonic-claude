@@ -17,6 +17,7 @@ export interface BaseWebSocketMessage {
 export interface ActiveNote {
     clip_id: string;
     note: number;
+    start_time: number;  // Position in clip (beats) - uniquely identifies the note instance
 }
 
 /**
@@ -25,6 +26,7 @@ export interface ActiveNote {
 export interface TransportMessage extends BaseWebSocketMessage {
     type: "transport";
     is_playing: boolean;
+    is_paused?: boolean;
     position_beats: number;
     position_seconds: number;
     tempo: number;

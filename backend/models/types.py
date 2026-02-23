@@ -20,7 +20,8 @@ class ActiveMIDINote(TypedDict):
     """Information about an active MIDI note"""
     clip_id: str
     note: int
-    start_time: float
+    start_time: float  # Position in clip (beats) - uniquely identifies the note instance
+    wall_time: float  # Wall clock time for debugging
 
 
 class PlaybackState(TypedDict):

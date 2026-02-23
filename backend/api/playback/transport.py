@@ -87,32 +87,69 @@ async def stop(
     try:
         await playback_engine_service.stop_playback()
         return {"status": "stopped"}
-        
+
     except Exception as e:
         logger.error(f"❌ Failed to stop playback: {e}")
         raise ServiceError(f"Failed to stop playback: {str(e)}")
 
 
+@router.post("/pause")
+async def pause(
+    playback_engine_service: PlaybackEngineService = Depends(get_playback_engine_service)
+):
+    """Pause playback (keeps position)"""
+    try:
+        await playback_engine_service.pause_playback()
+        return {"status": "paused"}
+
+    except Exception as e:
+        logger.error(f"❌ Failed to pause playback: {e}")
+        raise ServiceError(f"Failed to pause playback: {str(e)}")
+
+
+@router.post("/resume")
+async def resume(
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
+    playback_engine_service: PlaybackEngineService = Depends(get_playback_engine_service)
+):
+    """Resume playback from paused position"""
+    try:
+        if not composition_state_service.current_composition_id:
+            raise ServiceError("No composition loaded")
+
+        # Resume from current playhead position
+        await playback_engine_service.play_composition(
+            composition_state_service.current_composition_id,
+            playback_engine_service.playhead_position
+        )
+        return {"status": "playing"}
+
+    except Exception as e:
+        logger.error(f"❌ Failed to resume playback: {e}")
+        raise ServiceError(f"Failed to resume playback: {str(e)}")
+
+
 @router.post("/seek")
 async def seek(
     request: SeekRequest,
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
     playback_engine_service: PlaybackEngineService = Depends(get_playback_engine_service)
 ):
     """Seek to a position in the current composition"""
     try:
-        if not playback_engine_service.current_composition_id:
+        if not composition_state_service.current_composition_id:
             raise ServiceError("No composition loaded")
-        
+
         await playback_engine_service.seek(
-            playback_engine_service.current_composition_id,
+            composition_state_service.current_composition_id,
             request.position
         )
-        
+
         return {
             "status": "success",
             "position": request.position
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Failed to seek: {e}")
         raise ServiceError(f"Failed to seek: {str(e)}")
@@ -121,6 +158,7 @@ async def seek(
 @router.put("/tempo")
 async def set_tempo(
     request: SetTempoRequest,
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
     playback_engine_service: PlaybackEngineService = Depends(get_playback_engine_service),
     composition_service: CompositionService = Depends(get_composition_service),
     mixer_service: MixerService = Depends(get_mixer_service),
@@ -128,10 +166,10 @@ async def set_tempo(
 ):
     """Set tempo for the current composition"""
     try:
-        if not playback_engine_service.current_composition_id:
+        if not composition_state_service.current_composition_id:
             raise ServiceError("No composition loaded")
 
-        composition_id = playback_engine_service.current_composition_id
+        composition_id = composition_state_service.current_composition_id
 
         await playback_engine_service.set_tempo(composition_id, request.tempo)
 
@@ -156,6 +194,7 @@ async def set_tempo(
 @router.put("/loop")
 async def set_loop(
     request: SetLoopRequest,
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
     playback_engine_service: PlaybackEngineService = Depends(get_playback_engine_service),
     composition_service: CompositionService = Depends(get_composition_service),
     mixer_service: MixerService = Depends(get_mixer_service),
@@ -163,10 +202,10 @@ async def set_loop(
 ):
     """Set loop points for the current composition"""
     try:
-        if not playback_engine_service.current_composition_id:
+        if not composition_state_service.current_composition_id:
             raise ServiceError("No composition loaded")
 
-        composition_id = playback_engine_service.current_composition_id
+        composition_id = composition_state_service.current_composition_id
 
         await playback_engine_service.set_loop(
             composition_id=composition_id,
@@ -183,7 +222,7 @@ async def set_loop(
             effects_service=effects_service
         )
 
-        composition = playback_engine_service.get_composition(composition_id)
+        composition = composition_state_service.get_composition(composition_id)
 
         return {
             "status": "success",

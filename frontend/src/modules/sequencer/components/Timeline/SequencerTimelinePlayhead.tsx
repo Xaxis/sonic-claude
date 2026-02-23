@@ -27,6 +27,7 @@ export function SequencerTimelinePlayhead({
 
     const currentPosition = transport?.position_beats ?? 0;
     const isPlaying = transport?.is_playing ?? false;
+    const isPaused = transport?.is_paused ?? false;
     const tempo = activeComposition?.tempo ?? 120;
     const zoom = useDAWStore(state => state.zoom);
     const snapEnabled = useDAWStore(state => state.snapEnabled);
@@ -64,13 +65,28 @@ export function SequencerTimelinePlayhead({
         lastUpdateTimeRef.current = now;
     }, [currentPosition]);
 
+    // Store latest values in refs to avoid animation loop restarts
+    const tempoRef = useRef(tempo);
+    const pixelsPerBeatRef = useRef(pixelsPerBeat);
+    const zoomRef = useRef(zoom);
+    const loopEnabledRef = useRef(loopEnabled);
+    const loopEndRef = useRef(loopEnd);
+
+    useEffect(() => {
+        tempoRef.current = tempo;
+        pixelsPerBeatRef.current = pixelsPerBeat;
+        zoomRef.current = zoom;
+        loopEnabledRef.current = loopEnabled;
+        loopEndRef.current = loopEnd;
+    }, [tempo, pixelsPerBeat, zoom, loopEnabled, loopEnd]);
+
     // Smooth animation loop using requestAnimationFrame
     useEffect(() => {
-        if (!isPlaying || isDraggingPlayhead) {
-            // Not playing or dragging - just use exact position
+        if (!isPlaying || isPaused || isDraggingPlayhead) {
+            // Not playing, paused, or dragging - just use exact position
             interpolatedPositionRef.current = draggedPlayheadPosition ?? currentPosition;
             if (playheadRef.current) {
-                const x = interpolatedPositionRef.current * pixelsPerBeat * zoom;
+                const x = interpolatedPositionRef.current * pixelsPerBeatRef.current * zoomRef.current;
                 playheadRef.current.style.transform = `translateX(${x}px)`;
             }
             return;
@@ -82,14 +98,14 @@ export function SequencerTimelinePlayhead({
             const deltaTime = (now - lastUpdateTimeRef.current) / 1000; // seconds
 
             // Dead reckoning: extrapolate position based on tempo
-            const beatsPerSecond = tempo / 60;
+            const beatsPerSecond = tempoRef.current / 60;
             let expectedPosition = targetPositionRef.current + (deltaTime * beatsPerSecond);
 
             // Clamp to loop boundaries if loop is enabled
-            if (loopEnabled) {
-                if (expectedPosition >= loopEnd) {
+            if (loopEnabledRef.current) {
+                if (expectedPosition >= loopEndRef.current) {
                     // Don't extrapolate past loop end - wait for WebSocket to send loop reset
-                    expectedPosition = loopEnd - 0.01; // Just before loop end
+                    expectedPosition = loopEndRef.current - 0.01; // Just before loop end
                 }
             }
 
@@ -99,7 +115,7 @@ export function SequencerTimelinePlayhead({
 
             // Update DOM directly for performance (avoid React re-renders)
             if (playheadRef.current) {
-                const x = interpolatedPositionRef.current * pixelsPerBeat * zoom;
+                const x = interpolatedPositionRef.current * pixelsPerBeatRef.current * zoomRef.current;
                 playheadRef.current.style.transform = `translateX(${x}px)`;
             }
 
@@ -113,7 +129,7 @@ export function SequencerTimelinePlayhead({
                 cancelAnimationFrame(animationFrameRef.current);
             }
         };
-    }, [isPlaying, isDraggingPlayhead, tempo, pixelsPerBeat, zoom, currentPosition, draggedPlayheadPosition, loopEnabled, loopEnd]);
+    }, [isPlaying, isPaused, isDraggingPlayhead, draggedPlayheadPosition, currentPosition]);
 
     // Calculate display position for initial render
     const displayPosition = draggedPlayheadPosition !== null ? draggedPlayheadPosition : currentPosition;

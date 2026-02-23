@@ -254,8 +254,9 @@ export function SequencerPianoRollGrid({
                     const isSelected = selectedNotes.has(index);
 
                     // Check if this note is currently playing
+                    // Match by clip_id, note pitch, AND start_time to uniquely identify the note instance
                     const isPlaying = activeNotes?.some(
-                        an => an.clip_id === clipId && an.note === note.note
+                        an => an.clip_id === clipId && an.note === note.note && an.start_time === note.start_time
                     ) ?? false;
 
                     // Velocity determines color intensity (0-127 -> 0.3-1.0 opacity)

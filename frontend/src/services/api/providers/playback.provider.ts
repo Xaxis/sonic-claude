@@ -59,6 +59,22 @@ export class PlaybackProvider extends BaseAPIClient {
     }
 
     /**
+     * Pause playback (keeps position)
+     * POST /api/playback/pause
+     */
+    async pause(): Promise<any> {
+        return this.post("/api/playback/pause", {});
+    }
+
+    /**
+     * Resume playback from paused position
+     * POST /api/playback/resume
+     */
+    async resume(): Promise<any> {
+        return this.post("/api/playback/resume", {});
+    }
+
+    /**
      * Seek to position
      * POST /api/playback/seek
      */
