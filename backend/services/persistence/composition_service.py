@@ -27,8 +27,7 @@ from backend.models.composition_snapshot import (
     AIIteration,
     IterationHistory,
 )
-from backend.models.composition import CompositionMetadata
-from backend.models.sequence import Sequence
+from backend.models.composition import Composition, CompositionMetadata
 from backend.models.mixer import MixerState
 from backend.models.effects import TrackEffectChain
 
@@ -376,7 +375,7 @@ class CompositionService:
         sequencer_service: 'SequencerService',
         mixer_service: 'MixerService',
         effects_service: 'TrackEffectsService',
-        sequence_id: str,
+        composition_id: str,
         name: str = "Snapshot",
         metadata: Optional[Dict[str, Any]] = None,
         chat_history: Optional[List[Dict[str, Any]]] = None
@@ -388,18 +387,18 @@ class CompositionService:
             sequencer_service: SequencerService instance
             mixer_service: MixerService instance
             effects_service: TrackEffectsService instance
-            sequence_id: ID of the sequence to snapshot
+            composition_id: ID of the composition to snapshot
             name: Name for the snapshot
             metadata: Additional metadata
             chat_history: Chat conversation history
 
         Returns:
-            Complete composition snapshot or None if sequence not found
+            Complete composition snapshot or None if composition not found
         """
-        # Get sequence
-        sequence = sequencer_service.get_sequence(sequence_id)
-        if not sequence:
-            logger.error(f"❌ Sequence {sequence_id} not found")
+        # Get composition
+        composition = sequencer_service.get_composition(composition_id)
+        if not composition:
+            logger.error(f"❌ Composition {composition_id} not found")
             return None
 
         # Get mixer state
@@ -407,23 +406,35 @@ class CompositionService:
 
         # Get all track effects
         track_effects = []
-        for track in sequence.tracks:
+        for track in composition.tracks:
             effect_chain = effects_service.get_track_effect_chain(track.id)
             if effect_chain and effect_chain.effects:  # Only include if there are effects
                 track_effects.append(effect_chain)
 
         # Get sample assignments (from sample tracks)
         sample_assignments = {}
-        for track in sequence.tracks:
+        for track in composition.tracks:
             if track.type == "sample" and hasattr(track, 'sample_path') and track.sample_path:
                 sample_assignments[track.id] = track.sample_path
 
-        # Build snapshot
+        # Build snapshot (flatten composition fields at top level)
         snapshot = CompositionSnapshot(
-            id=str(uuid.uuid4()),
-            name=name,
-            created_at=datetime.now(),
-            sequence=sequence,
+            # Composition fields (flattened)
+            id=composition.id,
+            name=composition.name,
+            tempo=composition.tempo,
+            time_signature=composition.time_signature,
+            tracks=composition.tracks,
+            clips=composition.clips,
+            is_playing=composition.is_playing,
+            current_position=composition.current_position,
+            loop_enabled=composition.loop_enabled,
+            loop_start=composition.loop_start,
+            loop_end=composition.loop_end,
+            created_at=composition.created_at,
+            updated_at=composition.updated_at,
+
+            # Additional state
             mixer_state=mixer_state,
             track_effects=track_effects,
             sample_assignments=sample_assignments,
@@ -451,20 +462,38 @@ class CompositionService:
             sequencer_service: SequencerService instance
             mixer_service: MixerService instance
             effects_service: TrackEffectsService instance
-            set_as_current: Whether to set this sequence as the current sequence (default: True)
+            set_as_current: Whether to set this composition as the current composition (default: True)
 
         Returns:
             True if successful, False otherwise
         """
         try:
-            # Restore sequence
-            sequence = snapshot.sequence
-            sequencer_service.sequences[sequence.id] = sequence
+            # Reconstruct Composition from flattened snapshot fields
+            from backend.models.composition import Composition
 
-            # Set as current sequence (only if requested)
+            composition = Composition(
+                id=snapshot.id,
+                name=snapshot.name,
+                tempo=snapshot.tempo,
+                time_signature=snapshot.time_signature,
+                tracks=snapshot.tracks,
+                clips=snapshot.clips,
+                is_playing=snapshot.is_playing,
+                current_position=snapshot.current_position,
+                loop_enabled=snapshot.loop_enabled,
+                loop_start=snapshot.loop_start,
+                loop_end=snapshot.loop_end,
+                created_at=snapshot.created_at,
+                updated_at=snapshot.updated_at
+            )
+
+            # Store composition in sequencer service
+            sequencer_service.compositions[composition.id] = composition
+
+            # Set as current composition (only if requested)
             if set_as_current:
-                sequencer_service.current_sequence_id = sequence.id
-                # Restore mixer state (only for current sequence)
+                sequencer_service.current_composition_id = composition.id
+                # Restore mixer state (only for current composition)
                 mixer_service.state = snapshot.mixer_state
 
             # Restore effects
@@ -473,8 +502,8 @@ class CompositionService:
 
             # Restore sample assignments
             for track_id, sample_path in snapshot.sample_assignments.items():
-                # Find track in sequence
-                track = next((t for t in sequence.tracks if t.id == track_id), None)
+                # Find track in composition
+                track = next((t for t in composition.tracks if t.id == track_id), None)
                 if track and hasattr(track, 'sample_path'):
                     track.sample_path = sample_path
 

@@ -23,12 +23,12 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
-import type { Sequence } from "../../types";
+import type { CompositionSnapshot } from "@/stores/dawStore";
 
 interface SequenceSettingsDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    sequence: Sequence | null;
+    composition: CompositionSnapshot | null;
     onSave: (settings: SequenceSettings) => void;
 }
 
@@ -44,7 +44,7 @@ export interface SequenceSettings {
 export function SequencerSettingsDialog({
     isOpen,
     onClose,
-    sequence,
+    composition,
     onSave,
 }: SequenceSettingsDialogProps) {
     const [name, setName] = useState("");
@@ -54,17 +54,17 @@ export function SequencerSettingsDialog({
     const [loopStart, setLoopStart] = useState("0");
     const [loopEnd, setLoopEnd] = useState("16");
 
-    // Load sequence settings when dialog opens
+    // Load composition settings when dialog opens
     useEffect(() => {
-        if (sequence) {
-            setName(sequence.name);
-            setTempo(sequence.tempo.toString());
-            setTimeSignature(sequence.time_signature);
-            setLoopEnabled(sequence.loop_enabled || false);
-            setLoopStart((sequence.loop_start || 0).toString());
-            setLoopEnd((sequence.loop_end || 16).toString());
+        if (composition) {
+            setName(composition.name);
+            setTempo(composition.tempo.toString());
+            setTimeSignature(composition.time_signature);
+            setLoopEnabled(composition.loop_enabled || false);
+            setLoopStart((composition.loop_start || 0).toString());
+            setLoopEnd((composition.loop_end || 16).toString());
         }
-    }, [sequence]);
+    }, [composition]);
 
     const handleSave = () => {
         const settings: SequenceSettings = {
@@ -196,11 +196,11 @@ export function SequencerSettingsDialog({
                     {/* Metadata */}
                     <div className="grid grid-cols-4 items-center gap-4 text-sm text-muted-foreground">
                         <Label className="text-right">Created</Label>
-                        <div className="col-span-3">{formatDate(sequence?.created_at)}</div>
+                        <div className="col-span-3">{formatDate(composition?.created_at)}</div>
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4 text-sm text-muted-foreground">
                         <Label className="text-right">Updated</Label>
-                        <div className="col-span-3">{formatDate(sequence?.updated_at)}</div>
+                        <div className="col-span-3">{formatDate(composition?.updated_at)}</div>
                     </div>
                 </div>
 

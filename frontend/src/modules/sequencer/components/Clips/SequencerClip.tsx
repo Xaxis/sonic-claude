@@ -52,7 +52,7 @@ export function SequencerClip({
 }: SequencerClipProps) {
     // Get state from Zustand store
     const activeComposition = useDAWStore(state => state.activeComposition);
-    const tempo = activeComposition?.sequence.tempo ?? 120;
+    const tempo = activeComposition?.tempo ?? 120;
     const zoom = useDAWStore(state => state.zoom);
     const snapEnabled = useDAWStore(state => state.snapEnabled);
     const gridSize = useDAWStore(state => state.gridSize);

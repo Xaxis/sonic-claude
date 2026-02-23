@@ -1,44 +1,79 @@
 """
-Composition Models - The PRIMARY entity in the DAW
+Composition Models - The PRIMARY and ONLY entity in the DAW
 
-A Composition is a PROJECT (like .als in Ableton, .logicx in Logic Pro).
-It contains EVERYTHING:
-- ONE Sequence (the timeline with tracks and clips)
-- Mixer state (all channels, master)
-- Effects (all track effect chains)
-- Sample assignments
-- Metadata (name, tempo, time signature, created/updated timestamps)
+A Composition IS a PROJECT (like .als in Ableton, .logicx in Logic Pro).
+It contains the TIMELINE DATA:
+- Tracks and clips (the timeline)
+- Tempo, time signature, loop settings
+- Playback state (is_playing, current_position)
+- Metadata (name, created/updated timestamps)
+
+NOTE: Mixer state and Effects are stored GLOBALLY in their respective services,
+NOT in the Composition model. When saving, CompositionSnapshot captures a snapshot
+of the global mixer/effects state along with the composition timeline data.
 
 Key Concepts:
-- Composition = Project File (what users think about)
-- Sequence = Internal data structure (implementation detail)
-- Composition ID = Sequence ID (1:1 relationship)
+- Composition = The ONLY entity (no separate "Sequence")
+- ONE ID = composition_id
+- Composition is stored in SequencerService.compositions dict
+- CompositionService handles persistence only
 """
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field
+from backend.models.sequence import SequencerTrack, Clip
+
+
+class Composition(BaseModel):
+    """
+    Complete composition - THE primary entity in the DAW
+
+    This is the ONLY entity. There is no separate "Sequence".
+    A composition contains everything needed for a project.
+    """
+    id: str = Field(description="Unique composition ID")
+    name: str = Field(description="Composition name")
+    tempo: float = Field(default=120.0, gt=0, le=300, description="Tempo in BPM")
+    time_signature: str = Field(default="4/4", pattern=r"^\d+/\d+$", description="Time signature")
+
+    # Timeline data
+    tracks: List[SequencerTrack] = Field(default_factory=list, description="All tracks in composition")
+    clips: List[Clip] = Field(default_factory=list, description="All clips in composition")
+
+    # Playback state
+    is_playing: bool = Field(default=False, description="Whether composition is playing")
+    current_position: float = Field(default=0.0, ge=0, description="Playhead position in beats")
+
+    # Loop settings
+    loop_enabled: bool = Field(default=False, description="Whether looping is enabled")
+    loop_start: float = Field(default=0.0, ge=0, description="Loop start position in beats")
+    loop_end: float = Field(default=16.0, gt=0, description="Loop end position in beats")
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
 
 class CompositionMetadata(BaseModel):
     """
     Composition metadata - lightweight info for listing/browsing
-    
+
     This is what gets returned when listing all compositions.
     """
-    id: str = Field(description="Unique composition ID (same as sequence_id)")
+    id: str = Field(description="Unique composition ID")
     name: str = Field(description="Composition name")
     tempo: float = Field(default=120.0, gt=0, le=300, description="Tempo in BPM")
     time_signature: str = Field(default="4/4", pattern=r"^\d+/\d+$", description="Time signature")
-    
+
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
-    
+
     # Stats (for UI display)
     track_count: int = Field(default=0, ge=0, description="Number of tracks")
     clip_count: int = Field(default=0, ge=0, description="Number of clips")
     duration_beats: float = Field(default=0.0, ge=0, description="Total duration in beats")
-    
+
     # File info
     file_size_bytes: Optional[int] = Field(default=None, description="File size in bytes")
     has_autosave: bool = Field(default=False, description="Whether autosave exists")

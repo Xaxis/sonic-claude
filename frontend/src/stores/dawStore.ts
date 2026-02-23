@@ -28,23 +28,43 @@ import type { WaveformData } from '@/hooks/useWaveformWebsocket';
 import type { AnalyticsData } from '@/hooks/useAnalyticsWebsocket';
 
 // Application Types
-import type { Sequence, SequencerTrack, SequencerClip, SynthDefInfo } from '@/modules/sequencer/types';
+import type { SequencerTrack, SequencerClip, SynthDefInfo } from '@/modules/sequencer/types';
 import type { MixerChannel, MasterChannel } from '@/modules/mixer/types';
 import type { EffectDefinition, TrackEffectChain } from '@/services/api/providers';
 import type { SampleMetadata } from '@/services/api/providers/samples.provider';
 import type { CompositionMetadata } from '@/services/api/providers/compositions.provider';
 
 // Composition Snapshot (complete state)
+// NOTE: Composition IS the project - no separate "Sequence" entity
 export interface CompositionSnapshot {
     id: string;
     name: string;
-    created_at: string;
-    sequence: Sequence;
+    tempo: number;
+    time_signature: string;
+
+    // Timeline data (directly on composition, not nested in sequence)
+    tracks: SequencerTrack[];
+    clips: SequencerClip[];
+
+    // Playback state
+    is_playing: boolean;
+    current_position: number;
+
+    // Loop settings
+    loop_enabled: boolean;
+    loop_start: number;
+    loop_end: number;
+
+    // Additional state
     mixer_state: any;
     track_effects: TrackEffectChain[];
     sample_assignments: Record<string, string>;
     chat_history: any[];
     metadata: Record<string, any>;
+
+    // Timestamps
+    created_at: string;
+    updated_at: string;
 }
 
 // AI & Activity Types
@@ -92,13 +112,13 @@ interface DAWStore {
     // ========================================================================
 
     // Compositions (PRIMARY - this is what users think about)
-    // A composition = project file (contains ONE sequence + all state)
+    // A composition = project file (contains tracks, clips, and all state)
     activeComposition: CompositionSnapshot | null;  // Currently loaded composition
     compositions: CompositionMetadata[];             // List of all compositions (for browsing)
     hasUnsavedChanges: boolean;
 
     // Sequencer (INTERNAL - part of active composition)
-    // These are derived from activeComposition.sequence
+    // These are derived from activeComposition (for convenience/performance)
     tracks: SequencerTrack[];
     clips: SequencerClip[];
     synthDefs: SynthDefInfo[];
@@ -456,7 +476,7 @@ export const useDAWStore = create<DAWStore>()(
                     set((state) => ({
                         activeComposition: state.activeComposition ? {
                             ...state.activeComposition,
-                            sequence: { ...state.activeComposition.sequence, tempo }
+                            tempo
                         } : null,
                         hasUnsavedChanges: true,
                     }));
@@ -484,7 +504,8 @@ export const useDAWStore = create<DAWStore>()(
                     return;
                 }
 
-                await api.sequencer.seek(activeComposition.sequence.id, {
+                // ALWAYS use composition ID (composition ID = sequence ID)
+                await api.sequencer.seek(activeComposition.id, {
                     position: position,
                     trigger_audio: triggerAudio,
                 });
@@ -506,8 +527,9 @@ export const useDAWStore = create<DAWStore>()(
                     return;
                 }
 
+                // ALWAYS use composition ID (composition ID = sequence ID)
                 const track = await api.sequencer.createTrack({
-                    sequence_id: activeComposition.sequence.id,  // Use sequence ID, not composition ID
+                    sequence_id: activeComposition.id,
                     name,
                     type: type as "midi" | "audio" | "sample",
                     instrument,
@@ -1249,10 +1271,9 @@ export const useDAWStore = create<DAWStore>()(
             try {
                 const snapshot = await api.compositions.getById(compositionId);
 
-                // Extract state from snapshot
-                const sequence = snapshot.sequence;
-                const tracks = sequence.tracks || [];
-                const clips = sequence.clips || []; // Clips are stored in sequence, not in tracks
+                // Extract state from snapshot (composition has tracks/clips directly)
+                const tracks = snapshot.tracks || [];
+                const clips = snapshot.clips || [];
 
                 // Load mixer state
                 const channels = snapshot.mixer_state?.channels || [];
@@ -1278,9 +1299,9 @@ export const useDAWStore = create<DAWStore>()(
                     sampleAssignments,
                     hasUnsavedChanges: false,
                     // Sync loop state from composition to UI state
-                    isLooping: sequence.loop_enabled ?? false,
-                    loopStart: sequence.loop_start ?? 0,
-                    loopEnd: sequence.loop_end ?? 16,
+                    isLooping: snapshot.loop_enabled ?? false,
+                    loopStart: snapshot.loop_start ?? 0,
+                    loopEnd: snapshot.loop_end ?? 16,
                 });
 
                 // Save to localStorage so we can auto-load on next startup
@@ -1349,8 +1370,8 @@ export const useDAWStore = create<DAWStore>()(
                 // Update local state
                 const updatedComposition = { ...activeComposition };
                 if (name) updatedComposition.name = name;
-                if (tempo) updatedComposition.sequence.tempo = tempo;
-                if (timeSignature) updatedComposition.sequence.time_signature = timeSignature;
+                if (tempo) updatedComposition.tempo = tempo;
+                if (timeSignature) updatedComposition.time_signature = timeSignature;
 
                 set({
                     activeComposition: updatedComposition,
@@ -1411,13 +1432,10 @@ export const useDAWStore = create<DAWStore>()(
             set({ isLooping: looping });
             const { activeComposition } = get();
             if (activeComposition) {
-                // Update composition's sequence
+                // Update composition directly (no nested sequence)
                 const updatedComposition = {
                     ...activeComposition,
-                    sequence: {
-                        ...activeComposition.sequence,
-                        loop_enabled: looping,
-                    },
+                    loop_enabled: looping,
                 };
                 set({ activeComposition: updatedComposition, hasUnsavedChanges: true });
                 // Send to backend
@@ -1432,13 +1450,10 @@ export const useDAWStore = create<DAWStore>()(
             set({ loopStart: start });
             const { activeComposition } = get();
             if (activeComposition) {
-                // Update composition's sequence
+                // Update composition directly (no nested sequence)
                 const updatedComposition = {
                     ...activeComposition,
-                    sequence: {
-                        ...activeComposition.sequence,
-                        loop_start: start,
-                    },
+                    loop_start: start,
                 };
                 set({ activeComposition: updatedComposition, hasUnsavedChanges: true });
                 // Send to backend
@@ -1453,13 +1468,10 @@ export const useDAWStore = create<DAWStore>()(
             set({ loopEnd: end });
             const { activeComposition } = get();
             if (activeComposition) {
-                // Update composition's sequence
+                // Update composition directly (no nested sequence)
                 const updatedComposition = {
                     ...activeComposition,
-                    sequence: {
-                        ...activeComposition.sequence,
-                        loop_end: end,
-                    },
+                    loop_end: end,
                 };
                 set({ activeComposition: updatedComposition, hasUnsavedChanges: true });
                 // Send to backend

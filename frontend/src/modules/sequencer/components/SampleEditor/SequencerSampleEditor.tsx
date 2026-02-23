@@ -54,7 +54,7 @@ export function SequencerSampleEditor({
 }: SequencerSampleEditorProps) {
     // Get tempo from Zustand store
     const activeComposition = useDAWStore(state => state.activeComposition);
-    const tempo = activeComposition?.sequence.tempo ?? 120;
+    const tempo = activeComposition?.tempo ?? 120;
 
     // Local UI state
     const [localGain, setLocalGain] = useState(gain);

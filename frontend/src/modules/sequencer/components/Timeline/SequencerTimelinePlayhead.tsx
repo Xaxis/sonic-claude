@@ -27,7 +27,7 @@ export function SequencerTimelinePlayhead({
 
     const currentPosition = transport?.position_beats ?? 0;
     const isPlaying = transport?.is_playing ?? false;
-    const tempo = activeComposition?.sequence.tempo ?? 120;
+    const tempo = activeComposition?.tempo ?? 120;
     const zoom = useDAWStore(state => state.zoom);
     const snapEnabled = useDAWStore(state => state.snapEnabled);
     const gridSize = useDAWStore(state => state.gridSize);

@@ -30,6 +30,7 @@ from backend.services.daw.effects_service import TrackEffectsService
 from backend.services.ai.agent_service import AIAgentService
 from backend.core.exceptions import ServiceError, ResourceNotFoundError
 from backend.models.composition import (
+    Composition,
     CreateCompositionRequest,
     UpdateCompositionRequest,
     SaveCompositionRequest,
@@ -38,7 +39,6 @@ from backend.models.composition import (
     CompositionSavedResponse,
     CompositionDeletedResponse,
 )
-from backend.models.sequence import Sequence, CreateSequenceRequest
 
 logger = logging.getLogger(__name__)
 
@@ -61,63 +61,44 @@ async def create_composition(
     Create a new composition (project)
 
     This is the PRIMARY way to create a new project. It:
-    1. Creates a new sequence internally (with unique ID)
+    1. Creates a new composition with unique ID
     2. Initializes mixer state
     3. Saves initial composition snapshot to disk
     4. Returns composition ID
-
-    The composition ID = sequence ID (1:1 relationship).
     """
     try:
-        # Generate unique composition ID
-        composition_id = str(uuid.uuid4())
-
-        # Create sequence internally (this is an implementation detail)
-        sequence_request = CreateSequenceRequest(
+        # Create composition in sequencer service
+        composition = sequencer_service.create_composition(
             name=request.name,
             tempo=request.tempo or 120.0,
             time_signature=request.time_signature or "4/4"
         )
-        temp_sequence = sequencer_service.create_sequence(sequence_request)
-
-        # Override sequence ID with composition ID (they're the same)
-        # Pydantic models are immutable, so we need to create a new object with model_copy()
-        old_sequence_id = temp_sequence.id
-        sequence = temp_sequence.model_copy(update={"id": composition_id})
-
-        # Remove old sequence from dict and add with new ID
-        if old_sequence_id in sequencer_service.sequences:
-            del sequencer_service.sequences[old_sequence_id]
-        sequencer_service.sequences[composition_id] = sequence
-
-        # Mixer is already initialized in MixerService.__init__
-        # No need to call initialize_mixer() - it doesn't exist
 
         # Build initial snapshot
         snapshot = composition_service.build_snapshot_from_services(
             sequencer_service=sequencer_service,
             mixer_service=mixer_service,
             effects_service=effects_service,
-            sequence_id=composition_id,
+            composition_id=composition.id,
             name=request.name,
             metadata={"source": "create_composition", "initial": True}
         )
 
         if not snapshot:
-            raise ServiceError(f"Failed to build initial snapshot for composition {composition_id}")
+            raise ServiceError(f"Failed to build initial snapshot for composition {composition.id}")
 
         # Save initial composition to disk
         composition_service.save_composition(
-            composition_id=composition_id,
+            composition_id=composition.id,
             snapshot=snapshot,
             create_history=True,  # Create initial history entry
             is_autosave=False
         )
 
-        logger.info(f"✅ Created composition: {request.name} (ID: {composition_id})")
+        logger.info(f"✅ Created composition: {request.name} (ID: {composition.id})")
 
         return CompositionCreatedResponse(
-            composition_id=composition_id,
+            composition_id=composition.id,
             name=request.name,
             message=f"Composition '{request.name}' created successfully"
         )
@@ -143,9 +124,9 @@ async def save_composition(
     Optionally creates a history entry for versioning.
     """
     try:
-        # Get sequence (composition contains ONE sequence)
-        sequence = sequencer_service.get_sequence(composition_id)
-        if not sequence:
+        # Get composition
+        composition = sequencer_service.get_composition(composition_id)
+        if not composition:
             raise ResourceNotFoundError(f"Composition {composition_id} not found")
 
         # Build complete snapshot
@@ -153,8 +134,8 @@ async def save_composition(
             sequencer_service=sequencer_service,
             mixer_service=mixer_service,
             effects_service=effects_service,
-            sequence_id=composition_id,
-            name=sequence.name,
+            composition_id=composition_id,
+            name=composition.name,
             metadata=request.metadata or {"source": "manual_save" if not request.is_autosave else "autosave"}
         )
 
@@ -264,18 +245,18 @@ async def update_composition(
     Call /save to persist changes.
     """
     try:
-        # Get sequence (composition contains ONE sequence)
-        sequence = sequencer_service.get_sequence(composition_id)
-        if not sequence:
+        # Get composition
+        composition = sequencer_service.get_composition(composition_id)
+        if not composition:
             raise ResourceNotFoundError(f"Composition {composition_id} not found")
 
         # Update fields
         if request.name is not None:
-            sequence.name = request.name
+            composition.name = request.name
         if request.tempo is not None:
-            sequence.tempo = request.tempo
+            composition.tempo = request.tempo
         if request.time_signature is not None:
-            sequence.time_signature = request.time_signature
+            composition.time_signature = request.time_signature
 
         logger.info(f"✅ Updated composition {composition_id} metadata")
 
@@ -306,7 +287,7 @@ async def delete_composition(
     """
     try:
         # Delete from memory
-        success = sequencer_service.delete_sequence(composition_id)
+        success = sequencer_service.delete_composition(composition_id)
         if not success:
             raise ResourceNotFoundError(f"Composition {composition_id} not found")
 

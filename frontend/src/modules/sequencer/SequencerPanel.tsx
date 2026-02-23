@@ -47,7 +47,7 @@ export function SequencerPanel() {
     const duplicateClip = useDAWStore(state => state.duplicateClip);
 
     // Local UI state
-    const [tempoInput, setTempoInput] = useState(activeComposition?.sequence.tempo.toString() || "120");
+    const [tempoInput, setTempoInput] = useState(activeComposition?.tempo?.toString() || "120");
     const [isPaused, setIsPaused] = useState(false);
     const [showTrackTypeDialog, setShowTrackTypeDialog] = useState(false);
     const [showSampleBrowser, setShowSampleBrowser] = useState(false);
@@ -69,13 +69,13 @@ export function SequencerPanel() {
     // Update tempo input when composition tempo changes
     useEffect(() => {
         if (activeComposition) {
-            setTempoInput(activeComposition.sequence.tempo.toString());
+            setTempoInput(activeComposition.tempo.toString());
         }
-    }, [activeComposition?.sequence.tempo]);
+    }, [activeComposition?.tempo]);
 
     // Derived state
     const isPlaying = transport?.is_playing ?? false;
-    const tempo = activeComposition?.sequence.tempo ?? 120;
+    const tempo = activeComposition?.tempo ?? 120;
     const metronomeEnabled = transport?.metronome_enabled ?? false;
 
     // Transport handlers
@@ -173,7 +173,7 @@ export function SequencerPanel() {
         if (!track) return;
 
         const clipRequest = {
-            sequence_id: activeComposition.sequence.id,  // Use sequence ID, not composition ID
+            sequence_id: activeComposition.id,  // ALWAYS use composition ID (composition ID = sequence ID)
             clip_type: track.type === "midi" ? "midi" : "audio",
             track_id: trackId,
             start_time: startTime,
@@ -184,7 +184,7 @@ export function SequencerPanel() {
 
     const handleDuplicateClip = useCallback(async (clipId: string) => {
         if (!activeComposition) return;
-        await duplicateClip(activeComposition.sequence.id, clipId);  // Use sequence ID, not composition ID
+        await duplicateClip(activeComposition.id, clipId);  // ALWAYS use composition ID (composition ID = sequence ID)
     }, [activeComposition, duplicateClip]);
 
     const openPianoRoll = useDAWStore(state => state.openPianoRoll);
@@ -324,11 +324,11 @@ export function SequencerPanel() {
             {showSequenceSettings && activeComposition && (
                 <SequencerSettingsDialog
                     isOpen={showSequenceSettings}
-                    sequence={activeComposition.sequence}
+                    composition={activeComposition}
                     onClose={() => setShowSequenceSettings(false)}
                     onSave={async () => {
-                        // TODO: Implement sequence settings update
-                        toast.info("Sequence settings update not yet implemented");
+                        // TODO: Implement composition settings update
+                        toast.info("Composition settings update not yet implemented");
                         setShowSequenceSettings(false);
                     }}
                 />

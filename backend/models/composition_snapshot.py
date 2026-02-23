@@ -2,7 +2,7 @@
 Composition Snapshot Models - Complete DAW state for AI iterations
 
 A composition snapshot captures EVERYTHING needed to restore the exact state:
-- Sequence (tracks, clips, tempo, time signature, loop settings)
+- Composition (tracks, clips, tempo, time signature, loop settings)
 - Mixer state (all channels, volumes, pans, mutes, solos, master)
 - Effects (all track effect chains with parameters)
 - Sample assignments
@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel, Field
 
-from backend.models.sequence import Sequence, SequencerTrack, Clip
+from backend.models.sequence import SequencerTrack, Clip
 from backend.models.mixer import MixerState, MixerChannel, MasterChannel
 from backend.models.effects import EffectInstance, TrackEffectChain
 
@@ -36,22 +36,34 @@ class CompositionSnapshot(BaseModel):
     Complete composition state snapshot
 
     This captures EVERYTHING needed to restore the exact state of a composition:
-    - All sequence data (tracks, clips, tempo, etc.)
+    - All composition data (tracks, clips, tempo, etc.)
     - All mixer state (channels, volumes, pans, etc.)
     - All effects (track effect chains with parameters)
     - All sample assignments
     - UI state (zoom, grid, selected clips, etc.)
     - Chat history (all AI conversations)
     """
-    id: str = Field(description="Unique snapshot ID")
-    name: str = Field(description="Snapshot name/description")
-    created_at: datetime = Field(default_factory=datetime.now)
+    # === COMPOSITION IDENTITY ===
+    id: str = Field(description="Composition ID (snapshot ID = composition ID)")
+    name: str = Field(description="Composition name")
 
-    # === SEQUENCE STATE ===
-    sequence: Sequence = Field(description="Complete sequence with tracks and clips")
+    # === COMPOSITION TIMELINE ===
+    tempo: float = Field(default=120.0, description="Tempo in BPM")
+    time_signature: str = Field(default="4/4", description="Time signature")
+    tracks: List[SequencerTrack] = Field(default_factory=list, description="All tracks")
+    clips: List[Clip] = Field(default_factory=list, description="All clips")
+
+    # === PLAYBACK STATE ===
+    is_playing: bool = Field(default=False, description="Is composition playing")
+    current_position: float = Field(default=0.0, description="Current playhead position in beats")
+
+    # === LOOP SETTINGS ===
+    loop_enabled: bool = Field(default=False, description="Is looping enabled")
+    loop_start: float = Field(default=0.0, description="Loop start position in beats")
+    loop_end: float = Field(default=16.0, description="Loop end position in beats")
 
     # === MIXER STATE ===
-    mixer_state: MixerState = Field(description="Complete mixer state")
+    mixer_state: MixerState = Field(default_factory=MixerState, description="Complete mixer state")
 
     # === EFFECTS STATE ===
     track_effects: List[TrackEffectChain] = Field(
@@ -78,6 +90,10 @@ class CompositionSnapshot(BaseModel):
         default_factory=dict,
         description="Additional metadata (e.g., AI prompt, user notes)"
     )
+
+    # === TIMESTAMPS ===
+    created_at: datetime = Field(default_factory=datetime.now, description="When composition was created")
+    updated_at: datetime = Field(default_factory=datetime.now, description="When composition was last updated")
 
 
 class AIIteration(BaseModel):
