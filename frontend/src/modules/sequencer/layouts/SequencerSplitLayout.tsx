@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from "react";
+import { Music } from "lucide-react";
 import { SequencerTimelineSection } from "./SequencerTimelineSection.tsx";
 import { PianoRollWrapper } from "./PianoRollWrapper.tsx";
 import { useDAWStore } from '@/stores/dawStore';
@@ -113,6 +114,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
     // Handle divider drag
     const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
         e.preventDefault();
+        e.stopPropagation();
         setIsDragging(true);
     }, []);
 
@@ -199,7 +201,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                 style={{ height: `${100 - timelineHeightPercent}%` }}
             >
                 <div className="h-full flex flex-col overflow-hidden">
-                    {showPianoRoll && (
+                    {showPianoRoll ? (
                         <PianoRollWrapper
                             clip={pianoRollClip}
                             track={pianoRollTrack}
@@ -217,6 +219,16 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                             onLoopStartChange={props.onLoopStartChange}
                             onLoopEndChange={props.onLoopEndChange}
                         />
+                    ) : (
+                        <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center bg-muted/20">
+                            <div className="text-muted-foreground">
+                                <Music size={48} className="mx-auto mb-4 opacity-20" />
+                                <div className="text-base font-medium mb-1">No Editor Open</div>
+                                <div className="text-xs text-muted-foreground/70">
+                                    Double-click a clip in the timeline above to open it in the editor.
+                                </div>
+                            </div>
+                        </div>
                     )}
                     {/* TODO: Implement sample editor */}
                 </div>
