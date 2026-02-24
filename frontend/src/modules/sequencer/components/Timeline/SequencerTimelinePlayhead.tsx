@@ -200,7 +200,7 @@ export function SequencerTimelinePlayhead({
         >
             {/* Playhead triangle at top */}
             <div
-                className="absolute -top-3 -left-2.5 w-0 h-0 pointer-events-none"
+                className="absolute -top-2 -left-2 w-0 h-0 pointer-events-none"
                 style={{
                     borderLeft: '10px solid transparent',
                     borderRight: '10px solid transparent',

@@ -12,7 +12,7 @@ import logging
 import uuid
 import asyncio
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 from datetime import datetime
 
 from backend.models.composition import Composition
@@ -75,6 +75,9 @@ class PlaybackEngineService:
 
         # Active MIDI notes (for visual feedback in piano roll)
         self.active_midi_notes: Dict[int, ActiveMIDINote] = {}
+
+        # Track all MIDI note tasks so we can cancel them on pause/stop
+        self.midi_note_tasks: Set[asyncio.Task] = set()
 
         logger.info("✅ PlaybackEngineService initialized")
 
@@ -524,37 +527,50 @@ class PlaybackEngineService:
 
                         # Schedule note start and release
                         async def play_note(nid, freq_val, amp_val, synth, delay, dur_beats, note_pitch, clip_id_val, out_bus):
-                            await asyncio.sleep(delay)
-                            if self.engine_manager:
-                                # Start the note
-                                self.engine_manager.send_message(
-                                    "/s_new",
-                                    synth,
-                                    nid,
-                                    0,  # addAction
-                                    1,  # target
-                                    "freq", freq_val,
-                                    "amp", amp_val,
-                                    "gate", 1,
-                                    "out", out_bus  # Route to track bus
-                                )
-                                # Track active note for visual feedback
-                                self.active_midi_notes[nid] = {
-                                    "clip_id": clip_id_val,
-                                    "note": note_pitch,
-                                    "start_time": note.start_time,  # Position in clip (beats)
-                                    "wall_time": time.time()  # Wall clock time for debugging
-                                }
-                                # Schedule release
-                                note_duration = dur_beats * (60.0 / self.tempo)
-                                await asyncio.sleep(note_duration)
-                                self.engine_manager.send_message("/n_set", nid, "gate", 0)
-                                # Remove from active notes
+                            try:
+                                await asyncio.sleep(delay)
+                                if self.engine_manager and self.is_playing:
+                                    # Start the note
+                                    self.engine_manager.send_message(
+                                        "/s_new",
+                                        synth,
+                                        nid,
+                                        0,  # addAction
+                                        1,  # target
+                                        "freq", freq_val,
+                                        "amp", amp_val,
+                                        "gate", 1,
+                                        "out", out_bus  # Route to track bus
+                                    )
+                                    # Track active note for visual feedback
+                                    self.active_midi_notes[nid] = {
+                                        "clip_id": clip_id_val,
+                                        "note": note_pitch,
+                                        "start_time": note.start_time,  # Position in clip (beats)
+                                        "wall_time": time.time()  # Wall clock time for debugging
+                                    }
+                                    # Schedule release
+                                    note_duration = dur_beats * (60.0 / self.tempo)
+                                    await asyncio.sleep(note_duration)
+                                    if self.engine_manager:
+                                        self.engine_manager.send_message("/n_set", nid, "gate", 0)
+                                    # Remove from active notes
+                                    if nid in self.active_midi_notes:
+                                        del self.active_midi_notes[nid]
+                                    logger.debug(f"🔇 Released MIDI note {nid}")
+                            except asyncio.CancelledError:
+                                # Task was cancelled (pause/stop was called)
+                                # Free the synth if it was started
                                 if nid in self.active_midi_notes:
+                                    if self.engine_manager:
+                                        self.engine_manager.send_message("/n_free", nid)
                                     del self.active_midi_notes[nid]
-                                logger.debug(f"🔇 Released MIDI note {nid}")
+                                raise  # Re-raise to mark task as cancelled
 
-                        asyncio.create_task(play_note(node_id, freq, amp, synthdef, delay_seconds, note.duration, note.note, clip.id, track_bus))
+                        task = asyncio.create_task(play_note(node_id, freq, amp, synthdef, delay_seconds, note.duration, note.note, clip.id, track_bus))
+                        self.midi_note_tasks.add(task)
+                        # Remove task from set when it completes
+                        task.add_done_callback(self.midi_note_tasks.discard)
                     else:
                         logger.info(f"      ❌ SKIPPED (note already passed: offset={offset:.2f}, note_start={note.start_time:.2f})")
 
@@ -590,11 +606,24 @@ class PlaybackEngineService:
                 pass
             self.playback_task = None
 
-        # Stop all active synths
+        # Stop all active synths (sample/audio clips)
         if self.engine_manager:
             for node_id in self.active_synths.values():
                 self.engine_manager.send_message("/n_free", node_id)
         self.active_synths.clear()
+
+        # Cancel all scheduled MIDI note tasks
+        for task in self.midi_note_tasks:
+            task.cancel()
+        if self.midi_note_tasks:
+            await asyncio.gather(*self.midi_note_tasks, return_exceptions=True)
+        self.midi_note_tasks.clear()
+
+        # Stop all active MIDI notes (use /n_free for immediate silence)
+        if self.engine_manager:
+            for node_id in self.active_midi_notes.keys():
+                self.engine_manager.send_message("/n_free", node_id)
+        self.active_midi_notes.clear()
 
         # Broadcast stopped state via WebSocket
         if self.websocket_manager and self.composition_state_service.current_composition_id:
@@ -640,11 +669,32 @@ class PlaybackEngineService:
                     pass
                 self.playback_task = None
 
-            # Stop all active synths
+            # Stop all active synths (sample/audio clips)
+            logger.info(f"🛑 Stopping {len(self.active_synths)} active sample/audio synths")
             if self.engine_manager:
-                for node_id in self.active_synths.values():
+                for clip_id, node_id in self.active_synths.items():
+                    logger.info(f"🛑 Freeing synth node {node_id} for clip {clip_id}")
                     self.engine_manager.send_message("/n_free", node_id)
+            else:
+                logger.warning("⚠️ No engine_manager available to free synths!")
             self.active_synths.clear()
+
+            # Cancel all scheduled MIDI note tasks
+            logger.info(f"🛑 Cancelling {len(self.midi_note_tasks)} MIDI note tasks")
+            for task in self.midi_note_tasks:
+                task.cancel()
+            # Wait for all tasks to be cancelled
+            if self.midi_note_tasks:
+                await asyncio.gather(*self.midi_note_tasks, return_exceptions=True)
+            self.midi_note_tasks.clear()
+
+            # Stop all active MIDI notes (use /n_free for immediate silence)
+            logger.info(f"🛑 Stopping {len(self.active_midi_notes)} active MIDI notes")
+            if self.engine_manager:
+                for node_id, note_info in self.active_midi_notes.items():
+                    logger.info(f"🛑 Freeing MIDI note node {node_id} (note={note_info['note']}, clip={note_info['clip_id']})")
+                    self.engine_manager.send_message("/n_free", node_id)
+            self.active_midi_notes.clear()
 
             # Broadcast paused state via WebSocket
             if self.websocket_manager and self.composition_state_service.current_composition_id:

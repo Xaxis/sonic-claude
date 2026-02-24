@@ -114,6 +114,7 @@ export class StatePersistenceService {
     // ACTIVE SEQUENCE
     // ========================================================================
 
+    // @TODO - This is clearly not correct as composition id is the refacored state/store paradigm. Fix!
     getActiveSequenceId(): string | null {
         return this.get<string | null>(STORAGE_KEYS.ACTIVE_SEQUENCE_ID, null);
     }

@@ -98,8 +98,11 @@ class AudioEngineManager:
         """Send OSC message to scsynth"""
         if not self.scsynth_client:
             raise RuntimeError("Not connected to SuperCollider")
-        
+
         try:
+            # Log /n_free and /n_set messages to debug pause issue
+            if address in ["/n_free", "/n_set"]:
+                logger.info(f"📤 Sending OSC: {address} {args}")
             self.scsynth_client.send_message(address, args if args else [])
         except Exception as e:
             logger.error(f"❌ Failed to send OSC message {address}: {e}")

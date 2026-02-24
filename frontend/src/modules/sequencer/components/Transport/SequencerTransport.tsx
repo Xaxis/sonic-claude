@@ -54,7 +54,7 @@ export function SequencerTransport() {
     const hasTracksOrClips = tracks.length > 0 || clips.length > 0;
     const canPlay = hasTracksOrClips;
     const playTooltip = canPlay
-        ? (isPlaying ? "Pause" : "Play")
+        ? (isPlaying ? "Pause" : (isPaused ? "Resume" : "Play"))
         : "Add tracks and clips to play";
 
     // ========================================================================
@@ -131,10 +131,10 @@ export function SequencerTransport() {
                     icon={isPlaying ? Pause : Play}
                     tooltip={playTooltip}
                     onClick={handlePlayPause}
-                    variant={isPlaying ? "default" : "ghost"}
+                    variant={isPlaying || isPaused ? "default" : "ghost"}
                     size="icon-sm"
                     disabled={!canPlay}
-                    className={cn(isPlaying && "bg-primary")}
+                    className={cn((isPlaying || isPaused) && "bg-primary")}
                 />
                 <Button
                     onClick={handleRecord}
