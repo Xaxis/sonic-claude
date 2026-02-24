@@ -7,15 +7,14 @@
  * - Manages local tempo input state internally
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { Play, Pause, SkipBack, Circle, Repeat, Music } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import { cn } from "@/lib/utils.ts";
 import { useDAWStore } from '@/stores/dawStore';
 import { toast } from "sonner";
+import { SequencerTempoControl } from './SequencerTempoControl.tsx';
 
 export function SequencerTransport() {
     // ========================================================================
@@ -34,14 +33,8 @@ export function SequencerTransport() {
     const pause = useDAWStore(state => state.pause);
     const resume = useDAWStore(state => state.resume);
     const stop = useDAWStore(state => state.stop);
-    const setTempo = useDAWStore(state => state.setTempo);
     const toggleMetronome = useDAWStore(state => state.toggleMetronome);
     const setIsLooping = useDAWStore(state => state.setIsLooping);
-
-    // ========================================================================
-    // LOCAL UI STATE: Tempo input field
-    // ========================================================================
-    const [tempoInput, setTempoInput] = useState(activeComposition?.tempo?.toString() || "120");
 
     // ========================================================================
     // DERIVED STATE
@@ -49,22 +42,12 @@ export function SequencerTransport() {
     const isPlaying = transport?.is_playing ?? false;
     const isPaused = transport?.is_paused ?? false;
     const isRecording = false; // TODO: Add is_recording to TransportMessage when backend supports it
-    const tempo = activeComposition?.tempo ?? 120;
     const metronomeEnabled = transport?.metronome_enabled ?? false;
     const hasTracksOrClips = tracks.length > 0 || clips.length > 0;
     const canPlay = hasTracksOrClips;
     const playTooltip = canPlay
         ? (isPlaying ? "Pause" : (isPaused ? "Resume" : "Play"))
         : "Add tracks and clips to play";
-
-    // ========================================================================
-    // EFFECTS: Sync tempo input with composition tempo
-    // ========================================================================
-    useEffect(() => {
-        if (activeComposition) {
-            setTempoInput(activeComposition.tempo.toString());
-        }
-    }, [activeComposition?.tempo]);
 
     // ========================================================================
     // HANDLERS: Transport controls
@@ -96,25 +79,6 @@ export function SequencerTransport() {
             toast.error("Failed to toggle loop");
         }
     }, [isLooping, setIsLooping]);
-
-    const handleTempoChange = useCallback((value: string) => {
-        setTempoInput(value);
-    }, []);
-
-    const handleTempoBlur = useCallback(async () => {
-        const newTempo = parseFloat(tempoInput);
-        if (!isNaN(newTempo) && newTempo >= 20 && newTempo <= 300) {
-            await setTempo(newTempo);
-        } else {
-            setTempoInput(tempo.toString());
-        }
-    }, [tempoInput, tempo, setTempo]);
-
-    const handleTempoKeyDown = useCallback(async (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === "Enter") {
-            await handleTempoBlur();
-        }
-    }, [handleTempoBlur]);
 
     return (
         <div className="flex items-center gap-4">
@@ -162,22 +126,7 @@ export function SequencerTransport() {
             </div>
 
             {/* Tempo Control */}
-            <div className="flex items-center gap-2">
-                <Label htmlFor="tempo" className="text-xs text-muted-foreground">
-                    BPM
-                </Label>
-                <Input
-                    id="tempo"
-                    type="number"
-                    min="20"
-                    max="300"
-                    value={tempoInput}
-                    onChange={(e) => handleTempoChange(e.target.value)}
-                    onBlur={handleTempoBlur}
-                    onKeyDown={handleTempoKeyDown}
-                    className="w-16 h-7 text-sm"
-                />
-            </div>
+            <SequencerTempoControl />
         </div>
     );
 }

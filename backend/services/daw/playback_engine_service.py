@@ -124,10 +124,8 @@ class PlaybackEngineService:
         logger.info(f"   Tempo: {self.tempo} BPM, WebSocket: {'connected' if self.websocket_manager else 'not available'}")
         logger.info(f"   WebSocket has {len(self.websocket_manager.transport_clients) if self.websocket_manager else 0} connected clients")
 
-        # Calculate time per beat in seconds
-        beat_duration = 60.0 / self.tempo  # seconds per beat
+        # Playback loop constants
         update_interval = 0.02  # 50 Hz update rate (20ms)
-        beats_per_update = (update_interval / beat_duration)
 
         last_time = time.time()
         loop_count = 0
@@ -144,6 +142,9 @@ class PlaybackEngineService:
                 current_time = time.time()
                 delta_time = current_time - last_time
                 last_time = current_time
+
+                # Recalculate beat duration on every iteration to respond to tempo changes in real-time
+                beat_duration = 60.0 / self.tempo  # seconds per beat
 
                 # Advance playhead
                 delta_beats = (delta_time / beat_duration)

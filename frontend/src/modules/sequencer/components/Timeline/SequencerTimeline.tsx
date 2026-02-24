@@ -81,8 +81,6 @@ export function SequencerTimeline({
         }
     }, [playheadX, scrollContainerRef]);
 
-
-
     return (
         <>
             {/* Tracks and Clips - Ruler is now rendered in fixed header above */}
