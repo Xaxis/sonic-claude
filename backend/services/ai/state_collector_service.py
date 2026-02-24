@@ -20,6 +20,7 @@ from backend.models.daw_state import (
     CompactTrack,
     CompactClip,
     CompactMIDINote,
+    CompactEffect,
     AudioFeatures,
     MusicalContext,
     StateDetailLevel,
@@ -166,9 +167,27 @@ class DAWStateService:
     
     def _convert_sequence(self, seq, detail: StateDetailLevel) -> CompactSequence:
         """Convert full sequence to compact representation"""
-        # Convert tracks
-        tracks = [
-            CompactTrack(
+        # Build track effects lookup for quick access
+        track_effects_map = {}
+        if hasattr(seq, 'track_effects') and seq.track_effects:
+            for track_effect_chain in seq.track_effects:
+                track_effects_map[track_effect_chain.track_id] = track_effect_chain.effects
+
+        # Convert tracks with effect chains
+        tracks = []
+        for track in seq.tracks:
+            # Get effects for this track
+            effects = []
+            if track.id in track_effects_map:
+                for effect in track_effects_map[track.id]:
+                    effects.append(CompactEffect(
+                        id=effect.id,
+                        name=effect.effect_name,
+                        params=effect.parameters,
+                        bypassed=effect.is_bypassed
+                    ))
+
+            tracks.append(CompactTrack(
                 id=track.id,
                 name=track.name,
                 type=track.type,
@@ -176,10 +195,10 @@ class DAWStateService:
                 vol=track.volume,
                 pan=track.pan,
                 muted=track.is_muted,
-                solo=track.is_solo
-            )
-            for track in seq.tracks
-        ]
+                solo=track.is_solo,
+                effects=effects
+            ))
+
         
         # Convert clips (with optional limits)
         clips = []

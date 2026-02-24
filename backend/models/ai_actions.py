@@ -93,6 +93,123 @@ class StopPlaybackAction(BaseModel):
 
 
 # ============================================================================
+# EXTENDED TRACK OPERATIONS
+# ============================================================================
+
+class DeleteTrackAction(BaseModel):
+    """Delete a track and all its clips"""
+    action: Literal["delete_track"] = "delete_track"
+    track_id: str
+
+
+class RenameTrackAction(BaseModel):
+    """Rename a track"""
+    action: Literal["rename_track"] = "rename_track"
+    track_id: str
+    name: str
+
+
+class ChangeTrackInstrumentAction(BaseModel):
+    """Change the instrument/synth of a MIDI track"""
+    action: Literal["change_track_instrument"] = "change_track_instrument"
+    track_id: str
+    instrument: str = Field(..., description="New instrument/synth name")
+
+
+class ReorderTracksAction(BaseModel):
+    """Reorder tracks in the composition"""
+    action: Literal["reorder_tracks"] = "reorder_tracks"
+    track_order: List[str] = Field(..., description="List of track IDs in desired order")
+
+
+# ============================================================================
+# EXTENDED CLIP OPERATIONS
+# ============================================================================
+
+class DuplicateClipAction(BaseModel):
+    """Duplicate a clip"""
+    action: Literal["duplicate_clip"] = "duplicate_clip"
+    clip_id: str
+    start_time: Optional[float] = Field(None, description="Start time for duplicate (auto-place if not specified)")
+
+
+class MoveClipAction(BaseModel):
+    """Move a clip to a different track or time"""
+    action: Literal["move_clip"] = "move_clip"
+    clip_id: str
+    track_id: Optional[str] = Field(None, description="New track ID (keep same track if not specified)")
+    start_time: Optional[float] = Field(None, description="New start time (keep same if not specified)")
+
+
+class SplitClipAction(BaseModel):
+    """Split a clip at a specific time"""
+    action: Literal["split_clip"] = "split_clip"
+    clip_id: str
+    split_time: float = Field(..., description="Time to split at (in beats, relative to clip start)")
+
+
+class SetClipGainAction(BaseModel):
+    """Set clip gain/volume"""
+    action: Literal["set_clip_gain"] = "set_clip_gain"
+    clip_id: str
+    gain: float = Field(..., ge=0.0, le=2.0, description="Clip gain (0.0-2.0, 1.0 = unity)")
+
+
+# ============================================================================
+# EXTENDED EFFECT OPERATIONS
+# ============================================================================
+
+class RemoveEffectAction(BaseModel):
+    """Remove an effect from a track"""
+    action: Literal["remove_effect"] = "remove_effect"
+    effect_id: str
+
+
+class BypassEffectAction(BaseModel):
+    """Bypass/unbypass an effect"""
+    action: Literal["bypass_effect"] = "bypass_effect"
+    effect_id: str
+    bypassed: bool
+
+
+class ReorderEffectsAction(BaseModel):
+    """Reorder effects in a track's effect chain"""
+    action: Literal["reorder_effects"] = "reorder_effects"
+    track_id: str
+    effect_order: List[str] = Field(..., description="List of effect IDs in desired order")
+
+
+# ============================================================================
+# COMPOSITION OPERATIONS
+# ============================================================================
+
+class SetTimeSignatureAction(BaseModel):
+    """Set composition time signature"""
+    action: Literal["set_time_signature"] = "set_time_signature"
+    time_signature: str = Field(..., pattern=r"^\d+/\d+$", description="Time signature (e.g., '4/4', '3/4', '6/8')")
+
+
+class SetLoopPointsAction(BaseModel):
+    """Set loop start and end points"""
+    action: Literal["set_loop_points"] = "set_loop_points"
+    loop_start: float = Field(..., ge=0.0, description="Loop start in beats")
+    loop_end: float = Field(..., gt=0.0, description="Loop end in beats")
+    loop_enabled: Optional[bool] = Field(None, description="Enable/disable looping")
+
+
+class SeekToPositionAction(BaseModel):
+    """Seek playhead to a specific position"""
+    action: Literal["seek_to_position"] = "seek_to_position"
+    position: float = Field(..., ge=0.0, description="Position in beats")
+
+
+class RenameCompositionAction(BaseModel):
+    """Rename the composition"""
+    action: Literal["rename_composition"] = "rename_composition"
+    name: str
+
+
+# ============================================================================
 # ACTION EXECUTION
 # ============================================================================
 
@@ -102,14 +219,34 @@ class DAWAction(BaseModel):
     LLM returns one of these via function calling
     """
     action: Literal[
+        # Clip operations
         "create_midi_clip",
         "modify_clip",
         "delete_clip",
+        "duplicate_clip",
+        "move_clip",
+        "split_clip",
+        "set_clip_gain",
+        # Track operations
         "create_track",
+        "delete_track",
+        "rename_track",
+        "change_track_instrument",
+        "reorder_tracks",
         "set_track_parameter",
-        "set_tempo",
+        # Effect operations
         "add_effect",
+        "remove_effect",
+        "bypass_effect",
+        "reorder_effects",
         "set_effect_parameter",
+        # Composition operations
+        "set_tempo",
+        "set_time_signature",
+        "set_loop_points",
+        "seek_to_position",
+        "rename_composition",
+        # Playback operations
         "play_sequence",
         "stop_playback"
     ]

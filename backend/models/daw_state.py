@@ -42,6 +42,14 @@ class CompactClip(BaseModel):
     audio_analysis: Optional[Dict[str, Any]] = Field(None, description="Audio analysis summary")
 
 
+class CompactEffect(BaseModel):
+    """Minimal effect representation for AI"""
+    id: str
+    name: str = Field(..., description="Effect name (e.g., 'reverb', 'delay')")
+    params: Dict[str, float] = Field(default_factory=dict, description="Effect parameters")
+    bypassed: bool = False
+
+
 class CompactTrack(BaseModel):
     """Minimal track representation"""
     id: str
@@ -52,6 +60,7 @@ class CompactTrack(BaseModel):
     pan: float = Field(default=0.0, description="Pan (-1.0 to 1.0)")
     muted: bool = False
     solo: bool = False
+    effects: List["CompactEffect"] = Field(default_factory=list, description="Track effect chain")
 
 
 class CompactComposition(BaseModel):

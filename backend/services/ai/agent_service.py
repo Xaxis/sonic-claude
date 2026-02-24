@@ -1120,6 +1120,194 @@ Keep suggestions simple and musical. Explain your reasoning briefly."""
                     "type": "object",
                     "properties": {}
                 }
+            },
+            # Extended Clip Operations
+            {
+                "name": "duplicate_clip",
+                "description": "Duplicate a clip to create a copy. Useful for repeating patterns or creating variations.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "clip_id": {"type": "string", "description": "Clip ID to duplicate"},
+                        "start_time": {"type": "number", "description": "Start time for the duplicate in beats (optional, defaults to after original clip)"}
+                    },
+                    "required": ["clip_id"]
+                }
+            },
+            {
+                "name": "move_clip",
+                "description": "Move a clip to a different track or time position",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "clip_id": {"type": "string", "description": "Clip ID to move"},
+                        "track_id": {"type": "string", "description": "New track ID (optional)"},
+                        "start_time": {"type": "number", "description": "New start time in beats (optional)"}
+                    },
+                    "required": ["clip_id"]
+                }
+            },
+            {
+                "name": "split_clip",
+                "description": "Split a clip into two clips at a specific time point",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "clip_id": {"type": "string", "description": "Clip ID to split"},
+                        "split_time": {"type": "number", "description": "Time to split at in beats (relative to clip start)"}
+                    },
+                    "required": ["clip_id", "split_time"]
+                }
+            },
+            {
+                "name": "set_clip_gain",
+                "description": "Set the gain/volume of a specific clip",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "clip_id": {"type": "string", "description": "Clip ID"},
+                        "gain": {"type": "number", "description": "Gain multiplier (0.0-2.0, 1.0 = unity)"}
+                    },
+                    "required": ["clip_id", "gain"]
+                }
+            },
+            # Extended Track Operations
+            {
+                "name": "delete_track",
+                "description": "Delete a track and all its clips",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "track_id": {"type": "string", "description": "Track ID to delete"}
+                    },
+                    "required": ["track_id"]
+                }
+            },
+            {
+                "name": "rename_track",
+                "description": "Rename a track",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "track_id": {"type": "string", "description": "Track ID to rename"},
+                        "name": {"type": "string", "description": "New track name"}
+                    },
+                    "required": ["track_id", "name"]
+                }
+            },
+            {
+                "name": "change_track_instrument",
+                "description": "Change the instrument/synth of a MIDI track",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "track_id": {"type": "string", "description": "Track ID"},
+                        "instrument": {"type": "string", "description": "New instrument name (e.g., sine, saw, square, kick, snare, hihat)"}
+                    },
+                    "required": ["track_id", "instrument"]
+                }
+            },
+            {
+                "name": "reorder_tracks",
+                "description": "Reorder tracks in the composition",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "track_order": {
+                            "type": "array",
+                            "description": "Array of track IDs in desired order",
+                            "items": {"type": "string"}
+                        }
+                    },
+                    "required": ["track_order"]
+                }
+            },
+            # Extended Effect Operations
+            {
+                "name": "remove_effect",
+                "description": "Remove an effect from a track",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "effect_id": {"type": "string", "description": "Effect ID to remove"}
+                    },
+                    "required": ["effect_id"]
+                }
+            },
+            {
+                "name": "bypass_effect",
+                "description": "Bypass or unbypass an effect (turn it on/off without removing it)",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "effect_id": {"type": "string", "description": "Effect ID"},
+                        "bypassed": {"type": "boolean", "description": "True to bypass (turn off), false to unbypass (turn on)"}
+                    },
+                    "required": ["effect_id", "bypassed"]
+                }
+            },
+            {
+                "name": "reorder_effects",
+                "description": "Reorder effects in a track's effect chain. Effect order matters - effects process audio sequentially.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "track_id": {"type": "string", "description": "Track ID"},
+                        "effect_order": {
+                            "type": "array",
+                            "description": "Array of effect IDs in desired order",
+                            "items": {"type": "string"}
+                        }
+                    },
+                    "required": ["track_id", "effect_order"]
+                }
+            },
+            # Extended Composition Operations
+            {
+                "name": "set_time_signature",
+                "description": "Set the time signature of the composition",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "time_signature": {"type": "string", "description": "Time signature (e.g., '4/4', '3/4', '6/8')"}
+                    },
+                    "required": ["time_signature"]
+                }
+            },
+            {
+                "name": "set_loop_points",
+                "description": "Set loop start and end points for playback",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "loop_start": {"type": "number", "description": "Loop start position in beats"},
+                        "loop_end": {"type": "number", "description": "Loop end position in beats"},
+                        "loop_enabled": {"type": "boolean", "description": "Enable/disable looping (optional)"}
+                    },
+                    "required": ["loop_start", "loop_end"]
+                }
+            },
+            {
+                "name": "seek_to_position",
+                "description": "Move the playhead to a specific position",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "position": {"type": "number", "description": "Position in beats"}
+                    },
+                    "required": ["position"]
+                }
+            },
+            {
+                "name": "rename_composition",
+                "description": "Rename the composition",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "New composition name"}
+                    },
+                    "required": ["name"]
+                }
             }
         ]
 
