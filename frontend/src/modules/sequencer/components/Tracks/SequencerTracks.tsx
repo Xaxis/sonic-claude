@@ -40,13 +40,9 @@ export function SequencerTracks({
     const tracks = useDAWStore(state => state.tracks);
 
     // ========================================================================
-    // ACTIONS: Get directly from Zustand store
+    // ACTIONS: Get directly from Zustand store (only for delete dialog)
     // ========================================================================
-    const muteTrack = useDAWStore(state => state.muteTrack);
-    const soloTrack = useDAWStore(state => state.soloTrack);
     const deleteTrack = useDAWStore(state => state.deleteTrack);
-    const renameTrack = useDAWStore(state => state.renameTrack);
-    const updateTrack = useDAWStore(state => state.updateTrack);
 
     // ========================================================================
     // LOCAL UI STATE: Delete dialog and track expansion
@@ -60,7 +56,7 @@ export function SequencerTracks({
     const setExpandedTracks = onExpandedTracksChange ?? setInternalExpandedTracks;
 
     // ========================================================================
-    // HANDLERS: Adapt store actions to component callbacks
+    // HANDLERS: Only for local UI state (delete dialog, track expansion)
     // ========================================================================
     const handleDeleteClick = (trackId: string) => {
         const track = tracks.find((t) => t.id === trackId);
@@ -91,28 +87,6 @@ export function SequencerTracks({
         }
     };
 
-    const handleRenameTrack = async (trackId: string, newName: string) => {
-        await renameTrack(trackId, newName);
-    };
-
-    const handleUpdateTrack = async (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => {
-        await updateTrack(trackId, updates);
-    };
-
-    const handleToggleMute = async (trackId: string) => {
-        const track = tracks.find(t => t.id === trackId);
-        if (track) {
-            await muteTrack(trackId, !track.is_muted);
-        }
-    };
-
-    const handleToggleSolo = async (trackId: string) => {
-        const track = tracks.find(t => t.id === trackId);
-        if (track) {
-            await soloTrack(trackId, !track.is_solo);
-        }
-    };
-
     return (
         <div className="flex flex-col">
             {tracks.length === 0 ? (
@@ -129,14 +103,10 @@ export function SequencerTracks({
                 tracks.map((track) => (
                     <SequencerTrackHeader
                         key={track.id}
-                        track={track}
-                        onToggleMute={handleToggleMute}
-                        onToggleSolo={handleToggleSolo}
-                        onRename={handleRenameTrack}
-                        onDelete={handleDeleteClick}
-                        onUpdateTrack={handleUpdateTrack}
+                        trackId={track.id}
                         isExpanded={expandedTracks.has(track.id)}
                         onToggleExpand={handleToggleExpand}
+                        onDeleteClick={handleDeleteClick}
                     />
                 ))
             )}

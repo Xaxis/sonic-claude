@@ -1,6 +1,11 @@
 /**
  * SequencerTrackHeader Component
- * 
+ *
+ * REFACTORED: Uses Zustand best practices
+ * - Reads track from Zustand directly (no prop drilling)
+ * - Calls all Zustand actions directly (no callback props)
+ * - Only receives trackId (identifier) and local UI state/callbacks
+ *
  * Professional DAW-style track header with clean hierarchical organization.
  */
 
@@ -19,51 +24,61 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
+import { useDAWStore } from "@/stores/dawStore";
 
 interface SequencerTrackHeaderProps {
-    track: {
-        id: string;
-        name: string;
-        type: "midi" | "audio" | "sample";
-        is_muted: boolean;
-        is_solo: boolean;
-        is_armed: boolean;
-        volume: number; // 0.0-2.0
-        pan: number; // -1.0 to 1.0
-        instrument?: string; // MIDI only
-        sample_name?: string; // Sample only
-        color?: string;
-    };
-    onToggleMute: (trackId: string) => void;
-    onToggleSolo: (trackId: string) => void;
-    onRename?: (trackId: string, newName: string) => void;
-    onDelete?: (trackId: string) => void;
-    onUpdateTrack?: (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => void;
-    isExpanded?: boolean; // Track header expansion state
-    onToggleExpand?: (trackId: string) => void; // Toggle expanded/minimized
+    trackId: string;
+    isExpanded?: boolean;
+    onToggleExpand?: (trackId: string) => void;
+    onDeleteClick?: (trackId: string) => void;
 }
 
 export function SequencerTrackHeader({
-    track,
-    onToggleMute,
-    onToggleSolo,
-    onRename,
-    onDelete,
-    onUpdateTrack,
+    trackId,
     isExpanded = false,
     onToggleExpand,
+    onDeleteClick,
 }: SequencerTrackHeaderProps) {
-    const [isEditing, setIsEditing] = useState(false);
-    const [editName, setEditName] = useState(track.name);
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
+    const tracks = useDAWStore(state => state.tracks);
 
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
+    const muteTrack = useDAWStore(state => state.muteTrack);
+    const soloTrack = useDAWStore(state => state.soloTrack);
+    const renameTrack = useDAWStore(state => state.renameTrack);
+    const updateTrack = useDAWStore(state => state.updateTrack);
+
+    // ========================================================================
+    // DERIVED STATE: Find track by ID
+    // ========================================================================
+    const track = tracks.find(t => t.id === trackId);
+
+    // ========================================================================
+    // LOCAL UI STATE: Track name editing
+    // ========================================================================
+    const [isEditing, setIsEditing] = useState(false);
+    const [editName, setEditName] = useState(track?.name || "");
+
+    // Guard: If track not found, render nothing
+    if (!track) {
+        return null;
+    }
+
+    // ========================================================================
+    // HANDLERS: Track name editing
+    // ========================================================================
     const handleStartEdit = () => {
         setEditName(track.name);
         setIsEditing(true);
     };
 
-    const handleSaveEdit = () => {
-        if (editName.trim() && onRename) {
-            onRename(track.id, editName.trim());
+    const handleSaveEdit = async () => {
+        if (editName.trim()) {
+            await renameTrack(track.id, editName.trim());
         }
         setIsEditing(false);
     };
@@ -71,6 +86,25 @@ export function SequencerTrackHeader({
     const handleCancelEdit = () => {
         setEditName(track.name);
         setIsEditing(false);
+    };
+
+    // ========================================================================
+    // HANDLERS: Track actions (call Zustand actions directly)
+    // ========================================================================
+    const handleToggleMute = async () => {
+        await muteTrack(track.id, !track.is_muted);
+    };
+
+    const handleToggleSolo = async () => {
+        await soloTrack(track.id, !track.is_solo);
+    };
+
+    const handleUpdateVolume = async (volume: number) => {
+        await updateTrack(track.id, { volume });
+    };
+
+    const handleUpdatePan = async (pan: number) => {
+        await updateTrack(track.id, { pan });
     };
 
     return (
@@ -108,7 +142,7 @@ export function SequencerTrackHeader({
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                            onClick={() => onDelete?.(track.id)}
+                            onClick={() => onDeleteClick?.(track.id)}
                             className="text-xs py-1 text-red-500 focus:text-red-500"
                         >
                             <Trash2 size={10} className="mr-1.5" />
@@ -154,7 +188,7 @@ export function SequencerTrackHeader({
                     <SequencerTrackButton
                         variant="mute"
                         active={track.is_muted}
-                        onClick={() => onToggleMute(track.id)}
+                        onClick={handleToggleMute}
                         size="xs"
                     >
                         M
@@ -163,7 +197,7 @@ export function SequencerTrackHeader({
                     <SequencerTrackButton
                         variant="solo"
                         active={track.is_solo}
-                        onClick={() => onToggleSolo(track.id)}
+                        onClick={handleToggleSolo}
                         size="xs"
                     >
                         S
@@ -229,7 +263,7 @@ export function SequencerTrackHeader({
                             <SequencerTrackButton
                                 variant="mute"
                                 active={track.is_muted}
-                                onClick={() => onToggleMute(track.id)}
+                                onClick={handleToggleMute}
                                 size="sm"
                                 bordered
                             >
@@ -239,7 +273,7 @@ export function SequencerTrackHeader({
                             <SequencerTrackButton
                                 variant="solo"
                                 active={track.is_solo}
-                                onClick={() => onToggleSolo(track.id)}
+                                onClick={handleToggleSolo}
                                 size="sm"
                                 bordered
                             >
@@ -259,43 +293,41 @@ export function SequencerTrackHeader({
                     </div>
 
                     {/* ROW 3: MIXING - Volume and Pan */}
-                    {onUpdateTrack && (
-                        <div className="flex items-center gap-3 text-[10px]">
-                            <div className="flex items-center gap-1.5 flex-1">
-                                <span className="text-muted-foreground w-7 flex-shrink-0">Vol</span>
-                                <Slider
-                                    value={[track.volume * 100]}
-                                    onValueChange={(values) => {
-                                        onUpdateTrack(track.id, { volume: values[0] / 100 });
-                                    }}
-                                    min={0}
-                                    max={200}
-                                    step={1}
-                                    className="flex-1"
-                                />
-                                <span className="text-muted-foreground w-10 text-right flex-shrink-0 font-mono">
-                                    {Math.round(track.volume * 100)}%
-                                </span>
-                            </div>
-
-                            <div className="flex items-center gap-1.5 flex-1">
-                                <span className="text-muted-foreground w-7 flex-shrink-0">Pan</span>
-                                <Slider
-                                    value={[track.pan * 100]}
-                                    onValueChange={(values) => {
-                                        onUpdateTrack(track.id, { pan: values[0] / 100 });
-                                    }}
-                                    min={-100}
-                                    max={100}
-                                    step={1}
-                                    className="flex-1"
-                                />
-                                <span className="text-muted-foreground w-9 text-right flex-shrink-0 font-mono">
-                                    {track.pan === 0 ? "C" : track.pan > 0 ? `R${Math.round(track.pan * 100)}` : `L${Math.round(Math.abs(track.pan) * 100)}`}
-                                </span>
-                            </div>
+                    <div className="flex items-center gap-3 text-[10px]">
+                        <div className="flex items-center gap-1.5 flex-1">
+                            <span className="text-muted-foreground w-7 flex-shrink-0">Vol</span>
+                            <Slider
+                                value={[track.volume * 100]}
+                                onValueChange={async (values) => {
+                                    await handleUpdateVolume(values[0] / 100);
+                                }}
+                                min={0}
+                                max={200}
+                                step={1}
+                                className="flex-1"
+                            />
+                            <span className="text-muted-foreground w-10 text-right flex-shrink-0 font-mono">
+                                {Math.round(track.volume * 100)}%
+                            </span>
                         </div>
-                    )}
+
+                        <div className="flex items-center gap-1.5 flex-1">
+                            <span className="text-muted-foreground w-7 flex-shrink-0">Pan</span>
+                            <Slider
+                                value={[track.pan * 100]}
+                                onValueChange={async (values) => {
+                                    await handleUpdatePan(values[0] / 100);
+                                }}
+                                min={-100}
+                                max={100}
+                                step={1}
+                                className="flex-1"
+                            />
+                            <span className="text-muted-foreground w-9 text-right flex-shrink-0 font-mono">
+                                {track.pan === 0 ? "C" : track.pan > 0 ? `R${Math.round(track.pan * 100)}` : `L${Math.round(Math.abs(track.pan) * 100)}`}
+                            </span>
+                        </div>
+                    </div>
                 </>
             )}
         </div>

@@ -4,7 +4,7 @@
  * PURE ORCHESTRATOR COMPONENT:
  * - No prop drilling - child components read from store directly
  * - No handler wrappers - child components call store actions directly
- * - Only manages local UI state (tempo input, settings dialog)
+ * - Only manages local UI state
  * - Only passes scroll refs to child components
  *
  * Main orchestrator component for the sequencer.
@@ -66,7 +66,7 @@ export function SequencerPanel() {
             <div className="flex-shrink-0">
                 <SubPanel title="TRANSPORT" showHeader={false}>
                     <div className="px-4 py-3 bg-gradient-to-r from-muted/20 to-muted/10 flex items-center justify-between">
-                        {/* Left: Transport Controls - NO PROPS! Reads from Zustand directly */}
+                        {/* Left: Transport Controls */}
                         <SequencerTransport />
 
                         {/* Right: Toolbar Controls */}
