@@ -325,14 +325,44 @@ class DAWActionService:
             parameter = params["parameter"]
             value = params["value"]
 
+            # Get current composition ID
+            if not self.composition_state.current_composition_id:
+                return ActionResult(
+                    success=False,
+                    action="set_track_parameter",
+                    message="No active composition",
+                    error="NO_COMPOSITION"
+                )
+
+            composition_id = self.composition_state.current_composition_id
+
+            # Get the track to update its properties
+            composition = self.composition_state.get_composition(composition_id)
+            if not composition:
+                return ActionResult(
+                    success=False,
+                    action="set_track_parameter",
+                    message=f"Composition {composition_id} not found",
+                    error="COMPOSITION_NOT_FOUND"
+                )
+
+            track = next((t for t in composition.tracks if t.id == track_id), None)
+            if not track:
+                return ActionResult(
+                    success=False,
+                    action="set_track_parameter",
+                    message=f"Track {track_id} not found",
+                    error="TRACK_NOT_FOUND"
+                )
+
             if parameter == "volume":
-                await self.composition_state.update_track(track_id, volume=value)
+                track.volume = value
             elif parameter == "pan":
-                await self.composition_state.update_track(track_id, pan=value)
+                track.pan = value
             elif parameter == "mute":
-                await self.composition_state.update_track_mute(track_id, value)
+                track.is_muted = value
             elif parameter == "solo":
-                await self.composition_state.update_track_solo(track_id, value)
+                track.is_solo = value
             else:
                 return ActionResult(
                     success=False,
@@ -353,7 +383,17 @@ class DAWActionService:
     async def _set_tempo(self, params: Dict[str, Any]) -> ActionResult:
         """Set global tempo"""
         try:
-            await self.playback_engine.set_tempo(params["tempo"])
+            # Get current composition ID
+            if not self.composition_state.current_composition_id:
+                return ActionResult(
+                    success=False,
+                    action="set_tempo",
+                    message="No active composition",
+                    error="NO_COMPOSITION"
+                )
+
+            composition_id = self.composition_state.current_composition_id
+            await self.playback_engine.set_tempo(composition_id, params["tempo"])
             return ActionResult(
                 success=True,
                 action="set_tempo",

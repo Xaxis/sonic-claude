@@ -52,6 +52,12 @@ export function AIPanel() {
             }
         },
         loadEffectDefs: loadEffectDefinitions,
+        // CRITICAL: Reload the active composition to show AI changes
+        reloadActiveComposition: async () => {
+            if (activeComposition?.id) {
+                await loadComposition(activeComposition.id);
+            }
+        },
     });
 
     // Load initial state AND AI context on mount

@@ -34,6 +34,7 @@ interface UseAIHandlersProps {
     loadSequences: () => Promise<void>;
     loadTracks: () => Promise<void>;  // Reload mixer tracks
     loadEffectDefs: () => Promise<void>;  // Reload effect definitions
+    reloadActiveComposition: () => Promise<void>;  // CRITICAL: Reload active composition to show AI changes
 }
 
 export function useAIHandlers(props: UseAIHandlersProps) {
@@ -49,6 +50,7 @@ export function useAIHandlers(props: UseAIHandlersProps) {
         loadSequences,
         loadTracks,
         loadEffectDefs,
+        reloadActiveComposition,
     } = props;
 
     // Activity tracking for animations from Zustand
@@ -159,8 +161,10 @@ export function useAIHandlers(props: UseAIHandlersProps) {
                 if (response.actions_executed && response.actions_executed.length > 0) {
                     console.log("🔄 AI executed actions - reloading ALL UI components...");
 
-                    // Reload sequencer (THIS LOADS CLIPS!)
-                    // Sequences contain clips, so this is critical for showing clip modifications
+                    // CRITICAL: Reload the active composition first to get all updated data
+                    await reloadActiveComposition();
+
+                    // Reload composition list (in case new compositions were created)
                     await loadSequences();
 
                     // Reload tracks (in case tracks were created/modified)
@@ -194,7 +198,7 @@ export function useAIHandlers(props: UseAIHandlersProps) {
                 setIsSendingMessage(false);
             }
         },
-        [addChatMessage, addAnalysisEvent, setIsSendingMessage, loadSequences, loadSequencerTracks, loadTracks, loadEffectDefs, activeSequenceId]
+        [addChatMessage, addAnalysisEvent, setIsSendingMessage, loadSequences, loadSequencerTracks, loadTracks, loadEffectDefs, reloadActiveComposition, activeSequenceId]
     );
 
     // ========================================================================
