@@ -97,52 +97,50 @@ export function SequencerTimeline({
     }, [playheadX]);
 
     return (
-        <div ref={timelineContainerRef} className="flex-shrink-0" style={{ width: `${totalWidth}px`, minWidth: `${totalWidth}px` }}>
+        <div ref={timelineContainerRef}>
             {/* Tracks and Clips - Ruler is now rendered in fixed header above */}
             {tracks.length === 0 ? (
                 <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
                     No tracks. Add a track to start sequencing.
                 </div>
             ) : (
-                <div className="flex-shrink-0" style={{ width: `${totalWidth}px` }}>
-                    <div className="relative" style={{ width: `${totalWidth}px` }}>
-                        {/* Grid Lines */}
-                        <SequencerTimelineGrid rulerMarkers={rulerMarkers} />
+                <div className="relative">
+                    {/* Grid Lines */}
+                    <SequencerTimelineGrid rulerMarkers={rulerMarkers} />
 
-                        {/* Loop Region */}
-                        <SequencerTimelineLoopRegion
+                    {/* Loop Region */}
+                    <SequencerTimelineLoopRegion
+                        pixelsPerBeat={pixelsPerBeat}
+                        onLoopStartChange={onLoopStartChange}
+                        onLoopEndChange={onLoopEndChange}
+                    />
+
+                    {/* Track Rows */}
+                    {tracks.map((track) => (
+                        <SequencerTimelineTrackRow
+                            key={track.id}
+                            track={track}
+                            clips={clips}
                             pixelsPerBeat={pixelsPerBeat}
-                            onLoopStartChange={onLoopStartChange}
-                            onLoopEndChange={onLoopEndChange}
+                            isExpanded={expandedTracks?.has(track.id)}
+                            onSelectClip={onSelectClip}
+                            onDuplicateClip={onDuplicateClip}
+                            onDeleteClip={onDeleteClip}
+                            onAddClipToTrack={onAddClipToTrack}
+                            onMoveClip={onMoveClip}
+                            onResizeClip={onResizeClip}
+                            onUpdateClip={onUpdateClip}
+                            onOpenPianoRoll={onOpenPianoRoll}
+                            onOpenSampleEditor={onOpenSampleEditor}
+                            onClipDragStateChange={onClipDragStateChange}
                         />
+                    ))}
 
-                        {/* Track Rows */}
-                        {tracks.map((track) => (
-                            <SequencerTimelineTrackRow
-                                key={track.id}
-                                track={track}
-                                clips={clips}
-                                pixelsPerBeat={pixelsPerBeat}
-                                isExpanded={expandedTracks?.has(track.id)}
-                                onSelectClip={onSelectClip}
-                                onDuplicateClip={onDuplicateClip}
-                                onDeleteClip={onDeleteClip}
-                                onAddClipToTrack={onAddClipToTrack}
-                                onMoveClip={onMoveClip}
-                                onResizeClip={onResizeClip}
-                                onUpdateClip={onUpdateClip}
-                                onOpenPianoRoll={onOpenPianoRoll}
-                                onOpenSampleEditor={onOpenSampleEditor}
-                                onClipDragStateChange={onClipDragStateChange}
-                            />
-                        ))}
-
-                        {/* Playhead - Rendered AFTER tracks so it appears on top */}
-                        <SequencerTimelinePlayhead
-                            pixelsPerBeat={pixelsPerBeat}
-                            onSeek={onSeek}
-                        />
-                    </div>
+                    {/* Playhead - Rendered AFTER tracks so it appears on top */}
+                    <SequencerTimelinePlayhead
+                        pixelsPerBeat={pixelsPerBeat}
+                        onSeek={onSeek}
+                    />
                 </div>
             )}
         </div>

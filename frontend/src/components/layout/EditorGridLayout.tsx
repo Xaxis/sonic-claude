@@ -91,7 +91,7 @@ export function EditorGridLayout({
                 height: '100%',
             }}
         >
-            {/* BEST PRACTICE: Use CSS Grid for layout */}
+            {/* BEST PRACTICE: Use CSS Grid for layout with sticky columns */}
             <div
                 style={{
                     display: 'grid',
@@ -100,50 +100,58 @@ export function EditorGridLayout({
                     minWidth: `${sidebarWidth + contentWidth}px`,
                 }}
             >
-                {/* Top-Left: Corner Header - Sticky to top-left corner */}
+                {/* Top-Left: Corner Header - Sticky to top-left corner (FIXED, doesn't scroll) */}
                 <div
-                    className="border-r border-b border-border bg-muted/30 flex items-center px-3"
+                    className="border-r border-b border-border flex items-center px-3"
                     style={{
                         position: 'sticky',
                         top: 0,
                         left: 0,
+                        width: `${sidebarWidth}px`,
                         height: `${headerHeight}px`,
-                        zIndex: 30, // Highest z-index (on top of everything)
-                        backgroundColor: 'hsl(var(--muted) / 0.3)',
+                        zIndex: 40, // Highest z-index (on top of everything)
+                        backgroundColor: 'hsl(var(--background))',
                     }}
                 >
                     {cornerHeader}
                 </div>
 
-                {/* Top-Right: Ruler - Sticky to top */}
+                {/* Top-Right: Ruler - Sticky to top, scrolls horizontally UNDER the corner header */}
                 <div
                     className="border-b border-border"
                     style={{
                         position: 'sticky',
                         top: 0,
+                        width: `${contentWidth}px`,
                         height: `${headerHeight}px`,
-                        zIndex: 20, // Below corner header
+                        zIndex: 20, // Below corner header, above timeline
                         backgroundColor: 'hsl(var(--background))',
+                        overflow: 'hidden', // Prevent ruler content from bleeding out
                     }}
                 >
                     {ruler}
                 </div>
 
-                {/* Bottom-Left: Sidebar (Track Headers) - Sticky to left */}
+                {/* Bottom-Left: Sidebar (Track Headers) - Sticky to left, FIXED horizontally, scrolls vertically */}
                 <div
-                    className="border-r border-border bg-background"
+                    className="border-r border-border"
                     style={{
                         position: 'sticky',
                         left: 0,
-                        zIndex: 10, // Below ruler and corner
+                        width: `${sidebarWidth}px`,
+                        zIndex: 30, // Above timeline, below corner header
                         backgroundColor: 'hsl(var(--background))',
                     }}
                 >
                     {sidebar}
                 </div>
 
-                {/* Bottom-Right: Main Content (Timeline) - Normal flow */}
-                <div>
+                {/* Bottom-Right: Main Content (Timeline) - Scrolls UNDER the sidebar */}
+                <div
+                    style={{
+                        width: `${contentWidth}px`,
+                    }}
+                >
                     {mainContent}
                 </div>
             </div>

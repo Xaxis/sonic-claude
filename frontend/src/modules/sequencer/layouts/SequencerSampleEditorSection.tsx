@@ -91,7 +91,7 @@ export function SequencerSampleEditorSection({
                 />
             }
             sidebar={
-                <div className="flex-1 flex items-center justify-center text-muted-foreground/30 text-sm">
+                <div className="flex-1 flex items-center justify-center text-muted-foreground/30 text-sm bg-background">
                     {/* Empty placeholder - could add controls here later */}
                 </div>
             }

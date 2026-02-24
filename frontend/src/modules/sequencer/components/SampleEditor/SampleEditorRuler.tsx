@@ -188,7 +188,7 @@ export function SampleEditorRuler({
 
     return (
         <div
-            className="relative h-8 border-b border-border bg-muted/30 flex-shrink-0 cursor-pointer hover:bg-muted/50 transition-colors"
+            className="relative h-8 cursor-pointer hover:bg-muted/30 transition-colors"
             onClick={handleRulerClick}
             title="Click to seek"
             style={{ width: totalWidth }}

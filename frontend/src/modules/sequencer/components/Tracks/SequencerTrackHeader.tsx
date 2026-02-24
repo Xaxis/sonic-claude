@@ -76,7 +76,7 @@ export function SequencerTrackHeader({
     return (
         <div
             className={cn(
-                "relative flex flex-col border-b border-border hover:bg-muted/30 transition-all group",
+                "relative flex flex-col border-b border-border bg-background hover:bg-muted/30 transition-all group",
                 isExpanded ? "h-32 px-3 py-2 gap-2" : "h-16 px-2 py-1 gap-1"
             )}
             style={{ borderLeftColor: track.color, borderLeftWidth: "3px" }}

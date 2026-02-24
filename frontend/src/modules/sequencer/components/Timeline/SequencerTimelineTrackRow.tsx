@@ -112,6 +112,11 @@ export function SequencerTimelineTrackRow({
                 "relative border-b border-border cursor-pointer hover:bg-muted/10 transition-all",
                 isExpanded ? "h-32" : "h-16"
             )}
+            style={{
+                // IMPORTANT: z-index must be lower than sticky sidebar (which is z-index: 30)
+                // so timeline content scrolls UNDER the track headers
+                zIndex: 1,
+            }}
             onMouseDown={handleTrackMouseDown}
             onClick={handleTrackClick}
             title="Click to add clip"
