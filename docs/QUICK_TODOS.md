@@ -35,6 +35,4 @@ MAYBE:
 ...
 ...
 
-- Implement "merged" sequencer "editor" components. Eg:
-- - Merge SequencerPianoRoll -> SequencerPianoRollSection
-- - Merge SequencerPianoRollWrapper -> SequencerPianoRollSection
+- Investigate if PianoRoll snap to grid is working/snapping correctly. It appears its not.
