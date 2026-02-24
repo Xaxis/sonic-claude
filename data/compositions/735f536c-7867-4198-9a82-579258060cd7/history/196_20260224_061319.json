@@ -313,9 +313,9 @@
           "channel": 0
         },
         {
-          "note": 34,
-          "note_name": "A#1",
-          "start_time": 2.0,
+          "note": 32,
+          "note_name": "G#1",
+          "start_time": 0.0,
           "duration": 1.0,
           "velocity": 100,
           "channel": 0
@@ -325,22 +325,6 @@
           "note_name": "C2",
           "start_time": 0.0,
           "duration": 0.0625,
-          "velocity": 100,
-          "channel": 0
-        },
-        {
-          "note": 39,
-          "note_name": "D#2",
-          "start_time": 2.5,
-          "duration": 1.0,
-          "velocity": 100,
-          "channel": 0
-        },
-        {
-          "note": 39,
-          "note_name": "D#2",
-          "start_time": 1.0,
-          "duration": 0.5,
           "velocity": 100,
           "channel": 0
         }
@@ -722,7 +706,7 @@
     }
   ],
   "is_playing": true,
-  "current_position": 10.81909500360489,
+  "current_position": 117.96852928002679,
   "loop_enabled": false,
   "loop_start": 0.0,
   "loop_end": 16.0,
@@ -881,5 +865,5 @@
     "source": "manual_save"
   },
   "created_at": "2026-02-23T17:50:41.081441",
-  "updated_at": "2026-02-24T06:15:58.931970"
+  "updated_at": "2026-02-24T06:13:19.929885"
 }

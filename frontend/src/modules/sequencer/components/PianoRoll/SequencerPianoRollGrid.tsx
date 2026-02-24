@@ -94,6 +94,9 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
         return `${noteName}${octave}`;
     };
 
+    // Grid subdivision size in beats (e.g., gridSize=16 → 0.0625 beats = 1/16 note)
+    const gridSubdivision = 1 / gridSize;
+
     // Grid spans the full composition width (like timeline) - allows scrolling freely
     // Clip region is visually highlighted so user knows the clip boundaries
     const totalHeight = (maxPitch - minPitch + 1) * noteHeight;
@@ -111,6 +114,12 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
         return x / beatWidth;
     };
 
+    // Snap beats to grid (used for note placement, movement, and resizing)
+    const snapBeatsToGrid = (beats: number): number => {
+        if (!snapEnabled) return beats;
+        return Math.round(beats / gridSubdivision) * gridSubdivision;
+    };
+
     // ========================================================================
     // NOTE EDITING HANDLERS: Call Zustand actions directly
     // ========================================================================
@@ -118,8 +127,8 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
         const newNote: MIDIEvent = {
             note: pitch,
             note_name: getNoteName(pitch),
-            start_time: snapEnabled ? Math.round(startTime * gridSize) / gridSize : startTime,
-            duration: snapEnabled ? 1 / gridSize : 0.25,
+            start_time: snapBeatsToGrid(startTime),
+            duration: snapEnabled ? gridSubdivision : 0.25,
             velocity: 100,
             channel: 0,
         };
@@ -145,7 +154,7 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
             ...updatedNotes[index],
             note: newPitch,
             note_name: getNoteName(newPitch),
-            start_time: snapEnabled ? Math.round(newStartTime * gridSize) / gridSize : newStartTime,
+            start_time: snapBeatsToGrid(newStartTime),
         };
         await updateClip(clipId, { midi_events: updatedNotes });
 
@@ -166,9 +175,12 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
 
     const handleResizeNote = async (index: number, newDuration: number) => {
         const updatedNotes = [...notes];
+        const snappedDuration = snapBeatsToGrid(newDuration);
+        // Ensure minimum duration of one grid subdivision (or 1/16 note if snap is off)
+        const minDuration = snapEnabled ? gridSubdivision : 0.0625;
         updatedNotes[index] = {
             ...updatedNotes[index],
-            duration: Math.max(0.0625, snapEnabled ? Math.round(newDuration * gridSize) / gridSize : newDuration),
+            duration: Math.max(minDuration, snappedDuration),
         };
         await updateClip(clipId, { midi_events: updatedNotes });
     };
@@ -240,7 +252,7 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     // Helper function to find if a note exists at a given position
     const findNoteAtPosition = (pitch: number, time: number): number => {
         // Calculate tolerance based on grid size for click detection
-        const timeTolerance = snapEnabled ? (1 / gridSize) * 0.5 : 0.1;
+        const timeTolerance = snapEnabled ? gridSubdivision * 0.5 : 0.1;
 
         return notes.findIndex(note => {
             const noteAbsoluteTime = note.start_time;
@@ -371,6 +383,11 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
         return () => document.removeEventListener("keydown", handleKeyDown);
     }, [selectedNotes, copiedNotes, notes, handleDeleteSelected, handleCopyNotes, handlePasteNotes]);
 
+    // Calculate grid line spacing based on gridSize
+    // gridSize = 4 (1/4 notes) → 4 lines per beat
+    // gridSize = 16 (1/16 notes) → 16 lines per beat
+    const gridLineSpacing = beatWidth / gridSize;
+
     return (
         <div className="flex-1 overflow-auto">
             <div
@@ -379,12 +396,14 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
                 style={{
                     width: `${totalWidth}px`,
                     height: `${totalHeight}px`,
-                    // Use background-size for precise grid alignment (avoids gradient rounding issues)
+                    // Grid lines match the snap grid subdivision
+                    // Horizontal lines: every gridSubdivision beats
+                    // Vertical lines: every note (piano key)
                     backgroundImage: `
                         linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
                         linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px)
                     `,
-                    backgroundSize: `${beatWidth}px ${noteHeight}px`,
+                    backgroundSize: `${gridLineSpacing}px ${noteHeight}px`,
                     backgroundColor: '#0a0a0a'
                 }}
                 onClick={handleGridClick}
@@ -398,6 +417,22 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
                         width: `${clipEndX - clipStartX}px`,
                     }}
                 />
+
+                {/* Beat Lines - Stronger lines every beat (every gridSize subdivisions) */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
+                    {Array.from({ length: Math.ceil(totalWidth / beatWidth) + 1 }).map((_, i) => (
+                        <line
+                            key={`beat-${i}`}
+                            x1={i * beatWidth}
+                            y1={0}
+                            x2={i * beatWidth}
+                            y2={totalHeight}
+                            stroke="rgba(255, 255, 255, 0.2)"
+                            strokeWidth={i % 4 === 0 ? 1.5 : 1}
+                            opacity={i % 4 === 0 ? 0.4 : 0.2}
+                        />
+                    ))}
+                </svg>
 
                 {/* MIDI Notes - Positioned at absolute time */}
                 {notes.map((note, index) => {
