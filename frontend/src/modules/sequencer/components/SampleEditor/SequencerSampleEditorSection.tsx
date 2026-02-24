@@ -14,12 +14,12 @@
  */
 
 import React from "react";
-import { SampleEditorRuler } from "../SampleEditor/SampleEditorRuler.tsx";
+import { SampleEditorRuler } from "./SampleEditorRuler.tsx";
 import { WaveformDisplay } from "../../../../components/ui/waveform-display.tsx";
 import { SequencerTimelineLoopRegion } from "../Timeline/SequencerTimelineLoopRegion.tsx";
 import { useDAWStore } from '@/stores/dawStore.ts';
 import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
-import { SequencerGridLayout } from "./SequencerGridLayout.tsx";
+import { SequencerGridLayout } from "../Layouts/SequencerGridLayout.tsx";
 
 interface SequencerSampleEditorSectionProps {
     // Clip identifier

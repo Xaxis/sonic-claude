@@ -251,6 +251,36 @@ class CompositionStateService:
                     return True
         return False
 
+    def set_track_mute(self, composition_id: str, track_id: str, is_muted: bool) -> bool:
+        """Set track mute state"""
+        composition = self.compositions.get(composition_id)
+        if not composition:
+            return False
+
+        for track in composition.tracks:
+            if track.id == track_id:
+                track.is_muted = is_muted
+                composition.updated_at = datetime.now()
+                logger.info(f"🔇 Set track {track_id} mute: {is_muted}")
+                return True
+
+        return False
+
+    def set_track_solo(self, composition_id: str, track_id: str, is_solo: bool) -> bool:
+        """Set track solo state"""
+        composition = self.compositions.get(composition_id)
+        if not composition:
+            return False
+
+        for track in composition.tracks:
+            if track.id == track_id:
+                track.is_solo = is_solo
+                composition.updated_at = datetime.now()
+                logger.info(f"🎧 Set track {track_id} solo: {is_solo}")
+                return True
+
+        return False
+
     def update_sample_references(self, sample_id: str, new_name: str) -> int:
         """Update sample references across all tracks"""
         count = 0

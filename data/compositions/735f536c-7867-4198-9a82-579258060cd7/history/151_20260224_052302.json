@@ -155,6 +155,14 @@
         {
           "note": 36,
           "note_name": "C2",
+          "start_time": 8.0,
+          "duration": 0.5,
+          "velocity": 110,
+          "channel": 0
+        },
+        {
+          "note": 36,
+          "note_name": "C2",
           "start_time": 12.0,
           "duration": 0.5,
           "velocity": 110,
@@ -849,5 +857,5 @@
     "source": "manual_save"
   },
   "created_at": "2026-02-23T17:50:41.081441",
-  "updated_at": "2026-02-24T05:41:12.894359"
+  "updated_at": "2026-02-24T05:23:02.888939"
 }

@@ -179,8 +179,9 @@ export function SequencerPianoRollGrid({
     };
 
     const handleGridClick = (e: React.MouseEvent) => {
-        // Don't add notes if we just finished dragging/resizing
-        if (isDragging !== null || isResizing !== null) return;
+        // Don't add/delete notes if we just finished dragging/resizing
+        // hasDragged persists after mouseup, so we can detect if this click was part of a drag
+        if (isDragging !== null || isResizing !== null || hasDragged) return;
 
         const rect = gridRef.current?.getBoundingClientRect();
         if (!rect) return;

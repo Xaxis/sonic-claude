@@ -16,10 +16,10 @@
 
 import React, { useState } from "react";
 import { SequencerTracks } from "../Tracks/SequencerTracks.tsx";
-import { SequencerTimeline } from "../Timeline/SequencerTimeline.tsx";
-import { SequencerTimelineRuler } from "../Timeline/SequencerTimelineRuler.tsx";
+import { SequencerTimeline } from "./SequencerTimeline.tsx";
+import { SequencerTimelineRuler } from "./SequencerTimelineRuler.tsx";
 import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
-import { SequencerGridLayout } from "./SequencerGridLayout.tsx";
+import { SequencerGridLayout } from "../Layouts/SequencerGridLayout.tsx";
 import { useDAWStore } from '@/stores/dawStore.ts';
 
 interface SequencerTimelineSectionProps {

@@ -16,7 +16,7 @@ import { X } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
-import { SequencerSampleEditorSection } from "@/modules/sequencer/components/Layouts/SequencerSampleEditorSection.tsx";
+import { SequencerSampleEditorSection } from "@/modules/sequencer/components/SampleEditor/SequencerSampleEditorSection.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { useWaveformData } from "../../hooks/useWaveformData.ts";
 

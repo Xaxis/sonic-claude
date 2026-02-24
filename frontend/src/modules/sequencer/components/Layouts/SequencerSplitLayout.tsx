@@ -12,7 +12,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { Music } from "lucide-react";
-import { SequencerTimelineSection } from "./SequencerTimelineSection.tsx";
+import { SequencerTimelineSection } from "../Timeline/SequencerTimelineSection.tsx";
 import { SequencerPianoRollWrapper } from "../PianoRoll/SequencerPianoRollWrapper.tsx";
 import { SequencerSampleEditorWrapper } from "../SampleEditor/SequencerSampleEditorWrapper.tsx";
 import { useDAWStore } from '@/stores/dawStore.ts';

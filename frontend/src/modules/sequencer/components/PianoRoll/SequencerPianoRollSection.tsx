@@ -12,13 +12,13 @@
  * - Keyboard vertical scroll is synced with grid vertical scroll
  */
 
-import { SequencerPianoRollKeyboard } from "../PianoRoll/SequencerPianoRollKeyboard.tsx";
-import { SequencerPianoRollGrid } from "../PianoRoll/SequencerPianoRollGrid.tsx";
-import { SequencerPianoRollRuler } from "../PianoRoll/SequencerPianoRollRuler.tsx";
+import { SequencerPianoRollKeyboard } from "./SequencerPianoRollKeyboard.tsx";
+import { SequencerPianoRollGrid } from "./SequencerPianoRollGrid.tsx";
+import { SequencerPianoRollRuler } from "./SequencerPianoRollRuler.tsx";
 import { SequencerTimelineLoopRegion } from "../Timeline/SequencerTimelineLoopRegion.tsx";
 import { useDAWStore } from '@/stores/dawStore.ts';
 import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
-import { SequencerGridLayout } from "./SequencerGridLayout.tsx";
+import { SequencerGridLayout } from "../Layouts/SequencerGridLayout.tsx";
 
 interface SequencerPianoRollSectionProps {
     // Scroll ref
