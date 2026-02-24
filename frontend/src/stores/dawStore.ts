@@ -134,6 +134,7 @@ interface DAWStore {
     activeComposition: Composition | null;  // Currently loaded composition
     compositions: CompositionMetadata[];             // List of all compositions (for browsing)
     hasUnsavedChanges: boolean;
+    _persistedCompositionId: string | null; // For auto-load on startup (persisted by middleware)
 
     // Undo/Redo (built-in to composition system)
     canUndo: boolean;
@@ -422,6 +423,7 @@ export const useDAWStore = create<DAWStore>()(
                 activeComposition: null,
                 compositions: [],
                 hasUnsavedChanges: false,
+                _persistedCompositionId: null, // Restored by persist middleware
                 canUndo: false,
                 canRedo: false,
 
@@ -1510,19 +1512,21 @@ export const useDAWStore = create<DAWStore>()(
          */
         initialize: async () => {
             try {
+                console.log('🚀 Initializing DAW store...');
+
                 // Load all compositions
                 await get().loadCompositions();
 
-                // Get persisted composition ID from localStorage (via persist middleware)
-                const persistedState = localStorage.getItem('sonic-claude-daw');
-                if (persistedState) {
-                    const parsed = JSON.parse(persistedState);
-                    const lastCompositionId = parsed.state?._persistedCompositionId;
+                // Get persisted composition ID from state (restored by persist middleware)
+                const { _persistedCompositionId } = get();
 
-                    if (lastCompositionId) {
-                        console.log(`🔄 Auto-loading last composition: ${lastCompositionId}`);
-                        await get().loadComposition(lastCompositionId);
-                    }
+                console.log('🔍 Checking for persisted composition ID:', _persistedCompositionId);
+
+                if (_persistedCompositionId) {
+                    console.log(`🔄 Auto-loading last composition: ${_persistedCompositionId}`);
+                    await get().loadComposition(_persistedCompositionId);
+                } else {
+                    console.log('⚠️ No persisted composition ID found - showing composition loader');
                 }
             } catch (error) {
                 console.error("Failed to initialize store:", error);
@@ -2233,6 +2237,18 @@ export const useDAWStore = create<DAWStore>()(
                     ...currentState,
                     ...persistedState,
                 }),
+
+                // onRehydrateStorage: Called after hydration completes
+                onRehydrateStorage: () => {
+                    console.log('🔄 Zustand persist: Starting hydration...');
+                    return (state, error) => {
+                        if (error) {
+                            console.error('❌ Zustand persist: Hydration failed:', error);
+                        } else {
+                            console.log('✅ Zustand persist: Hydration complete', state);
+                        }
+                    };
+                },
             }
         )
     )

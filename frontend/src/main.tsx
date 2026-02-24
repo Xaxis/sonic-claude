@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import App from "./App";
 import { PopoutWindow } from "@/components/layout";
 import { LayoutProvider } from "./contexts/LayoutContext";
-import { WebSocketSync } from "./stores/WebSocketSync";
+import { WebSocketProvider } from "./providers/WebSocketProvider.tsx";
 import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./styles/globals.css";
@@ -15,7 +15,7 @@ createRoot(document.getElementById("root")!).render(
             <TooltipProvider delayDuration={300}>
                 <ToastProvider>
                     {/* WebSocket Sync - Wires WebSocket hooks to Zustand store */}
-                    <WebSocketSync />
+                    <WebSocketProvider />
 
                     {/* Layout & UI State */}
                     <LayoutProvider>

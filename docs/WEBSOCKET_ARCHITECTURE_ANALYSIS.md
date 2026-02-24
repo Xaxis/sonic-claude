@@ -32,7 +32,7 @@ The backend has 4 WebSocket endpoints:
 
 ### Frontend WebSocket Sync
 
-**File**: `frontend/src/stores/WebSocketSync.tsx`
+**File**: `frontend/src/stores/WebSocketProvider.tsx`
 
 A component that:
 - Uses all WebSocket hooks

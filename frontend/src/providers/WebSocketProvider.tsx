@@ -8,14 +8,14 @@
  */
 
 import { useEffect } from 'react';
-import { useDAWStore } from '@/stores/dawStore';
-import { useTransportWebSocket } from '@/hooks/useTransportWebsocket';
-import { useMeterWebSocket } from '@/hooks/useMeterWebsocket';
-import { useSpectrumWebSocket } from '@/hooks/useSpectrumWebsocket';
-import { useWaveformWebSocket } from '@/hooks/useWaveformWebsocket';
+import { useDAWStore } from '@/stores/dawStore.ts';
+import { useTransportWebSocket } from '@/hooks/useTransportWebsocket.ts';
+import { useMeterWebSocket } from '@/hooks/useMeterWebsocket.ts';
+import { useSpectrumWebSocket } from '@/hooks/useSpectrumWebsocket.ts';
+import { useWaveformWebSocket } from '@/hooks/useWaveformWebsocket.ts';
 // import { useAnalyticsWebSocket } from '@/hooks/useAnalyticsWebsocket'; // TODO: Implement backend endpoint
 
-export function WebSocketSync() {
+export function WebSocketProvider() {
     // WebSocket hooks
     const { transport } = useTransportWebSocket();
     const { meters } = useMeterWebSocket();
