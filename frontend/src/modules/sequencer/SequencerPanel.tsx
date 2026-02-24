@@ -18,7 +18,7 @@ import { SequencerSettingsDialog } from "./components/Dialogs/SequencerSettingsD
 import { SequencerEmptyState } from "./components/States/SequencerEmptyState.tsx";
 import { SequencerTransport } from "./components/Transport/SequencerTransport.tsx";
 import { SequencerToolbar } from "./components/Toolbar/SequencerToolbar.tsx";
-import { SequencerSplitLayout } from "./layouts/SequencerSplitLayout.tsx";
+import { SequencerSplitLayout } from "@/modules/sequencer/components/Layouts/SequencerSplitLayout.tsx";
 import { toast } from "sonner";
 
 export function SequencerPanel() {

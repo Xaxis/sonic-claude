@@ -1,49 +1,55 @@
 /**
  * SampleEditorRuler - Timeline ruler for sample editor
  *
- * Displays beat/measure markers and playhead position.
- * Follows the same pattern as SequencerTimelineRuler.
+ * REFACTORED: Pure component that reads everything from Zustand
+ * - Reads ALL state from Zustand (composition, transport, settings, clip data)
+ * - Calls seek() action directly
+ * - Only receives clipId prop
  */
 
 import { useEffect, useRef, useState } from "react";
 import { useDAWStore } from '@/stores/dawStore';
-
-interface RulerMarker {
-    beat: number;
-    x: number;
-    isMeasure: boolean;
-    label: string;
-}
+import { useTimelineCalculations } from '../../hooks/useTimelineCalculations.ts';
 
 interface SampleEditorRulerProps {
-    totalBeats: number; // Total timeline length in beats
-    clipDuration: number; // in beats
-    clipStartTime: number; // in beats - position in sequence
-    currentPosition: number; // current playback position in beats
-    isPlaying: boolean;
-    zoom: number;
-    pixelsPerBeat: number;
-    totalWidth: number;
-    snapEnabled: boolean;
-    gridSize: number;
-    onSeek?: (position: number, triggerAudio?: boolean) => void;
+    clipId: string;
 }
 
 export function SampleEditorRuler({
-    totalBeats,
-    clipDuration,
-    clipStartTime,
-    currentPosition,
-    isPlaying,
-    zoom,
-    pixelsPerBeat,
-    totalWidth,
-    snapEnabled,
-    gridSize,
-    onSeek,
+    clipId,
 }: SampleEditorRulerProps) {
-    // Get isPaused from transport WebSocket state
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
+    const clips = useDAWStore(state => state.clips);
+    const clipDragStates = useDAWStore(state => state.clipDragStates);
+    const snapEnabled = useDAWStore(state => state.snapEnabled);
+    const gridSize = useDAWStore(state => state.gridSize);
     const transport = useDAWStore(state => state.transport);
+
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
+    const seek = useDAWStore(state => state.seek);
+
+    // ========================================================================
+    // SHARED TIMELINE CALCULATIONS: Use the same hook as timeline for consistency!
+    // ========================================================================
+    const { pixelsPerBeat, totalWidth, rulerMarkers, zoom } = useTimelineCalculations();
+    const beatWidth = pixelsPerBeat * zoom;
+
+    // ========================================================================
+    // DERIVED STATE: Get clip data
+    // ========================================================================
+    const clip = clips.find(c => c.id === clipId);
+    const clipDragState = clipDragStates.get(clipId);
+
+    // Use drag state if available (for real-time sync with timeline)
+    const clipStartTime = clipDragState?.startTime ?? clip?.start_time ?? 0;
+    const clipDuration = clipDragState?.duration ?? clip?.duration ?? 0;
+
+    const currentPosition = transport?.position_beats || 0;
+    const isPlaying = transport?.is_playing || false;
     const isPaused = transport?.is_paused ?? false;
 
     const playheadRef = useRef<HTMLDivElement>(null);
@@ -51,25 +57,6 @@ export function SampleEditorRuler({
     const [draggedPlayheadPosition, setDraggedPlayheadPosition] = useState<number | null>(null);
     const dragStartXRef = useRef<number>(0);
     const dragStartValueRef = useRef<number>(0);
-    const beatsPerMeasure = 4;
-    const beatWidth = pixelsPerBeat * zoom;
-
-    // Generate ruler markers for entire timeline
-    const rulerMarkers: RulerMarker[] = [];
-    const totalBeatsToShow = Math.ceil(totalBeats) + 1;
-
-    for (let beat = 0; beat <= totalBeatsToShow; beat++) {
-        const x = beat * beatWidth;
-        const isMeasure = beat % beatsPerMeasure === 0;
-        const measure = Math.floor(beat / beatsPerMeasure) + 1;
-
-        rulerMarkers.push({
-            beat,
-            x,
-            isMeasure,
-            label: isMeasure ? `${measure}` : "",
-        });
-    }
 
     // Calculate playhead position relative to clip
     const displayPosition = draggedPlayheadPosition !== null ? draggedPlayheadPosition : currentPosition;
@@ -124,7 +111,7 @@ export function SampleEditorRuler({
     }, [isPlaying, isPaused, isDraggingPlayhead, draggedPlayheadPosition]);
 
     const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!onSeek || isDraggingPlayhead) return;
+        if (isDraggingPlayhead) return;
 
         const rect = e.currentTarget.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -132,7 +119,7 @@ export function SampleEditorRuler({
 
         // Convert to absolute position in sequence
         const absolutePosition = clipStartTime + clickedBeat;
-        onSeek(Math.max(0, absolutePosition), true);
+        seek(Math.max(0, absolutePosition), true);
     };
 
     const handlePlayheadMouseDown = (e: React.MouseEvent) => {
@@ -169,9 +156,7 @@ export function SampleEditorRuler({
             newValue = Math.max(0, newValue);
 
             // Call seek API once on mouse up
-            if (onSeek) {
-                onSeek(newValue, true);
-            }
+            seek(newValue, true);
 
             setIsDraggingPlayhead(false);
             setDraggedPlayheadPosition(null);
@@ -184,11 +169,11 @@ export function SampleEditorRuler({
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [isDraggingPlayhead, currentPosition, beatWidth, snapEnabled, gridSize, onSeek]);
+    }, [isDraggingPlayhead, currentPosition, beatWidth, snapEnabled, gridSize, seek]);
 
     return (
         <div
-            className="relative h-8 cursor-pointer hover:bg-muted/30 transition-colors"
+            className="relative h-8 border-b border-border bg-muted/30 flex-shrink-0 cursor-pointer hover:bg-muted/50 transition-colors"
             onClick={handleRulerClick}
             title="Click to seek"
             style={{ width: totalWidth }}

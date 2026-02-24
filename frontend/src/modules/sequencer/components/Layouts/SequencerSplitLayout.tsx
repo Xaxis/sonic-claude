@@ -13,9 +13,10 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { Music } from "lucide-react";
 import { SequencerTimelineSection } from "./SequencerTimelineSection.tsx";
-import { SequencerPianoRollWrapper } from "../components/PianoRoll/SequencerPianoRollWrapper.tsx";
-import { useDAWStore } from '@/stores/dawStore';
-import { statePersistence } from "@/services/state-persistence/state-persistence.service";
+import { SequencerPianoRollWrapper } from "../PianoRoll/SequencerPianoRollWrapper.tsx";
+import { SequencerSampleEditorWrapper } from "../SampleEditor/SequencerSampleEditorWrapper.tsx";
+import { useDAWStore } from '@/stores/dawStore.ts';
+import { statePersistence } from "@/services/state-persistence/state-persistence.service.ts";
 
 interface SequencerSplitLayoutProps {
     // Scroll refs for auto-scroll functionality
@@ -27,18 +28,17 @@ interface SequencerSplitLayoutProps {
 export function SequencerSplitLayout({
     timelineScrollRef,
     pianoRollScrollRef,
-    sampleEditorScrollRef, // TODO: Will be used when sample editor is implemented
+    sampleEditorScrollRef,
 }: SequencerSplitLayoutProps) {
-    // Suppress unused variable warning - will be used when sample editor is implemented
-    void sampleEditorScrollRef;
-
     // ========================================================================
     // STATE: Read directly from Zustand store
     // ========================================================================
     const tracks = useDAWStore(state => state.tracks);
     const clips = useDAWStore(state => state.clips);
     const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
+    const sampleEditorClipId = useDAWStore(state => state.sampleEditorClipId);
     const showPianoRoll = useDAWStore(state => state.showPianoRoll);
+    const showSampleEditor = useDAWStore(state => state.showSampleEditor);
 
     // ========================================================================
     // LOCAL UI STATE: Split ratio and drag states
@@ -102,12 +102,14 @@ export function SequencerSplitLayout({
 
     // Find the clip for piano roll
     const pianoRollClip = clips.find(c => c.id === pianoRollClipId);
+    const sampleEditorClip = clips.find(c => c.id === sampleEditorClipId);
 
     // Find the track for the clip (to get instrument)
     const pianoRollTrack = pianoRollClip ? tracks.find(t => t.id === pianoRollClip.track_id) : undefined;
 
     // Get drag state for active editor clips (if being dragged)
     const pianoRollClipDragState = pianoRollClipId ? clipDragStates.get(pianoRollClipId) : null;
+    const sampleEditorClipDragState = sampleEditorClipId ? clipDragStates.get(sampleEditorClipId) : null;
 
     // Calculate totalBeats (same as timeline)
     const minBeats = 64; // Minimum 16 measures
@@ -152,6 +154,13 @@ export function SequencerSplitLayout({
                             totalBeats={totalBeats}
                             pianoRollScrollRef={pianoRollScrollRef}
                         />
+                    ) : showSampleEditor ? (
+                        <SequencerSampleEditorWrapper
+                            clip={sampleEditorClip}
+                            clipDragState={sampleEditorClipDragState}
+                            totalBeats={totalBeats}
+                            sampleEditorScrollRef={sampleEditorScrollRef}
+                        />
                     ) : (
                         <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center bg-muted/20">
                             <div className="text-muted-foreground">
@@ -163,7 +172,6 @@ export function SequencerSplitLayout({
                             </div>
                         </div>
                     )}
-                    {/* TODO: Implement sample editor */}
                 </div>
             </div>
         </div>

@@ -14,7 +14,7 @@ import { useState, useEffect } from "react";
 import { X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { IconButton } from "@/components/ui/icon-button.tsx";
-import { SequencerPianoRollSection } from "../../layouts/SequencerPianoRollSection.tsx";
+import { SequencerPianoRollSection } from "@/modules/sequencer/components/Layouts/SequencerPianoRollSection.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import type { MIDIEvent } from "../../types.ts";
 

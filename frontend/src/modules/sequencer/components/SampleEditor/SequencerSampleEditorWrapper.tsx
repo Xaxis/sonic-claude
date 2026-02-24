@@ -1,56 +1,42 @@
 /**
  * SequencerSampleEditorWrapper Component
- * 
- * Smart container for sample editor that handles:
- * 1. Auto-scroll to clip when sample editor opens
- * 2. Empty state when no clip is selected
- * 3. Proper clip data validation
- * 
+ *
+ * REFACTORED: Uses Zustand best practices
+ * - Receives clip, clipDragState, totalBeats, and scroll ref from parent
+ * - Handles validation and empty states
+ * - Force re-render when clip changes
+ *
  * This is the "glue" layer between SequencerSplitLayout and SequencerSampleEditor.
  */
 
 import { SequencerSampleEditor } from "./SequencerSampleEditor.tsx";
 import { Music } from "lucide-react";
-import type { SequencerClip } from "../../types.ts";
+import type { Clip } from '@/types/daw.types';
 
-interface SequencerSampleEditorWrapperProps {
-    // Clip data
-    clip: SequencerClip | undefined;
-
-    // Drag state (for real-time sync with timeline)
-    clipDragState?: { startTime: number; duration: number } | null;
-
-    // State (shared with timeline - Ableton pattern)
-    totalBeats: number;
-    currentPosition: number; // Playback position
-    isPlaying: boolean; // Playback state
-
-    // Scroll refs
-    timelineScrollRef: React.RefObject<HTMLDivElement | null>;
-    sampleEditorScrollRef: React.RefObject<HTMLDivElement | null>;
-    onSampleEditorScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-
-    // Handlers
-    onClose: () => void;
-    onUpdateClip: (clipId: string, updates: { gain?: number; audio_offset?: number }) => Promise<void>;
-    onSeek?: (position: number, triggerAudio?: boolean) => void;
+interface ClipDragState {
+    startTime: number;
+    duration: number;
 }
 
-export function SequencerSampleEditorWrapper(props: SequencerSampleEditorWrapperProps) {
-    const {
-        clip,
-        clipDragState,
-        totalBeats,
-        currentPosition,
-        isPlaying,
-        sampleEditorScrollRef,
-        onSampleEditorScroll,
-        onClose,
-        onUpdateClip,
-        onSeek,
-    } = props;
+interface SequencerSampleEditorWrapperProps {
+    clip: Clip | undefined; // ✅ Data from parent - acceptable
+    clipDragState: ClipDragState | null; // ✅ Data from parent - acceptable
+    totalBeats: number; // ✅ Calculation from parent - acceptable
+    sampleEditorScrollRef: React.RefObject<HTMLDivElement | null>; // ✅ Scroll ref - acceptable
+}
 
-    // Empty state - no clip selected
+export function SequencerSampleEditorWrapper({
+    clip,
+    clipDragState,
+    totalBeats,
+    sampleEditorScrollRef,
+}: SequencerSampleEditorWrapperProps) {
+    // Suppress unused variable warnings - will be used when needed
+    void totalBeats;
+
+    // ========================================================================
+    // VALIDATION: Empty state - no clip selected
+    // ========================================================================
     if (!clip) {
         return (
             <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center overflow-hidden min-h-0 min-w-0">
@@ -65,7 +51,9 @@ export function SequencerSampleEditorWrapper(props: SequencerSampleEditorWrapper
         );
     }
 
-    // Validate clip type
+    // ========================================================================
+    // VALIDATION: Clip type must be audio
+    // ========================================================================
     if (clip.type !== "audio") {
         return (
             <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center overflow-hidden min-h-0 min-w-0">
@@ -80,7 +68,9 @@ export function SequencerSampleEditorWrapper(props: SequencerSampleEditorWrapper
         );
     }
 
-    // Validate audio file path
+    // ========================================================================
+    // VALIDATION: Audio file path must exist
+    // ========================================================================
     if (!clip.audio_file_path) {
         return (
             <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center overflow-hidden min-h-0 min-w-0">
@@ -95,6 +85,9 @@ export function SequencerSampleEditorWrapper(props: SequencerSampleEditorWrapper
         );
     }
 
+    // ========================================================================
+    // RENDER: Force re-render when clip or drag state changes
+    // ========================================================================
     // Use drag state if available (for real-time sync with timeline)
     const effectiveStartTime = clipDragState?.startTime ?? clip.start_time;
     const effectiveDuration = clipDragState?.duration ?? clip.duration;
@@ -106,20 +99,7 @@ export function SequencerSampleEditorWrapper(props: SequencerSampleEditorWrapper
         <SequencerSampleEditor
             key={clipKey}
             clipId={clip.id}
-            clipName={clip.name}
-            clipDuration={effectiveDuration}
-            clipStartTime={effectiveStartTime}
-            audioFilePath={clip.audio_file_path}
-            audioOffset={clip.audio_offset}
-            gain={clip.gain}
-            totalBeats={totalBeats}
-            currentPosition={currentPosition}
-            isPlaying={isPlaying}
             sampleEditorScrollRef={sampleEditorScrollRef}
-            onSampleEditorScroll={onSampleEditorScroll}
-            onClose={onClose}
-            onUpdateClip={onUpdateClip}
-            onSeek={onSeek}
         />
     );
 }

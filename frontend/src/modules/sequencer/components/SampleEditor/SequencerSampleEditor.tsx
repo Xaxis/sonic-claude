@@ -1,75 +1,90 @@
 /**
  * SequencerSampleEditor - Sample/audio clip editor (bottom panel)
  *
+ * REFACTORED: Uses Zustand best practices
+ * - Reads state directly from store (no prop drilling)
+ * - Calls actions directly from store (no handler props)
+ * - Only receives clipId (identifier)
+ * - Only receives scroll ref (local UI state)
+ *
  * Shows when an audio clip is selected. Allows visual editing of sample properties.
  * Displays as a bottom panel in the sequencer (like Ableton's clip view for audio).
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
-import { SequencerSampleEditorSection } from "../../layouts/SequencerSampleEditorSection.tsx";
+import { SequencerSampleEditorSection } from "@/modules/sequencer/components/Layouts/SequencerSampleEditorSection.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { useWaveformData } from "../../hooks/useWaveformData.ts";
 
 interface SequencerSampleEditorProps {
-    clipId: string;
-    clipName: string;
-    clipDuration: number; // beats
-    clipStartTime: number; // beats - position in sequence
-    audioFilePath: string;
-    audioOffset?: number; // seconds
-    gain: number; // 0.0-2.0
-    totalBeats: number; // Total composition length in beats
-    currentPosition: number; // Playback position
-    isPlaying: boolean; // Playback state
-    sampleEditorScrollRef: React.RefObject<HTMLDivElement | null>;
-    onSampleEditorScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-    onClose: () => void;
-    onUpdateClip: (clipId: string, updates: { gain?: number; audio_offset?: number }) => Promise<void>;
-    onSeek?: (position: number, triggerAudio?: boolean) => void;
+    clipId: string; // ✅ Identifier - acceptable
+    sampleEditorScrollRef: React.RefObject<HTMLDivElement | null>; // ✅ Scroll ref - acceptable
 }
 
 export function SequencerSampleEditor({
     clipId,
-    clipName,
-    clipDuration,
-    clipStartTime,
-    audioFilePath,
-    gain,
-    totalBeats,
-    currentPosition,
-    isPlaying,
     sampleEditorScrollRef,
-    onSampleEditorScroll,
-    onClose,
-    onUpdateClip,
-    onSeek,
 }: SequencerSampleEditorProps) {
-    // Get tempo from Zustand store
+    // ========================================================================
+    // STATE: Read directly from Zustand store
+    // ========================================================================
+    const clips = useDAWStore(state => state.clips);
     const activeComposition = useDAWStore(state => state.activeComposition);
     const tempo = activeComposition?.tempo ?? 120;
 
-    // Local UI state
-    const [localGain, setLocalGain] = useState(gain);
+    // Find clip by ID
+    const clip = clips.find(c => c.id === clipId);
+
+    // ========================================================================
+    // ACTIONS: Get directly from Zustand store
+    // ========================================================================
+    const updateClip = useDAWStore(state => state.updateClip);
+    const closeSampleEditor = useDAWStore(state => state.closeSampleEditor);
+
+    // ========================================================================
+    // LOCAL UI STATE: Gain slider
+    // ========================================================================
+    const [localGain, setLocalGain] = useState(clip?.gain ?? 1.0);
+
+    // Sync local gain with clip gain when clip changes
+    useEffect(() => {
+        if (clip) {
+            setLocalGain(clip.gain);
+        }
+    }, [clip?.gain]);
+
+    // ========================================================================
+    // VALIDATION: Clip must exist
+    // ========================================================================
+    if (!clip) {
+        return null;
+    }
 
     // Load waveform data using hook (2000 samples for detailed editor view)
     const { leftData: waveformData, rightData: waveformDataRight } = useWaveformData({
-        sampleId: audioFilePath,
-        clipDuration,
+        sampleId: clip.audio_file_path || '',
+        clipDuration: clip.duration,
         tempo,
         samplesPerLoop: 2000,
     });
 
-    // Sample editor settings
-    const pixelsPerBeat = 40; // Base pixels per beat (matches piano roll and timeline)
-
+    // ========================================================================
+    // HANDLERS: Clip actions (call Zustand actions directly)
+    // ========================================================================
     const handleGainChange = async (value: number[]) => {
         const newGain = value[0];
         setLocalGain(newGain);
-        await onUpdateClip(clipId, { gain: newGain });
+        if (activeComposition) {
+            await updateClip(activeComposition.id, clipId, { gain: newGain });
+        }
+    };
+
+    const handleClose = () => {
+        closeSampleEditor();
     };
 
     return (
@@ -86,9 +101,9 @@ export function SequencerSampleEditor({
                 {/* Right Column - Scrollable content area (matches grid) */}
                 <div className="flex-1 px-4 py-2 pl-[17rem] flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <span className="text-sm font-semibold">{clipName}</span>
+                        <span className="text-sm font-semibold">{clip.name}</span>
                         <span className="text-xs text-muted-foreground">
-                            • Bar {Math.floor(clipStartTime / 4) + 1} • {clipDuration} beats
+                            • Bar {Math.floor(clip.start_time / 4) + 1} • {clip.duration} beats
                         </span>
 
                         {/* Gain Control */}
@@ -112,7 +127,7 @@ export function SequencerSampleEditor({
                     <IconButton
                         icon={X}
                         tooltip="Close sample editor"
-                        onClick={onClose}
+                        onClick={handleClose}
                         variant="ghost"
                         size="icon-sm"
                     />
@@ -122,17 +137,10 @@ export function SequencerSampleEditor({
             {/* Sample Editor Content - Use dedicated layout component */}
             {waveformData.length > 0 ? (
                 <SequencerSampleEditorSection
+                    clipId={clipId}
                     waveformData={waveformData}
                     waveformDataRight={waveformDataRight}
-                    clipDuration={clipDuration}
-                    clipStartTime={clipStartTime}
-                    totalBeats={totalBeats}
-                    currentPosition={currentPosition}
-                    isPlaying={isPlaying}
-                    pixelsPerBeat={pixelsPerBeat}
                     sampleEditorScrollRef={sampleEditorScrollRef}
-                    onSampleEditorScroll={onSampleEditorScroll}
-                    onSeek={onSeek}
                 />
             ) : (
                 <div className="flex-1 flex items-center justify-center text-muted-foreground">

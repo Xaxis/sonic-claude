@@ -39,33 +39,6 @@ export interface SequencerTrack {
     sample_file_path?: string; // Cached file path
 }
 
-export interface Sequence {
-    id: string;
-    name: string;
-    tempo: number;
-    time_signature: string;
-    tracks: SequencerTrack[]; // Tracks belong to sequence
-    clips: SequencerClip[];
-    is_playing: boolean;
-    current_position: number; // beats
-
-    // Loop settings
-    loop_enabled: boolean;
-    loop_start: number; // beats
-    loop_end: number; // beats
-
-    // UI settings (per-sequence)
-    zoom: number; // Timeline zoom level
-    snap_enabled: boolean; // Grid snapping enabled
-    grid_size: number; // Grid size (1/16 note = 16)
-    selected_clip_id?: string | null; // Currently selected clip ID
-    piano_roll_clip_id?: string | null; // Clip ID with piano roll open
-    sample_editor_clip_id?: string | null; // Clip ID with sample editor open
-
-    created_at: string; // ISO datetime string
-    updated_at: string; // ISO datetime string
-}
-
 export interface SequencerClip {
     id: string;
     name: string;
@@ -84,40 +57,6 @@ export interface SequencerClip {
     is_muted: boolean;
     is_looped: boolean;
     gain: number; // 0.0-2.0, 1.0 = unity
-}
-
-export interface CreateSequenceRequest {
-    name: string;
-    tempo?: number;
-    time_signature?: string;
-}
-
-export interface AddClipRequest {
-    clip_type: "midi" | "audio";
-    track_id: string;
-    start_time: number;
-    duration: number;
-    midi_events?: MIDIEvent[];
-    audio_file_path?: string;
-}
-
-export interface UpdateClipRequest {
-    start_time?: number;
-    duration?: number;
-    midi_events?: MIDIEvent[];
-    is_muted?: boolean;
-    is_looped?: boolean;
-    gain?: number;
-    audio_offset?: number; // seconds
-}
-
-export interface SetTempoRequest {
-    tempo: number;
-}
-
-export interface SeekRequest {
-    position: number; // beats
-    trigger_audio?: boolean; // Whether to trigger audio at the new position (for scrubbing)
 }
 
 // ============================================================================
