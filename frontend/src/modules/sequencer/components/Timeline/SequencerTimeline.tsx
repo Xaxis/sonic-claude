@@ -34,21 +34,13 @@ export function SequencerTimeline({
     // STATE: Read directly from Zustand store
     // ========================================================================
     const tracks = useDAWStore(state => state.tracks);
-    const clips = useDAWStore(state => state.clips);
     const transport = useDAWStore(state => state.transport);
     const currentPosition = transport?.position_beats ?? 0;
 
     // ========================================================================
     // ACTIONS: Get directly from Zustand store
     // ========================================================================
-    const setSelectedClipId = useDAWStore(state => state.setSelectedClipId);
-    const duplicateClip = useDAWStore(state => state.duplicateClip);
-    const deleteClip = useDAWStore(state => state.deleteClip);
-    const addClip = useDAWStore(state => state.addClip);
-    const updateClip = useDAWStore(state => state.updateClip);
-    const openPianoRoll = useDAWStore(state => state.openPianoRoll);
     const seek = useDAWStore(state => state.seek);
-    const activeComposition = useDAWStore(state => state.activeComposition);
 
     // ========================================================================
     // CALCULATIONS
@@ -89,40 +81,7 @@ export function SequencerTimeline({
         }
     }, [playheadX, scrollContainerRef]);
 
-    // ========================================================================
-    // HANDLER WRAPPERS: Adapt store actions to component callbacks
-    // ========================================================================
-    const handleAddClipToTrack = async (trackId: string, startTime: number) => {
-        if (!activeComposition) return;
-        const track = tracks.find(t => t.id === trackId);
-        if (!track) return;
 
-        const clipRequest = {
-            sequence_id: activeComposition.id,
-            clip_type: track.type === "midi" ? "midi" : "audio",
-            track_id: trackId,
-            start_time: startTime,
-            duration: 4.0, // Default 1 bar at 4/4
-        };
-        await addClip(clipRequest);
-    };
-
-    const handleDuplicateClip = async (clipId: string) => {
-        if (!activeComposition) return;
-        await duplicateClip(activeComposition.id, clipId);
-    };
-
-    const handleMoveClip = async (clipId: string, newStartTime: number) => {
-        await updateClip(clipId, { start_time: newStartTime });
-    };
-
-    const handleResizeClip = async (clipId: string, newDuration: number) => {
-        await updateClip(clipId, { duration: newDuration });
-    };
-
-    const handleUpdateClip = async (clipId: string, updates: { gain?: number; audio_offset?: number }) => {
-        await updateClip(clipId, updates);
-    };
 
     return (
         <>
@@ -144,18 +103,7 @@ export function SequencerTimeline({
                         <SequencerTimelineTrackRow
                             key={track.id}
                             track={track}
-                            clips={clips}
-                            pixelsPerBeat={pixelsPerBeat}
                             isExpanded={expandedTracks?.has(track.id)}
-                            onSelectClip={setSelectedClipId}
-                            onDuplicateClip={handleDuplicateClip}
-                            onDeleteClip={deleteClip}
-                            onAddClipToTrack={handleAddClipToTrack}
-                            onMoveClip={handleMoveClip}
-                            onResizeClip={handleResizeClip}
-                            onUpdateClip={handleUpdateClip}
-                            onOpenPianoRoll={openPianoRoll}
-                            onOpenSampleEditor={() => {}} // TODO: Implement sample editor
                         />
                     ))}
 

@@ -1,75 +1,64 @@
 /**
  * SequencerTimelineTrackRow - Individual track row with clips
  *
+ * REFACTORED: Uses Zustand best practices
+ * - Reads clips from Zustand directly (no prop drilling)
+ * - Uses useTimelineCalculations() for pixelsPerBeat (no prop drilling)
+ * - Calls Zustand actions directly (no callback props)
+ * - Only receives track (iteration data) and isExpanded (local UI state)
+ *
  * Displays a single track row in the timeline with its clips.
  * Supports click-to-add-clip functionality.
- * Uses SequencerContext for state management.
  */
 
 import { useRef } from "react";
 import { SequencerClip } from "../Clips/SequencerClip.tsx";
 import { cn } from "@/lib/utils.ts";
 import { useDAWStore } from '@/stores/dawStore';
-
-interface Clip {
-    id: string;
-    name: string;
-    track_id: string;
-    start_time: number;
-    duration: number;
-    type: "midi" | "audio";
-    audio_file_path?: string;
-    audio_offset?: number;
-    gain: number;
-    is_muted: boolean;
-    is_looped: boolean;
-}
-
-interface Track {
-    id: string;
-    name: string;
-    color?: string;
-}
+import { useTimelineCalculations } from '../../hooks/useTimelineCalculations';
+import type { SequencerTrack } from '../../types';
 
 interface SequencerTimelineTrackRowProps {
-    track: Track;
-    clips: Clip[];
-    pixelsPerBeat: number;
-    isExpanded?: boolean; // Track header expansion state
-    onSelectClip: (clipId: string | null) => void;
-    onDuplicateClip: (clipId: string) => void;
-    onDeleteClip: (clipId: string) => void;
-    onAddClipToTrack?: (trackId: string, startBeat: number) => void;
-    onMoveClip?: (clipId: string, newStartTime: number) => void;
-    onResizeClip?: (clipId: string, newDuration: number) => void;
-    onUpdateClip?: (clipId: string, updates: { gain?: number; audio_offset?: number }) => void;
-    onOpenPianoRoll?: (clipId: string) => void;
-    onOpenSampleEditor?: (clipId: string) => void;
+    track: SequencerTrack;  // Iteration data - acceptable to pass
+    isExpanded?: boolean;   // Local UI state - acceptable to pass
 }
 
 export function SequencerTimelineTrackRow({
     track,
-    clips,
-    pixelsPerBeat,
     isExpanded = false,
-    onSelectClip,
-    onDuplicateClip,
-    onDeleteClip,
-    onAddClipToTrack,
-    onMoveClip,
-    onResizeClip,
-    onUpdateClip,
-    onOpenPianoRoll,
-    onOpenSampleEditor,
 }: SequencerTimelineTrackRowProps) {
-    // Get state from Zustand store
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
+    const clips = useDAWStore(state => state.clips);
+    const activeComposition = useDAWStore(state => state.activeComposition);
     const zoom = useDAWStore(state => state.zoom);
     const snapEnabled = useDAWStore(state => state.snapEnabled);
     const gridSize = useDAWStore(state => state.gridSize);
-    const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
 
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
+    const addClip = useDAWStore(state => state.addClip);
+
+    // ========================================================================
+    // SHARED TIMELINE CALCULATIONS: Use the same hook as timeline for consistency!
+    // ========================================================================
+    const { pixelsPerBeat } = useTimelineCalculations();
+
+    // ========================================================================
+    // DERIVED STATE: Filter clips for this track
+    // ========================================================================
+    const trackClips = clips.filter((clip) => clip.track_id === track.id);
+
+    // ========================================================================
+    // LOCAL STATE: Track mouse down for click-to-add-clip
+    // ========================================================================
     const mouseDownPosRef = useRef<{ x: number; y: number; target: EventTarget | null } | null>(null);
 
+    // ========================================================================
+    // HANDLERS: Click-to-add-clip functionality
+    // ========================================================================
     const handleTrackMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
         // Only track mouse down if clicking on the track background (not on a clip)
         if (e.target === e.currentTarget) {
@@ -77,8 +66,8 @@ export function SequencerTimelineTrackRow({
         }
     };
 
-    const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!onAddClipToTrack) return;
+    const handleTrackClick = async (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!activeComposition) return;
 
         // Only add clip if we clicked on the track background (not on a clip)
         if (!mouseDownPosRef.current || mouseDownPosRef.current.target !== e.currentTarget) {
@@ -101,9 +90,20 @@ export function SequencerTimelineTrackRow({
         // Snap to grid if snap is enabled
         const finalBeat = snapEnabled ? Math.round(clickBeat * gridSize) / gridSize : clickBeat;
 
-        onAddClipToTrack(track.id, finalBeat);
+        // Add clip using Zustand action
+        const clipRequest = {
+            sequence_id: activeComposition.id,
+            clip_type: track.type === "midi" ? "midi" : "audio",
+            track_id: track.id,
+            start_time: finalBeat,
+            duration: 4.0, // Default 1 bar at 4/4
+        };
+        await addClip(clipRequest);
     };
 
+    // ========================================================================
+    // RENDER
+    // ========================================================================
     return (
         <div
             className={cn(
@@ -120,27 +120,12 @@ export function SequencerTimelineTrackRow({
             title="Click to add clip"
         >
             {/* Clips for this track */}
-            {clips
-                .filter((clip) => clip.track_id === track.id)
-                .map((clip) => (
-                    <SequencerClip
-                        key={clip.id}
-                        clip={clip}
-                        trackColor={track.color}
-                        isEditingInPianoRoll={pianoRollClipId === clip.id}
-                        isEditingInSampleEditor={false}
-                        pixelsPerBeat={pixelsPerBeat}
-                        isTrackExpanded={isExpanded}
-                        onSelect={onSelectClip}
-                        onDuplicate={onDuplicateClip}
-                        onDelete={onDeleteClip}
-                        onMove={onMoveClip}
-                        onResize={onResizeClip}
-                        onUpdateClip={onUpdateClip}
-                        onOpenPianoRoll={onOpenPianoRoll}
-                        onOpenSampleEditor={onOpenSampleEditor}
-                    />
-                ))}
+            {trackClips.map((clip) => (
+                <SequencerClip
+                    key={clip.id}
+                    clip={clip}
+                />
+            ))}
         </div>
     );
 }

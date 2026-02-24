@@ -1,8 +1,13 @@
 /**
  * SequencerClip - Individual clip component with waveform
  *
+ * REFACTORED: Uses Zustand best practices
+ * - Reads ALL state from Zustand directly (no prop drilling)
+ * - Uses useTimelineCalculations() for pixelsPerBeat (no prop drilling)
+ * - Calls Zustand actions directly (no callback props)
+ * - Only receives clip (iteration data)
+ *
  * Displays a clip with waveform visualization, handles selection and actions
- * Uses SequencerContext for state management
  */
 
 import { useEffect, useState } from "react";
@@ -10,59 +15,57 @@ import { Copy, Trash2, Volume2, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { cn } from "@/lib/utils.ts";
-import type { MIDIEvent, SequencerClip } from "../../types.ts";
+import type { SequencerClip } from "../../types.ts";
 import { WaveformDisplay } from "../../../../components/ui/waveform-display.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { useWaveformData } from "../../hooks/useWaveformData.ts";
+import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
 
 interface SequencerClipProps {
-    clip: SequencerClip;
-    trackColor?: string; // Track color for clip background
-    isEditingInPianoRoll?: boolean; // True if this clip is currently open in piano roll
-    isEditingInSampleEditor?: boolean; // True if this clip is currently open in sample editor
-    pixelsPerBeat: number;
-    isTrackExpanded?: boolean; // Whether the parent track is in expanded mode
-    onSelect: (clipId: string | null) => void; // Accept null to clear selection
-    onDuplicate: (clipId: string) => void;
-    onDelete: (clipId: string) => void;
-    onMove?: (clipId: string, newStartTime: number) => void; // Drag to move
-    onResize?: (clipId: string, newDuration: number) => void; // Resize duration
-    onUpdateClip?: (clipId: string, updates: { gain?: number; audio_offset?: number; midi_events?: MIDIEvent[] }) => void; // Update clip properties
-    onOpenPianoRoll?: (clipId: string) => void; // Open piano roll for MIDI clips
-    onOpenSampleEditor?: (clipId: string) => void; // Open sample editor for audio clips
+    clip: SequencerClip;  // Iteration data - acceptable to pass
 }
 
 export function SequencerClip({
     clip,
-    trackColor = "#3b82f6",
-    isEditingInPianoRoll = false,
-    isEditingInSampleEditor = false,
-    pixelsPerBeat,
-    isTrackExpanded = false,
-    onSelect,
-    onDuplicate,
-    onDelete,
-    onMove,
-    onResize,
-    onUpdateClip,
-    onOpenPianoRoll,
-    onOpenSampleEditor,
 }: SequencerClipProps) {
     // ========================================================================
     // STATE: Read from Zustand store
     // ========================================================================
+    const tracks = useDAWStore(state => state.tracks);
     const activeComposition = useDAWStore(state => state.activeComposition);
     const tempo = activeComposition?.tempo ?? 120;
     const zoom = useDAWStore(state => state.zoom);
     const snapEnabled = useDAWStore(state => state.snapEnabled);
     const gridSize = useDAWStore(state => state.gridSize);
     const selectedClipId = useDAWStore(state => state.selectedClipId);
+    const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
     const isSelected = selectedClipId === clip.id;
+    const isEditingInPianoRoll = pianoRollClipId === clip.id;
+    const isEditingInSampleEditor = false; // TODO: Implement sample editor
 
     // ========================================================================
     // ACTIONS: Get from Zustand store
     // ========================================================================
+    const setSelectedClipId = useDAWStore(state => state.setSelectedClipId);
+    const duplicateClip = useDAWStore(state => state.duplicateClip);
+    const deleteClip = useDAWStore(state => state.deleteClip);
+    const updateClip = useDAWStore(state => state.updateClip);
+    const openPianoRoll = useDAWStore(state => state.openPianoRoll);
     const setClipDragState = useDAWStore(state => state.setClipDragState);
+
+    // ========================================================================
+    // SHARED TIMELINE CALCULATIONS: Use the same hook for consistency!
+    // ========================================================================
+    const { pixelsPerBeat } = useTimelineCalculations();
+
+    // ========================================================================
+    // DERIVED STATE: Get track color and expansion state
+    // ========================================================================
+    const track = tracks.find(t => t.id === clip.track_id);
+    const trackColor = track?.color ?? "#3b82f6";
+    // TODO: Track expansion state - for now assume collapsed (64px)
+    // This could be passed as context or derived from track height
+    const isTrackExpanded = false;
 
     // Load waveform data using hook (200 samples for clip preview)
     const { leftData: waveformData } = useWaveformData({
@@ -171,15 +174,15 @@ export function SequencerClip({
             }
         };
 
-        const handleMouseUp = () => {
+        const handleMouseUp = async () => {
             // Apply final values to backend on mouse up
-            if (isDragging && onMove && dragState) {
-                onMove(clip.id, dragState.startTime);
-            } else if (isResizing === "left" && onResize && onMove && dragState) {
-                onMove(clip.id, dragState.startTime);
-                onResize(clip.id, dragState.duration);
-            } else if (isResizing === "right" && onResize && dragState) {
-                onResize(clip.id, dragState.duration);
+            if (isDragging && dragState) {
+                await updateClip(clip.id, { start_time: dragState.startTime });
+            } else if (isResizing === "left" && dragState) {
+                await updateClip(clip.id, { start_time: dragState.startTime });
+                await updateClip(clip.id, { duration: dragState.duration });
+            } else if (isResizing === "right" && dragState) {
+                await updateClip(clip.id, { duration: dragState.duration });
             }
 
             // Clean up drag state
@@ -196,7 +199,7 @@ export function SequencerClip({
             window.removeEventListener("mousemove", handleMouseMove);
             window.removeEventListener("mouseup", handleMouseUp);
         };
-    }, [isDragging, isResizing, dragStartX, dragStartTime, dragStartDuration, pixelsPerBeat, zoom, snapEnabled, gridSize, clip.id, displayStartTime, displayDuration, dragState, onMove, onResize]);
+    }, [isDragging, isResizing, dragStartX, dragStartTime, dragStartDuration, pixelsPerBeat, zoom, snapEnabled, gridSize, clip.id, displayStartTime, displayDuration, dragState, updateClip]);
 
     const handleClick = () => {
         const now = Date.now();
@@ -205,17 +208,16 @@ export function SequencerClip({
         // Double-click detection (within 300ms)
         if (timeSinceLastClick < 300) {
             // Double-click: clear selection first, then open editor
-            onSelect(null);
-            if (clip.type === "midi" && onOpenPianoRoll) {
-                onOpenPianoRoll(clip.id);
-            } else if (clip.type === "audio" && onOpenSampleEditor) {
-                onOpenSampleEditor(clip.id);
+            setSelectedClipId(null);
+            if (clip.type === "midi") {
+                openPianoRoll(clip.id);
             }
+            // TODO: Implement sample editor for audio clips
             // Reset click time to prevent triple-click issues
             setLastClickTime(0);
         } else {
             // Single-click: select clip
-            onSelect(clip.id);
+            setSelectedClipId(clip.id);
             setLastClickTime(now);
         }
     };
@@ -255,20 +257,16 @@ export function SequencerClip({
             onMouseDown={(e) => handleMouseDown(e, "move")}
         >
             {/* Left resize handle */}
-            {onResize && (
-                <div
-                    className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/20 z-20"
-                    onMouseDown={(e) => handleMouseDown(e, "resize-left")}
-                />
-            )}
+            <div
+                className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/20 z-20"
+                onMouseDown={(e) => handleMouseDown(e, "resize-left")}
+            />
 
             {/* Right resize handle */}
-            {onResize && (
-                <div
-                    className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/20 z-20"
-                    onMouseDown={(e) => handleMouseDown(e, "resize-right")}
-                />
-            )}
+            <div
+                className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/20 z-20"
+                onMouseDown={(e) => handleMouseDown(e, "resize-right")}
+            />
 
             {/* Waveform Display */}
             {clip.type === "audio" && waveformData.length > 0 && (
@@ -312,9 +310,11 @@ export function SequencerClip({
             {isSelected && (
                 <div className="absolute top-1 right-1 flex gap-1 z-20">
                     <Button
-                        onClick={(e) => {
+                        onClick={async (e) => {
                             e.stopPropagation();
-                            onDuplicate(clip.id);
+                            if (activeComposition) {
+                                await duplicateClip(activeComposition.id, clip.id);
+                            }
                         }}
                         size="sm"
                         variant="ghost"
@@ -323,9 +323,9 @@ export function SequencerClip({
                         <Copy size={10} className="text-white" />
                     </Button>
                     <Button
-                        onClick={(e) => {
+                        onClick={async (e) => {
                             e.stopPropagation();
-                            onDelete(clip.id);
+                            await deleteClip(clip.id);
                         }}
                         size="sm"
                         variant="ghost"
@@ -337,7 +337,7 @@ export function SequencerClip({
             )}
 
             {/* Audio Offset/Trim Control (show when selected, audio clip, and wide enough) */}
-            {isSelected && width > 100 && onUpdateClip && clip.type === "audio" && (
+            {isSelected && width > 100 && clip.type === "audio" && (
                 <div
                     className="absolute bottom-8 left-2 right-2 flex items-center gap-1 z-20 bg-background/90 rounded px-2 py-1"
                     onClick={(e) => e.stopPropagation()}
@@ -346,9 +346,9 @@ export function SequencerClip({
                     <Scissors size={12} className="text-white flex-shrink-0" />
                     <Slider
                         value={[(clip.audio_offset || 0) * 10]}
-                        onValueChange={(values) => {
+                        onValueChange={async (values) => {
                             const newOffset = values[0] / 10;
-                            onUpdateClip(clip.id, { audio_offset: newOffset });
+                            await updateClip(clip.id, { audio_offset: newOffset });
                         }}
                         min={0}
                         max={100}
@@ -362,7 +362,7 @@ export function SequencerClip({
             )}
 
             {/* Gain Control (show when selected and wide enough) */}
-            {isSelected && width > 100 && onUpdateClip && (
+            {isSelected && width > 100 && (
                 <div
                     className="absolute bottom-1 left-2 right-2 flex items-center gap-1 z-20 bg-background/90 rounded px-2 py-1"
                     onClick={(e) => e.stopPropagation()}
@@ -371,9 +371,9 @@ export function SequencerClip({
                     <Volume2 size={12} className="text-white flex-shrink-0" />
                     <Slider
                         value={[clip.gain * 100]}
-                        onValueChange={(values) => {
+                        onValueChange={async (values) => {
                             const newGain = values[0] / 100;
-                            onUpdateClip(clip.id, { gain: newGain });
+                            await updateClip(clip.id, { gain: newGain });
                         }}
                         min={0}
                         max={200}
