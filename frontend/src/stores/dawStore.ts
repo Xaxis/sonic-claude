@@ -180,11 +180,16 @@ interface DAWStore {
     selectedEffectId: string | null;
     showEffectBrowser: boolean;
 
-    // AI State
+    // Assistant State
     chatHistory: ChatMessage[];
     analysisEvents: AnalysisEvent[];
     dawStateSnapshot: DAWStateSnapshot | null;
     aiContext: string | null;
+
+    // Assistant UI State
+    activeAssistantTab: "chat" | "analysis";
+    isSendingMessage: boolean;
+    isLoadingAssistantState: boolean;
 
     // Activity State
     activities: AIActivity[];
@@ -328,7 +333,7 @@ interface DAWStore {
     setShowEffectBrowser: (show: boolean) => void;
 
     // ========================================================================
-    // AI ACTIONS
+    // ASSISTANT ACTIONS
     // ========================================================================
     addChatMessage: (message: ChatMessage) => void;
     clearChatHistory: () => void;
@@ -336,6 +341,13 @@ interface DAWStore {
     clearAnalysisEvents: () => void;
     setDAWStateSnapshot: (snapshot: DAWStateSnapshot | null) => void;
     setAIContext: (context: string | null) => void;
+
+    // Assistant UI Actions
+    setActiveAssistantTab: (tab: "chat" | "analysis") => void;
+    setIsSendingMessage: (sending: boolean) => void;
+    setIsLoadingAssistantState: (loading: boolean) => void;
+    sendMessage: (message: string) => Promise<void>;
+    refreshAssistantState: () => Promise<void>;
 
     // ========================================================================
     // ACTIVITY ACTIONS
@@ -395,9 +407,9 @@ export const useDAWStore = create<DAWStore>()(
         activeSynths: {},
 
         // UI State
-        zoom: 0.5,
-        snapEnabled: true,
-        gridSize: 16,
+        zoom: statePersistence.getZoom(),
+        snapEnabled: statePersistence.getSnapEnabled(),
+        gridSize: statePersistence.getGridSize(),
         isLooping: true,
         loopStart: 0,
         loopEnd: 16,
@@ -424,11 +436,16 @@ export const useDAWStore = create<DAWStore>()(
         selectedEffectId: null,
         showEffectBrowser: false,
 
-        // AI State
+        // Assistant State
         chatHistory: [],
         analysisEvents: [],
         dawStateSnapshot: null,
         aiContext: null,
+
+        // Assistant UI State
+        activeAssistantTab: statePersistence.getActiveAssistantTab(),
+        isSendingMessage: false,
+        isLoadingAssistantState: false,
 
         // Activity State
         activities: [],
@@ -1522,9 +1539,18 @@ export const useDAWStore = create<DAWStore>()(
         // UI ACTIONS
         // ====================================================================
 
-        setZoom: (zoom) => set({ zoom }),
-        setSnapEnabled: (enabled) => set({ snapEnabled: enabled }),
-        setGridSize: (size) => set({ gridSize: size }),
+        setZoom: (zoom) => {
+            set({ zoom });
+            statePersistence.setZoom(zoom);
+        },
+        setSnapEnabled: (enabled) => {
+            set({ snapEnabled: enabled });
+            statePersistence.setSnapEnabled(enabled);
+        },
+        setGridSize: (size) => {
+            set({ gridSize: size });
+            statePersistence.setGridSize(size);
+        },
         setIsLooping: async (looping) => {
             set({ isLooping: looping });
             const { activeComposition, loopStart, loopEnd } = get();
@@ -1649,7 +1675,7 @@ export const useDAWStore = create<DAWStore>()(
         setShowEffectBrowser: (show) => set({ showEffectBrowser: show }),
 
         // ====================================================================
-        // AI ACTIONS
+        // ASSISTANT ACTIONS
         // ====================================================================
 
         addChatMessage: (message) => {
@@ -1684,6 +1710,93 @@ export const useDAWStore = create<DAWStore>()(
         setAIContext: (context) => {
             set({ aiContext: context });
             windowManager.broadcastState('aiContext', context);
+        },
+
+        // Assistant UI Actions
+        setActiveAssistantTab: (tab) => {
+            set({ activeAssistantTab: tab });
+            statePersistence.setActiveAssistantTab(tab);
+        },
+
+        setIsSendingMessage: (sending) => {
+            set({ isSendingMessage: sending });
+        },
+
+        setIsLoadingAssistantState: (loading) => {
+            set({ isLoadingAssistantState: loading });
+        },
+
+        sendMessage: async (message) => {
+            try {
+                set({ isSendingMessage: true });
+
+                // Add user message to chat history
+                const userMessage: ChatMessage = {
+                    id: `msg-${Date.now()}`,
+                    role: "user",
+                    content: message,
+                    timestamp: new Date().toISOString(),
+                };
+                get().addChatMessage(userMessage);
+
+                // Send to backend
+                const response = await api.assistant.chat({
+                    message,
+                });
+
+                // Add assistant response to chat history
+                const assistantMessage: ChatMessage = {
+                    id: `msg-${Date.now()}-response`,
+                    role: "assistant",
+                    content: response.response,
+                    timestamp: new Date().toISOString(),
+                    actions_executed: response.actions_executed,
+                };
+                get().addChatMessage(assistantMessage);
+
+                // Update AI context if provided
+                if (response.musical_context) {
+                    get().setAIContext(response.musical_context);
+                }
+
+                // Add analysis event if actions were executed
+                if (response.actions_executed && response.actions_executed.length > 0) {
+                    const analysisEvent: AnalysisEvent = {
+                        id: `event-${Date.now()}`,
+                        type: "action",
+                        message: `Executed ${response.actions_executed.length} action(s)`,
+                        timestamp: new Date().toISOString(),
+                        metadata: { actions: response.actions_executed },
+                    };
+                    get().addAnalysisEvent(analysisEvent);
+                }
+            } catch (error) {
+                console.error("Failed to send message:", error);
+                toast.error("Failed to send message");
+            } finally {
+                set({ isSendingMessage: false });
+            }
+        },
+
+        refreshAssistantState: async () => {
+            try {
+                set({ isLoadingAssistantState: true });
+
+                // Get current DAW state
+                const stateResponse = await api.assistant.getState({});
+                get().setDAWStateSnapshot(stateResponse.full_state);
+
+                // Get AI context
+                const contextResponse = await api.assistant.getContext();
+                get().setAIContext(contextResponse.context);
+
+                toast.success("Assistant state refreshed");
+            } catch (error) {
+                console.error("Failed to refresh assistant state:", error);
+                toast.error("Failed to refresh assistant state");
+            } finally {
+                set({ isLoadingAssistantState: false });
+            }
         },
 
         // ====================================================================

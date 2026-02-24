@@ -3,6 +3,8 @@
  *
  * User interaction with AI assistant.
  * Accepts vague, creative commands for autonomous composition.
+ *
+ * NO PROPS - Reads from Zustand store directly
  */
 
 import { useState, useRef, useEffect } from "react";
@@ -11,20 +13,15 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Send, Sparkles, Music, Zap, Info } from "lucide-react";
-import type { AIState } from "../../hooks/useAIState.ts";
 import type { ChatMessage } from "../../types.ts";
 
-interface AssistantChatLayoutProps {
-    state: AIState;
-    handlers: {
-        handleSendMessage: (message: string) => Promise<void>;
-        handleRefreshState: () => Promise<void>;
-    };
-}
-
-export function AssistantChatLayout({ state, handlers }: AssistantChatLayoutProps) {
-    // Get chat history from Zustand store
+export function AssistantChatLayout() {
+    // Read state from Zustand store
     const chatHistory = useDAWStore(state => state.chatHistory);
+    const isSendingMessage = useDAWStore(state => state.isSendingMessage);
+    const sendMessage = useDAWStore(state => state.sendMessage);
+
+    // Local UI state
     const [inputValue, setInputValue] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -34,8 +31,8 @@ export function AssistantChatLayout({ state, handlers }: AssistantChatLayoutProp
     }, [chatHistory]);
 
     const handleSend = async () => {
-        if (!inputValue.trim() || state.isSendingMessage) return;
-        await handlers.handleSendMessage(inputValue);
+        if (!inputValue.trim() || isSendingMessage) return;
+        await sendMessage(inputValue);
         setInputValue("");
     };
 
@@ -85,7 +82,7 @@ export function AssistantChatLayout({ state, handlers }: AssistantChatLayoutProp
 
             {/* Chat Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {chatHistory.length === 0 && !state.isSendingMessage ? (
+                {chatHistory.length === 0 && !isSendingMessage ? (
                     <div className="flex h-full items-center justify-center text-center">
                         <div className="space-y-2 text-muted-foreground">
                             <Sparkles size={32} className="mx-auto opacity-50" />
@@ -136,7 +133,7 @@ export function AssistantChatLayout({ state, handlers }: AssistantChatLayoutProp
                         ))}
 
                         {/* Typing Indicator */}
-                        {state.isSendingMessage && (
+                        {isSendingMessage && (
                             <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
                                 <div className="max-w-[80%] rounded-lg p-3 bg-muted">
                                     <div className="flex items-center gap-3">
@@ -168,12 +165,12 @@ export function AssistantChatLayout({ state, handlers }: AssistantChatLayoutProp
                             }
                         }}
                         placeholder="Give me a vague, creative command..."
-                        disabled={state.isSendingMessage}
+                        disabled={isSendingMessage}
                         className="flex-1"
                     />
                     <Button
                         onClick={handleSend}
-                        disabled={!inputValue.trim() || state.isSendingMessage}
+                        disabled={!inputValue.trim() || isSendingMessage}
                         size="icon"
                     >
                         <Send size={16} />

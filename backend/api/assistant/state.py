@@ -1,7 +1,7 @@
 """
-AI State Operations - DAW state and context endpoints
+Assistant State Operations - DAW state and context endpoints
 
-This module handles DAW state retrieval and AI context generation.
+This module handles DAW state retrieval and assistant context generation.
 """
 import logging
 from fastapi import APIRouter, Depends

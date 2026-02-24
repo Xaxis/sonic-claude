@@ -32,7 +32,7 @@ from backend.api.audio import router as audio_router
 from backend.api.playback import router as playback_router
 from backend.api.mixer import router as mixer_router
 from backend.api.effects import router as effects_router
-from backend.api.ai import router as ai_router
+from backend.api.assistant import router as assistant_router
 from backend.api.samples import router as samples_router
 from backend.api.compositions import router as compositions_router
 
@@ -210,7 +210,7 @@ async def sonic_claude_exception_handler(request: Request, exc: SonicClaudeExcep
 #   - /api/mixer/* - Mixer operations
 #   - /api/effects/* - Effects operations
 #   - /api/audio/* - Audio synthesis and metronome
-#   - /api/ai/* - AI chat and actions
+#   - /api/assistant/* - Assistant chat and actions
 #   - /api/ws/* - WebSocket streams
 # ============================================================================
 
@@ -223,7 +223,7 @@ app.include_router(playback_router, prefix="/api/playback")
 app.include_router(mixer_router, prefix="/api/mixer")
 app.include_router(effects_router, prefix="/api/effects")
 app.include_router(audio_router, prefix="/api/audio")
-app.include_router(ai_router, prefix="/api/ai")
+app.include_router(assistant_router, prefix="/api/assistant")
 app.include_router(websocket.router, prefix="/api/ws", tags=["websocket"])
 
 

@@ -41,7 +41,7 @@ export const apiConfig = {
             samples: "/api/samples",
             compositions: "/api/compositions",
             playback: "/api/playback",
-            ai: "/api/ai",
+            assistant: "/api/assistant",
         },
 
         // WebSocket endpoints

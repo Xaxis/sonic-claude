@@ -1,7 +1,7 @@
 """
-AI Chat Operations - Chat endpoint for AI-DAW interaction
+Assistant Chat Operations - Chat endpoint for assistant-DAW interaction
 
-This module handles chat interactions with the AI agent.
+This module handles chat interactions with the assistant agent.
 """
 import logging
 from fastapi import APIRouter, Depends, HTTPException

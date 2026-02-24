@@ -1,7 +1,7 @@
 """
-AI Action Operations - Execute AI-generated actions
+Assistant Action Operations - Execute assistant-generated actions
 
-This module handles execution of AI-generated DAW actions.
+This module handles execution of assistant-generated DAW actions.
 """
 import logging
 from fastapi import APIRouter, Depends, HTTPException

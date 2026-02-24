@@ -25,8 +25,16 @@ export const STORAGE_KEYS = {
     ACTIVE_SEQUENCE_ID: "sonic-claude-active-sequence",
     SEQUENCER_SPLIT_RATIO: "sonic-claude-sequencer-split",
 
+    // Sequencer UI State
+    ZOOM: "sonic-claude-zoom",
+    SNAP_ENABLED: "sonic-claude-snap-enabled",
+    GRID_SIZE: "sonic-claude-grid-size",
+
     // Composition
     ACTIVE_COMPOSITION_ID: "sonic-claude-active-composition",
+
+    // Assistant
+    ACTIVE_ASSISTANT_TAB: "sonic-claude-active-assistant-tab",
 
     // Settings
     SETTINGS: "sonic-claude-settings",
@@ -155,6 +163,30 @@ export class StatePersistenceService {
         this.set(STORAGE_KEYS.SEQUENCER_SPLIT_RATIO, ratio);
     }
 
+    getZoom(): number {
+        return this.get<number>(STORAGE_KEYS.ZOOM, 0.5);
+    }
+
+    setZoom(zoom: number): void {
+        this.set(STORAGE_KEYS.ZOOM, zoom);
+    }
+
+    getSnapEnabled(): boolean {
+        return this.get<boolean>(STORAGE_KEYS.SNAP_ENABLED, true);
+    }
+
+    setSnapEnabled(enabled: boolean): void {
+        this.set(STORAGE_KEYS.SNAP_ENABLED, enabled);
+    }
+
+    getGridSize(): number {
+        return this.get<number>(STORAGE_KEYS.GRID_SIZE, 16);
+    }
+
+    setGridSize(size: number): void {
+        this.set(STORAGE_KEYS.GRID_SIZE, size);
+    }
+
     // ========================================================================
     // LAYOUT STATE
     // ========================================================================
@@ -165,6 +197,18 @@ export class StatePersistenceService {
 
     setLayout<T>(layout: T): void {
         this.set(STORAGE_KEYS.LAYOUT, layout);
+    }
+
+    // ========================================================================
+    // ASSISTANT UI STATE
+    // ========================================================================
+
+    getActiveAssistantTab(): "chat" | "analysis" {
+        return this.get<"chat" | "analysis">(STORAGE_KEYS.ACTIVE_ASSISTANT_TAB, "chat");
+    }
+
+    setActiveAssistantTab(tab: "chat" | "analysis"): void {
+        this.set(STORAGE_KEYS.ACTIVE_ASSISTANT_TAB, tab);
     }
 
     // ========================================================================

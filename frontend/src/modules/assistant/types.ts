@@ -95,6 +95,7 @@ export interface ActionResult {
 // ============================================================================
 
 export interface ChatMessage {
+    id: string;
     role: "user" | "assistant";
     content: string;
     timestamp: string;
@@ -103,19 +104,21 @@ export interface ChatMessage {
 
 export interface ChatRequest {
     message: string;
+    context?: string;
 }
 
 export interface ChatResponse {
     response: string;
-    actions_executed?: ActionResult[];
-    musical_context?: string;  // Full musical analysis sent to LLM
+    actions_taken?: ActionResult[];
+    context?: string;
 }
 
 export interface AnalysisEvent {
     id: string;
     timestamp: string;
-    type: "system_prompt" | "context" | "user_message" | "llm_response" | "tool_call" | "action_result";
-    content: string;
+    type: "system_prompt" | "context" | "user_message" | "llm_response" | "tool_call" | "action_result" | "action";
+    message?: string;
+    content?: string;
     metadata?: Record<string, any>;
 }
 

@@ -13,7 +13,7 @@ import {
     MixerProvider,
     EffectsProvider,
     AudioProvider,
-    AIProvider,
+    AssistantProvider,
     SamplesProvider,
 } from "./providers";
 
@@ -54,7 +54,7 @@ export class APIClient {
     public mixer: MixerProvider;
     public effects: EffectsProvider;
     public audio: AudioProvider;
-    public ai: AIProvider;
+    public assistant: AssistantProvider;
     public samples: SamplesProvider;
 
     constructor(baseURL?: string) {
@@ -64,7 +64,7 @@ export class APIClient {
         this.mixer = new MixerProvider(baseURL);
         this.effects = new EffectsProvider(baseURL);
         this.audio = new AudioProvider(baseURL);
-        this.ai = new AIProvider(baseURL);
+        this.assistant = new AssistantProvider(baseURL);
         this.samples = new SamplesProvider(baseURL);
     }
 }

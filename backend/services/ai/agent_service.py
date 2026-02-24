@@ -798,7 +798,7 @@ When modifying sequences:
 
             # Show effects if any
             if hasattr(track, 'effects') and track.effects:
-                parts.append(f"  effects: {', '.join([f'{e.type}' for e in track.effects])}")
+                parts.append(f"  effects: {', '.join([f'{e.name}' for e in track.effects])}")
 
         # === CLIPS (with complete note data) ===
         parts.append(f"\n=== CLIPS ({len(state.sequence.clips)}) ===")

@@ -10,7 +10,7 @@ export { PlaybackProvider } from "./playback.provider";
 export { MixerProvider } from "./mixer.provider";
 export { EffectsProvider } from "./effects.provider";
 export { AudioProvider } from "./audio.provider";
-export { AIProvider } from "./ai.provider";
+export { AssistantProvider } from "./assistant.provider";
 export { SamplesProvider } from "./samples.provider";
 
 // Re-export types
@@ -82,7 +82,7 @@ export type {
     ActionResult,
     BatchActionRequest,
     BatchActionResponse,
-} from "./ai.provider";
+} from "./assistant.provider";
 
 export type {
     SampleMetadata,

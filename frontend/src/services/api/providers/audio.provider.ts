@@ -74,6 +74,7 @@ export interface SynthDefInfo {
     display_name: string;
     description: string;
     category: string;
+    parameters: string[];
 }
 
 // ============================================================================

@@ -1,13 +1,13 @@
 /**
- * AI API Provider
- * Thin HTTP client mapping to /api/ai/* routes
- * 
+ * Assistant API Provider
+ * Thin HTTP client mapping to /api/assistant/* routes
+ *
  * Backend routes:
- * - POST   /api/ai/chat                                 (chat.py)
- * - POST   /api/ai/state                                (state.py)
- * - GET    /api/ai/context                              (state.py)
- * - POST   /api/ai/action                               (actions.py)
- * - POST   /api/ai/actions/batch                        (actions.py)
+ * - POST   /api/assistant/chat                          (chat.py)
+ * - POST   /api/assistant/state                         (state.py)
+ * - GET    /api/assistant/context                       (state.py)
+ * - POST   /api/assistant/action                        (actions.py)
+ * - POST   /api/assistant/actions/batch                 (actions.py)
  */
 
 import { BaseAPIClient } from "../base";
@@ -67,31 +67,31 @@ export interface BatchActionResponse {
 }
 
 // ============================================================================
-// AI PROVIDER (HTTP CLIENT ONLY - NO BUSINESS LOGIC)
+// ASSISTANT PROVIDER (HTTP CLIENT ONLY - NO BUSINESS LOGIC)
 // ============================================================================
 
-export class AIProvider extends BaseAPIClient {
+export class AssistantProvider extends BaseAPIClient {
     // === CHAT ===
     async chat(request: ChatRequest): Promise<ChatResponse> {
-        return this.post("/api/ai/chat", request);
+        return this.post("/api/assistant/chat", request);
     }
 
     // === STATE ===
     async getState(request: GetStateRequest = {}): Promise<GetStateResponse> {
-        return this.post("/api/ai/state", request);
+        return this.post("/api/assistant/state", request);
     }
 
     async getContext(): Promise<{ context: string }> {
-        return this.get("/api/ai/context");
+        return this.get("/api/assistant/context");
     }
 
     // === ACTIONS ===
     async executeAction(action: DAWAction): Promise<ActionResult> {
-        return this.post("/api/ai/action", action);
+        return this.post("/api/assistant/action", action);
     }
 
     async executeBatchActions(request: BatchActionRequest): Promise<BatchActionResponse> {
-        return this.post("/api/ai/actions/batch", request);
+        return this.post("/api/assistant/actions/batch", request);
     }
 }
 

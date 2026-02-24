@@ -337,7 +337,7 @@
       "name": "AI Clip 5b2b16",
       "type": "midi",
       "track_id": "4ded763a-0589-4857-a173-fe7e943c0d69",
-      "start_time": 2.0,
+      "start_time": 1.9375,
       "duration": 82.0,
       "is_muted": false,
       "is_looped": false,
@@ -857,5 +857,5 @@
     "source": "manual_save"
   },
   "created_at": "2026-02-23T17:50:41.081441",
-  "updated_at": "2026-02-24T05:10:50.891005"
+  "updated_at": "2026-02-24T05:09:00.910875"
 }
