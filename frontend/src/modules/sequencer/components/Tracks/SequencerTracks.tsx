@@ -1,6 +1,11 @@
 /**
  * SequencerTracks - Track list container
  *
+ * REFACTORED: Uses Zustand best practices
+ * - Reads tracks directly from store (no prop drilling)
+ * - Calls track actions directly from store (no handler props)
+ * - Only receives expandedTracks as prop (local UI state, not in Zustand)
+ *
  * Renders track headers using the professional SequencerTrackHeader component.
  * Handles delete confirmation dialog.
  */
@@ -8,6 +13,7 @@
 import { Volume2 } from "lucide-react";
 import { useState } from "react";
 import { SequencerTrackHeader } from "././SequencerTrackHeader.tsx";
+import { useDAWStore } from '@/stores/dawStore';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -19,41 +25,32 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog.tsx";
 
-interface Track {
-    id: string;
-    name: string;
-    type: "midi" | "audio" | "sample";
-    is_muted: boolean;
-    is_solo: boolean;
-    is_armed: boolean;
-    volume: number;
-    pan: number;
-    color?: string;
-    sample_name?: string;
-    instrument?: string; // MIDI track instrument (SynthDef name)
-}
-
 interface SequencerTrackListProps {
-    tracks: Track[];
-    onToggleMute: (trackId: string) => void;
-    onToggleSolo: (trackId: string) => void;
-    onDeleteTrack?: (trackId: string) => void;
-    onRenameTrack?: (trackId: string, newName: string) => void;
-    onUpdateTrack?: (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => void;
-    expandedTracks?: Set<string>;
+    expandedTracks?: Set<string>; // Local UI state, not in Zustand
     onExpandedTracksChange?: (expandedTracks: Set<string>) => void;
 }
 
 export function SequencerTracks({
-    tracks,
-    onToggleMute,
-    onToggleSolo,
-    onDeleteTrack,
-    onRenameTrack,
-    onUpdateTrack,
     expandedTracks: externalExpandedTracks,
     onExpandedTracksChange,
 }: SequencerTrackListProps) {
+    // ========================================================================
+    // STATE: Read directly from Zustand store
+    // ========================================================================
+    const tracks = useDAWStore(state => state.tracks);
+
+    // ========================================================================
+    // ACTIONS: Get directly from Zustand store
+    // ========================================================================
+    const muteTrack = useDAWStore(state => state.muteTrack);
+    const soloTrack = useDAWStore(state => state.soloTrack);
+    const deleteTrack = useDAWStore(state => state.deleteTrack);
+    const renameTrack = useDAWStore(state => state.renameTrack);
+    const updateTrack = useDAWStore(state => state.updateTrack);
+
+    // ========================================================================
+    // LOCAL UI STATE: Delete dialog and track expansion
+    // ========================================================================
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [trackToDelete, setTrackToDelete] = useState<{ id: string; name: string } | null>(null);
     const [internalExpandedTracks, setInternalExpandedTracks] = useState<Set<string>>(new Set());
@@ -62,6 +59,9 @@ export function SequencerTracks({
     const expandedTracks = externalExpandedTracks ?? internalExpandedTracks;
     const setExpandedTracks = onExpandedTracksChange ?? setInternalExpandedTracks;
 
+    // ========================================================================
+    // HANDLERS: Adapt store actions to component callbacks
+    // ========================================================================
     const handleDeleteClick = (trackId: string) => {
         const track = tracks.find((t) => t.id === trackId);
         if (track) {
@@ -70,9 +70,9 @@ export function SequencerTracks({
         }
     };
 
-    const handleConfirmDelete = () => {
-        if (trackToDelete && onDeleteTrack) {
-            onDeleteTrack(trackToDelete.id);
+    const handleConfirmDelete = async () => {
+        if (trackToDelete) {
+            await deleteTrack(trackToDelete.id);
         }
         setDeleteDialogOpen(false);
         setTrackToDelete(null);
@@ -88,6 +88,28 @@ export function SequencerTracks({
                 next.add(trackId);
             }
             setExpandedTracks(next);
+        }
+    };
+
+    const handleRenameTrack = async (trackId: string, newName: string) => {
+        await renameTrack(trackId, newName);
+    };
+
+    const handleUpdateTrack = async (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => {
+        await updateTrack(trackId, updates);
+    };
+
+    const handleToggleMute = async (trackId: string) => {
+        const track = tracks.find(t => t.id === trackId);
+        if (track) {
+            await muteTrack(trackId, !track.is_muted);
+        }
+    };
+
+    const handleToggleSolo = async (trackId: string) => {
+        const track = tracks.find(t => t.id === trackId);
+        if (track) {
+            await soloTrack(trackId, !track.is_solo);
         }
     };
 
@@ -108,11 +130,11 @@ export function SequencerTracks({
                     <SequencerTrackHeader
                         key={track.id}
                         track={track}
-                        onToggleMute={onToggleMute}
-                        onToggleSolo={onToggleSolo}
-                        onRename={onRenameTrack}
-                        onDelete={onDeleteTrack ? handleDeleteClick : undefined}
-                        onUpdateTrack={onUpdateTrack}
+                        onToggleMute={handleToggleMute}
+                        onToggleSolo={handleToggleSolo}
+                        onRename={handleRenameTrack}
+                        onDelete={handleDeleteClick}
+                        onUpdateTrack={handleUpdateTrack}
                         isExpanded={expandedTracks.has(track.id)}
                         onToggleExpand={handleToggleExpand}
                     />

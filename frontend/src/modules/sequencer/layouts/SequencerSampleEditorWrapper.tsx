@@ -1,5 +1,5 @@
 /**
- * SampleEditorWrapper Component
+ * SequencerSampleEditorWrapper Component
  * 
  * Smart container for sample editor that handles:
  * 1. Auto-scroll to clip when sample editor opens
@@ -13,7 +13,7 @@ import { SequencerSampleEditor } from "../components/SampleEditor/SequencerSampl
 import { Music } from "lucide-react";
 import type { SequencerClip } from "../types";
 
-interface SampleEditorWrapperProps {
+interface SequencerSampleEditorWrapperProps {
     // Clip data
     clip: SequencerClip | undefined;
 
@@ -38,7 +38,7 @@ interface SampleEditorWrapperProps {
     onLoopEndChange: (end: number) => void;
 }
 
-export function SampleEditorWrapper(props: SampleEditorWrapperProps) {
+export function SequencerSampleEditorWrapper(props: SequencerSampleEditorWrapperProps) {
     const {
         clip,
         clipDragState,

@@ -1,21 +1,26 @@
 /**
- * PianoRollWrapper Component
- * 
+ * SequencerPianoRollWrapper Component
+ *
+ * REFACTORED: Uses Zustand best practices
+ * - Reads state directly from store (no prop drilling)
+ * - Calls actions directly from store (no handler props)
+ * - Only receives clip/track data, drag state, and scroll refs
+ *
  * Smart container for piano roll that handles:
  * 1. Auto-scroll to clip when piano roll opens
  * 2. Empty state when no clip is selected
  * 3. Proper clip data validation
- * 
+ *
  * This is the "glue" layer between SequencerSplitLayout and SequencerPianoRoll.
  */
 
 import { SequencerPianoRoll } from "../components/PianoRoll/SequencerPianoRoll.tsx";
 import { Music } from "lucide-react";
+import { useDAWStore } from '@/stores/dawStore';
 import type { SequencerClip, SequencerTrack } from "../types";
-import type { MIDIEvent } from "../types";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
-interface PianoRollWrapperProps {
+interface SequencerPianoRollWrapperProps {
     // Clip data
     clip: SequencerClip | undefined;
     track: SequencerTrack | undefined; // Track for instrument info
@@ -31,35 +36,41 @@ interface PianoRollWrapperProps {
     currentPosition: number;
     isPlaying: boolean;
 
-    // Scroll refs
-    timelineScrollRef: React.RefObject<HTMLDivElement | null>;
+    // Scroll ref
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
-    onPianoRollScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-
-    // Handlers
-    onClose: () => void;
-    onUpdateNotes: (clipId: string, notes: MIDIEvent[]) => Promise<void>;
-    onSeek?: (position: number, triggerAudio?: boolean) => void;
-    onLoopStartChange: (start: number) => void;
-    onLoopEndChange: (end: number) => void;
 }
 
-export function PianoRollWrapper(props: PianoRollWrapperProps) {
-    const {
-        clip,
-        track,
-        clipDragState,
-        totalBeats,
-        currentPosition,
-        isPlaying,
-        pianoRollScrollRef,
-        onPianoRollScroll,
-        onClose,
-        onUpdateNotes,
-        onSeek,
-        onLoopStartChange,
-        onLoopEndChange,
-    } = props;
+export function SequencerPianoRollWrapper({
+    clip,
+    track,
+    clipDragState,
+    totalBeats,
+    activeNotes,
+    currentPosition,
+    isPlaying,
+    pianoRollScrollRef,
+}: SequencerPianoRollWrapperProps) {
+    // ========================================================================
+    // ACTIONS: Get directly from Zustand store
+    // ========================================================================
+    const closePianoRoll = useDAWStore(state => state.closePianoRoll);
+    const updateClip = useDAWStore(state => state.updateClip);
+    const seek = useDAWStore(state => state.seek);
+    const setLoopStart = useDAWStore(state => state.setLoopStart);
+    const setLoopEnd = useDAWStore(state => state.setLoopEnd);
+    const setPianoRollScrollLeft = useDAWStore(state => state.setPianoRollScrollLeft);
+
+    // ========================================================================
+    // HANDLERS: Adapt store actions to component callbacks
+    // ========================================================================
+    const handleUpdateNotes = async (clipId: string, notes: any[]) => {
+        await updateClip(clipId, { midi_events: notes });
+    };
+
+    const handlePianoRollScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const scrollLeft = e.currentTarget.scrollLeft;
+        setPianoRollScrollLeft(scrollLeft);
+    };
 
     // Empty state - no clip selected
     if (!clip) {
@@ -109,16 +120,16 @@ export function PianoRollWrapper(props: PianoRollWrapperProps) {
             midiEvents={clip.midi_events || []}
             totalBeats={totalBeats}
             instrument={track?.instrument}
-            activeNotes={props.activeNotes}
+            activeNotes={activeNotes}
             currentPosition={currentPosition}
             isPlaying={isPlaying}
             pianoRollScrollRef={pianoRollScrollRef}
-            onPianoRollScroll={onPianoRollScroll}
-            onClose={onClose}
-            onUpdateNotes={onUpdateNotes}
-            onSeek={onSeek}
-            onLoopStartChange={onLoopStartChange}
-            onLoopEndChange={onLoopEndChange}
+            onPianoRollScroll={handlePianoRollScroll}
+            onClose={closePianoRoll}
+            onUpdateNotes={handleUpdateNotes}
+            onSeek={seek}
+            onLoopStartChange={setLoopStart}
+            onLoopEndChange={setLoopEnd}
         />
     );
 }

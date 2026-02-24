@@ -1,90 +1,54 @@
 /**
  * SequencerSplitLayout Component
  *
+ * REFACTORED: Pure layout component using Zustand best practices
+ * - No prop drilling - child components read from store directly
+ * - Only manages local UI state (split ratio, drag states)
+ * - Only receives scroll refs and active notes
+ *
  * Layout for when piano roll or sample editor is open.
  * Features drag-resizable split between timeline (top) and editor (bottom).
- * Uses SequencerContext for state management.
  */
 
 import React, { useState, useCallback, useEffect } from "react";
 import { Music } from "lucide-react";
 import { SequencerTimelineSection } from "./SequencerTimelineSection.tsx";
-import { PianoRollWrapper } from "./PianoRollWrapper.tsx";
+import { SequencerPianoRollWrapper } from "./SequencerPianoRollWrapper.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { statePersistence } from "@/services/state-persistence/state-persistence.service";
-import type { MIDIEvent } from "../types";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
 interface SequencerSplitLayoutProps {
-    // Scroll refs
+    // Scroll refs for auto-scroll functionality
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
     sampleEditorScrollRef: React.RefObject<HTMLDivElement | null>;
-    onTimelineScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-    onPianoRollScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-    onSampleEditorScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-
-    // Track handlers
-    onToggleMute: (trackId: string) => Promise<void>;
-    onToggleSolo: (trackId: string) => Promise<void>;
-    onDeleteTrack: (trackId: string) => Promise<void>;
-    onRenameTrack: (trackId: string, name: string) => Promise<void>;
-    onUpdateTrack: (trackId: string, updates: { volume?: number; pan?: number }) => Promise<void>;
-
-    // Clip handlers
-    onSelectClip: (clipId: string | null) => void;
-    onDuplicateClip: (clipId: string) => Promise<void>;
-    onDeleteClip: (clipId: string) => Promise<void>;
-    onAddClipToTrack: (trackId: string, startBeat: number) => Promise<void>;
-    onMoveClip: (clipId: string, newStartTime: number) => Promise<void>;
-    onResizeClip: (clipId: string, newDuration: number) => Promise<void>;
-    onUpdateClip: (clipId: string, updates: { gain?: number; audio_offset?: number }) => Promise<void>;
-    onOpenPianoRoll: (clipId: string) => void;
-    onOpenSampleEditor: (clipId: string) => void;
-
-    // Loop handlers
-    onLoopStartChange: (start: number) => void;
-    onLoopEndChange: (end: number) => void;
-    onSeek: (position: number, triggerAudio?: boolean) => Promise<void>;
-
-    // Piano roll handlers
-    onClosePianoRoll: () => void;
-    onUpdateMIDINotes: (clipId: string, notes: MIDIEvent[]) => Promise<void>;
-
-    // Sample editor handlers
-    onCloseSampleEditor: () => void;
 
     // Active notes for visual feedback
     activeNotes?: ActiveNote[];
 }
 
-export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
-    const {
-        pianoRollScrollRef,
-        sampleEditorScrollRef,
-        onPianoRollScroll,
-        onSampleEditorScroll,
-        onClosePianoRoll,
-        onCloseSampleEditor,
-        onUpdateMIDINotes,
-        onUpdateClip,
-        onSeek,
-        timelineScrollRef,
-        ...timelineSectionProps
-    } = props;
+export function SequencerSplitLayout({
+    timelineScrollRef,
+    pianoRollScrollRef,
+    sampleEditorScrollRef,
+    activeNotes,
+}: SequencerSplitLayoutProps) {
 
-    // Get state from Zustand store
+    // ========================================================================
+    // STATE: Read directly from Zustand store
+    // ========================================================================
     const tracks = useDAWStore(state => state.tracks);
     const clips = useDAWStore(state => state.clips);
     const transport = useDAWStore(state => state.transport);
     const currentPosition = transport?.position_beats ?? 0;
     const isPlaying = transport?.is_playing ?? false;
-
-    // Get UI state from Zustand store
     const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
     const showPianoRoll = useDAWStore(state => state.showPianoRoll);
 
-    // Resizable split state - percentage of height for timeline (0-100)
+    // ========================================================================
+    // LOCAL UI STATE: Split ratio and drag states
+    // ========================================================================
     const [timelineHeightPercent, setTimelineHeightPercent] = useState(() => {
         return statePersistence.getSequencerSplitRatio();
     });
@@ -93,7 +57,9 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
     // Track clip drag states for piano roll sync
     const [clipDragStates, setClipDragStates] = useState<Map<string, { startTime: number; duration: number } | null>>(new Map());
 
-    // Handle clip drag state changes from timeline
+    // ========================================================================
+    // HANDLERS: Clip drag state sync
+    // ========================================================================
     const handleClipDragStateChange = useCallback((clipId: string, dragState: { startTime: number; duration: number } | null) => {
         setClipDragStates(prev => {
             const next = new Map(prev);
@@ -177,10 +143,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
                 style={{ flexGrow: timelineHeightPercent, flexShrink: 1, flexBasis: 0 }}
             >
                 <SequencerTimelineSection
-                    {...timelineSectionProps}
                     timelineScrollRef={timelineScrollRef}
-                    onUpdateClip={onUpdateClip}
-                    onSeek={onSeek}
                     onClipDragStateChange={handleClipDragStateChange}
                 />
             </div>
@@ -202,22 +165,15 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
             >
                 <div className="h-full flex flex-col overflow-hidden">
                     {showPianoRoll ? (
-                        <PianoRollWrapper
+                        <SequencerPianoRollWrapper
                             clip={pianoRollClip}
                             track={pianoRollTrack}
                             clipDragState={pianoRollClipDragState}
                             totalBeats={totalBeats}
-                            activeNotes={props.activeNotes}
+                            activeNotes={activeNotes}
                             currentPosition={currentPosition}
                             isPlaying={isPlaying ?? false}
-                            timelineScrollRef={timelineScrollRef}
                             pianoRollScrollRef={pianoRollScrollRef}
-                            onPianoRollScroll={onPianoRollScroll}
-                            onClose={onClosePianoRoll}
-                            onUpdateNotes={onUpdateMIDINotes}
-                            onSeek={onSeek}
-                            onLoopStartChange={props.onLoopStartChange}
-                            onLoopEndChange={props.onLoopEndChange}
                         />
                     ) : (
                         <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center bg-muted/20">

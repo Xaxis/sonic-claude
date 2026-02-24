@@ -144,7 +144,7 @@ interface DAWStore {
     // ========================================================================
     // UI STATE (Local)
     // ========================================================================
-    
+
     // Sequencer UI
     zoom: number;
     snapEnabled: boolean;
@@ -153,19 +153,24 @@ interface DAWStore {
     loopStart: number;
     loopEnd: number;
     selectedClipId: string | null;
-    
+
+    // Scroll State (for synchronized scrolling between timeline/piano roll/sample editor)
+    timelineScrollLeft: number;
+    pianoRollScrollLeft: number;
+    sampleEditorScrollLeft: number;
+
     // Modals
     showSampleBrowser: boolean;
     showSequenceManager: boolean;
     showSequenceSettings: boolean;
     showPianoRoll: boolean;
     pianoRollClipId: string | null;
-    
+
     // Mixer UI
     showMeters: boolean;
     meterMode: "peak" | "rms" | "both";
     selectedChannelId: string | null;
-    
+
     // Effects UI
     selectedEffectId: string | null;
     showEffectBrowser: boolean;
@@ -293,6 +298,12 @@ interface DAWStore {
     setLoopStart: (start: number) => void;
     setLoopEnd: (end: number) => void;
     setSelectedClipId: (id: string | null) => void;
+
+    // Scroll actions (for synchronized scrolling)
+    setTimelineScrollLeft: (scrollLeft: number) => void;
+    setPianoRollScrollLeft: (scrollLeft: number) => void;
+    setSampleEditorScrollLeft: (scrollLeft: number) => void;
+
     setShowSampleBrowser: (show: boolean) => void;
     setShowSequenceManager: (show: boolean) => void;
     setShowSequenceSettings: (show: boolean) => void;
@@ -379,6 +390,12 @@ export const useDAWStore = create<DAWStore>()(
         loopStart: 0,
         loopEnd: 16,
         selectedClipId: null,
+
+        // Scroll State
+        timelineScrollLeft: 0,
+        pianoRollScrollLeft: 0,
+        sampleEditorScrollLeft: 0,
+
         showSampleBrowser: false,
         showSequenceManager: false,
         showSequenceSettings: false,
@@ -1542,6 +1559,12 @@ export const useDAWStore = create<DAWStore>()(
             }
         },
         setSelectedClipId: (id) => set({ selectedClipId: id }),
+
+        // Scroll actions - simple state updates, no side effects
+        setTimelineScrollLeft: (scrollLeft) => set({ timelineScrollLeft: scrollLeft }),
+        setPianoRollScrollLeft: (scrollLeft) => set({ pianoRollScrollLeft: scrollLeft }),
+        setSampleEditorScrollLeft: (scrollLeft) => set({ sampleEditorScrollLeft: scrollLeft }),
+
         setShowSampleBrowser: (show) => set({ showSampleBrowser: show }),
         setShowSequenceManager: (show) => set({ showSequenceManager: show }),
         setShowSequenceSettings: (show) => set({ showSequenceSettings: show }),

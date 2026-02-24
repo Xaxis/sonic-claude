@@ -1,9 +1,16 @@
 /**
  * SequencerTimelineRuler - Time ruler with measure markers
- * 
+ *
+ * REFACTORED: Uses Zustand best practices
+ * - Reads zoom, snapEnabled, gridSize from store
+ * - Calls seek action directly from store
+ * - Only receives calculated values (rulerMarkers, totalWidth, pixelsPerBeat)
+ *
  * Displays measure numbers and beat markers at the top of the timeline.
  * Supports click-to-seek functionality.
  */
+
+import { useDAWStore } from '@/stores/dawStore';
 
 interface RulerMarker {
     beat: number;
@@ -16,25 +23,27 @@ interface RulerMarker {
 interface SequencerTimelineRulerProps {
     rulerMarkers: RulerMarker[];
     totalWidth: number;
-    onSeek?: (position: number, triggerAudio?: boolean) => void;
     pixelsPerBeat: number;
-    zoom: number;
-    snapEnabled: boolean;
-    gridSize: number;
 }
 
 export function SequencerTimelineRuler({
     rulerMarkers,
     totalWidth,
-    onSeek,
     pixelsPerBeat,
-    zoom,
-    snapEnabled,
-    gridSize,
 }: SequencerTimelineRulerProps) {
-    const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!onSeek) return;
+    // ========================================================================
+    // STATE: Read directly from Zustand store
+    // ========================================================================
+    const zoom = useDAWStore(state => state.zoom);
+    const snapEnabled = useDAWStore(state => state.snapEnabled);
+    const gridSize = useDAWStore(state => state.gridSize);
 
+    // ========================================================================
+    // ACTIONS: Get directly from Zustand store
+    // ========================================================================
+    const seek = useDAWStore(state => state.seek);
+
+    const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
         const clickedBeat = clickX / (pixelsPerBeat * zoom);
@@ -45,7 +54,7 @@ export function SequencerTimelineRuler({
             : clickedBeat;
 
         // Click to seek - trigger audio once at the clicked position
-        onSeek(Math.max(0, snappedBeat), true);
+        seek(Math.max(0, snappedBeat), true);
     };
 
     return (

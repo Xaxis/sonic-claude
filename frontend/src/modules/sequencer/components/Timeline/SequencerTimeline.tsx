@@ -1,16 +1,19 @@
 /**
  * SequencerTimeline - Timeline container component
  *
+ * REFACTORED: Uses Zustand best practices
+ * - Reads state directly from store (no prop drilling)
+ * - Calls actions directly from store (no handler props)
+ * - Uses Zustand scroll state for auto-scroll
+ *
  * Composes timeline subcomponents into a cohesive timeline view:
- * - SequencerTimelineRuler: Time ruler with measure markers
  * - SequencerTimelineGrid: Grid lines background
  * - SequencerTimelineLoopRegion: Loop region markers
  * - SequencerTimelinePlayhead: Playhead indicator with drag support
  * - SequencerTimelineTrackRow: Individual track rows with clips
- * Uses SequencerContext for state management.
  */
 
-import { useRef, useEffect } from "react";
+import { useEffect } from "react";
 import { SequencerTimelineGrid } from "./SequencerTimelineGrid.tsx";
 import { SequencerTimelineLoopRegion } from "./SequencerTimelineLoopRegion.tsx";
 import { SequencerTimelinePlayhead } from "./SequencerTimelinePlayhead.tsx";
@@ -19,57 +22,51 @@ import { useDAWStore } from '@/stores/dawStore';
 import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
 
 interface SequencerTimelineProps {
-    expandedTracks?: Set<string>; // Track header expansion state
-    onSelectClip: (clipId: string | null) => void;
-    onDuplicateClip: (clipId: string) => void;
-    onDeleteClip: (clipId: string) => void;
-    onAddClipToTrack?: (trackId: string, startBeat: number) => void;
-    onMoveClip?: (clipId: string, newStartTime: number) => void;
-    onResizeClip?: (clipId: string, newDuration: number) => void;
-    onUpdateClip?: (clipId: string, updates: { gain?: number; audio_offset?: number }) => void;
-    onOpenPianoRoll?: (clipId: string) => void;
-    onOpenSampleEditor?: (clipId: string) => void;
-    onLoopStartChange?: (newLoopStart: number) => void;
-    onLoopEndChange?: (newLoopEnd: number) => void;
-    onSeek?: (position: number, triggerAudio?: boolean) => void;
-    onClipDragStateChange?: (clipId: string, dragState: { startTime: number; duration: number } | null) => void;
+    expandedTracks?: Set<string>; // Track header expansion state (local UI state, not in Zustand)
+    scrollContainerRef?: React.RefObject<HTMLDivElement | null>; // Ref to scroll container for auto-scroll
+    onClipDragStateChange?: (clipId: string, dragState: { startTime: number; duration: number } | null) => void; // For piano roll sync
 }
 
 export function SequencerTimeline({
     expandedTracks,
-    onSelectClip,
-    onDuplicateClip,
-    onDeleteClip,
-    onAddClipToTrack,
-    onMoveClip,
-    onResizeClip,
-    onUpdateClip,
-    onOpenPianoRoll,
-    onOpenSampleEditor,
-    onLoopStartChange,
-    onLoopEndChange,
-    onSeek,
+    scrollContainerRef,
     onClipDragStateChange,
 }: SequencerTimelineProps) {
-    // Get state from Zustand store
+    // ========================================================================
+    // STATE: Read directly from Zustand store
+    // ========================================================================
     const tracks = useDAWStore(state => state.tracks);
     const clips = useDAWStore(state => state.clips);
     const transport = useDAWStore(state => state.transport);
     const currentPosition = transport?.position_beats ?? 0;
 
-    // Get timeline calculations from shared hook
-    const { pixelsPerBeat, totalWidth, rulerMarkers, zoom } = useTimelineCalculations();
+    // ========================================================================
+    // ACTIONS: Get directly from Zustand store
+    // ========================================================================
+    const setSelectedClipId = useDAWStore(state => state.setSelectedClipId);
+    const duplicateClip = useDAWStore(state => state.duplicateClip);
+    const deleteClip = useDAWStore(state => state.deleteClip);
+    const addClip = useDAWStore(state => state.addClip);
+    const updateClip = useDAWStore(state => state.updateClip);
+    const openPianoRoll = useDAWStore(state => state.openPianoRoll);
+    const setLoopStart = useDAWStore(state => state.setLoopStart);
+    const setLoopEnd = useDAWStore(state => state.setLoopEnd);
+    const seek = useDAWStore(state => state.seek);
+    const activeComposition = useDAWStore(state => state.activeComposition);
 
-    // Ref for timeline container to enable auto-scroll
-    const timelineContainerRef = useRef<HTMLDivElement>(null);
-
+    // ========================================================================
+    // CALCULATIONS
+    // ========================================================================
+    const { pixelsPerBeat, rulerMarkers, zoom } = useTimelineCalculations();
     const playheadX = currentPosition * pixelsPerBeat * zoom;
 
-    // Auto-scroll timeline to keep playhead visible during playback
+    // ========================================================================
+    // AUTO-SCROLL: Keep playhead visible during playback
+    // ========================================================================
     useEffect(() => {
-        if (!timelineContainerRef.current) return;
+        if (!scrollContainerRef?.current) return;
 
-        const container = timelineContainerRef.current;
+        const container = scrollContainerRef.current;
         const containerWidth = container.clientWidth;
         const scrollLeft = container.scrollLeft;
 
@@ -94,10 +91,45 @@ export function SequencerTimeline({
                 behavior: 'smooth',
             });
         }
-    }, [playheadX]);
+    }, [playheadX, scrollContainerRef]);
+
+    // ========================================================================
+    // HANDLER WRAPPERS: Adapt store actions to component callbacks
+    // ========================================================================
+    const handleAddClipToTrack = async (trackId: string, startTime: number) => {
+        if (!activeComposition) return;
+        const track = tracks.find(t => t.id === trackId);
+        if (!track) return;
+
+        const clipRequest = {
+            sequence_id: activeComposition.id,
+            clip_type: track.type === "midi" ? "midi" : "audio",
+            track_id: trackId,
+            start_time: startTime,
+            duration: 4.0, // Default 1 bar at 4/4
+        };
+        await addClip(clipRequest);
+    };
+
+    const handleDuplicateClip = async (clipId: string) => {
+        if (!activeComposition) return;
+        await duplicateClip(activeComposition.id, clipId);
+    };
+
+    const handleMoveClip = async (clipId: string, newStartTime: number) => {
+        await updateClip(clipId, { start_time: newStartTime });
+    };
+
+    const handleResizeClip = async (clipId: string, newDuration: number) => {
+        await updateClip(clipId, { duration: newDuration });
+    };
+
+    const handleUpdateClip = async (clipId: string, updates: { gain?: number; audio_offset?: number }) => {
+        await updateClip(clipId, updates);
+    };
 
     return (
-        <div ref={timelineContainerRef}>
+        <>
             {/* Tracks and Clips - Ruler is now rendered in fixed header above */}
             {tracks.length === 0 ? (
                 <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
@@ -111,8 +143,8 @@ export function SequencerTimeline({
                     {/* Loop Region */}
                     <SequencerTimelineLoopRegion
                         pixelsPerBeat={pixelsPerBeat}
-                        onLoopStartChange={onLoopStartChange}
-                        onLoopEndChange={onLoopEndChange}
+                        onLoopStartChange={setLoopStart}
+                        onLoopEndChange={setLoopEnd}
                     />
 
                     {/* Track Rows */}
@@ -123,15 +155,15 @@ export function SequencerTimeline({
                             clips={clips}
                             pixelsPerBeat={pixelsPerBeat}
                             isExpanded={expandedTracks?.has(track.id)}
-                            onSelectClip={onSelectClip}
-                            onDuplicateClip={onDuplicateClip}
-                            onDeleteClip={onDeleteClip}
-                            onAddClipToTrack={onAddClipToTrack}
-                            onMoveClip={onMoveClip}
-                            onResizeClip={onResizeClip}
-                            onUpdateClip={onUpdateClip}
-                            onOpenPianoRoll={onOpenPianoRoll}
-                            onOpenSampleEditor={onOpenSampleEditor}
+                            onSelectClip={setSelectedClipId}
+                            onDuplicateClip={handleDuplicateClip}
+                            onDeleteClip={deleteClip}
+                            onAddClipToTrack={handleAddClipToTrack}
+                            onMoveClip={handleMoveClip}
+                            onResizeClip={handleResizeClip}
+                            onUpdateClip={handleUpdateClip}
+                            onOpenPianoRoll={openPianoRoll}
+                            onOpenSampleEditor={() => {}} // TODO: Implement sample editor
                             onClipDragStateChange={onClipDragStateChange}
                         />
                     ))}
@@ -139,11 +171,11 @@ export function SequencerTimeline({
                     {/* Playhead - Rendered AFTER tracks so it appears on top */}
                     <SequencerTimelinePlayhead
                         pixelsPerBeat={pixelsPerBeat}
-                        onSeek={onSeek}
+                        onSeek={seek}
                     />
                 </div>
             )}
-        </div>
+        </>
     );
 }
 
