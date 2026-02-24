@@ -2,9 +2,10 @@
  * SequencerPianoRollKeyboard - Piano keyboard display for piano roll
  *
  * REFACTORED: Pure component that reads everything from Zustand
+ * - Reads pianoRollClipId from Zustand
  * - Reads clip data from Zustand to get instrument
  * - Uses constants for minPitch, maxPitch, noteHeight
- * - Only receives clipId
+ * - No props needed!
  */
 
 import { useState } from "react";
@@ -13,26 +14,30 @@ import { api } from "@/services/api";
 import { useDAWStore } from "@/stores/dawStore";
 
 interface SequencerPianoRollKeyboardProps {
-    clipId: string;
+    // No props needed - reads everything from Zustand!
 }
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-export function SequencerPianoRollKeyboard({
-    clipId,
-}: SequencerPianoRollKeyboardProps) {
+export function SequencerPianoRollKeyboard({}: SequencerPianoRollKeyboardProps) {
     // ========================================================================
     // STATE: Read from Zustand store
     // ========================================================================
+    const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
     const clips = useDAWStore(state => state.clips);
     const tracks = useDAWStore(state => state.tracks);
 
     // ========================================================================
     // DERIVED STATE: Get clip data
     // ========================================================================
-    const clip = clips.find(c => c.id === clipId);
+    const clip = pianoRollClipId ? clips.find(c => c.id === pianoRollClipId) : undefined;
     const track = clip ? tracks.find(t => t.id === clip.track_id) : undefined;
     const instrument = track?.instrument || "sine";
+
+    // Early return if no clip
+    if (!clip) {
+        return <div className="flex items-center justify-center h-full text-muted-foreground">No clip selected</div>;
+    }
 
     // Piano roll settings (constants)
     const minPitch = 21; // A0 - Full piano range

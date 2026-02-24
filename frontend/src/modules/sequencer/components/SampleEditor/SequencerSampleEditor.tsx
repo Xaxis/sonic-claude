@@ -30,8 +30,6 @@ interface SequencerSampleEditorProps {
     onClose: () => void;
     onUpdateClip: (clipId: string, updates: { gain?: number; audio_offset?: number }) => Promise<void>;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
-    onLoopStartChange: (start: number) => void;
-    onLoopEndChange: (end: number) => void;
 }
 
 export function SequencerSampleEditor({
@@ -49,8 +47,6 @@ export function SequencerSampleEditor({
     onClose,
     onUpdateClip,
     onSeek,
-    onLoopStartChange,
-    onLoopEndChange,
 }: SequencerSampleEditorProps) {
     // Get tempo from Zustand store
     const activeComposition = useDAWStore(state => state.activeComposition);
@@ -137,8 +133,6 @@ export function SequencerSampleEditor({
                     sampleEditorScrollRef={sampleEditorScrollRef}
                     onSampleEditorScroll={onSampleEditorScroll}
                     onSeek={onSeek}
-                    onLoopStartChange={onLoopStartChange}
-                    onLoopEndChange={onLoopEndChange}
                 />
             ) : (
                 <div className="flex-1 flex items-center justify-center text-muted-foreground">

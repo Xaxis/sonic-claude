@@ -1,39 +1,58 @@
 /**
  * SequencerTimelineLoopRegion - Loop region markers and background
  *
- * Displays loop region with draggable start/end markers.
- * Uses SequencerContext for state management.
+ * REFACTORED: Pure component that reads everything from Zustand
+ * - Uses useTimelineCalculations() for pixelsPerBeat
+ * - Calls setLoopStart/setLoopEnd actions directly
+ * - No props needed!
  */
 
 import { useEffect, useRef, useState } from "react";
 import { useDAWStore } from '@/stores/dawStore';
+import { useTimelineCalculations } from '../../hooks/useTimelineCalculations.ts';
 
 interface SequencerTimelineLoopRegionProps {
-    pixelsPerBeat: number;
-    onLoopStartChange?: (newLoopStart: number) => void;
-    onLoopEndChange?: (newLoopEnd: number) => void;
+    // No props needed - reads everything from Zustand!
 }
 
-export function SequencerTimelineLoopRegion({
-    pixelsPerBeat,
-    onLoopStartChange,
-    onLoopEndChange,
-}: SequencerTimelineLoopRegionProps) {
-    // Get state from Zustand store
+export function SequencerTimelineLoopRegion({}: SequencerTimelineLoopRegionProps) {
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
     const isLooping = useDAWStore(state => state.isLooping);
     const loopStart = useDAWStore(state => state.loopStart);
     const loopEnd = useDAWStore(state => state.loopEnd);
-    const zoom = useDAWStore(state => state.zoom);
     const snapEnabled = useDAWStore(state => state.snapEnabled);
     const gridSize = useDAWStore(state => state.gridSize);
+
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
+    const setLoopStart = useDAWStore(state => state.setLoopStart);
+    const setLoopEnd = useDAWStore(state => state.setLoopEnd);
+
+    // ========================================================================
+    // SHARED TIMELINE CALCULATIONS: Use the same hook as timeline for consistency!
+    // ========================================================================
+    const { pixelsPerBeat, zoom } = useTimelineCalculations();
+
+    // ========================================================================
+    // LOCAL STATE: Drag state
+    // ========================================================================
     const [isDraggingLoopStart, setIsDraggingLoopStart] = useState(false);
     const [isDraggingLoopEnd, setIsDraggingLoopEnd] = useState(false);
     const dragStartXRef = useRef<number>(0);
     const dragStartValueRef = useRef<number>(0);
 
+    // ========================================================================
+    // DERIVED STATE: Calculate positions
+    // ========================================================================
     const loopStartX = loopStart * pixelsPerBeat * zoom;
     const loopEndX = loopEnd * pixelsPerBeat * zoom;
 
+    // ========================================================================
+    // HANDLERS: Mouse interaction
+    // ========================================================================
     const handleLoopMarkerMouseDown = (type: 'start' | 'end', e: React.MouseEvent) => {
         e.stopPropagation();
         e.preventDefault();
@@ -60,10 +79,10 @@ export function SequencerTimelineLoopRegion({
             // Clamp to valid range
             if (isDraggingLoopStart) {
                 newValue = Math.max(0, Math.min(newValue, loopEnd - 1));
-                if (onLoopStartChange) onLoopStartChange(newValue);
+                setLoopStart(newValue);
             } else {
                 newValue = Math.max(loopStart + 1, newValue);
-                if (onLoopEndChange) onLoopEndChange(newValue);
+                setLoopEnd(newValue);
             }
         };
 
@@ -80,11 +99,11 @@ export function SequencerTimelineLoopRegion({
             // Clamp and apply final value
             if (isDraggingLoopStart) {
                 newValue = Math.max(0, Math.min(newValue, loopEnd - 1));
-                if (onLoopStartChange) onLoopStartChange(newValue);
+                setLoopStart(newValue);
                 setIsDraggingLoopStart(false);
             } else {
                 newValue = Math.max(loopStart + 1, newValue);
-                if (onLoopEndChange) onLoopEndChange(newValue);
+                setLoopEnd(newValue);
                 setIsDraggingLoopEnd(false);
             }
         };
@@ -96,7 +115,7 @@ export function SequencerTimelineLoopRegion({
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [isDraggingLoopStart, isDraggingLoopEnd, loopStart, loopEnd, pixelsPerBeat, zoom, snapEnabled, gridSize, onLoopStartChange, onLoopEndChange]);
+    }, [isDraggingLoopStart, isDraggingLoopEnd, loopStart, loopEnd, pixelsPerBeat, zoom, snapEnabled, gridSize, setLoopStart, setLoopEnd]);
 
     if (!isLooping) return null;
 

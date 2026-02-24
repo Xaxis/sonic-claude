@@ -2,9 +2,10 @@
  * SequencerPianoRollGrid - Piano roll note grid with editing capabilities
  *
  * REFACTORED: Pure component that reads everything from Zustand
+ * - Reads pianoRollClipId from Zustand
  * - Reads ALL state from Zustand (clip data, settings, transport)
  * - Calls updateClip() directly for all note editing operations
- * - Only receives clipId and local UI callbacks (onSelectNote, onToggleSelectNote)
+ * - Only receives local UI callbacks (onSelectNote, onToggleSelectNote)
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -17,9 +18,6 @@ import type { MIDIEvent } from "../../types";
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 interface SequencerPianoRollGridProps {
-    // Clip to edit
-    clipId: string;
-
     // Local UI callbacks (for parent component's local state)
     selectedNotes: Set<number>;
     onSelectNote: (index: number) => void;
@@ -27,7 +25,6 @@ interface SequencerPianoRollGridProps {
 }
 
 export function SequencerPianoRollGrid({
-    clipId,
     selectedNotes,
     onSelectNote,
     onToggleSelectNote,
@@ -35,6 +32,7 @@ export function SequencerPianoRollGrid({
     // ========================================================================
     // STATE: Read from Zustand store
     // ========================================================================
+    const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
     const clips = useDAWStore(state => state.clips);
     const tracks = useDAWStore(state => state.tracks);
     const snapEnabled = useDAWStore(state => state.snapEnabled);
@@ -55,7 +53,7 @@ export function SequencerPianoRollGrid({
     // ========================================================================
     // DERIVED STATE: Get clip data
     // ========================================================================
-    const clip = clips.find(c => c.id === clipId);
+    const clip = pianoRollClipId ? clips.find(c => c.id === pianoRollClipId) : undefined;
     if (!clip || clip.type !== 'midi') {
         return <div className="flex items-center justify-center h-full text-muted-foreground">Invalid clip</div>;
     }
@@ -65,6 +63,7 @@ export function SequencerPianoRollGrid({
     const clipStartTime = clip.start_time;
     const clipDuration = clip.duration;
     const instrument = track?.instrument || 'sine';
+    const clipId = clip.id;
 
     // Transport state
     const activeNotes = transport?.active_notes || [];

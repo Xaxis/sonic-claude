@@ -2,9 +2,8 @@
  * SequencerPianoRollSection Component
  *
  * REFACTORED: Pure layout component matching SequencerTimelineSection architecture
- * - Only receives clipId and scroll ref
- * - Reads all data from Zustand store
- * - Manages selectedNotes as local state (like SequencerTimelineSection manages expandedTracks)
+ * - Only receives scroll ref and local UI callbacks
+ * - Reads pianoRollClipId from Zustand store
  * - Calls Zustand actions directly
  *
  * Architecture:
@@ -22,9 +21,6 @@ import { useTimelineCalculations } from "../hooks/useTimelineCalculations.ts";
 import { SequencerGridLayout } from "./SequencerGridLayout.tsx";
 
 interface SequencerPianoRollSectionProps {
-    // Clip to display
-    clipId: string;
-
     // Scroll ref
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
 
@@ -35,7 +31,6 @@ interface SequencerPianoRollSectionProps {
 }
 
 export function SequencerPianoRollSection({
-    clipId,
     pianoRollScrollRef,
     selectedNotes,
     onSelectNote,
@@ -44,14 +39,12 @@ export function SequencerPianoRollSection({
     // ========================================================================
     // ACTIONS: Get from Zustand store
     // ========================================================================
-    const setLoopStart = useDAWStore(state => state.setLoopStart);
-    const setLoopEnd = useDAWStore(state => state.setLoopEnd);
     const setPianoRollScrollLeft = useDAWStore(state => state.setPianoRollScrollLeft);
 
     // ========================================================================
     // SHARED TIMELINE CALCULATIONS: Use the same hook as timeline for consistency!
     // ========================================================================
-    const { pixelsPerBeat, totalWidth } = useTimelineCalculations();
+    const { totalWidth } = useTimelineCalculations();
 
     // ========================================================================
     // HANDLERS
@@ -72,25 +65,18 @@ export function SequencerPianoRollSection({
                 <SequencerPianoRollRuler />
             }
             sidebar={
-                <SequencerPianoRollKeyboard
-                    clipId={clipId}
-                />
+                <SequencerPianoRollKeyboard />
             }
             mainContent={
                 <div className="relative">
                     <SequencerPianoRollGrid
-                        clipId={clipId}
                         selectedNotes={selectedNotes}
                         onSelectNote={onSelectNote}
                         onToggleSelectNote={onToggleSelectNote}
                     />
 
                     {/* Loop Region - Overlaid on grid */}
-                    <SequencerTimelineLoopRegion
-                        pixelsPerBeat={pixelsPerBeat}
-                        onLoopStartChange={setLoopStart}
-                        onLoopEndChange={setLoopEnd}
-                    />
+                    <SequencerTimelineLoopRegion />
                 </div>
             }
             sidebarWidth={256}

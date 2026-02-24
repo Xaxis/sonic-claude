@@ -525,16 +525,7 @@
       "is_muted": false,
       "is_looped": false,
       "gain": 1.0,
-      "midi_events": [
-        {
-          "note": 105,
-          "note_name": "A7",
-          "start_time": 0.0,
-          "duration": 1.0,
-          "velocity": 100,
-          "channel": 0
-        }
-      ],
+      "midi_events": [],
       "audio_file_path": null,
       "audio_offset": null
     },
@@ -674,7 +665,7 @@
       "duration": 11.6875,
       "is_muted": false,
       "is_looped": false,
-      "gain": 0.87,
+      "gain": 1.0,
       "midi_events": [
         {
           "note": 85,
@@ -698,7 +689,7 @@
     }
   ],
   "is_playing": true,
-  "current_position": 40.037577629089355,
+  "current_position": 92.41307592391968,
   "loop_enabled": false,
   "loop_start": 0.0,
   "loop_end": 16.0,
@@ -857,5 +848,5 @@
     "source": "manual_save"
   },
   "created_at": "2026-02-23T17:50:41.081441",
-  "updated_at": "2026-02-23T20:12:03.533750"
+  "updated_at": "2026-02-23T20:07:00.558880"
 }

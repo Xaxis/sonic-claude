@@ -40,8 +40,6 @@ interface SequencerSampleEditorSectionProps {
 
     // Handlers
     onSeek?: (position: number, triggerAudio?: boolean) => void;
-    onLoopStartChange: (start: number) => void;
-    onLoopEndChange: (end: number) => void;
 }
 
 export function SequencerSampleEditorSection({
@@ -56,8 +54,6 @@ export function SequencerSampleEditorSection({
     sampleEditorScrollRef,
     onSampleEditorScroll,
     onSeek,
-    onLoopStartChange,
-    onLoopEndChange,
 }: SequencerSampleEditorSectionProps) {
     // Get state from Zustand store
     const zoom = useDAWStore(state => state.zoom);
@@ -155,11 +151,7 @@ export function SequencerSampleEditorSection({
                     </div>
 
                     {/* Loop Region - Overlaid on waveform */}
-                    <SequencerTimelineLoopRegion
-                        pixelsPerBeat={pixelsPerBeat}
-                        onLoopStartChange={onLoopStartChange}
-                        onLoopEndChange={onLoopEndChange}
-                    />
+                    <SequencerTimelineLoopRegion />
                 </div>
             }
             sidebarWidth={256}

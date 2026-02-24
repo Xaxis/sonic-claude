@@ -49,8 +49,6 @@ export function SequencerTimeline({
     const addClip = useDAWStore(state => state.addClip);
     const updateClip = useDAWStore(state => state.updateClip);
     const openPianoRoll = useDAWStore(state => state.openPianoRoll);
-    const setLoopStart = useDAWStore(state => state.setLoopStart);
-    const setLoopEnd = useDAWStore(state => state.setLoopEnd);
     const seek = useDAWStore(state => state.seek);
     const activeComposition = useDAWStore(state => state.activeComposition);
 
@@ -141,11 +139,7 @@ export function SequencerTimeline({
                     <SequencerTimelineGrid rulerMarkers={rulerMarkers} />
 
                     {/* Loop Region */}
-                    <SequencerTimelineLoopRegion
-                        pixelsPerBeat={pixelsPerBeat}
-                        onLoopStartChange={setLoopStart}
-                        onLoopEndChange={setLoopEnd}
-                    />
+                    <SequencerTimelineLoopRegion />
 
                     {/* Track Rows */}
                     {tracks.map((track) => (

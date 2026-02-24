@@ -154,7 +154,6 @@ export function SequencerPianoRoll({
 
             {/* Piano Roll Content - Pure layout component */}
             <SequencerPianoRollSection
-                clipId={clipId}
                 pianoRollScrollRef={pianoRollScrollRef}
                 selectedNotes={selectedNotes}
                 onSelectNote={(index: number) => setSelectedNotes(new Set([index]))}

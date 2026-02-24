@@ -34,8 +34,6 @@ interface SequencerSampleEditorWrapperProps {
     onClose: () => void;
     onUpdateClip: (clipId: string, updates: { gain?: number; audio_offset?: number }) => Promise<void>;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
-    onLoopStartChange: (start: number) => void;
-    onLoopEndChange: (end: number) => void;
 }
 
 export function SequencerSampleEditorWrapper(props: SequencerSampleEditorWrapperProps) {
@@ -50,8 +48,6 @@ export function SequencerSampleEditorWrapper(props: SequencerSampleEditorWrapper
         onClose,
         onUpdateClip,
         onSeek,
-        onLoopStartChange,
-        onLoopEndChange,
     } = props;
 
     // Empty state - no clip selected
@@ -124,8 +120,6 @@ export function SequencerSampleEditorWrapper(props: SequencerSampleEditorWrapper
             onClose={onClose}
             onUpdateClip={onUpdateClip}
             onSeek={onSeek}
-            onLoopStartChange={onLoopStartChange}
-            onLoopEndChange={onLoopEndChange}
         />
     );
 }
