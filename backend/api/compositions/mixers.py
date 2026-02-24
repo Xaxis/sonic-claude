@@ -26,7 +26,7 @@ from backend.core.dependencies import (
     get_track_effects_service
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/mixers")
 logger = logging.getLogger(__name__)
 
 

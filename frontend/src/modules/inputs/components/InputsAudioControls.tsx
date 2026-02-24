@@ -123,7 +123,7 @@ export function InputsAudioControls({
                                 }}
                             />
                         </div>
-                        <Label className="w-14 text-right text-xs">
+                        <Label className="w-16 text-right text-xs font-mono tabular-nums">
                             {inputLevel.toFixed(1)} dB
                         </Label>
                     </div>
@@ -137,7 +137,7 @@ export function InputsAudioControls({
                             onValueChange={(values) => onGainChange(values[0])}
                             className="flex-1"
                         />
-                        <Label className="w-14 text-right text-xs">
+                        <Label className="w-16 text-right text-xs font-mono tabular-nums">
                             {gain > 0 ? "+" : ""}
                             {gain.toFixed(1)} dB
                         </Label>

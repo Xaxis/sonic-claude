@@ -50,32 +50,32 @@ export interface UpdateMasterRequest {
 export class MixerProvider extends BaseAPIClient {
     // === CHANNELS ===
     async getChannels(): Promise<any[]> {
-        return this.get("/api/compositions/mixer/channels");
+        return this.get("/api/compositions/mixers/channels");
     }
 
     async createChannel(request: CreateChannelRequest): Promise<any> {
-        return this.post("/api/compositions/mixer/channels", request);
+        return this.post("/api/compositions/mixers/channels", request);
     }
 
     async getChannel(id: string): Promise<any> {
-        return this.get(`/api/compositions/mixer/channels/${id}`);
+        return this.get(`/api/compositions/mixers/channels/${id}`);
     }
 
     async updateChannel(id: string, request: UpdateChannelRequest): Promise<any> {
-        return this.patch(`/api/compositions/mixer/channels/${id}`, request);
+        return this.patch(`/api/compositions/mixers/channels/${id}`, request);
     }
 
     async deleteChannel(id: string): Promise<any> {
-        return this.delete(`/api/compositions/mixer/channels/${id}`);
+        return this.delete(`/api/compositions/mixers/channels/${id}`);
     }
 
     // === MASTER ===
     async getMaster(): Promise<any> {
-        return this.get("/api/compositions/mixer/master");
+        return this.get("/api/compositions/mixers/master");
     }
 
     async updateMaster(request: UpdateMasterRequest): Promise<any> {
-        return this.patch("/api/compositions/mixer/master", request);
+        return this.patch("/api/compositions/mixers/master", request);
     }
 }
 

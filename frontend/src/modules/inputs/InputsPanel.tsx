@@ -1,80 +1,70 @@
 /**
- * Input Panel
+ * InputsPanel Component
  *
- * Main orchestrator component for input sources.
- * Manages tab state and renders appropriate section components.
+ * Main panel for managing all input sources: audio, MIDI, and sample library.
+ * Provides tabbed interface for switching between different input types.
  *
- * Architecture:
- * - Tab management (audio, midi, library)
- * - Delegates to section components:
- *   - AudioInputSection (audio input + recording)
- *   - SampleLibrarySection (sample browsing + upload)
- *   - MidiInputSection (MIDI device + settings)
+ * State Management:
+ * - Local state: Tab selection (audio/midi/library)
+ * - Hook state: Each section manages its own state via custom hooks
+ * - Global state: Samples are synced with DAW store
+ *
+ * Data Flow:
+ * 1. User selects tab → InputsPanel updates local state
+ * 2. Section component uses hook → Hook manages device/library state
+ * 3. Hook calls API → Backend handles audio/MIDI/sample operations
+ * 4. Recording complete → Upload to backend → Switch to library tab
  */
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button.tsx";
+import { TabHeader, type Tab } from "@/components/ui/tab-header";
 import { Mic, Piano, Folder } from "lucide-react";
-import { AudioInputSection } from "@/modules/inputs/components/Layouts/AudioInputSection.tsx";
-import { SampleLibrarySection } from "@/modules/inputs/components/Layouts/SampleLibrarySection.tsx";
-import { MidiInputSection } from "@/modules/inputs/components/Layouts/MidiInputSection.tsx";
+import { InputsAudioInputSection } from "./components/Layouts/InputsAudioInputSection";
+import { InputsSampleLibrarySection } from "./components/Layouts/InputsSampleLibrarySection";
+import { InputsMidiInputSection } from "./components/Layouts/InputsMidiInputSection";
+import { useDAWStore } from "@/stores/dawStore";
 
 export function InputsPanel() {
-    // Tab state
-    const [activeTab, setActiveTab] = useState<"audio" | "midi" | "library">("audio");
+    // Read tab state from Zustand store
+    const activeInputsTab = useDAWStore(state => state.activeInputsTab);
+    const setActiveInputsTab = useDAWStore(state => state.setActiveInputsTab);
 
-    // Handle recording completion - switch to library tab
-    const handleRecordingComplete = () => {
-        setActiveTab("library");
-    };
-
-    // Handle switching to library tab
-    const handleSwitchToLibrary = () => {
-        setActiveTab("library");
-    };
+    // Tab configuration
+    const tabs: Tab[] = [
+        {
+            id: "audio",
+            label: "AUDIO IN",
+            icon: <Mic size={14} />,
+        },
+        {
+            id: "midi",
+            label: "MIDI IN",
+            icon: <Piano size={14} />,
+        },
+        {
+            id: "library",
+            label: "LIBRARY",
+            icon: <Folder size={14} />,
+        },
+    ];
 
     return (
-        <div className="flex h-full flex-1 flex-col overflow-hidden">
-            {/* Tab Buttons */}
-            <div className="border-border flex gap-1 border-b p-2">
-                <Button
-                    onClick={() => setActiveTab("audio")}
-                    variant={activeTab === "audio" ? "default" : "ghost"}
-                    size="xs"
-                >
-                    <Mic size={12} />
-                    AUDIO IN
-                </Button>
-                <Button
-                    onClick={() => setActiveTab("midi")}
-                    variant={activeTab === "midi" ? "default" : "ghost"}
-                    size="xs"
-                >
-                    <Piano size={12} />
-                    MIDI IN
-                </Button>
-                <Button
-                    onClick={() => setActiveTab("library")}
-                    variant={activeTab === "library" ? "default" : "ghost"}
-                    size="xs"
-                >
-                    <Folder size={12} />
-                    LIBRARY
-                </Button>
-            </div>
+        <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
+            <div className="flex-1 min-h-0 flex flex-col">
+                {/* Tab Navigation */}
+                <TabHeader
+                    tabs={tabs}
+                    activeTab={activeInputsTab}
+                    onTabChange={(tabId) => setActiveInputsTab(tabId as "audio" | "midi" | "library")}
+                />
 
-            {/* Content Area */}
-            <div className="flex-1 space-y-2 overflow-auto p-2">
-                {activeTab === "audio" && (
-                    <AudioInputSection
-                        onRecordingComplete={handleRecordingComplete}
-                        onSwitchToLibrary={handleSwitchToLibrary}
-                    />
-                )}
-
-                {activeTab === "library" && <SampleLibrarySection />}
-
-                {activeTab === "midi" && <MidiInputSection />}
+                {/* Tab Content */}
+                <div className="flex-1 overflow-hidden bg-gradient-to-b from-background to-background/95">
+                    <div className="h-full overflow-auto p-2">
+                        {activeInputsTab === "audio" && <InputsAudioInputSection />}
+                        {activeInputsTab === "library" && <InputsSampleLibrarySection />}
+                        {activeInputsTab === "midi" && <InputsMidiInputSection />}
+                    </div>
+                </div>
             </div>
         </div>
     );

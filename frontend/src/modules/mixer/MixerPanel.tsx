@@ -12,13 +12,16 @@ import { MixerToolbar } from "@/modules/mixer/components/Toolbars/MixerToolbar";
 import { MixerChannelList } from "@/modules/mixer/components/Channel/MixerChannelList.tsx";
 
 export function MixerPanel() {
-    // Get mixer actions from Zustand store
+    // Get state and actions from Zustand store
+    const activeComposition = useDAWStore(state => state.activeComposition);
     const loadMaster = useDAWStore(state => state.loadMaster);
 
-    // Load master channel when component mounts
+    // Load master channel when composition is active
     useEffect(() => {
-        loadMaster();
-    }, [loadMaster]);
+        if (activeComposition) {
+            loadMaster();
+        }
+    }, [activeComposition, loadMaster]);
 
     return (
         <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">

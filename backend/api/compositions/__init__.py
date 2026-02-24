@@ -18,11 +18,13 @@ from . import crud, history, tracks, clips, mixers, effects, startup
 router = APIRouter()
 
 # Include all sub-routers (no prefix needed - they define their own paths)
-router.include_router(crud.router, tags=["compositions"])
-router.include_router(history.router, tags=["compositions"])
-router.include_router(tracks.router, tags=["compositions-tracks"])
-router.include_router(clips.router, tags=["compositions-clips"])
+# IMPORTANT: Register more specific routes (with prefixes) BEFORE generic routes with path parameters
+# This prevents /{composition_id} from catching "mixers", "effects", etc. as composition IDs
 router.include_router(mixers.router, tags=["compositions-mixers"])
 router.include_router(effects.router, tags=["compositions-effects"])
+router.include_router(tracks.router, tags=["compositions-tracks"])
+router.include_router(clips.router, tags=["compositions-clips"])
 router.include_router(startup.router, tags=["compositions"])
+router.include_router(history.router, tags=["compositions"])
+router.include_router(crud.router, tags=["compositions"])
 

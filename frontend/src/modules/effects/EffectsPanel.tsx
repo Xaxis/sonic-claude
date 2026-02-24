@@ -18,12 +18,15 @@ import { EffectsChannelList } from "@/modules/effects/components/Layouts/Effects
 
 export function EffectsPanel() {
     // Get state and actions from Zustand store
+    const activeComposition = useDAWStore(state => state.activeComposition);
     const loadEffectDefinitions = useDAWStore(state => state.loadEffectDefinitions);
 
-    // Load effect definitions when panel mounts
+    // Load effect definitions when composition is active
     useEffect(() => {
-        loadEffectDefinitions();
-    }, [loadEffectDefinitions]);
+        if (activeComposition) {
+            loadEffectDefinitions();
+        }
+    }, [activeComposition, loadEffectDefinitions]);
 
     return (
         <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">

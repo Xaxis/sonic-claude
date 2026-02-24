@@ -1,18 +1,18 @@
 /**
  * Effects API Provider
- * Thin HTTP client mapping to /api/compositions/effects/* routes
+ * Thin HTTP client mapping to /api/compositions/* routes
  *
  * Backend routes (backend/api/compositions/effects.py):
- * - GET    /api/compositions/effects/definitions
- * - GET    /api/compositions/effects/categories
- * - GET    /api/compositions/effects/categories/{category}
- * - GET    /api/compositions/effects/track/{track_id}
- * - POST   /api/compositions/effects/track/{track_id}
- * - GET    /api/compositions/effects/{effect_id}
- * - PATCH  /api/compositions/effects/{effect_id}
- * - DELETE /api/compositions/effects/{effect_id}
- * - POST   /api/compositions/effects/{effect_id}/move
- * - DELETE /api/compositions/effects/track/{track_id}/clear
+ * - GET    /api/compositions/definitions
+ * - GET    /api/compositions/categories
+ * - GET    /api/compositions/categories/{category}
+ * - GET    /api/compositions/track/{track_id}
+ * - POST   /api/compositions/track/{track_id}
+ * - GET    /api/compositions/{effect_id}
+ * - PATCH  /api/compositions/{effect_id}
+ * - DELETE /api/compositions/{effect_id}
+ * - POST   /api/compositions/{effect_id}/move
+ * - DELETE /api/compositions/track/{track_id}/clear
  */
 
 import { BaseAPIClient } from "../base";

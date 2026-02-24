@@ -211,6 +211,9 @@ interface DAWStore {
     isSendingMessage: boolean;
     isLoadingAssistantState: boolean;
 
+    // Inputs UI State
+    activeInputsTab: "audio" | "midi" | "library";
+
     // Activity State
     activities: AIActivity[];
     activityHistory: AIActivity[];
@@ -371,6 +374,9 @@ interface DAWStore {
     sendMessage: (message: string) => Promise<void>;
     refreshAssistantState: () => Promise<void>;
 
+    // Inputs UI Actions
+    setActiveInputsTab: (tab: "audio" | "midi" | "library") => void;
+
     // ========================================================================
     // ACTIVITY ACTIONS
     // ========================================================================
@@ -480,6 +486,9 @@ export const useDAWStore = create<DAWStore>()(
                 activeAssistantTab: "chat",
                 isSendingMessage: false,
                 isLoadingAssistantState: false,
+
+                // Inputs UI State (PERSISTED)
+                activeInputsTab: "audio",
 
         // Activity State
         activities: [],
@@ -1915,6 +1924,12 @@ export const useDAWStore = create<DAWStore>()(
             set({ isSendingMessage: sending });
         },
 
+        // Inputs UI Actions
+        setActiveInputsTab: (tab) => {
+            set({ activeInputsTab: tab });
+            // Auto-persisted by Zustand persist middleware
+        },
+
         setIsLoadingAssistantState: (loading) => {
             set({ isLoadingAssistantState: loading });
         },
@@ -2217,6 +2232,7 @@ export const useDAWStore = create<DAWStore>()(
                     showMeters: state.showMeters,
                     meterMode: state.meterMode,
                     activeAssistantTab: state.activeAssistantTab,
+                    activeInputsTab: state.activeInputsTab,
 
                     // Active Composition ID (for auto-load on startup)
                     _persistedCompositionId: state.activeComposition?.id || null,

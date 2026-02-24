@@ -10,7 +10,7 @@
 
 import { useEffect } from "react";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
-import { Button } from "@/components/ui/button.tsx";
+import { TabHeader, type Tab } from "@/components/ui/tab-header";
 import { AssistantChatLayout } from "@/modules/assistant/components/Layouts/AssistantChatLayout.tsx";
 import { AssistantAnalysisLayout } from "@/modules/assistant/components/Layouts/AssistantAnalysisLayout.tsx";
 import { useDAWStore } from "@/stores/dawStore";
@@ -26,29 +26,28 @@ export function AssistantPanel() {
         refreshAssistantState();
     }, [refreshAssistantState]);
 
+    // Tab configuration
+    const tabs: Tab[] = [
+        {
+            id: "chat",
+            label: "CHAT",
+        },
+        {
+            id: "analysis",
+            label: "ANALYSIS",
+        },
+    ];
+
     return (
         <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
             <div className="flex-1 min-h-0 flex flex-col">
                 <SubPanel title="ASSISTANT" showHeader={false} contentOverflow="hidden">
                     {/* Tab Navigation */}
-                    <div className="border-b-2 border-border/70 bg-gradient-to-b from-muted/30 to-muted/10 px-4 py-2.5 flex-shrink-0 shadow-sm">
-                        <div className="flex gap-2">
-                            <Button
-                                variant={activeAssistantTab === "chat" ? "default" : "ghost"}
-                                size="sm"
-                                onClick={() => setActiveAssistantTab("chat")}
-                            >
-                                CHAT
-                            </Button>
-                            <Button
-                                variant={activeAssistantTab === "analysis" ? "default" : "ghost"}
-                                size="sm"
-                                onClick={() => setActiveAssistantTab("analysis")}
-                            >
-                                ANALYSIS
-                            </Button>
-                        </div>
-                    </div>
+                    <TabHeader
+                        tabs={tabs}
+                        activeTab={activeAssistantTab}
+                        onTabChange={(tabId) => setActiveAssistantTab(tabId as "chat" | "analysis")}
+                    />
 
                     {/* Tab Content - NO PROPS, components read from store */}
                     <div className="flex-1 overflow-hidden bg-gradient-to-b from-background to-background/95">
