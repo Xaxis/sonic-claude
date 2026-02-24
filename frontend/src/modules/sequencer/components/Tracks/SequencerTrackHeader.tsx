@@ -220,7 +220,6 @@ export function SequencerTrackHeader({
                             <div className="flex items-center gap-2">
                                 <SequencerInstrumentSelector
                                     trackId={track.id}
-                                    currentInstrument={track.instrument}
                                 />
                             </div>
                         )}

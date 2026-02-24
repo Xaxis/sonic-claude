@@ -1,11 +1,16 @@
 /**
  * SequencerInstrumentSelector Component
  *
+ * REFACTORED: Uses Zustand best practices
+ * - Reads track from Zustand directly (no prop drilling)
+ * - Only receives trackId (identifier) and disabled (local UI state)
+ *
  * Dropdown selector for choosing MIDI track instruments (SynthDefs).
  * Displays instrument name with category grouping.
  *
  * Architecture:
  * - Reads available SynthDefs from Zustand store
+ * - Reads track from Zustand store to get current instrument
  * - Groups instruments by category
  * - Updates track instrument via Zustand action
  * - Shows current instrument or placeholder
@@ -24,21 +29,30 @@ import { useDAWStore } from "@/stores/dawStore";
 import type { SynthDefInfo } from "../../types.ts";
 
 interface SequencerInstrumentSelectorProps {
-    trackId: string;
-    currentInstrument?: string;
-    disabled?: boolean;
+    trackId: string;    // Identifier - acceptable to pass
+    disabled?: boolean; // Local UI state - acceptable to pass
 }
 
 export function SequencerInstrumentSelector({
     trackId,
-    currentInstrument,
     disabled = false,
 }: SequencerInstrumentSelectorProps) {
-    // Read state from Zustand store
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
     const synthDefs = useDAWStore(state => state.synthDefs);
+    const tracks = useDAWStore(state => state.tracks);
 
-    // Get actions from Zustand store
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
     const updateTrack = useDAWStore(state => state.updateTrack);
+
+    // ========================================================================
+    // DERIVED STATE: Find track and get current instrument
+    // ========================================================================
+    const track = tracks.find(t => t.id === trackId);
+    const currentInstrument = track?.instrument;
 
     // Group SynthDefs by category
     const groupedSynthDefs = synthDefs.reduce((acc, synthDef) => {
