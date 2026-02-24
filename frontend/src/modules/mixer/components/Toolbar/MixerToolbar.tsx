@@ -1,8 +1,12 @@
 /**
  * MixerToolbar - Toolbar for mixer operations
  *
+ * REFACTORED: Pure component that reads everything from Zustand
+ * - Reads ALL state from Zustand (tracks, showMeters, meterMode)
+ * - Calls actions directly from store
+ * - No props needed
+ *
  * Handles meter controls and view options
- * Uses MixerContext for state management
  */
 
 import { Activity, Sliders } from "lucide-react";
@@ -20,10 +24,16 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils";
 
 export function MixerToolbar() {
-    // Get tracks and UI state from Zustand store
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
     const tracks = useDAWStore(state => state.tracks);
     const showMeters = useDAWStore(state => state.showMeters);
     const meterMode = useDAWStore(state => state.meterMode);
+
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
     const setShowMeters = useDAWStore(state => state.setShowMeters);
     const setMeterMode = useDAWStore(state => state.setMeterMode);
 

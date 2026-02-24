@@ -6,8 +6,8 @@
  */
 
 import { useState } from "react";
-import { useMidiInput } from "../hooks/useMidiInput.ts";
-import { MidiDeviceSelector } from "../components/MidiDeviceSelector.tsx";
+import { useMidiInput } from "../../hooks/useMidiInput.ts";
+import { MidiDeviceSelector } from "../MidiDeviceSelector.tsx";
 
 export function MidiInputSection() {
     // Local UI state for MIDI settings

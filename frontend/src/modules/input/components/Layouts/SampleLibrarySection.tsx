@@ -6,8 +6,8 @@
  */
 
 import { useState, useCallback } from "react";
-import { useSampleLibrary } from "../hooks/useSampleLibrary.ts";
-import { SampleLibraryBrowser } from "../components/SampleLibraryBrowser.tsx";
+import { useSampleLibrary } from "../../hooks/useSampleLibrary.ts";
+import { SampleLibraryBrowser } from "../SampleLibraryBrowser.tsx";
 import type { SampleMetadata } from "@/services/api/providers";
 
 interface SampleLibrarySectionProps {

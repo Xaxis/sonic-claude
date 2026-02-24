@@ -11,8 +11,8 @@ import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { useAIState } from "./hooks/useAIState";
 import { useAIHandlers } from "./hooks/useAIHandlers";
-import { ChatLayout } from "./layouts/ChatLayout";
-import { AnalysisLayout } from "./layouts/AnalysisLayout";
+import { ChatLayout } from "@/modules/ai/components/Layouts/ChatLayout";
+import { AnalysisLayout } from "@/modules/ai/components/Layouts/AnalysisLayout";
 import { api } from "@/services/api";
 import { useDAWStore } from "@/stores/dawStore";
 

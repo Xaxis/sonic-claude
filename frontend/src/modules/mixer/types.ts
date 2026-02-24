@@ -152,39 +152,3 @@ export interface MixerSnapshot {
     state: MixerState;
 }
 
-// API Request/Response types
-export interface CreateChannelRequest {
-    name: string;
-    type: "audio" | "instrument" | "aux" | "group";
-    color?: string;
-}
-
-export interface UpdateChannelRequest {
-    name?: string;
-    color?: string;
-    input_gain?: number;
-    pan?: number;
-    fader?: number;
-    mute?: boolean;
-    solo?: boolean;
-    output_bus?: string;
-}
-
-export interface CreateSendBusRequest {
-    name: string;
-    color?: string;
-}
-
-export interface UpdateSendRequest {
-    level?: number;
-    enabled?: boolean;
-    pre_fader?: boolean;
-}
-
-export interface UpdateMasterRequest {
-    fader?: number;
-    mute?: boolean;
-    limiter_enabled?: boolean;
-    limiter_threshold?: number;
-}
-

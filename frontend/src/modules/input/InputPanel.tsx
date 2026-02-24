@@ -15,9 +15,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Mic, Piano, Folder } from "lucide-react";
-import { AudioInputSection } from "./layouts/AudioInputSection.tsx";
-import { SampleLibrarySection } from "./layouts/SampleLibrarySection.tsx";
-import { MidiInputSection } from "./layouts/MidiInputSection.tsx";
+import { AudioInputSection } from "@/modules/input/components/Layouts/AudioInputSection.tsx";
+import { SampleLibrarySection } from "@/modules/input/components/Layouts/SampleLibrarySection.tsx";
+import { MidiInputSection } from "@/modules/input/components/Layouts/MidiInputSection.tsx";
 
 export function InputPanel() {
     // Tab state

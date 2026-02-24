@@ -1,10 +1,14 @@
 /**
  * EffectsMasterSection - Master effects column component
  *
+ * REFACTORED: Pure component that reads everything from Zustand
+ * - No props needed
+ * - Will read master effect chain from store when implemented
+ *
  * Displays master bus effects chain.
  * Matches MixerMasterSection width (w-56) for 1:1 alignment.
  *
- * TODO: Master effect chain support not yet implemented in backend/EffectsContext
+ * TODO: Master effect chain support not yet implemented in backend
  */
 
 export function EffectsMasterSection() {

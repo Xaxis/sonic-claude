@@ -1,37 +1,50 @@
 /**
  * EffectsChannelStrip - Individual effects column component
  *
+ * REFACTORED: Pure component that reads everything from Zustand
+ * - Reads ALL state from Zustand (tracks, effectChains, effectDefinitions)
+ * - Calls actions directly from store
+ * - Only receives trackId prop (identifier)
+ *
  * Displays a sequencer track's effects chain as a vertical column.
  * Follows professional DAW layout: track header, 8 effect slots, add button.
  * Matches MixerChannelStrip width (w-56) for 1:1 alignment.
- *
- * Architecture:
- * - Uses EffectSlot for each effect instance
- * - Uses EffectSelector for adding new effects
- * - Manages effect chain state via context
- * - Follows established UI/UX patterns
- * - Supports native drag-and-drop reordering of effects
+ * Supports native drag-and-drop reordering of effects
  */
 
 import { useState } from "react";
 import { useDAWStore } from '@/stores/dawStore';
 import { EffectSlot } from "./EffectSlot";
 import { EffectSelector } from "./EffectSelector";
-import type { SequencerTrack } from "@/modules/sequencer/types";
-import type { TrackEffectChain } from "@/services/api/providers";
 
 interface EffectsChannelStripProps {
-    track: SequencerTrack;
-    effectChain: TrackEffectChain | null;
+    trackId: string; // ✅ Identifier - acceptable
 }
 
-export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripProps) {
+export function EffectsChannelStrip({ trackId }: EffectsChannelStripProps) {
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
+    const tracks = useDAWStore(state => state.tracks);
+    const effectChains = useDAWStore(state => state.effectChains);
     const effectDefinitions = useDAWStore(state => state.effectDefinitions);
+
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
     const addEffect = useDAWStore(state => state.addEffect);
-    const updateEffectParameter = useDAWStore(state => state.updateEffectParameter);
-    const toggleEffectBypass = useDAWStore(state => state.toggleEffectBypass);
-    const deleteEffect = useDAWStore(state => state.deleteEffect);
     const moveEffect = useDAWStore(state => state.moveEffect);
+
+    // ========================================================================
+    // DERIVED STATE: Get track and effect chain data
+    // ========================================================================
+    const track = tracks.find(t => t.id === trackId);
+    const effectChain = effectChains[trackId] || null;
+
+    // Validation: track must exist
+    if (!track) {
+        return null;
+    }
 
     // Get effects sorted by slot index
     const effects = effectChain?.effects || [];
@@ -40,7 +53,9 @@ export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripP
     // Check if we can add more effects (max 8)
     const canAddMore = effects.length < 8;
 
-    // Drag state for reordering effects
+    // ========================================================================
+    // LOCAL STATE: Drag state for reordering effects
+    // ========================================================================
     const [draggingEffectId, setDraggingEffectId] = useState<string | null>(null);
     const [dragOverEffectId, setDragOverEffectId] = useState<string | null>(null);
 
@@ -87,17 +102,10 @@ export function EffectsChannelStrip({ track, effectChain }: EffectsChannelStripP
                 ) : (
                     // Effect slots with native drag and drop
                     sortedEffects.map((effect) => {
-                        const effectDef = effectDefinitions.find(
-                            (def) => def.name === effect.effect_name
-                        );
                         return (
                             <EffectSlot
                                 key={effect.id}
-                                effect={effect}
-                                effectDefinition={effectDef}
-                                onParameterChange={updateEffectParameter}
-                                onToggleBypass={toggleEffectBypass}
-                                onDelete={deleteEffect}
+                                effectId={effect.id}
                                 isDragging={draggingEffectId === effect.id}
                                 isDragOver={dragOverEffectId === effect.id}
                                 onDragStart={() => setDraggingEffectId(effect.id)}

@@ -1,32 +1,27 @@
 /**
  * EffectSlot - Individual effect instance component
  *
+ * REFACTORED: Pure component that reads everything from Zustand
+ * - Reads effectDefinitions from Zustand store
+ * - Calls actions directly from store
+ * - Only receives effectId and drag/drop state props (local UI state managed by parent)
+ *
  * Displays a single effect with professional DAW-style controls:
  * - Clean, spacious header with effect name and category
  * - Bypass toggle and delete button (hover-based)
  * - Expandable parameter controls using EffectParameterControl (sliders)
  * - Visual feedback for bypass state
- *
- * Follows established UI/UX patterns:
- * - Uses EffectParameterControl for parameters (space-efficient sliders)
- * - Uses IconButton for actions
- * - Uses consistent color scheme and spacing
- * - Matches mixer channel strip styling
  */
 
 import { useState } from "react";
 import { ChevronDown, Trash2, GripVertical } from "lucide-react";
+import { useDAWStore } from '@/stores/dawStore';
 import { EffectParameterControl } from "./EffectParameterControl";
 import { cn } from "@/lib/utils";
-import type { EffectInstance, EffectDefinition } from "@/services/api/providers";
 
 interface EffectSlotProps {
-    effect: EffectInstance;
-    effectDefinition?: EffectDefinition;
-    onParameterChange: (effectId: string, parameterName: string, value: number) => void;
-    onToggleBypass: (effectId: string) => void;
-    onDelete: (effectId: string) => void;
-    // Drag and drop props
+    effectId: string; // ✅ Identifier - acceptable
+    // Drag and drop props (local UI state managed by parent)
     isDragging?: boolean;
     isDragOver?: boolean;
     onDragStart?: (effectId: string) => void;
@@ -37,11 +32,7 @@ interface EffectSlotProps {
 }
 
 export function EffectSlot({
-    effect,
-    effectDefinition,
-    onParameterChange,
-    onToggleBypass,
-    onDelete,
+    effectId,
     isDragging = false,
     isDragOver = false,
     onDragStart,
@@ -50,10 +41,48 @@ export function EffectSlot({
     onDragLeave,
     onDrop,
 }: EffectSlotProps) {
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
+    const effectChains = useDAWStore(state => state.effectChains);
+    const effectDefinitions = useDAWStore(state => state.effectDefinitions);
+
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
+    const updateEffectParameter = useDAWStore(state => state.updateEffectParameter);
+    const toggleEffectBypass = useDAWStore(state => state.toggleEffectBypass);
+    const deleteEffect = useDAWStore(state => state.deleteEffect);
+
+    // ========================================================================
+    // LOCAL STATE
+    // ========================================================================
     const [isExpanded, setIsExpanded] = useState(false);
 
+    // ========================================================================
+    // DERIVED STATE: Find effect instance
+    // ========================================================================
+    let effect = null;
+    for (const chain of Object.values(effectChains)) {
+        const found = chain.effects.find(e => e.id === effectId);
+        if (found) {
+            effect = found;
+            break;
+        }
+    }
+
+    // Validation: effect must exist
+    if (!effect) {
+        return null;
+    }
+
+    // Find effect definition
+    const effectDefinition = effectDefinitions.find(
+        (def) => def.name === effect.effect_name
+    );
+
     const handleParameterChange = (paramName: string, value: number) => {
-        onParameterChange(effect.id, paramName, value);
+        updateEffectParameter(effect.id, paramName, value);
     };
 
     // Drag handlers
@@ -160,7 +189,7 @@ export function EffectSlot({
                 <div className="flex gap-1.5">
                     {/* Bypass Button - MixerButton style */}
                     <button
-                        onClick={() => onToggleBypass(effect.id)}
+                        onClick={() => toggleEffectBypass(effect.id)}
                         className={cn(
                             "flex-1 h-7 px-2 text-xs font-bold uppercase tracking-wide rounded transition-all duration-150",
                             effect.is_bypassed
@@ -174,7 +203,7 @@ export function EffectSlot({
 
                     {/* Delete Button - Destructive style */}
                     <button
-                        onClick={() => onDelete(effect.id)}
+                        onClick={() => deleteEffect(effect.id)}
                         className="h-7 px-3 rounded transition-all duration-150 bg-muted text-muted-foreground hover:bg-destructive hover:text-white border border-border hover:border-destructive flex items-center gap-1.5"
                         title="Delete Effect"
                     >

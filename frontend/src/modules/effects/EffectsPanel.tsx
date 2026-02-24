@@ -14,7 +14,7 @@
 import { useEffect } from "react";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { useDAWStore } from "@/stores/dawStore";
-import { EffectsChannelList } from "./layouts/EffectsChannelList";
+import { EffectsChannelList } from "@/modules/effects/components/Layouts/EffectsChannelList";
 
 export function EffectsPanel() {
     // Get state and actions from Zustand store

@@ -1,23 +1,22 @@
 /**
  * MixerChannelList - Layout component for mixer channel strips
  *
- * Displays horizontal scrollable list of channel strips (from sequencer tracks) with master channel
+ * REFACTORED: Pure layout component using Zustand best practices
+ * - No prop drilling - child components read from store directly
+ * - Only manages layout and rendering
  *
- * ARCHITECTURE:
- * - Gets tracks from SequencerContext (sequencer owns tracks)
- * - Gets mixer state from MixerContext (mixer owns channels/master)
- * - Each track has a corresponding mixer channel (1:1 relationship)
+ * Displays horizontal scrollable list of channel strips (from sequencer tracks) with master channel
  */
 
-import { useDAWStore } from '@/stores/dawStore';
-import { MixerChannelStrip } from "../components/Channel/MixerChannelStrip.tsx";
-import { MixerMasterSection } from "../components/Master/MixerMasterSection.tsx";
+import { useDAWStore } from '@/stores/dawStore.ts';
+import { MixerChannelStrip } from "../Channel/MixerChannelStrip.tsx";
+import { MixerMasterSection } from "../Master/MixerMasterSection.tsx";
 
 export function MixerChannelList() {
-    // Get tracks, master, and UI state from Zustand store
+    // ========================================================================
+    // STATE: Read from Zustand store (only for layout logic)
+    // ========================================================================
     const tracks = useDAWStore(state => state.tracks);
-    const master = useDAWStore(state => state.master);
-    const showMeters = useDAWStore(state => state.showMeters);
 
     return (
         <div className="flex h-full gap-4 overflow-x-auto overflow-y-hidden bg-gradient-to-b from-background/50 to-background p-5">
@@ -38,8 +37,7 @@ export function MixerChannelList() {
             {tracks.map((track) => (
                 <MixerChannelStrip
                     key={track.id}
-                    track={track}
-                    showMeters={showMeters}
+                    trackId={track.id}
                 />
             ))}
 
@@ -51,12 +49,7 @@ export function MixerChannelList() {
             )}
 
             {/* Master Section - ALWAYS VISIBLE */}
-            {master && (
-                <MixerMasterSection
-                    master={master}
-                    showMeters={showMeters}
-                />
-            )}
+            <MixerMasterSection />
         </div>
     );
 }

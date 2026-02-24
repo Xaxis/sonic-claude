@@ -3,18 +3,13 @@
  *
  * Professional mixing console for sequencer tracks.
  * Displays sequencer tracks as mixer channels with faders, pan, mute/solo.
- *
- * ARCHITECTURE:
- * - Uses global MixerContext for mixer state (channels, master, meters)
- * - Uses global SequencerContext for track data
- * - MixerContext manages channels (1:1 with sequencer tracks)
  */
 
 import { useEffect } from "react";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { useDAWStore } from "@/stores/dawStore";
 import { MixerToolbar } from "./components/Toolbar/MixerToolbar";
-import { MixerChannelList } from "./layouts/MixerChannelList";
+import { MixerChannelList } from "@/modules/mixer/components/Layouts/MixerChannelList";
 
 export function MixerPanel() {
     // Get mixer actions from Zustand store

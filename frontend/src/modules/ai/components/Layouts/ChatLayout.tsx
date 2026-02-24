@@ -6,13 +6,13 @@
  */
 
 import { useState, useRef, useEffect } from "react";
-import { useDAWStore } from "@/stores/dawStore";
+import { useDAWStore } from "@/stores/dawStore.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Send, Sparkles, Music, Zap, Info } from "lucide-react";
-import type { AIState } from "../hooks/useAIState";
-import type { ChatMessage } from "../types";
+import type { AIState } from "../../hooks/useAIState.ts";
+import type { ChatMessage } from "../../types.ts";
 
 interface ChatLayoutProps {
     state: AIState;

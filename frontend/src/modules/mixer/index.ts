@@ -7,5 +7,5 @@ export type { MixerChannel, MasterChannel, InsertSlot, SendLevel, SendBus, Group
 export { MixerToolbar } from "./components/Toolbar/MixerToolbar";
 export { MixerChannelStrip } from "./components/Channel/MixerChannelStrip";
 export { MixerMasterSection } from "./components/Master/MixerMasterSection";
-export { MixerChannelList } from "./layouts/MixerChannelList";
+export { MixerChannelList } from "@/modules/mixer/components/Layouts/MixerChannelList";
 

@@ -1,6 +1,11 @@
 /**
  * MixerMasterSection - Master channel strip component
  *
+ * REFACTORED: Pure component that reads everything from Zustand
+ * - Reads ALL state from Zustand (master, meters, showMeters)
+ * - Calls actions directly from store
+ * - No props needed
+ *
  * Displays the master channel with fader, meters, and limiter controls
  * Visually distinct from regular channels (wider, different color)
  */
@@ -13,18 +18,26 @@ import { Slider } from "@/components/ui/slider.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { formatDb } from "@/lib/audio-utils";
 import { cn } from "@/lib/utils";
-import type { MasterChannel } from "../../types.ts";
 
-interface MixerMasterSectionProps {
-    master: MasterChannel;
-    showMeters: boolean;
-}
-
-export function MixerMasterSection({ master, showMeters }: MixerMasterSectionProps) {
+export function MixerMasterSection() {
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
+    const master = useDAWStore(state => state.master);
     const meters = useDAWStore(state => state.meters);
+    const showMeters = useDAWStore(state => state.showMeters);
+
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
     const updateMasterFader = useDAWStore(state => state.updateMasterFader);
     const toggleLimiter = useDAWStore(state => state.toggleLimiter);
     const setLimiterThreshold = useDAWStore(state => state.setLimiterThreshold);
+
+    // Validation: master must exist
+    if (!master) {
+        return null;
+    }
 
     // Get real-time meter data for master
     const masterMeter = meters["master"];

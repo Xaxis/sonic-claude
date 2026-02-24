@@ -1,17 +1,21 @@
 /**
  * EffectsChannelList - Layout component for effects channel strips
  *
+ * REFACTORED: Pure layout component using Zustand best practices
+ * - No prop drilling - child components read from store directly
+ * - Only manages layout and rendering
+ *
  * Displays horizontal scrollable list of effects columns (one per track) with master effects column.
- * Uses EffectsContext for state management.
- * Follows the exact pattern from MixerChannelList.
  */
 
-import { useDAWStore } from '@/stores/dawStore';
-import { EffectsChannelStrip } from "../components/Channel/EffectsChannelStrip";
-import { EffectsMasterSection } from "../components/Master/EffectsMasterSection";
+import { useDAWStore } from '@/stores/dawStore.ts';
+import { EffectsChannelStrip } from "../Channel/EffectsChannelStrip.tsx";
+import { EffectsMasterSection } from "../Master/EffectsMasterSection.tsx";
 
 export function EffectsChannelList() {
-    const effectChains = useDAWStore(state => state.effectChains);
+    // ========================================================================
+    // STATE: Read from Zustand store (only for layout logic)
+    // ========================================================================
     const tracks = useDAWStore(state => state.tracks);
 
     return (
@@ -33,8 +37,7 @@ export function EffectsChannelList() {
             {tracks.map((track) => (
                 <EffectsChannelStrip
                     key={track.id}
-                    track={track}
-                    effectChain={effectChains[track.id] || null}
+                    trackId={track.id}
                 />
             ))}
 

@@ -13,7 +13,7 @@
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Music } from "lucide-react";
-import type { AIState, AIActions } from "../hooks/useAIState";
+import type { AIState, AIActions } from "../../hooks/useAIState.ts";
 
 interface AnalysisLayoutProps {
     state: AIState;

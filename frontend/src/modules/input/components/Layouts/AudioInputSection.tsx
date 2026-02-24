@@ -6,8 +6,8 @@
  */
 
 import { useCallback } from "react";
-import { useAudioInput } from "../hooks/useAudioInput.ts";
-import { AudioInputControls } from "../components/AudioInputControls.tsx";
+import { useAudioInput } from "../../hooks/useAudioInput.ts";
+import { AudioInputControls } from "../AudioInputControls.tsx";
 import { api } from "@/services/api";
 import { toast } from "sonner";
 

@@ -1,13 +1,13 @@
 /**
  * MixerChannelStrip - Individual channel strip component
  *
+ * REFACTORED: Pure component that reads everything from Zustand
+ * - Reads ALL state from Zustand (meters, showMeters, track data)
+ * - Calls actions directly from store
+ * - Only receives trackId prop (identifier)
+ *
  * Displays a sequencer track as a vertical mixer channel strip
  * Follows professional DAW layout (top to bottom): name, meter, pan, fader, mute/solo
- *
- * ARCHITECTURE:
- * - Tracks have mixer properties (volume, pan, is_muted, is_solo) directly on them
- * - Updates go through Sequencer API (not a separate mixer API)
- * - Real-time meters come from TelemetryContext
  */
 
 import { Fader } from "@/components/ui/fader.tsx";
@@ -16,22 +16,36 @@ import { Meter } from "@/components/ui/meter.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { MixerButton } from "./MixerButton.tsx";
 import { volumeToDb, dbToVolume, formatDb } from "@/lib/audio-utils";
-import type { SequencerTrack } from "@/modules/sequencer/types";
 
 interface MixerChannelStripProps {
-    track: SequencerTrack;
-    showMeters: boolean;
+    trackId: string;
 }
 
-export function MixerChannelStrip({ track, showMeters }: MixerChannelStripProps) {
-    // Get real-time meters from Zustand store
+export function MixerChannelStrip({ trackId }: MixerChannelStripProps) {
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
+    const tracks = useDAWStore(state => state.tracks);
     const meters = useDAWStore(state => state.meters);
+    const showMeters = useDAWStore(state => state.showMeters);
 
-    // Get sequencer actions from Zustand store
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
     const updateTrackVolume = useDAWStore(state => state.updateTrackVolume);
     const updateTrackPan = useDAWStore(state => state.updateTrackPan);
     const muteTrack = useDAWStore(state => state.muteTrack);
     const soloTrack = useDAWStore(state => state.soloTrack);
+
+    // ========================================================================
+    // DERIVED STATE: Get track data
+    // ========================================================================
+    const track = tracks.find(t => t.id === trackId);
+
+    // Validation: track must exist
+    if (!track) {
+        return null;
+    }
 
     const faderValue = volumeToDb(track.volume);
 
