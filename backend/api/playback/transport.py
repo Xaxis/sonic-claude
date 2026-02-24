@@ -18,7 +18,7 @@ from backend.core.dependencies import (
 from backend.core.exceptions import ServiceError
 from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.playback_engine_service import PlaybackEngineService
-from backend.services.persistence.composition_service import CompositionService
+from backend.services.daw.composition_service import CompositionService
 from backend.services.daw.mixer_service import MixerService
 from backend.services.daw.effects_service import TrackEffectsService
 

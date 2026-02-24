@@ -9,13 +9,12 @@ Performance optimizations:
 - Rate limiting to prevent token waste
 """
 import logging
-import asyncio
-from typing import Optional, List, Dict, Any, Callable
-from datetime import datetime, timedelta
+from typing import Optional, List, Dict, Any
+from datetime import datetime
 from pathlib import Path
 import anthropic
 
-from backend.models.daw_state import DAWStateSnapshot, AudioFeatures, MusicalContext
+from backend.models.daw_state import DAWStateSnapshot
 from backend.models.ai_actions import DAWAction, ActionResult
 from backend.services.ai.state_collector_service import DAWStateService
 from backend.services.ai.action_executor_service import DAWActionService
@@ -23,9 +22,7 @@ from backend.services.analysis.sample_analyzer_service import SampleFileAnalyzer
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.services.persistence.composition_service import CompositionService
-    from backend.services.daw.mixer_service import MixerService
-    from backend.services.daw.effects_service import TrackEffectsService
+    from backend.services.daw.composition_service import CompositionService
 
 logger = logging.getLogger(__name__)
 

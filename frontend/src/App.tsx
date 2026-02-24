@@ -39,14 +39,14 @@ export default function App() {
 
             // Cmd/Ctrl + Z = Undo
             if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
-                if (canUndo()) {
+                if (canUndo) {
                     e.preventDefault();
                     undo();
                 }
             }
             // Cmd/Ctrl + Shift + Z = Redo
             else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') {
-                if (canRedo()) {
+                if (canRedo) {
                     e.preventDefault();
                     redo();
                 }

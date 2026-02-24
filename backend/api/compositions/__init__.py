@@ -6,11 +6,13 @@ This module organizes composition routes into logical groups:
 - history: Version history, restore version, recover from autosave
 - tracks: Track management within compositions (nested resource)
 - clips: Clip management within compositions (nested resource)
+- mixers: Mixer channels and master channel (nested resource)
+- effects: Effect definitions and per-track effect chains (nested resource)
 - startup: Load all compositions on app initialization
 """
 from fastapi import APIRouter
 
-from . import crud, history, tracks, clips, startup
+from . import crud, history, tracks, clips, mixers, effects, startup
 
 # Create main router
 router = APIRouter()
@@ -20,5 +22,7 @@ router.include_router(crud.router, tags=["compositions"])
 router.include_router(history.router, tags=["compositions"])
 router.include_router(tracks.router, tags=["compositions-tracks"])
 router.include_router(clips.router, tags=["compositions-clips"])
+router.include_router(mixers.router, tags=["compositions-mixers"])
+router.include_router(effects.router, tags=["compositions-effects"])
 router.include_router(startup.router, tags=["compositions"])
 

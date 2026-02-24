@@ -196,6 +196,46 @@ export class CompositionsProvider extends BaseAPIClient {
     }
 
     /**
+     * Undo to previous composition state
+     * POST /api/compositions/{composition_id}/undo
+     */
+    async undo(compositionId: string): Promise<any> {
+        return this.post(`/api/compositions/${compositionId}/undo`, {});
+    }
+
+    /**
+     * Redo to next composition state
+     * POST /api/compositions/{composition_id}/redo
+     */
+    async redo(compositionId: string): Promise<any> {
+        return this.post(`/api/compositions/${compositionId}/redo`, {});
+    }
+
+    /**
+     * Get undo/redo status
+     * GET /api/compositions/{composition_id}/undo-redo-status
+     */
+    async getUndoRedoStatus(compositionId: string): Promise<any> {
+        return this.get(`/api/compositions/${compositionId}/undo-redo-status`);
+    }
+
+    /**
+     * Get history for a composition
+     * GET /api/compositions/{composition_id}/history
+     */
+    async getHistory(compositionId: string): Promise<any> {
+        return this.get(`/api/compositions/${compositionId}/history`);
+    }
+
+    /**
+     * Restore composition to a specific history version
+     * POST /api/compositions/{composition_id}/history/{version}/restore
+     */
+    async restoreHistoryVersion(compositionId: string, version: number): Promise<any> {
+        return this.post(`/api/compositions/${compositionId}/history/${version}/restore`, {});
+    }
+
+    /**
      * Save composition to disk
      * POST /api/compositions/{composition_id}/save
      */

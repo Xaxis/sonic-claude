@@ -16,7 +16,8 @@ import { SequencerTimelineSection } from "../Timeline/SequencerTimelineSection.t
 import { SequencerPianoRoll } from "../PianoRoll/SequencerPianoRoll.tsx";
 import { SequencerSampleEditor } from "../SampleEditor/SequencerSampleEditor.tsx";
 import { useDAWStore } from '@/stores/dawStore.ts';
-import { statePersistence } from "@/services/state-persistence/state-persistence.service.ts";
+
+const SPLIT_RATIO_KEY = 'sonic-claude-sequencer-split-ratio';
 
 interface SequencerSplitLayoutProps {
     // Scroll refs for auto-scroll functionality
@@ -40,13 +41,14 @@ export function SequencerSplitLayout({
     // LOCAL UI STATE: Split ratio and drag states
     // ========================================================================
     const [timelineHeightPercent, setTimelineHeightPercent] = useState(() => {
-        return statePersistence.getSequencerSplitRatio();
+        const stored = localStorage.getItem(SPLIT_RATIO_KEY);
+        return stored ? parseFloat(stored) : 60; // Default 60%
     });
     const [isDragging, setIsDragging] = useState(false);
 
     // Save split ratio to localStorage
     useEffect(() => {
-        statePersistence.setSequencerSplitRatio(timelineHeightPercent);
+        localStorage.setItem(SPLIT_RATIO_KEY, timelineHeightPercent.toString());
     }, [timelineHeightPercent]);
 
     // Handle divider drag

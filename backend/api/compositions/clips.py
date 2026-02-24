@@ -18,7 +18,7 @@ from backend.core.exceptions import (
     ServiceError,
 )
 from backend.services.daw.composition_state_service import CompositionStateService
-from backend.services.persistence.composition_service import CompositionService
+from backend.services.daw.composition_service import CompositionService
 from backend.services.daw.mixer_service import MixerService
 from backend.services.daw.effects_service import TrackEffectsService
 from backend.models.sequence import Clip, AddClipRequest, UpdateClipRequest
@@ -42,6 +42,10 @@ async def create_clip(
 ):
     """Create a new clip in the composition"""
     try:
+        # UNDO: Push current state to undo stack BEFORE mutation
+        composition_state_service.push_undo(composition_id)
+
+        # Execute mutation
         clip = composition_state_service.add_clip(composition_id, request)
         if not clip:
             raise ResourceNotFoundError(f"Composition {composition_id} not found")
@@ -86,6 +90,9 @@ async def update_clip(
 ):
     """Update clip properties"""
     try:
+        # UNDO: Push current state to undo stack BEFORE mutation
+        composition_state_service.push_undo(composition_id)
+
         clip = composition_state_service.update_clip(composition_id, clip_id, request)
         if not clip:
             raise ResourceNotFoundError(f"Clip {clip_id} not found in composition {composition_id}")
@@ -116,6 +123,9 @@ async def delete_clip(
 ):
     """Delete a clip from the composition"""
     try:
+        # UNDO: Push current state to undo stack BEFORE mutation
+        composition_state_service.push_undo(composition_id)
+
         success = composition_state_service.delete_clip(composition_id, clip_id)
         if not success:
             raise ResourceNotFoundError(f"Clip {clip_id} not found in composition {composition_id}")

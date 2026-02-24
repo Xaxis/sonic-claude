@@ -1,21 +1,36 @@
 /**
  * DAW Zustand Store
- * 
- * Complete state management for the DAW using Zustand.
- * Handles both real-time WebSocket streams (30-60Hz) and HTTP CRUD operations.
- * 
- * Architecture:
- * - Layer 1: Audio Engine State (WebSocket real-time)
- * - Layer 2: Application State (HTTP CRUD)
- * - Layer 3: UI State (local)
+ *
+ * Complete state management for the DAW using Zustand with automatic persistence.
+ *
+ * State Persistence Architecture:
+ * ┌─────────────────────────────────────────────────────────────┐
+ * │ Layer 1: EPHEMERAL (Never Persisted)                       │
+ * │ - WebSocket real-time data (transport, meters, spectrum)   │
+ * │ - Drag states, scroll positions, loading flags             │
+ * └─────────────────────────────────────────────────────────────┘
+ * ┌─────────────────────────────────────────────────────────────┐
+ * │ Layer 2: UI PREFERENCES (localStorage via persist)         │
+ * │ - zoom, snap, grid, meter settings                         │
+ * │ - activeCompositionId (for auto-load on startup)           │
+ * │ - panel visibility, selected items                         │
+ * └─────────────────────────────────────────────────────────────┘
+ * ┌─────────────────────────────────────────────────────────────┐
+ * │ Layer 3: COMPOSITION DATA (Backend current.json)           │
+ * │ - tracks, clips, mixer, effects, samples                   │
+ * │ - Loaded on demand, auto-persisted after mutations         │
+ * └─────────────────────────────────────────────────────────────┘
+ * ┌─────────────────────────────────────────────────────────────┐
+ * │ Layer 4: VERSION HISTORY (Backend history/*.json)          │
+ * │ - Manual save points, undo/redo stacks                     │
+ * └─────────────────────────────────────────────────────────────┘
  */
 
 import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
+import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { api } from '@/services/api';
 import { toast } from 'sonner';
 import { windowManager } from '@/services/window-manager';
-import { statePersistence } from '@/services/state-persistence';
 
 // ============================================================================
 // TYPE IMPORTS
@@ -73,21 +88,6 @@ export interface Composition {
 // AI & Activity Types
 import type { ChatMessage, AnalysisEvent, DAWStateSnapshot } from '@/modules/assistant/types';
 
-// Undo/Redo Types
-import type { UndoableCommand } from '@/services/undo/types';
-import {
-    createTrackCommand,
-    deleteTrackCommand,
-    renameTrackCommand,
-    updateTrackCommand,
-    muteTrackCommand,
-    soloTrackCommand,
-    createClipCommand,
-    deleteClipCommand,
-    updateClipCommand,
-    updateTempoCommand,
-} from '@/services/undo/commands';
-
 export type ActivityStatus = "pending" | "in-progress" | "success" | "error";
 export type ActivityTargetType = "track" | "clip" | "effect" | "mixer" | "tempo" | "playback";
 
@@ -134,6 +134,10 @@ interface DAWStore {
     activeComposition: Composition | null;  // Currently loaded composition
     compositions: CompositionMetadata[];             // List of all compositions (for browsing)
     hasUnsavedChanges: boolean;
+
+    // Undo/Redo (built-in to composition system)
+    canUndo: boolean;
+    canRedo: boolean;
 
     // Sequencer (INTERNAL - part of active composition)
     // These are derived from activeComposition (for convenience/performance)
@@ -211,13 +215,6 @@ interface DAWStore {
     activityHistory: AIActivity[];
     isAIActive: boolean;
 
-    // Undo/Redo State
-    undoStack: UndoableCommand[];
-    redoStack: UndoableCommand[];
-    maxUndoHistory: number;
-    isUndoing: boolean;
-    isRedoing: boolean;
-
     // ========================================================================
     // AUDIO ENGINE ACTIONS (WebSocket Updates)
     // ========================================================================
@@ -231,11 +228,13 @@ interface DAWStore {
     // COMPOSITION ACTIONS (PRIMARY - what users interact with)
     // ========================================================================
     loadCompositions: () => Promise<void>;
+    initialize: () => Promise<void>;
     createComposition: (name: string, tempo?: number, timeSignature?: string) => Promise<void>;
     loadComposition: (compositionId: string) => Promise<void>;
     saveComposition: (createHistory?: boolean, isAutosave?: boolean) => Promise<void>;
     updateCompositionMetadata: (name?: string, tempo?: number, timeSignature?: string) => Promise<void>;
     deleteComposition: (compositionId: string) => Promise<void>;
+    refreshUndoRedoStatus: () => Promise<void>;
     markCompositionChanged: () => void;
     markCompositionSaved: () => void;
 
@@ -253,7 +252,7 @@ interface DAWStore {
     seek: (position: number, triggerAudio?: boolean) => Promise<void>;
 
     // Tracks (operate on active composition)
-    createTrack: (name: string, type: string, instrument?: string) => Promise<void>;
+    createTrack: (name: string, type: "midi" | "audio" | "sample", instrument?: string) => Promise<void>;
     deleteTrack: (trackId: string) => Promise<void>;
     renameTrack: (trackId: string, name: string) => Promise<void>;
     updateTrack: (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => Promise<void>;
@@ -398,98 +397,92 @@ interface DAWStore {
     // ========================================================================
     undo: () => Promise<void>;
     redo: () => Promise<void>;
-    canUndo: () => boolean;
-    canRedo: () => boolean;
-    clearHistory: () => void;
-    pushCommand: (command: UndoableCommand) => void;
 }
 
 // ============================================================================
-// CREATE STORE
+// CREATE STORE WITH PERSIST MIDDLEWARE
 // ============================================================================
 
 export const useDAWStore = create<DAWStore>()(
-    subscribeWithSelector((set, get) => ({
-        // ====================================================================
-        // INITIAL STATE
-        // ====================================================================
+    subscribeWithSelector(
+        persist(
+            (set, get) => ({
+                // ====================================================================
+                // INITIAL STATE
+                // ====================================================================
 
-        // Audio Engine State
-        transport: null,
-        meters: {},
-        spectrum: [],
-        waveform: null,
-        analytics: null,
+                // Audio Engine State (EPHEMERAL - never persisted)
+                transport: null,
+                meters: {},
+                spectrum: [],
+                waveform: null,
+                analytics: null,
 
-        // Application State - Composition First
-        activeComposition: null,
-        compositions: [],
-        hasUnsavedChanges: false,
+                // Application State - Composition First
+                activeComposition: null,
+                compositions: [],
+                hasUnsavedChanges: false,
+                canUndo: false,
+                canRedo: false,
 
-        // Derived from active composition
-        tracks: [],
-        clips: [],
-        synthDefs: [],
-        channels: [],
-        master: null,
-        effectDefinitions: [],
-        effectChains: {},
-        samples: [],
-        sampleAssignments: {},
-        activeSynths: {},
+                // Derived from active composition (loaded from backend)
+                tracks: [],
+                clips: [],
+                synthDefs: [],
+                channels: [],
+                master: null,
+                effectDefinitions: [],
+                effectChains: {},
+                samples: [],
+                sampleAssignments: {},
+                activeSynths: {},
 
-        // UI State
-        zoom: statePersistence.getZoom(),
-        snapEnabled: statePersistence.getSnapEnabled(),
-        gridSize: statePersistence.getGridSize(),
-        isLooping: true,
-        loopStart: 0,
-        loopEnd: 16,
-        selectedClipId: null,
+                // UI State (PERSISTED via middleware)
+                zoom: 0.5,
+                snapEnabled: true,
+                gridSize: 16,
+                isLooping: true,
+                loopStart: 0,
+                loopEnd: 16,
+                selectedClipId: null,
 
-        // Clip Drag State
-        clipDragStates: new Map(),
+                // Clip Drag State (EPHEMERAL)
+                clipDragStates: new Map(),
 
-        // Scroll State
-        timelineScrollLeft: 0,
-        pianoRollScrollLeft: 0,
-        sampleEditorScrollLeft: 0,
+                // Scroll State (EPHEMERAL)
+                timelineScrollLeft: 0,
+                pianoRollScrollLeft: 0,
+                sampleEditorScrollLeft: 0,
 
-        showSampleBrowser: false,
-        showSequenceManager: false,
-        showSequenceSettings: false,
-        showPianoRoll: false,
-        pianoRollClipId: null,
-        showSampleEditor: false,
-        sampleEditorClipId: null,
-        showMeters: true,
-        meterMode: "both",
-        selectedChannelId: null,
-        selectedEffectId: null,
-        showEffectBrowser: false,
+                // Panel Visibility (PERSISTED)
+                showSampleBrowser: false,
+                showSequenceManager: false,
+                showSequenceSettings: false,
+                showPianoRoll: false,
+                pianoRollClipId: null,
+                showSampleEditor: false,
+                sampleEditorClipId: null,
+                showMeters: true,
+                meterMode: "both",
+                selectedChannelId: null,
+                selectedEffectId: null,
+                showEffectBrowser: false,
 
-        // Assistant State
-        chatHistory: [],
-        analysisEvents: [],
-        dawStateSnapshot: null,
-        aiContext: null,
+                // Assistant State
+                chatHistory: [],
+                analysisEvents: [],
+                dawStateSnapshot: null,
+                aiContext: null,
 
-        // Assistant UI State
-        activeAssistantTab: statePersistence.getActiveAssistantTab(),
-        isSendingMessage: false,
-        isLoadingAssistantState: false,
+                // Assistant UI State (PERSISTED)
+                activeAssistantTab: "chat",
+                isSendingMessage: false,
+                isLoadingAssistantState: false,
 
         // Activity State
         activities: [],
         activityHistory: [],
         isAIActive: false,
-
-        // Undo/Redo State
-        undoStack: [],
-        redoStack: [],
-        maxUndoHistory: 100,
-        isUndoing: false,
-        isRedoing: false,
 
         // ====================================================================
         // AUDIO ENGINE ACTIONS (WebSocket Updates)
@@ -567,24 +560,18 @@ export const useDAWStore = create<DAWStore>()(
                     return;
                 }
 
-                // Create undoable command
-                const command = updateTempoCommand(
-                    activeComposition.id,
-                    activeComposition.tempo,
+                // Execute mutation (backend handles undo automatically)
+                await api.compositions.update(activeComposition.id, {
                     tempo,
-                    // onExecute callback - refresh state after updating tempo
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    },
-                    // onUndo callback - refresh state after reverting tempo
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    }
-                );
+                });
 
-                // Execute and push to undo stack
-                await command.execute();
-                get().pushCommand(command);
+                // Reload composition (backend auto-persisted)
+                await get().loadComposition(activeComposition.id);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
+
+                toast.success(`Tempo set to ${tempo} BPM`);
 
             } catch (error) {
                 console.error("Failed to set tempo:", error);
@@ -635,25 +622,19 @@ export const useDAWStore = create<DAWStore>()(
                     return;
                 }
 
-                // Create undoable command
-                const command = createTrackCommand(
-                    activeComposition.id,
+                // Execute mutation (backend handles undo automatically)
+                await api.compositions.createTrack({
+                    composition_id: activeComposition.id,
                     name,
                     type,
                     instrument,
-                    // onExecute callback - refresh state after creating track
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    },
-                    // onUndo callback - refresh state after deleting track
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    }
-                );
+                });
 
-                // Execute and push to undo stack
-                await command.execute();
-                get().pushCommand(command);
+                // Reload composition (backend auto-persisted)
+                await get().loadComposition(activeComposition.id);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
 
                 toast.success(`Created track: ${name}`);
             } catch (error) {
@@ -670,31 +651,21 @@ export const useDAWStore = create<DAWStore>()(
                     return;
                 }
 
-                // Find the track to capture its state for undo
+                // Find the track
                 const track = tracks.find(t => t.id === trackId);
                 if (!track) {
                     toast.error("Track not found");
                     return;
                 }
 
-                // Create undoable command
-                const command = deleteTrackCommand(
-                    activeComposition.id,
-                    trackId,
-                    track,
-                    // onExecute callback - refresh state after deleting track
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    },
-                    // onUndo callback - refresh state after recreating track
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    }
-                );
+                // Execute mutation (backend handles undo automatically)
+                await api.compositions.deleteTrack(activeComposition.id, trackId);
 
-                // Execute and push to undo stack
-                await command.execute();
-                get().pushCommand(command);
+                // Reload composition (backend auto-persisted)
+                await get().loadComposition(activeComposition.id);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
 
                 toast.success("Track deleted");
             } catch (error) {
@@ -708,32 +679,21 @@ export const useDAWStore = create<DAWStore>()(
                 const { activeComposition, tracks } = get();
                 if (!activeComposition) return;
 
-                // Find the track to capture old name for undo
+                // Find the track
                 const track = tracks.find(t => t.id === trackId);
                 if (!track) {
                     toast.error("Track not found");
                     return;
                 }
 
-                // Create undoable command
-                const command = renameTrackCommand(
-                    activeComposition.id,
-                    trackId,
-                    track.name,
-                    name,
-                    // onExecute callback - refresh state after renaming
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    },
-                    // onUndo callback - refresh state after reverting name
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    }
-                );
+                // Execute mutation (backend handles undo automatically)
+                await api.compositions.updateTrack(activeComposition.id, trackId, { name });
 
-                // Execute and push to undo stack
-                await command.execute();
-                get().pushCommand(command);
+                // Reload composition (backend auto-persisted)
+                await get().loadComposition(activeComposition.id);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
 
             } catch (error) {
                 console.error("Failed to rename track:", error);
@@ -746,38 +706,21 @@ export const useDAWStore = create<DAWStore>()(
                 const { activeComposition, tracks } = get();
                 if (!activeComposition) return;
 
-                // Find the track to capture old values for undo
+                // Find the track
                 const track = tracks.find(t => t.id === trackId);
                 if (!track) {
                     toast.error("Track not found");
                     return;
                 }
 
-                // Capture old values
-                const oldUpdates: { volume?: number; pan?: number; instrument?: string } = {};
-                if (updates.volume !== undefined) oldUpdates.volume = track.volume;
-                if (updates.pan !== undefined) oldUpdates.pan = track.pan;
-                if (updates.instrument !== undefined) oldUpdates.instrument = track.instrument;
+                // Execute mutation (backend handles undo automatically)
+                await api.compositions.updateTrack(activeComposition.id, trackId, updates);
 
-                // Create undoable command
-                const command = updateTrackCommand(
-                    activeComposition.id,
-                    trackId,
-                    oldUpdates,
-                    updates,
-                    // onExecute callback - refresh state after updating
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    },
-                    // onUndo callback - refresh state after reverting
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    }
-                );
+                // Reload composition (backend auto-persisted)
+                await get().loadComposition(activeComposition.id);
 
-                // Execute and push to undo stack
-                await command.execute();
-                get().pushCommand(command);
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
 
             } catch (error) {
                 console.error("Failed to update track:", error);
@@ -824,32 +767,25 @@ export const useDAWStore = create<DAWStore>()(
                 const { activeComposition, tracks } = get();
                 if (!activeComposition) return;
 
-                // Find the track to capture old mute state for undo
+                // Find the track
                 const track = tracks.find(t => t.id === trackId);
                 if (!track) {
                     toast.error("Track not found");
                     return;
                 }
 
-                // Create undoable command
-                const command = muteTrackCommand(
-                    activeComposition.id,
-                    trackId,
-                    track.is_muted || false,
-                    muted,
-                    // onExecute callback - refresh state after muting
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    },
-                    // onUndo callback - refresh state after reverting mute
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    }
-                );
+                // Execute mutation (backend handles undo automatically)
+                await api.compositions.muteTrack({
+                    composition_id: activeComposition.id,
+                    track_id: trackId,
+                    is_muted: muted,
+                });
 
-                // Execute and push to undo stack
-                await command.execute();
-                get().pushCommand(command);
+                // Reload composition (backend auto-persisted)
+                await get().loadComposition(activeComposition.id);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
 
             } catch (error) {
                 console.error("Failed to mute track:", error);
@@ -862,32 +798,25 @@ export const useDAWStore = create<DAWStore>()(
                 const { activeComposition, tracks } = get();
                 if (!activeComposition) return;
 
-                // Find the track to capture old solo state for undo
+                // Find the track
                 const track = tracks.find(t => t.id === trackId);
                 if (!track) {
                     toast.error("Track not found");
                     return;
                 }
 
-                // Create undoable command
-                const command = soloTrackCommand(
-                    activeComposition.id,
-                    trackId,
-                    track.is_solo || false,
-                    soloed,
-                    // onExecute callback - refresh state after soloing
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    },
-                    // onUndo callback - refresh state after reverting solo
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    }
-                );
+                // Execute mutation (backend handles undo automatically)
+                await api.compositions.soloTrack({
+                    composition_id: activeComposition.id,
+                    track_id: trackId,
+                    is_solo: soloed,
+                });
 
-                // Execute and push to undo stack
-                await command.execute();
-                get().pushCommand(command);
+                // Reload composition (backend auto-persisted)
+                await get().loadComposition(activeComposition.id);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
 
             } catch (error) {
                 console.error("Failed to solo track:", error);
@@ -907,22 +836,14 @@ export const useDAWStore = create<DAWStore>()(
                     return;
                 }
 
-                // Create undoable command
-                const command = createClipCommand(
-                    request,
-                    // onExecute callback - refresh state after creating clip
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    },
-                    // onUndo callback - refresh state after deleting clip
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    }
-                );
+                // Execute mutation (backend handles undo automatically)
+                await api.compositions.addClip(request);
 
-                // Execute and push to undo stack
-                await command.execute();
-                get().pushCommand(command);
+                // Reload composition (backend auto-persisted)
+                await get().loadComposition(activeComposition.id);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
 
             } catch (error) {
                 console.error("Failed to add clip:", error);
@@ -935,32 +856,21 @@ export const useDAWStore = create<DAWStore>()(
                 const { activeComposition, clips } = get();
                 if (!activeComposition) return;
 
-                // Find the clip to capture old values for undo
+                // Find the clip
                 const clip = clips.find(c => c.id === clipId);
                 if (!clip) {
                     toast.error("Clip not found");
                     return;
                 }
 
-                // Create undoable command
-                const command = updateClipCommand(
-                    activeComposition.id,
-                    clipId,
-                    clip,
-                    request,
-                    // onExecute callback - refresh state after updating
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    },
-                    // onUndo callback - refresh state after reverting
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    }
-                );
+                // Execute mutation (backend handles undo automatically)
+                await api.compositions.updateClip(activeComposition.id, clipId, request);
 
-                // Execute and push to undo stack
-                await command.execute();
-                get().pushCommand(command);
+                // Reload composition (backend auto-persisted)
+                await get().loadComposition(activeComposition.id);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
 
             } catch (error) {
                 console.error("Failed to update clip:", error);
@@ -973,31 +883,21 @@ export const useDAWStore = create<DAWStore>()(
                 const { activeComposition, clips } = get();
                 if (!activeComposition) return;
 
-                // Find the clip to capture its state for undo
+                // Find the clip
                 const clip = clips.find(c => c.id === clipId);
                 if (!clip) {
                     toast.error("Clip not found");
                     return;
                 }
 
-                // Create undoable command
-                const command = deleteClipCommand(
-                    activeComposition.id,
-                    clipId,
-                    clip,
-                    // onExecute callback - refresh state after deleting clip
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    },
-                    // onUndo callback - refresh state after recreating clip
-                    async () => {
-                        await get().loadComposition(activeComposition.id);
-                    }
-                );
+                // Execute mutation (backend handles undo automatically)
+                await api.compositions.deleteClip(activeComposition.id, clipId);
 
-                // Execute and push to undo stack
-                await command.execute();
-                get().pushCommand(command);
+                // Reload composition (backend auto-persisted)
+                await get().loadComposition(activeComposition.id);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
 
             } catch (error) {
                 console.error("Failed to delete clip:", error);
@@ -1090,6 +990,9 @@ export const useDAWStore = create<DAWStore>()(
                 }));
 
                 windowManager.broadcastState('channels', get().channels);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
             } catch (error) {
                 console.error("Failed to update channel volume:", error);
                 toast.error("Failed to update channel volume");
@@ -1105,6 +1008,9 @@ export const useDAWStore = create<DAWStore>()(
                 }));
 
                 windowManager.broadcastState('channels', get().channels);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
             } catch (error) {
                 console.error("Failed to update channel pan:", error);
                 toast.error("Failed to update channel pan");
@@ -1123,6 +1029,9 @@ export const useDAWStore = create<DAWStore>()(
                 }));
 
                 windowManager.broadcastState('channels', get().channels);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
             } catch (error) {
                 console.error("Failed to toggle channel mute:", error);
                 toast.error("Failed to toggle channel mute");
@@ -1141,6 +1050,9 @@ export const useDAWStore = create<DAWStore>()(
                 }));
 
                 windowManager.broadcastState('channels', get().channels);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
             } catch (error) {
                 console.error("Failed to toggle channel solo:", error);
                 toast.error("Failed to toggle channel solo");
@@ -1163,6 +1075,9 @@ export const useDAWStore = create<DAWStore>()(
                 const updated = await api.mixer.updateMaster({ fader });
                 set({ master: updated });
                 windowManager.broadcastState('master', updated);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
             } catch (error) {
                 console.error("Failed to update master fader:", error);
                 toast.error("Failed to update master fader");
@@ -1177,6 +1092,9 @@ export const useDAWStore = create<DAWStore>()(
                 const updated = await api.mixer.updateMaster({ mute: !master.mute });
                 set({ master: updated });
                 windowManager.broadcastState('master', updated);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
             } catch (error) {
                 console.error("Failed to toggle master mute:", error);
                 toast.error("Failed to toggle master mute");
@@ -1191,6 +1109,9 @@ export const useDAWStore = create<DAWStore>()(
                 const updated = await api.mixer.updateMaster({ limiter_enabled: !master.limiter_enabled });
                 set({ master: updated });
                 windowManager.broadcastState('master', updated);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
             } catch (error) {
                 console.error("Failed to toggle limiter:", error);
                 toast.error("Failed to toggle limiter");
@@ -1202,6 +1123,9 @@ export const useDAWStore = create<DAWStore>()(
                 const updated = await api.mixer.updateMaster({ limiter_threshold: threshold });
                 set({ master: updated });
                 windowManager.broadcastState('master', updated);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
             } catch (error) {
                 console.error("Failed to set limiter threshold:", error);
                 toast.error("Failed to set limiter threshold");
@@ -1297,6 +1221,9 @@ export const useDAWStore = create<DAWStore>()(
 
                 windowManager.broadcastState('effectChains', get().effectChains);
                 toast.success("Effect deleted");
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
             } catch (error) {
                 console.error("Failed to delete effect:", error);
                 toast.error("Failed to delete effect");
@@ -1353,6 +1280,9 @@ export const useDAWStore = create<DAWStore>()(
                     });
                     return { effectChains: newChains };
                 });
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
             } catch (error) {
                 console.error("Failed to toggle effect bypass:", error);
                 toast.error("Failed to toggle effect bypass");
@@ -1377,6 +1307,9 @@ export const useDAWStore = create<DAWStore>()(
                     });
                     return { effectChains: newChains };
                 });
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
             } catch (error) {
                 console.error("Failed to update effect parameter:", error);
                 toast.error("Failed to update effect parameter");
@@ -1414,6 +1347,9 @@ export const useDAWStore = create<DAWStore>()(
                 await api.samples.deleteSample(sampleId);
                 await get().loadSamples();
                 toast.success("Sample deleted");
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
             } catch (error) {
                 console.error("Failed to delete sample:", error);
                 toast.error("Failed to delete sample");
@@ -1425,6 +1361,9 @@ export const useDAWStore = create<DAWStore>()(
                 await api.samples.update(sampleId, { name, category });
                 await get().loadSamples();
                 toast.success("Sample updated");
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
             } catch (error) {
                 console.error("Failed to update sample:", error);
                 toast.error("Failed to update sample");
@@ -1564,6 +1503,33 @@ export const useDAWStore = create<DAWStore>()(
             }
         },
 
+        /**
+         * Initialize store on app startup
+         * - Loads composition list
+         * - Auto-loads last active composition if available
+         */
+        initialize: async () => {
+            try {
+                // Load all compositions
+                await get().loadCompositions();
+
+                // Get persisted composition ID from localStorage (via persist middleware)
+                const persistedState = localStorage.getItem('sonic-claude-daw');
+                if (persistedState) {
+                    const parsed = JSON.parse(persistedState);
+                    const lastCompositionId = parsed.state?._persistedCompositionId;
+
+                    if (lastCompositionId) {
+                        console.log(`🔄 Auto-loading last composition: ${lastCompositionId}`);
+                        await get().loadComposition(lastCompositionId);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to initialize store:", error);
+                // Don't show error toast - this is background initialization
+            }
+        },
+
         createComposition: async (name, tempo = 120, timeSignature = "4/4") => {
             try {
                 const response = await api.compositions.create({
@@ -1623,8 +1589,7 @@ export const useDAWStore = create<DAWStore>()(
                     loopEnd: snapshot.loop_end ?? 16,
                 });
 
-                // Save to localStorage so we can auto-load on next startup
-                statePersistence.setActiveSequenceId(compositionId);
+                // Composition ID auto-persisted by Zustand persist middleware
 
                 // Broadcast to other windows
                 windowManager.broadcastState('activeComposition', snapshot);
@@ -1636,10 +1601,29 @@ export const useDAWStore = create<DAWStore>()(
                 windowManager.broadcastState('sampleAssignments', sampleAssignments);
 
                 toast.success(`Loaded composition: ${snapshot.name}`);
+
+                // Refresh undo/redo status
+                await get().refreshUndoRedoStatus();
             } catch (error) {
                 console.error("Failed to load composition:", error);
                 toast.error("Failed to load composition");
                 throw error;
+            }
+        },
+
+        refreshUndoRedoStatus: async () => {
+            try {
+                const { activeComposition } = get();
+                if (!activeComposition) return;
+
+                const status = await api.compositions.getUndoRedoStatus(activeComposition.id);
+                set({
+                    canUndo: status.can_undo || false,
+                    canRedo: status.can_redo || false,
+                });
+            } catch (error) {
+                console.error("Failed to refresh undo/redo status:", error);
+                // Don't show error toast - this is background refresh
             }
         },
 
@@ -1746,15 +1730,15 @@ export const useDAWStore = create<DAWStore>()(
 
         setZoom: (zoom) => {
             set({ zoom });
-            statePersistence.setZoom(zoom);
+            // Auto-persisted by Zustand persist middleware
         },
         setSnapEnabled: (enabled) => {
             set({ snapEnabled: enabled });
-            statePersistence.setSnapEnabled(enabled);
+            // Auto-persisted by Zustand persist middleware
         },
         setGridSize: (size) => {
             set({ gridSize: size });
-            statePersistence.setGridSize(size);
+            // Auto-persisted by Zustand persist middleware
         },
         setIsLooping: async (looping) => {
             set({ isLooping: looping });
@@ -1920,7 +1904,7 @@ export const useDAWStore = create<DAWStore>()(
         // Assistant UI Actions
         setActiveAssistantTab: (tab) => {
             set({ activeAssistantTab: tab });
-            statePersistence.setActiveAssistantTab(tab);
+            // Auto-persisted by Zustand persist middleware
         },
 
         setIsSendingMessage: (sending) => {
@@ -2121,120 +2105,135 @@ export const useDAWStore = create<DAWStore>()(
         // ====================================================================
 
         undo: async () => {
-            const { undoStack, redoStack, isUndoing, isRedoing } = get();
-
-            // Prevent concurrent undo/redo operations
-            if (isUndoing || isRedoing) {
-                console.warn('Undo/redo operation already in progress');
-                return;
-            }
-
-            if (undoStack.length === 0) {
-                console.warn('Nothing to undo');
-                return;
-            }
-
-            set({ isUndoing: true });
-
             try {
-                // Pop command from undo stack
-                const command = undoStack[undoStack.length - 1];
-                const newUndoStack = undoStack.slice(0, -1);
+                const { activeComposition, canUndo } = get();
+                if (!activeComposition) {
+                    toast.error("No active composition");
+                    return;
+                }
 
-                // Execute undo
-                await command.undo();
+                if (!canUndo) {
+                    toast.error("Nothing to undo");
+                    return;
+                }
 
-                // Push to redo stack
-                const newRedoStack = [...redoStack, command];
+                // Call backend undo endpoint
+                const response = await api.compositions.undo(activeComposition.id);
 
-                // Update stacks
+                // Update state from response
+                const composition = response.composition;
+                const tracks = composition.tracks || [];
+                const clips = composition.clips || [];
+                const channels = composition.mixer_state?.channels || [];
+                const master = composition.mixer_state?.master || null;
+                const effectChainsArray = composition.track_effects || [];
+                const effectChains: Record<string, TrackEffectChain> = {};
+                effectChainsArray.forEach((chain: TrackEffectChain) => {
+                    effectChains[chain.track_id] = chain;
+                });
+                const sampleAssignments = composition.sample_assignments || {};
+
                 set({
-                    undoStack: newUndoStack,
-                    redoStack: newRedoStack,
-                    isUndoing: false,
+                    activeComposition: composition,
+                    tracks,
+                    clips,
+                    channels,
+                    master,
+                    effectChains,
+                    sampleAssignments,
+                    canUndo: response.can_undo || false,
+                    canRedo: response.can_redo || false,
                 });
 
-                toast.success(`Undone: ${command.description}`);
+                toast.success("Undone");
             } catch (error) {
                 console.error('Failed to undo:', error);
                 toast.error('Failed to undo action');
-                set({ isUndoing: false });
             }
         },
 
         redo: async () => {
-            const { undoStack, redoStack, isUndoing, isRedoing } = get();
-
-            // Prevent concurrent undo/redo operations
-            if (isUndoing || isRedoing) {
-                console.warn('Undo/redo operation already in progress');
-                return;
-            }
-
-            if (redoStack.length === 0) {
-                console.warn('Nothing to redo');
-                return;
-            }
-
-            set({ isRedoing: true });
-
             try {
-                // Pop command from redo stack
-                const command = redoStack[redoStack.length - 1];
-                const newRedoStack = redoStack.slice(0, -1);
+                const { activeComposition, canRedo } = get();
+                if (!activeComposition) {
+                    toast.error("No active composition");
+                    return;
+                }
 
-                // Execute redo
-                await command.execute();
+                if (!canRedo) {
+                    toast.error("Nothing to redo");
+                    return;
+                }
 
-                // Push to undo stack
-                const newUndoStack = [...undoStack, command];
+                // Call backend redo endpoint
+                const response = await api.compositions.redo(activeComposition.id);
 
-                // Update stacks
+                // Update state from response
+                const composition = response.composition;
+                const tracks = composition.tracks || [];
+                const clips = composition.clips || [];
+                const channels = composition.mixer_state?.channels || [];
+                const master = composition.mixer_state?.master || null;
+                const effectChainsArray = composition.track_effects || [];
+                const effectChains: Record<string, TrackEffectChain> = {};
+                effectChainsArray.forEach((chain: TrackEffectChain) => {
+                    effectChains[chain.track_id] = chain;
+                });
+                const sampleAssignments = composition.sample_assignments || {};
+
                 set({
-                    undoStack: newUndoStack,
-                    redoStack: newRedoStack,
-                    isRedoing: false,
+                    activeComposition: composition,
+                    tracks,
+                    clips,
+                    channels,
+                    master,
+                    effectChains,
+                    sampleAssignments,
+                    canUndo: response.can_undo || false,
+                    canRedo: response.can_redo || false,
                 });
 
-                toast.success(`Redone: ${command.description}`);
+                toast.success("Redone");
             } catch (error) {
                 console.error('Failed to redo:', error);
                 toast.error('Failed to redo action');
-                set({ isRedoing: false });
             }
         },
+            }),
+            {
+                name: 'sonic-claude-daw',
+                version: 1,
 
-        canUndo: () => {
-            return get().undoStack.length > 0 && !get().isUndoing && !get().isRedoing;
-        },
+                // Partialize: ONLY persist UI preferences, NOT composition data or ephemeral state
+                partialize: (state) => ({
+                    // UI Preferences
+                    zoom: state.zoom,
+                    snapEnabled: state.snapEnabled,
+                    gridSize: state.gridSize,
+                    showMeters: state.showMeters,
+                    meterMode: state.meterMode,
+                    activeAssistantTab: state.activeAssistantTab,
 
-        canRedo: () => {
-            return get().redoStack.length > 0 && !get().isUndoing && !get().isRedoing;
-        },
+                    // Active Composition ID (for auto-load on startup)
+                    _persistedCompositionId: state.activeComposition?.id || null,
 
-        clearHistory: () => {
-            set({
-                undoStack: [],
-                redoStack: [],
-            });
-        },
+                    // Panel Visibility
+                    showSampleBrowser: state.showSampleBrowser,
+                    showSequenceManager: state.showSequenceManager,
+                    showSequenceSettings: state.showSequenceSettings,
+                    showEffectBrowser: state.showEffectBrowser,
 
-        pushCommand: (command) => {
-            const { undoStack, maxUndoHistory } = get();
+                    // Selected Items
+                    selectedChannelId: state.selectedChannelId,
+                    selectedEffectId: state.selectedEffectId,
+                }),
 
-            // Add command to undo stack
-            let newUndoStack = [...undoStack, command];
-
-            // Enforce max history size
-            if (newUndoStack.length > maxUndoHistory) {
-                newUndoStack = newUndoStack.slice(-maxUndoHistory);
+                // Merge: Restore persisted state on hydration
+                merge: (persistedState: any, currentState) => ({
+                    ...currentState,
+                    ...persistedState,
+                }),
             }
-
-            // Clear redo stack (new action invalidates redo history)
-            set({
-                undoStack: newUndoStack,
-                redoStack: [],
-            });
-        },
-    }))
+        )
+    )
 );

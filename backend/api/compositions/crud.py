@@ -13,7 +13,6 @@ Key Operations:
 - DELETE /compositions/{id} - Delete composition
 """
 import logging
-import uuid
 from fastapi import APIRouter, Depends
 
 from backend.core.dependencies import (
@@ -23,14 +22,13 @@ from backend.core.dependencies import (
     get_track_effects_service,
     get_ai_agent_service,
 )
-from backend.services.persistence.composition_service import CompositionService
+from backend.services.daw.composition_service import CompositionService
 from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.mixer_service import MixerService
 from backend.services.daw.effects_service import TrackEffectsService
 from backend.services.ai.agent_service import AIAgentService
 from backend.core.exceptions import ServiceError, ResourceNotFoundError
 from backend.models.composition import (
-    Composition,
     CreateCompositionRequest,
     UpdateCompositionRequest,
     SaveCompositionRequest,
@@ -247,6 +245,9 @@ async def update_composition(
         if not composition:
             raise ResourceNotFoundError(f"Composition {composition_id} not found")
 
+        # UNDO: Push current state to undo stack BEFORE mutation
+        composition_state_service.push_undo(composition_id)
+
         # Update fields
         if request.name is not None:
             composition.name = request.name
@@ -276,6 +277,52 @@ async def update_composition(
     except Exception as e:
         logger.error(f"❌ Failed to update composition: {e}")
         raise ServiceError(f"Failed to update composition: {str(e)}")
+
+
+@router.post("/{composition_id}/snapshot")
+async def create_history_snapshot(
+    composition_id: str,
+    composition_service: CompositionService = Depends(get_composition_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
+    mixer_service: MixerService = Depends(get_mixer_service),
+    effects_service: TrackEffectsService = Depends(get_track_effects_service),
+):
+    """
+    Create a history snapshot of current state (for undo/redo)
+
+    This captures the current composition state and saves it as a history entry.
+    Used before undoable mutations to enable undo/redo.
+    """
+    try:
+        # Capture current state
+        composition = composition_service.capture_composition_from_services(
+            composition_state_service=composition_state_service,
+            mixer_service=mixer_service,
+            effects_service=effects_service,
+            composition_id=composition_id
+        )
+
+        if not composition:
+            raise ResourceNotFoundError(f"Composition {composition_id} not found")
+
+        # Save with history entry
+        composition_service.save_composition(
+            composition=composition,
+            create_history=True,
+            is_autosave=False
+        )
+
+        logger.info(f"📸 Created history snapshot for composition {composition_id}")
+
+        return {
+            "status": "ok",
+            "message": f"Created history snapshot for {composition_id}",
+            "composition_id": composition_id
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Failed to create history snapshot: {e}")
+        raise ServiceError(f"Failed to create history snapshot: {str(e)}")
 
 
 @router.delete("/{composition_id}", response_model=CompositionDeletedResponse)
@@ -329,4 +376,153 @@ async def get_composition_chat_history(
     except Exception as e:
         logger.error(f"❌ Failed to get chat history: {e}")
         raise ServiceError(f"Failed to get chat history: {str(e)}")
+
+
+# ============================================================================
+# UNDO/REDO ENDPOINTS (BUILT-IN)
+# ============================================================================
+
+@router.post("/{composition_id}/undo")
+async def undo_composition(
+    composition_id: str,
+    composition_service: CompositionService = Depends(get_composition_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
+    mixer_service: MixerService = Depends(get_mixer_service),
+    effects_service: TrackEffectsService = Depends(get_track_effects_service),
+):
+    """
+    Undo to previous composition state
+
+    This uses the built-in undo stack in CompositionStateService.
+    Returns the full composition state so frontend can update all UI.
+    """
+    try:
+        # Undo to previous state
+        previous_state = composition_state_service.undo(composition_id)
+        if not previous_state:
+            raise ServiceError("Nothing to undo")
+
+        # Restore to all services
+        success = composition_service.restore_composition_to_services(
+            composition=previous_state,
+            composition_state_service=composition_state_service,
+            mixer_service=mixer_service,
+            effects_service=effects_service,
+            set_as_current=True
+        )
+
+        if not success:
+            raise ServiceError("Failed to restore composition to services")
+
+        # Auto-persist to current.json (no history entry)
+        composition_service.auto_persist_composition(
+            composition_id=composition_id,
+            composition_state_service=composition_state_service,
+            mixer_service=mixer_service,
+            effects_service=effects_service
+        )
+
+        # Get stack sizes for response
+        undo_size, redo_size = composition_state_service.get_undo_redo_sizes(composition_id)
+
+        logger.info(f"⏪ Undone composition {composition_id} (undo: {undo_size}, redo: {redo_size})")
+
+        return {
+            "status": "ok",
+            "message": "Undone successfully",
+            "composition": previous_state,
+            "can_undo": undo_size > 0,
+            "can_redo": redo_size > 0
+        }
+
+    except ServiceError:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to undo: {e}")
+        raise ServiceError(f"Failed to undo: {str(e)}")
+
+
+@router.post("/{composition_id}/redo")
+async def redo_composition(
+    composition_id: str,
+    composition_service: CompositionService = Depends(get_composition_service),
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
+    mixer_service: MixerService = Depends(get_mixer_service),
+    effects_service: TrackEffectsService = Depends(get_track_effects_service),
+):
+    """
+    Redo to next composition state
+
+    This uses the built-in redo stack in CompositionStateService.
+    Returns the full composition state so frontend can update all UI.
+    """
+    try:
+        # Redo to next state
+        next_state = composition_state_service.redo(composition_id)
+        if not next_state:
+            raise ServiceError("Nothing to redo")
+
+        # Restore to all services
+        success = composition_service.restore_composition_to_services(
+            composition=next_state,
+            composition_state_service=composition_state_service,
+            mixer_service=mixer_service,
+            effects_service=effects_service,
+            set_as_current=True
+        )
+
+        if not success:
+            raise ServiceError("Failed to restore composition to services")
+
+        # Auto-persist to current.json (no history entry)
+        composition_service.auto_persist_composition(
+            composition_id=composition_id,
+            composition_state_service=composition_state_service,
+            mixer_service=mixer_service,
+            effects_service=effects_service
+        )
+
+        # Get stack sizes for response
+        undo_size, redo_size = composition_state_service.get_undo_redo_sizes(composition_id)
+
+        logger.info(f"⏩ Redone composition {composition_id} (undo: {undo_size}, redo: {redo_size})")
+
+        return {
+            "status": "ok",
+            "message": "Redone successfully",
+            "composition": next_state,
+            "can_undo": undo_size > 0,
+            "can_redo": redo_size > 0
+        }
+
+    except ServiceError:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to redo: {e}")
+        raise ServiceError(f"Failed to redo: {str(e)}")
+
+
+@router.get("/{composition_id}/undo-redo-status")
+async def get_undo_redo_status(
+    composition_id: str,
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
+):
+    """
+    Get undo/redo availability status
+
+    Returns whether undo/redo are available for this composition.
+    """
+    try:
+        undo_size, redo_size = composition_state_service.get_undo_redo_sizes(composition_id)
+
+        return {
+            "can_undo": undo_size > 0,
+            "can_redo": redo_size > 0,
+            "undo_stack_size": undo_size,
+            "redo_stack_size": redo_size
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Failed to get undo/redo status: {e}")
+        raise ServiceError(f"Failed to get undo/redo status: {str(e)}")
 

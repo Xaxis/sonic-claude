@@ -12,7 +12,7 @@ from backend.core.dependencies import (
     get_mixer_service,
     get_track_effects_service,
 )
-from backend.services.persistence.composition_service import CompositionService
+from backend.services.daw.composition_service import CompositionService
 from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.mixer_service import MixerService
 from backend.services.daw.effects_service import TrackEffectsService
@@ -80,28 +80,22 @@ async def restore_version(
     """
     try:
         # Load the version
-        snapshot = composition_service.load_history_version(composition_id, version)
-        if not snapshot:
+        composition = composition_service.load_history_version(composition_id, version)
+        if not composition:
             raise ResourceNotFoundError(f"Version {version} not found for composition {composition_id}")
 
-        # Restore to services
-        success = composition_service.restore_snapshot_to_services(
-            snapshot=snapshot,
+        # Restore to services (in-memory only, don't save to current.json)
+        # This allows redo to work by keeping current.json as the "head" state
+        success = composition_service.restore_composition_to_services(
+            composition=composition,
             composition_state_service=composition_state_service,
             mixer_service=mixer_service,
-            effects_service=effects_service
+            effects_service=effects_service,
+            set_as_current=True
         )
 
         if not success:
-            raise ServiceError(f"Failed to restore snapshot to services")
-
-        # Save as current (creates new history entry)
-        composition_service.save_composition(
-            composition_id=composition_id,
-            snapshot=snapshot,
-            create_history=True,
-            is_autosave=False
-        )
+            raise ServiceError(f"Failed to restore composition to services")
 
         logger.info(f"⏮️ Restored composition {composition_id} to version {version}")
 
@@ -134,16 +128,17 @@ async def recover_from_autosave(
     """
     try:
         # Load autosave
-        snapshot = composition_service.load_composition(composition_id, use_autosave=True)
-        if not snapshot:
+        composition = composition_service.load_composition(composition_id, use_autosave=True)
+        if not composition:
             raise ResourceNotFoundError(f"No autosave found for composition {composition_id}")
 
         # Restore to services
-        success = composition_service.restore_snapshot_to_services(
-            snapshot=snapshot,
+        success = composition_service.restore_composition_to_services(
+            composition=composition,
             composition_state_service=composition_state_service,
             mixer_service=mixer_service,
-            effects_service=effects_service
+            effects_service=effects_service,
+            set_as_current=True
         )
 
         if not success:
@@ -151,8 +146,7 @@ async def recover_from_autosave(
 
         # Save as current (creates history entry)
         composition_service.save_composition(
-            composition_id=composition_id,
-            snapshot=snapshot,
+            composition=composition,
             create_history=True,
             is_autosave=False
         )

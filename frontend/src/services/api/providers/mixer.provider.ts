@@ -1,15 +1,15 @@
 /**
  * Mixer API Provider
- * Thin HTTP client mapping to /api/mixer/* routes
- * 
- * Backend routes:
- * - GET    /api/mixer/channels                           (channels.py)
- * - POST   /api/mixer/channels                           (channels.py)
- * - GET    /api/mixer/channels/{id}                      (channels.py)
- * - PATCH  /api/mixer/channels/{id}                      (channels.py)
- * - DELETE /api/mixer/channels/{id}                      (channels.py)
- * - GET    /api/mixer/master                             (master.py)
- * - PATCH  /api/mixer/master                             (master.py)
+ * Thin HTTP client mapping to /api/compositions/mixer/* routes
+ *
+ * Backend routes (backend/api/compositions/mixers.py):
+ * - GET    /api/compositions/mixer/channels
+ * - POST   /api/compositions/mixer/channels
+ * - GET    /api/compositions/mixer/channels/{id}
+ * - PATCH  /api/compositions/mixer/channels/{id}
+ * - DELETE /api/compositions/mixer/channels/{id}
+ * - GET    /api/compositions/mixer/master
+ * - PATCH  /api/compositions/mixer/master
  */
 
 import { BaseAPIClient } from "../base";
@@ -50,32 +50,32 @@ export interface UpdateMasterRequest {
 export class MixerProvider extends BaseAPIClient {
     // === CHANNELS ===
     async getChannels(): Promise<any[]> {
-        return this.get("/api/mixer/channels");
+        return this.get("/api/compositions/mixer/channels");
     }
 
     async createChannel(request: CreateChannelRequest): Promise<any> {
-        return this.post("/api/mixer/channels", request);
+        return this.post("/api/compositions/mixer/channels", request);
     }
 
     async getChannel(id: string): Promise<any> {
-        return this.get(`/api/mixer/channels/${id}`);
+        return this.get(`/api/compositions/mixer/channels/${id}`);
     }
 
     async updateChannel(id: string, request: UpdateChannelRequest): Promise<any> {
-        return this.patch(`/api/mixer/channels/${id}`, request);
+        return this.patch(`/api/compositions/mixer/channels/${id}`, request);
     }
 
     async deleteChannel(id: string): Promise<any> {
-        return this.delete(`/api/mixer/channels/${id}`);
+        return this.delete(`/api/compositions/mixer/channels/${id}`);
     }
 
     // === MASTER ===
     async getMaster(): Promise<any> {
-        return this.get("/api/mixer/master");
+        return this.get("/api/compositions/mixer/master");
     }
 
     async updateMaster(request: UpdateMasterRequest): Promise<any> {
-        return this.patch("/api/mixer/master", request);
+        return this.patch("/api/compositions/mixer/master", request);
     }
 }
 

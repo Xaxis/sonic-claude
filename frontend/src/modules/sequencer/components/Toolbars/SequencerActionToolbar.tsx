@@ -37,8 +37,8 @@ export function SequencerActionToolbar() {
     // Undo/Redo actions
     const undo = useDAWStore(state => state.undo);
     const redo = useDAWStore(state => state.redo);
-    const canUndo = useDAWStore(state => state.canUndo());
-    const canRedo = useDAWStore(state => state.canRedo());
+    const canUndo = useDAWStore(state => state.canUndo);
+    const canRedo = useDAWStore(state => state.canRedo);
 
     // Local dialog state
     const [showTrackTypeDialog, setShowTrackTypeDialog] = useState(false);

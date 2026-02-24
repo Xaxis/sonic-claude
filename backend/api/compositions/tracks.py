@@ -20,7 +20,7 @@ from backend.core.exceptions import (
     ServiceError,
 )
 from backend.services.daw.composition_state_service import CompositionStateService
-from backend.services.persistence.composition_service import CompositionService
+from backend.services.daw.composition_service import CompositionService
 from backend.services.daw.mixer_service import MixerService
 from backend.services.daw.effects_service import TrackEffectsService
 from backend.models.sequence import Track
@@ -77,6 +77,9 @@ async def create_track(
     This automatically persists the composition to disk after creation.
     """
     try:
+        # UNDO: Push current state to undo stack BEFORE mutation
+        composition_state_service.push_undo(composition_id)
+
         track = composition_state_service.create_track(
             composition_id=composition_id,
             name=request.name,
@@ -131,6 +134,9 @@ async def update_track(
 ):
     """Update track properties"""
     try:
+        # UNDO: Push current state to undo stack BEFORE mutation
+        composition_state_service.push_undo(composition_id)
+
         track = composition_state_service.update_track(
             composition_id=composition_id,
             track_id=track_id,
@@ -169,6 +175,9 @@ async def delete_track(
 ):
     """Delete a track from the composition"""
     try:
+        # UNDO: Push current state to undo stack BEFORE mutation
+        composition_state_service.push_undo(composition_id)
+
         success = composition_state_service.delete_track(track_id)
         if not success:
             raise ResourceNotFoundError(f"Track {track_id} not found")
@@ -205,6 +214,9 @@ async def update_track_mute(
 ):
     """Update track mute state"""
     try:
+        # UNDO: Push current state to undo stack BEFORE mutation
+        composition_state_service.push_undo(composition_id)
+
         success = composition_state_service.set_track_mute(composition_id, track_id, request.is_muted)
         if not success:
             raise ResourceNotFoundError(f"Track {track_id} not found in composition {composition_id}")
@@ -236,6 +248,9 @@ async def update_track_solo(
 ):
     """Update track solo state"""
     try:
+        # UNDO: Push current state to undo stack BEFORE mutation
+        composition_state_service.push_undo(composition_id)
+
         success = composition_state_service.set_track_solo(composition_id, track_id, request.is_solo)
         if not success:
             raise ResourceNotFoundError(f"Track {track_id} not found in composition {composition_id}")

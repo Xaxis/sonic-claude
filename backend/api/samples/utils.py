@@ -8,8 +8,7 @@ import os
 import json
 from fastapi import Depends
 
-from backend.core.dependencies import get_settings
-from backend.core.config import Settings
+from backend.core.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 

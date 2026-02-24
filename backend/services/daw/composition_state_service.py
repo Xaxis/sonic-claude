@@ -7,11 +7,20 @@ ARCHITECTURE:
 - Does NOT handle playback (that's PlaybackEngineService)
 - Persistence handled by CompositionService (save/load to disk)
 - ONE ID: composition_id (no separate sequence_id)
+
+UNDO/REDO SYSTEM (BUILT-IN):
+- Each composition has its own undo/redo stacks (in-memory only)
+- Before any mutation, push current state to undo stack
+- Undo pops from undo stack, pushes to redo stack
+- Redo pops from redo stack, pushes to undo stack
+- New mutation clears redo stack
+- Stacks are NOT persisted (cleared on app restart)
 """
 import logging
 import uuid
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
+from collections import deque
 
 from backend.models.composition import Composition
 from backend.models.sequence import (
@@ -33,15 +42,25 @@ class CompositionStateService:
     - Store compositions in memory (self.compositions dict)
     - CRUD operations for compositions, tracks, clips
     - Sample reference management
+    - Built-in undo/redo stacks per composition
     - Persistence handled by CompositionService
     - Playback handled by PlaybackEngineService
     """
 
-    def __init__(self) -> None:
-        """Initialize composition state service"""
+    def __init__(self, max_undo_stack_size: int = 50) -> None:
+        """Initialize composition state service
+
+        Args:
+            max_undo_stack_size: Maximum number of states to keep in undo/redo stacks
+        """
         # State storage (in-memory ONLY - persistence handled by CompositionService)
         self.compositions: Dict[str, Composition] = {}  # composition_id -> Composition
         self.current_composition_id: Optional[str] = None  # Active composition
+
+        # Undo/Redo stacks (built-in, per composition)
+        self.max_undo_stack_size = max_undo_stack_size
+        self.undo_stacks: Dict[str, deque[Composition]] = {}  # composition_id -> undo stack
+        self.redo_stacks: Dict[str, deque[Composition]] = {}  # composition_id -> redo stack
 
         # Callback for composition changes (for AI musical context analysis)
         self.on_composition_changed: Optional[callable] = None
@@ -409,4 +428,128 @@ class CompositionStateService:
                 return new_clip
 
         return None
+
+    # ========================================================================
+    # UNDO/REDO SYSTEM (BUILT-IN)
+    # ========================================================================
+
+    def push_undo(self, composition_id: str) -> None:
+        """
+        Push current composition state to undo stack (call BEFORE mutation)
+
+        This should be called before ANY undoable mutation.
+        It captures the current state and clears the redo stack.
+
+        Args:
+            composition_id: Composition ID
+        """
+        composition = self.compositions.get(composition_id)
+        if not composition:
+            logger.warning(f"⚠️ Cannot push undo: composition {composition_id} not found")
+            return
+
+        # Initialize stacks if needed
+        if composition_id not in self.undo_stacks:
+            self.undo_stacks[composition_id] = deque(maxlen=self.max_undo_stack_size)
+            self.redo_stacks[composition_id] = deque(maxlen=self.max_undo_stack_size)
+
+        # Push deep copy to undo stack
+        self.undo_stacks[composition_id].append(composition.model_copy(deep=True))
+
+        # Clear redo stack (new action invalidates redo history)
+        self.redo_stacks[composition_id].clear()
+
+        logger.debug(f"📚 Pushed to undo stack for {composition_id} (stack size: {len(self.undo_stacks[composition_id])})")
+
+    def undo(self, composition_id: str) -> Optional[Composition]:
+        """
+        Undo to previous state
+
+        Pops from undo stack, pushes current state to redo stack, and returns previous state.
+        The caller is responsible for restoring this state to all services.
+
+        Args:
+            composition_id: Composition ID
+
+        Returns:
+            Previous composition state, or None if nothing to undo
+        """
+        if composition_id not in self.undo_stacks or not self.undo_stacks[composition_id]:
+            logger.debug(f"⚠️ Nothing to undo for {composition_id}")
+            return None
+
+        current_composition = self.compositions.get(composition_id)
+        if not current_composition:
+            logger.error(f"❌ Current composition {composition_id} not found")
+            return None
+
+        # Pop from undo stack
+        previous_state = self.undo_stacks[composition_id].pop()
+
+        # Push current state to redo stack
+        self.redo_stacks[composition_id].append(current_composition.model_copy(deep=True))
+
+        # Update in-memory composition
+        self.compositions[composition_id] = previous_state.model_copy(deep=True)
+
+        logger.info(f"⏪ Undo for {composition_id} (undo: {len(self.undo_stacks[composition_id])}, redo: {len(self.redo_stacks[composition_id])})")
+
+        return previous_state
+
+    def redo(self, composition_id: str) -> Optional[Composition]:
+        """
+        Redo to next state
+
+        Pops from redo stack, pushes current state to undo stack, and returns next state.
+        The caller is responsible for restoring this state to all services.
+
+        Args:
+            composition_id: Composition ID
+
+        Returns:
+            Next composition state, or None if nothing to redo
+        """
+        if composition_id not in self.redo_stacks or not self.redo_stacks[composition_id]:
+            logger.debug(f"⚠️ Nothing to redo for {composition_id}")
+            return None
+
+        current_composition = self.compositions.get(composition_id)
+        if not current_composition:
+            logger.error(f"❌ Current composition {composition_id} not found")
+            return None
+
+        # Pop from redo stack
+        next_state = self.redo_stacks[composition_id].pop()
+
+        # Push current state to undo stack
+        self.undo_stacks[composition_id].append(current_composition.model_copy(deep=True))
+
+        # Update in-memory composition
+        self.compositions[composition_id] = next_state.model_copy(deep=True)
+
+        logger.info(f"⏩ Redo for {composition_id} (undo: {len(self.undo_stacks[composition_id])}, redo: {len(self.redo_stacks[composition_id])})")
+
+        return next_state
+
+    def can_undo(self, composition_id: str) -> bool:
+        """Check if undo is available for a composition"""
+        return composition_id in self.undo_stacks and len(self.undo_stacks[composition_id]) > 0
+
+    def can_redo(self, composition_id: str) -> bool:
+        """Check if redo is available for a composition"""
+        return composition_id in self.redo_stacks and len(self.redo_stacks[composition_id]) > 0
+
+    def clear_undo_redo(self, composition_id: str) -> None:
+        """Clear undo/redo stacks for a composition"""
+        if composition_id in self.undo_stacks:
+            self.undo_stacks[composition_id].clear()
+        if composition_id in self.redo_stacks:
+            self.redo_stacks[composition_id].clear()
+        logger.debug(f"🗑️ Cleared undo/redo stacks for {composition_id}")
+
+    def get_undo_redo_sizes(self, composition_id: str) -> Tuple[int, int]:
+        """Get (undo_size, redo_size) for a composition"""
+        undo_size = len(self.undo_stacks.get(composition_id, []))
+        redo_size = len(self.redo_stacks.get(composition_id, []))
+        return (undo_size, redo_size)
 

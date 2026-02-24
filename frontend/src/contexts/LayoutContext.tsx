@@ -11,9 +11,10 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { windowManager } from "@/services/window-manager";
-import { statePersistence } from "@/services/state-persistence/state-persistence.service";
 import { DEFAULT_LAYOUT_STATE, BROADCAST_KEYS } from "@/config/layout.config";
 import type { GridLayoutItem, PanelAttachment } from "@/types/grid-layout";
+
+const LAYOUT_STORAGE_KEY = 'sonic-claude-layout';
 
 export interface TabConfig {
     id: string;
@@ -87,19 +88,24 @@ const LayoutContext = createContext<LayoutContextValue | undefined>(undefined);
 
 export function LayoutProvider({ children }: { children: ReactNode }) {
     const [state, setState] = useState<LayoutState>(() => {
-        // Load from localStorage via centralized service
-        const stored = statePersistence.getLayout<any>();
-        if (stored) {
-            // Validate that we have tabs
-            if (stored.tabs && Array.isArray(stored.tabs) && stored.tabs.length > 0) {
-                // IMPORTANT: Clear poppedOutTabs on page load since windows are closed
-                // Popout windows will re-register themselves if they're still open
-                return {
-                    ...stored,
-                    poppedOutTabs: new Set(), // Always start with no popouts
-                };
-            } else {
-                console.warn("Stored layout has no tabs, using defaults");
+        // Load from localStorage
+        const storedStr = localStorage.getItem(LAYOUT_STORAGE_KEY);
+        if (storedStr) {
+            try {
+                const stored = JSON.parse(storedStr);
+                // Validate that we have tabs
+                if (stored.tabs && Array.isArray(stored.tabs) && stored.tabs.length > 0) {
+                    // IMPORTANT: Clear poppedOutTabs on page load since windows are closed
+                    // Popout windows will re-register themselves if they're still open
+                    return {
+                        ...stored,
+                        poppedOutTabs: new Set(), // Always start with no popouts
+                    };
+                } else {
+                    console.warn("Stored layout has no tabs, using defaults");
+                }
+            } catch (error) {
+                console.error("Failed to parse stored layout:", error);
             }
         }
 
@@ -123,7 +129,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
             ...state,
             poppedOutTabs: Array.from(state.poppedOutTabs),
         };
-        statePersistence.setLayout(toStore);
+        localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(toStore));
     }, [state]);
 
     // Sync state across windows via WindowManager

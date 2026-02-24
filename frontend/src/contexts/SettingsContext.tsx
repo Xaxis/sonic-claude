@@ -5,7 +5,8 @@
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
-import { statePersistence } from "@/services/state-persistence/state-persistence.service";
+
+const SETTINGS_STORAGE_KEY = 'sonic-claude-settings';
 
 export interface AudioSettings {
     sampleRate: number;
@@ -82,17 +83,22 @@ const SettingsContext = createContext<SettingsContextValue | undefined>(undefine
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
     const [settings, setSettings] = useState<Settings>(() => {
-        // Load from localStorage via centralized service
-        const stored = statePersistence.getSettings<Settings>();
-        if (stored) {
-            return { ...DEFAULT_SETTINGS, ...stored };
+        // Load from localStorage
+        const storedStr = localStorage.getItem(SETTINGS_STORAGE_KEY);
+        if (storedStr) {
+            try {
+                const stored = JSON.parse(storedStr);
+                return { ...DEFAULT_SETTINGS, ...stored };
+            } catch (error) {
+                console.error("Failed to parse stored settings:", error);
+            }
         }
         return DEFAULT_SETTINGS;
     });
 
     // Save to localStorage whenever settings change
     useEffect(() => {
-        statePersistence.setSettings(settings);
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     }, [settings]);
 
     const updateAudioSettings = useCallback((updates: Partial<AudioSettings>) => {

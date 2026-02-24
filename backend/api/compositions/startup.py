@@ -13,7 +13,7 @@ from backend.core.dependencies import (
     get_track_effects_service,
     get_ai_agent_service,
 )
-from backend.services.persistence.composition_service import CompositionService
+from backend.services.daw.composition_service import CompositionService
 from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.mixer_service import MixerService
 from backend.services.daw.effects_service import TrackEffectsService

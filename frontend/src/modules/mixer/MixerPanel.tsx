@@ -8,8 +8,8 @@
 import { useEffect } from "react";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { useDAWStore } from "@/stores/dawStore";
-import { MixerToolbar } from "./components/Toolbar/MixerToolbar";
-import { MixerChannelList } from "@/modules/mixer/components/Layouts/MixerChannelList";
+import { MixerToolbar } from "@/modules/mixer/components/Toolbars/MixerToolbar";
+import { MixerChannelList } from "@/modules/mixer/components/Channel/MixerChannelList.tsx";
 
 export function MixerPanel() {
     // Get mixer actions from Zustand store

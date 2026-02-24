@@ -21,11 +21,9 @@ Usage:
         return await synthesis_service.create_synth(...)
 """
 import logging
-import asyncio
 from typing import Optional
-from fastapi import Depends
 
-from backend.core.config import Settings, get_settings
+from backend.core.config import Settings
 from backend.core.engine_manager import AudioEngineManager
 
 # Audio services (core audio infrastructure)
@@ -53,7 +51,7 @@ from backend.services.ai.action_executor_service import DAWActionService
 from backend.services.ai.agent_service import AIAgentService
 
 # Persistence services
-from backend.services.persistence.composition_service import CompositionService
+from backend.services.daw.composition_service import CompositionService
 
 # WebSocket services
 from backend.services.websocket import WebSocketManager

@@ -9,22 +9,19 @@ import uuid
 import subprocess
 from datetime import datetime
 from typing import List, Optional
-from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from backend.core.dependencies import (
-    get_settings,
     get_composition_state_service,
     get_composition_service,
     get_mixer_service,
     get_track_effects_service
 )
-from backend.core.config import Settings
 from backend.core.exceptions import SampleNotFoundError, SampleInUseError, ServiceError
 from backend.services.daw.composition_state_service import CompositionStateService
-from backend.services.persistence.composition_service import CompositionService
+from backend.services.daw.composition_service import CompositionService
 from backend.services.daw.mixer_service import MixerService
 from backend.services.daw.effects_service import TrackEffectsService
 from .utils import get_samples_dir, get_metadata_file, load_metadata, save_metadata
@@ -243,6 +240,11 @@ async def update_sample(
         metadata = load_metadata(metadata_file)
         if sample_id not in metadata:
             raise SampleNotFoundError(sample_id)
+
+        # UNDO: Push current state to undo stack BEFORE mutation (for all affected compositions)
+        if name is not None:
+            for composition in composition_state_service.compositions.values():
+                composition_state_service.push_undo(composition.id)
 
         if name is not None:
             metadata[sample_id]["name"] = name
