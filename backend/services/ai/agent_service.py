@@ -506,14 +506,14 @@ Execute now."""
     def _build_instruments_list(self) -> str:
         """Build formatted list of available instruments from SYNTHDEF_REGISTRY"""
         # Lazy import to avoid circular dependency
-        from backend.api.sequencer.synthdefs import SYNTHDEF_REGISTRY
+        from backend.services.daw.synthdef_registry import SYNTHDEF_REGISTRY
 
         categories = {}
         for synth in SYNTHDEF_REGISTRY:
-            cat = synth.category
+            cat = synth["category"]
             if cat not in categories:
                 categories[cat] = []
-            categories[cat].append(f"  • {synth.name} - {synth.description}")
+            categories[cat].append(f"  • {synth['name']} - {synth['description']}")
 
         lines = []
         for cat in sorted(categories.keys()):

@@ -76,7 +76,7 @@ class DAWStateService:
             return
 
         if self.composition_state.current_composition_id:
-            composition = self.composition_state.compositions.get(self.composition_state.current_composition_id)
+            composition = self.composition_state.get_composition(self.composition_state.current_composition_id)
             if composition:
                 context = self.musical_context_analyzer.analyze_sequence(composition)
                 self.update_musical_context(context)
@@ -136,39 +136,27 @@ class DAWStateService:
     
     def _build_snapshot(self, detail: StateDetailLevel) -> DAWStateSnapshot:
         """Build state snapshot from current services"""
-        # Get playback state
-        playback = self.composition_state.get_playback_state()
+        # Get current composition (if any)
+        composition = None
+        if self.composition_state.current_composition_id:
+            composition = self.composition_state.get_composition(self.composition_state.current_composition_id)
 
-        # Get current sequence (if any)
-        # Priority: 1) Currently playing sequence, 2) Most recently modified, 3) First available
+        # Build playback state from composition
+        is_playing = composition.is_playing if composition else False
+        position = composition.current_position if composition else 0.0
+        tempo = composition.tempo if composition else 120.0
+
+        # Convert composition to compact sequence format
         sequence = None
-        sequence_id = None
-
-        if playback["current_sequence"]:
-            # Use currently playing sequence
-            sequence_id = playback["current_sequence"]
-        elif self.composition_state.sequences:
-            # Not playing - get most recently modified sequence
-            # Sort by updated_at timestamp (most recent first)
-            sorted_sequences = sorted(
-                self.composition_state.sequences.items(),
-                key=lambda x: x[1].updated_at if hasattr(x[1], 'updated_at') else datetime.min,
-                reverse=True
-            )
-            if sorted_sequences:
-                sequence_id = sorted_sequences[0][0]
-
-        if sequence_id:
-            comp_data = self.composition_state.compositions.get(sequence_id)
-            if comp_data:
-                sequence = self._convert_sequence(comp_data, detail)
+        if composition:
+            sequence = self._convert_sequence(composition, detail)
 
         # Build snapshot
         snapshot = DAWStateSnapshot(
             timestamp=datetime.now(),
-            playing=playback["is_playing"],
-            position=playback["playhead_position"],
-            tempo=playback["tempo"],
+            playing=is_playing,
+            position=position,
+            tempo=tempo,
             sequence=sequence,
             audio=self._audio_features if detail.include_audio_analysis else None,
             musical=self._musical_context if detail.include_musical_analysis else None

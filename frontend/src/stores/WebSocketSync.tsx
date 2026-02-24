@@ -13,7 +13,7 @@ import { useTransportWebSocket } from '@/hooks/useTransportWebsocket';
 import { useMeterWebSocket } from '@/hooks/useMeterWebsocket';
 import { useSpectrumWebSocket } from '@/hooks/useSpectrumWebsocket';
 import { useWaveformWebSocket } from '@/hooks/useWaveformWebsocket';
-import { useAnalyticsWebSocket } from '@/hooks/useAnalyticsWebsocket';
+// import { useAnalyticsWebSocket } from '@/hooks/useAnalyticsWebsocket'; // TODO: Implement backend endpoint
 
 export function WebSocketSync() {
     // WebSocket hooks
@@ -21,14 +21,14 @@ export function WebSocketSync() {
     const { meters } = useMeterWebSocket();
     const { spectrum } = useSpectrumWebSocket();
     const { waveform } = useWaveformWebSocket();
-    const { analytics } = useAnalyticsWebSocket();
-    
+    // const { analytics } = useAnalyticsWebSocket(); // TODO: Implement backend endpoint
+
     // Zustand store actions
     const setTransport = useDAWStore((state) => state.setTransport);
     const setMeters = useDAWStore((state) => state.setMeters);
     const setSpectrum = useDAWStore((state) => state.setSpectrum);
     const setWaveform = useDAWStore((state) => state.setWaveform);
-    const setAnalytics = useDAWStore((state) => state.setAnalytics);
+    // const setAnalytics = useDAWStore((state) => state.setAnalytics); // TODO: Implement backend endpoint
     
     // Sync transport data
     useEffect(() => {
@@ -57,14 +57,15 @@ export function WebSocketSync() {
             setWaveform(waveform);
         }
     }, [waveform, setWaveform]);
-    
+
     // Sync analytics data
-    useEffect(() => {
-        if (analytics) {
-            setAnalytics(analytics);
-        }
-    }, [analytics, setAnalytics]);
-    
+    // TODO: Implement backend endpoint
+    // useEffect(() => {
+    //     if (analytics) {
+    //         setAnalytics(analytics);
+    //     }
+    // }, [analytics, setAnalytics]);
+
     // No UI - just sync
     return null;
 }
