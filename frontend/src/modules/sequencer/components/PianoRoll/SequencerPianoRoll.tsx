@@ -17,7 +17,6 @@ import { IconButton } from "@/components/ui/icon-button.tsx";
 import { SequencerPianoRollSection } from "../../layouts/SequencerPianoRollSection.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import type { MIDIEvent } from "../../types.ts";
-import { api } from "@/services/api";
 
 interface SequencerPianoRollProps {
     // Clip data (read-only props)
@@ -33,38 +32,29 @@ interface SequencerPianoRollProps {
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
 }
 
-const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-
 export function SequencerPianoRoll({
     clipId,
     clipName,
-    clipDuration,
-    clipStartTime,
     midiEvents,
-    totalBeats,
-    instrument,
     pianoRollScrollRef,
 }: SequencerPianoRollProps) {
     // ========================================================================
-    // STATE: Read directly from Zustand store
+    // STATE: Read from Zustand store
     // ========================================================================
-    const snapEnabled = useDAWStore(state => state.snapEnabled);
-    const gridSize = useDAWStore(state => state.gridSize);
-    const zoom = useDAWStore(state => state.zoom);
-    const transport = useDAWStore(state => state.transport);
-    const activeNotes = transport?.active_notes || [];
-    const currentPosition = transport?.position_beats || 0;
-    const isPlaying = transport?.is_playing || false;
+    const clips = useDAWStore(state => state.clips);
 
     // ========================================================================
     // ACTIONS: Get directly from Zustand store
     // ========================================================================
     const closePianoRoll = useDAWStore(state => state.closePianoRoll);
     const updateClip = useDAWStore(state => state.updateClip);
-    const seek = useDAWStore(state => state.seek);
-    const setLoopStart = useDAWStore(state => state.setLoopStart);
-    const setLoopEnd = useDAWStore(state => state.setLoopEnd);
-    const setPianoRollScrollLeft = useDAWStore(state => state.setPianoRollScrollLeft);
+
+    // ========================================================================
+    // DERIVED STATE: Get clip data for header display
+    // ========================================================================
+    const clip = clips.find(c => c.id === clipId);
+    const clipStartTime = clip?.start_time || 0;
+    const clipDuration = clip?.duration || 0;
 
     // ========================================================================
     // LOCAL UI STATE (not persisted to store)
@@ -73,101 +63,8 @@ export function SequencerPianoRoll({
     const [copiedNotes, setCopiedNotes] = useState<MIDIEvent[]>([]);
 
     // ========================================================================
-    // PIANO ROLL SETTINGS
+    // HANDLERS: Local UI state management only
     // ========================================================================
-    const minPitch = 21; // A0 - Full piano range
-    const maxPitch = 108; // C8
-    const pixelsPerBeat = 40; // Base pixels per beat
-    const beatWidth = pixelsPerBeat * zoom; // Apply piano roll zoom
-    const noteHeight = 20; // pixels per note row (taller for better clicking)
-
-    const getNoteName = (pitch: number): string => {
-        const octave = Math.floor(pitch / 12) - 1;
-        const noteName = NOTE_NAMES[pitch % 12];
-        return `${noteName}${octave}`;
-    };
-
-    // ========================================================================
-    // HANDLERS: Call Zustand actions directly
-    // ========================================================================
-    const handlePianoRollScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        const scrollLeft = e.currentTarget.scrollLeft;
-        setPianoRollScrollLeft(scrollLeft);
-    };
-
-    const handleAddNote = async (pitch: number, startTime: number) => {
-        const newNote: MIDIEvent = {
-            note: pitch,
-            note_name: getNoteName(pitch),
-            start_time: snapEnabled ? Math.round(startTime * gridSize) / gridSize : startTime,
-            duration: snapEnabled ? 1 / gridSize : 0.25,
-            velocity: 100,
-            channel: 0,
-        };
-        await updateClip(clipId, { midi_events: [...midiEvents, newNote] });
-
-        // Preview the note
-        try {
-            await api.audio.previewNote({
-                note: pitch,
-                velocity: 100,
-                duration: 0.5,
-                synthdef: instrument || "sine"
-            });
-        } catch (error) {
-            console.error("Failed to preview note:", error);
-        }
-    };
-
-    const handleMoveNote = async (index: number, newStartTime: number, newPitch: number) => {
-        const updatedNotes = [...midiEvents];
-        const oldPitch = updatedNotes[index].note;
-        updatedNotes[index] = {
-            ...updatedNotes[index],
-            note: newPitch,
-            note_name: getNoteName(newPitch),
-            start_time: snapEnabled ? Math.round(newStartTime * gridSize) / gridSize : newStartTime,
-        };
-        await updateClip(clipId, { midi_events: updatedNotes });
-
-        // Preview the note only if pitch changed
-        if (newPitch !== oldPitch) {
-            try {
-                await api.audio.previewNote({
-                    note: newPitch,
-                    velocity: updatedNotes[index].velocity,
-                    duration: 0.5,
-                    synthdef: instrument || "sine"
-                });
-            } catch (error) {
-                console.error("Failed to preview note:", error);
-            }
-        }
-    };
-
-    const handleResizeNote = async (index: number, newDuration: number) => {
-        const updatedNotes = [...midiEvents];
-        updatedNotes[index] = {
-            ...updatedNotes[index],
-            duration: Math.max(0.0625, snapEnabled ? Math.round(newDuration * gridSize) / gridSize : newDuration),
-        };
-        await updateClip(clipId, { midi_events: updatedNotes });
-    };
-
-    const handleUpdateVelocity = async (index: number, newVelocity: number) => {
-        const updatedNotes = [...midiEvents];
-        updatedNotes[index] = {
-            ...updatedNotes[index],
-            velocity: Math.max(1, Math.min(127, Math.round(newVelocity))),
-        };
-        await updateClip(clipId, { midi_events: updatedNotes });
-    };
-
-    const handleDeleteNote = async (index: number) => {
-        await updateClip(clipId, { midi_events: midiEvents.filter((_, i) => i !== index) });
-        setSelectedNotes(new Set(Array.from(selectedNotes).filter(i => i !== index)));
-    };
-
     const handleDeleteSelected = async () => {
         await updateClip(clipId, { midi_events: midiEvents.filter((_, i) => !selectedNotes.has(i)) });
         setSelectedNotes(new Set());
@@ -255,32 +152,13 @@ export function SequencerPianoRoll({
                 </div>
             </div>
 
-            {/* Piano Roll Content - Use dedicated layout component */}
+            {/* Piano Roll Content - Pure layout component */}
             <SequencerPianoRollSection
-                notes={midiEvents}
-                selectedNotes={selectedNotes}
-                minPitch={minPitch}
-                maxPitch={maxPitch}
-                noteHeight={noteHeight}
-                clipStartTime={clipStartTime}
-                clipDuration={clipDuration}
-                totalBeats={totalBeats}
-                beatWidth={beatWidth}
-                instrument={instrument}
                 clipId={clipId}
-                activeNotes={activeNotes}
-                currentPosition={currentPosition}
-                isPlaying={isPlaying}
-                pixelsPerBeat={pixelsPerBeat}
                 pianoRollScrollRef={pianoRollScrollRef}
-                onPianoRollScroll={handlePianoRollScroll}
-                onAddNote={handleAddNote}
-                onMoveNote={handleMoveNote}
-                onResizeNote={handleResizeNote}
-                onUpdateVelocity={handleUpdateVelocity}
-                onDeleteNote={handleDeleteNote}
-                onSelectNote={(index) => setSelectedNotes(new Set([index]))}
-                onToggleSelectNote={(index) => {
+                selectedNotes={selectedNotes}
+                onSelectNote={(index: number) => setSelectedNotes(new Set([index]))}
+                onToggleSelectNote={(index: number) => {
                     const newSelected = new Set(selectedNotes);
                     if (newSelected.has(index)) {
                         newSelected.delete(index);
@@ -289,9 +167,6 @@ export function SequencerPianoRoll({
                     }
                     setSelectedNotes(newSelected);
                 }}
-                onSeek={seek}
-                onLoopStartChange={setLoopStart}
-                onLoopEndChange={setLoopEnd}
             />
         </div>
     );

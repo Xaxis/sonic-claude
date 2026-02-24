@@ -3,7 +3,8 @@
  *
  * REFACTORED: Pure layout component using Zustand best practices
  * - No prop drilling - child components read from store directly
- * - Only manages local UI state (expandedTracks)
+ * - Only manages local UI state
+ * @TODO - Investigate why drag state is still being prop drilled here
  * - Only receives scroll ref and drag state callback
  *
  * Shared layout component for timeline + track list.

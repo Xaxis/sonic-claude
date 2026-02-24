@@ -1,9 +1,11 @@
 /**
  * SequencerPianoRollSection Component
  *
- * Shared layout component for piano roll keyboard + grid.
- * Matches the architecture of SequencerTimelineSection.
- * Uses SequencerContext for state management.
+ * REFACTORED: Pure layout component matching SequencerTimelineSection architecture
+ * - Only receives clipId and scroll ref
+ * - Reads all data from Zustand store
+ * - Manages selectedNotes as local state (like SequencerTimelineSection manages expandedTracks)
+ * - Calls Zustand actions directly
  *
  * Architecture:
  * - Piano keyboard (left): Fixed width, absolutely positioned, no scrollbar
@@ -11,94 +13,53 @@
  * - Keyboard vertical scroll is synced with grid vertical scroll
  */
 
-import React from "react";
 import { SequencerPianoRollKeyboard } from "../components/PianoRoll/SequencerPianoRollKeyboard.tsx";
 import { SequencerPianoRollGrid } from "../components/PianoRoll/SequencerPianoRollGrid.tsx";
 import { SequencerPianoRollRuler } from "../components/PianoRoll/SequencerPianoRollRuler.tsx";
 import { SequencerTimelineLoopRegion } from "../components/Timeline/SequencerTimelineLoopRegion.tsx";
 import { useDAWStore } from '@/stores/dawStore';
+import { useTimelineCalculations } from "../hooks/useTimelineCalculations.ts";
 import { SequencerGridLayout } from "./SequencerGridLayout.tsx";
-import type { MIDIEvent } from "../types";
-import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
 interface SequencerPianoRollSectionProps {
-    // Data
-    notes: MIDIEvent[];
-    selectedNotes: Set<number>;
+    // Clip to display
+    clipId: string;
 
-    // Piano roll settings
-    minPitch: number;
-    maxPitch: number;
-    noteHeight: number;
-    clipStartTime: number;
-    clipDuration: number;
-    totalBeats: number;
-    beatWidth: number;
-    instrument?: string; // Instrument/synthdef for note preview
-    clipId: string; // Clip ID for matching active notes
-    activeNotes?: ActiveNote[]; // Currently playing notes for visual feedback
-
-    // Playback state (for ruler) - from WebSocket/AudioEngine, not from Context
-    currentPosition: number;
-    isPlaying: boolean;
-    pixelsPerBeat: number;
-
-    // Scroll
+    // Scroll ref
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
-    onPianoRollScroll: (e: React.UIEvent<HTMLDivElement>) => void;
 
-    // Note handlers
-    onAddNote: (pitch: number, startTime: number) => void;
-    onMoveNote: (index: number, newStartTime: number, newPitch: number) => void;
-    onResizeNote: (index: number, newDuration: number) => void;
-    onUpdateVelocity: (index: number, newVelocity: number) => void;
-    onDeleteNote: (index: number) => void;
+    // Local UI state callbacks (selectedNotes is managed by parent for copy/paste functionality)
+    selectedNotes: Set<number>;
     onSelectNote: (index: number) => void;
     onToggleSelectNote: (index: number) => void;
-    onSeek?: (position: number, triggerAudio?: boolean) => void;
-    onLoopStartChange: (start: number) => void;
-    onLoopEndChange: (end: number) => void;
 }
 
-export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps) {
-    const {
-        notes,
-        selectedNotes,
-        minPitch,
-        maxPitch,
-        noteHeight,
-        clipStartTime,
-        clipDuration,
-        totalBeats,
-        beatWidth,
-        instrument,
-        clipId,
-        activeNotes,
-        currentPosition,
-        isPlaying,
-        pixelsPerBeat,
-        pianoRollScrollRef,
-        onPianoRollScroll,
-        onAddNote,
-        onMoveNote,
-        onResizeNote,
-        onUpdateVelocity,
-        onDeleteNote,
-        onSelectNote,
-        onToggleSelectNote,
-        onSeek,
-        onLoopStartChange,
-        onLoopEndChange,
-    } = props;
+export function SequencerPianoRollSection({
+    clipId,
+    pianoRollScrollRef,
+    selectedNotes,
+    onSelectNote,
+    onToggleSelectNote,
+}: SequencerPianoRollSectionProps) {
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
+    const setLoopStart = useDAWStore(state => state.setLoopStart);
+    const setLoopEnd = useDAWStore(state => state.setLoopEnd);
+    const setPianoRollScrollLeft = useDAWStore(state => state.setPianoRollScrollLeft);
 
-    // Get state from Zustand store
-    const snapEnabled = useDAWStore(state => state.snapEnabled);
-    const gridSize = useDAWStore(state => state.gridSize);
-    const zoom = useDAWStore(state => state.zoom);
+    // ========================================================================
+    // SHARED TIMELINE CALCULATIONS: Use the same hook as timeline for consistency!
+    // ========================================================================
+    const { pixelsPerBeat, totalWidth } = useTimelineCalculations();
 
-    // Calculate total width for ruler
-    // Add extra width to ensure content extends beyond viewport for smooth scrolling
-    const totalWidth = totalBeats * beatWidth + 1000;
+    // ========================================================================
+    // HANDLERS
+    // ========================================================================
+    const handlePianoRollScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const scrollLeft = e.currentTarget.scrollLeft;
+        setPianoRollScrollLeft(scrollLeft);
+    };
 
     return (
         <SequencerGridLayout
@@ -108,47 +69,18 @@ export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps)
                 </span>
             }
             ruler={
-                <SequencerPianoRollRuler
-                    totalBeats={totalBeats}
-                    currentPosition={currentPosition}
-                    isPlaying={isPlaying}
-                    zoom={zoom}
-                    pixelsPerBeat={pixelsPerBeat}
-                    totalWidth={totalWidth}
-                    snapEnabled={snapEnabled}
-                    gridSize={gridSize}
-                    onSeek={onSeek}
-                />
+                <SequencerPianoRollRuler />
             }
             sidebar={
                 <SequencerPianoRollKeyboard
-                    minPitch={minPitch}
-                    maxPitch={maxPitch}
-                    noteHeight={noteHeight}
-                    instrument={instrument}
+                    clipId={clipId}
                 />
             }
             mainContent={
                 <div className="relative">
                     <SequencerPianoRollGrid
-                        notes={notes}
-                        selectedNotes={selectedNotes}
-                        minPitch={minPitch}
-                        maxPitch={maxPitch}
-                        clipStartTime={clipStartTime}
-                        clipDuration={clipDuration}
-                        totalBeats={totalBeats}
-                        beatWidth={beatWidth}
-                        noteHeight={noteHeight}
-                        snapEnabled={snapEnabled}
-                        gridSize={gridSize}
                         clipId={clipId}
-                        activeNotes={activeNotes}
-                        onAddNote={onAddNote}
-                        onMoveNote={onMoveNote}
-                        onResizeNote={onResizeNote}
-                        onUpdateVelocity={onUpdateVelocity}
-                        onDeleteNote={onDeleteNote}
+                        selectedNotes={selectedNotes}
                         onSelectNote={onSelectNote}
                         onToggleSelectNote={onToggleSelectNote}
                     />
@@ -156,8 +88,8 @@ export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps)
                     {/* Loop Region - Overlaid on grid */}
                     <SequencerTimelineLoopRegion
                         pixelsPerBeat={pixelsPerBeat}
-                        onLoopStartChange={onLoopStartChange}
-                        onLoopEndChange={onLoopEndChange}
+                        onLoopStartChange={setLoopStart}
+                        onLoopEndChange={setLoopEnd}
                     />
                 </div>
             }
@@ -165,7 +97,7 @@ export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps)
             headerHeight={32}
             contentWidth={totalWidth}
             scrollRef={pianoRollScrollRef}
-            onScroll={onPianoRollScroll}
+            onScroll={handlePianoRollScroll}
             rulerScrollDataAttr="data-piano-ruler-scroll"
             sidebarScrollDataAttr="data-piano-keyboard"
         />

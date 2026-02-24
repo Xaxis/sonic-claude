@@ -1,45 +1,46 @@
 /**
  * SequencerPianoRollRuler - Timeline ruler for piano roll
  *
- * Displays beat/measure markers and playhead position.
- * Follows the same pattern as SequencerTimelineRuler and SampleEditorRuler.
+ * REFACTORED: Pure component that reads everything from Zustand
+ * - Reads ALL state from Zustand (composition, transport, settings)
+ * - Calls seek() action directly
+ * - No props needed!
  */
 
 import { useEffect, useRef, useState } from "react";
 import { useDAWStore } from '@/stores/dawStore';
+import { useTimelineCalculations } from '../../hooks/useTimelineCalculations.ts';
 
-interface RulerMarker {
-    beat: number;
-    x: number;
-    isMeasure: boolean;
-    label: string;
-}
+
 
 interface SequencerPianoRollRulerProps {
-    totalBeats: number; // Total composition length in beats
-    currentPosition: number; // Current playback position in beats
-    isPlaying: boolean;
-    zoom: number;
-    pixelsPerBeat: number;
-    totalWidth: number;
-    snapEnabled: boolean;
-    gridSize: number;
-    onSeek?: (position: number, triggerAudio?: boolean) => void;
+    // No props needed - reads everything from Zustand!
 }
 
-export function SequencerPianoRollRuler({
-    totalBeats,
-    currentPosition,
-    isPlaying,
-    zoom,
-    pixelsPerBeat,
-    totalWidth,
-    snapEnabled,
-    gridSize,
-    onSeek,
-}: SequencerPianoRollRulerProps) {
-    // Get isPaused from transport WebSocket state
+export function SequencerPianoRollRuler({}: SequencerPianoRollRulerProps) {
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
+    const snapEnabled = useDAWStore(state => state.snapEnabled);
+    const gridSize = useDAWStore(state => state.gridSize);
     const transport = useDAWStore(state => state.transport);
+
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
+    const seek = useDAWStore(state => state.seek);
+
+    // ========================================================================
+    // SHARED TIMELINE CALCULATIONS: Use the same hook as timeline for consistency!
+    // ========================================================================
+    const { pixelsPerBeat, totalWidth, rulerMarkers, zoom } = useTimelineCalculations();
+    const beatWidth = pixelsPerBeat * zoom;
+
+    // ========================================================================
+    // DERIVED STATE
+    // ========================================================================
+    const currentPosition = transport?.position_beats || 0;
+    const isPlaying = transport?.is_playing || false;
     const isPaused = transport?.is_paused ?? false;
 
     const playheadRef = useRef<HTMLDivElement>(null);
@@ -47,29 +48,10 @@ export function SequencerPianoRollRuler({
     const [draggedPlayheadPosition, setDraggedPlayheadPosition] = useState<number | null>(null);
     const dragStartXRef = useRef<number>(0);
     const dragStartValueRef = useRef<number>(0);
-    const beatsPerMeasure = 4;
-    const beatWidth = pixelsPerBeat * zoom;
 
-    // Generate ruler markers
-    const rulerMarkers: RulerMarker[] = [];
-    const totalBeatsToShow = Math.ceil(totalBeats) + 1;
-
-    for (let beat = 0; beat <= totalBeatsToShow; beat++) {
-        const x = beat * beatWidth;
-        const isMeasure = beat % beatsPerMeasure === 0;
-        const measure = Math.floor(beat / beatsPerMeasure) + 1;
-
-        rulerMarkers.push({
-            beat,
-            x,
-            isMeasure,
-            label: isMeasure ? `${measure}` : "",
-        });
-    }
-
-    // Calculate playhead position
+    // Calculate playhead position (rulerMarkers come from useTimelineCalculations hook)
     const displayPosition = draggedPlayheadPosition !== null ? draggedPlayheadPosition : currentPosition;
-    const playheadX = displayPosition * beatWidth;
+    const playheadX = displayPosition * pixelsPerBeat * zoom;
 
     // Store latest values in refs to avoid animation loop restarts
     const currentPositionRef = useRef(currentPosition);
@@ -110,7 +92,7 @@ export function SequencerPianoRollRuler({
     }, [isPlaying, isPaused, isDraggingPlayhead, draggedPlayheadPosition]);
 
     const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!onSeek || isDraggingPlayhead) return;
+        if (isDraggingPlayhead) return;
 
         const rect = e.currentTarget.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -122,7 +104,7 @@ export function SequencerPianoRollRuler({
             : clickedBeat;
 
         // Click to seek - trigger audio once at the clicked position
-        onSeek(Math.max(0, snappedBeat), true);
+        seek(Math.max(0, snappedBeat), true);
     };
 
     const handlePlayheadMouseDown = (e: React.MouseEvent) => {
@@ -159,9 +141,7 @@ export function SequencerPianoRollRuler({
             newValue = Math.max(0, newValue);
 
             // Call seek API once on mouse up
-            if (onSeek) {
-                onSeek(newValue, true);
-            }
+            seek(newValue, true);
 
             setIsDraggingPlayhead(false);
             setDraggedPlayheadPosition(null);
@@ -174,7 +154,7 @@ export function SequencerPianoRollRuler({
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [isDraggingPlayhead, currentPosition, beatWidth, snapEnabled, gridSize, onSeek]);
+    }, [isDraggingPlayhead, currentPosition, beatWidth, snapEnabled, gridSize, seek]);
 
     return (
         <div

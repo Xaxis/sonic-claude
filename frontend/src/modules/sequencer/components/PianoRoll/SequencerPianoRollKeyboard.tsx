@@ -1,29 +1,47 @@
 /**
  * SequencerPianoRollKeyboard - Piano keyboard display for piano roll
  *
- * Shows piano keys from minPitch to maxPitch with visual distinction between white and black keys.
- * Click keys to preview notes.
+ * REFACTORED: Pure component that reads everything from Zustand
+ * - Reads clip data from Zustand to get instrument
+ * - Uses constants for minPitch, maxPitch, noteHeight
+ * - Only receives clipId
  */
 
 import { useState } from "react";
 import { cn } from "@/lib/utils.ts";
 import { api } from "@/services/api";
+import { useDAWStore } from "@/stores/dawStore";
 
 interface SequencerPianoRollKeyboardProps {
-    minPitch: number; // MIDI note number (e.g., 36 = C2)
-    maxPitch: number; // MIDI note number (e.g., 96 = C7)
-    noteHeight: number; // pixels per note row
-    instrument?: string; // Instrument/synthdef to use for preview
+    clipId: string;
 }
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 export function SequencerPianoRollKeyboard({
-    minPitch,
-    maxPitch,
-    noteHeight,
-    instrument = "sine",
+    clipId,
 }: SequencerPianoRollKeyboardProps) {
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
+    const clips = useDAWStore(state => state.clips);
+    const tracks = useDAWStore(state => state.tracks);
+
+    // ========================================================================
+    // DERIVED STATE: Get clip data
+    // ========================================================================
+    const clip = clips.find(c => c.id === clipId);
+    const track = clip ? tracks.find(t => t.id === clip.track_id) : undefined;
+    const instrument = track?.instrument || "sine";
+
+    // Piano roll settings (constants)
+    const minPitch = 21; // A0 - Full piano range
+    const maxPitch = 108; // C8
+    const noteHeight = 20; // pixels per note row
+
+    // ========================================================================
+    // LOCAL STATE
+    // ========================================================================
     const [activeKey, setActiveKey] = useState<number | null>(null);
 
     const getNoteName = (pitch: number): string => {

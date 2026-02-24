@@ -1,58 +1,82 @@
 /**
  * SequencerPianoRollGrid - Piano roll note grid with editing capabilities
- * 
- * Displays MIDI notes on a grid, handles note creation, movement, resizing, and deletion.
+ *
+ * REFACTORED: Pure component that reads everything from Zustand
+ * - Reads ALL state from Zustand (clip data, settings, transport)
+ * - Calls updateClip() directly for all note editing operations
+ * - Only receives clipId and local UI callbacks (onSelectNote, onToggleSelectNote)
  */
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useDAWStore } from "@/stores/dawStore";
+import { useTimelineCalculations } from '../../hooks/useTimelineCalculations.ts';
+import { api } from "@/services/api";
 import type { MIDIEvent } from "../../types";
-import type { ActiveNote } from "@/hooks/useTransportWebsocket";
+
+const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 interface SequencerPianoRollGridProps {
-    notes: MIDIEvent[];
+    // Clip to edit
+    clipId: string;
+
+    // Local UI callbacks (for parent component's local state)
     selectedNotes: Set<number>;
-    minPitch: number;
-    maxPitch: number;
-    clipStartTime: number; // beats - where clip starts in composition
-    clipDuration: number; // beats - clip length
-    totalBeats: number; // beats - total composition length
-    beatWidth: number; // pixels per beat
-    noteHeight: number; // pixels per note row
-    snapEnabled: boolean;
-    gridSize: number;
-    clipId: string; // Clip ID for matching active notes
-    activeNotes?: ActiveNote[]; // Currently playing notes for visual feedback
-    onAddNote: (pitch: number, startTime: number) => void;
-    onMoveNote: (index: number, newStartTime: number, newPitch: number) => void;
-    onResizeNote: (index: number, newDuration: number) => void;
-    onUpdateVelocity: (index: number, newVelocity: number) => void;
-    onDeleteNote: (index: number) => void;
     onSelectNote: (index: number) => void;
     onToggleSelectNote: (index: number) => void;
 }
 
 export function SequencerPianoRollGrid({
-    notes,
-    selectedNotes,
-    minPitch,
-    maxPitch,
-    clipStartTime,
-    clipDuration,
-    totalBeats,
-    beatWidth,
-    noteHeight,
-    snapEnabled,
-    gridSize,
     clipId,
-    activeNotes,
-    onAddNote,
-    onMoveNote,
-    onResizeNote,
-    onDeleteNote,
+    selectedNotes,
     onSelectNote,
     onToggleSelectNote,
 }: SequencerPianoRollGridProps) {
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
+    const clips = useDAWStore(state => state.clips);
+    const tracks = useDAWStore(state => state.tracks);
+    const snapEnabled = useDAWStore(state => state.snapEnabled);
+    const gridSize = useDAWStore(state => state.gridSize);
+    const transport = useDAWStore(state => state.transport);
+
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
+    const updateClip = useDAWStore(state => state.updateClip);
+
+    // ========================================================================
+    // SHARED TIMELINE CALCULATIONS: Use the same hook as timeline for consistency!
+    // ========================================================================
+    const { pixelsPerBeat, totalWidth, zoom } = useTimelineCalculations();
+    const beatWidth = pixelsPerBeat * zoom;
+
+    // ========================================================================
+    // DERIVED STATE: Get clip data
+    // ========================================================================
+    const clip = clips.find(c => c.id === clipId);
+    if (!clip || clip.type !== 'midi') {
+        return <div className="flex items-center justify-center h-full text-muted-foreground">Invalid clip</div>;
+    }
+
+    const track = tracks.find(t => t.id === clip.track_id);
+    const notes = clip.midi_events || [];
+    const clipStartTime = clip.start_time;
+    const clipDuration = clip.duration;
+    const instrument = track?.instrument || 'sine';
+
+    // Transport state
+    const activeNotes = transport?.active_notes || [];
+
+    // Piano roll settings (constants)
+    const minPitch = 21; // A0 - Full piano range
+    const maxPitch = 108; // C8
+    const noteHeight = 20; // pixels per note row
+
+    // ========================================================================
+    // LOCAL STATE
+    // ========================================================================
     const gridRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState<number | null>(null);
     const [isResizing, setIsResizing] = useState<number | null>(null);
@@ -63,9 +87,17 @@ export function SequencerPianoRollGrid({
     const [dragStartDuration, setDragStartDuration] = useState(0);
     const [hasDragged, setHasDragged] = useState(false); // Track if mouse moved during mousedown
 
+    // ========================================================================
+    // HELPER FUNCTIONS
+    // ========================================================================
+    const getNoteName = (pitch: number): string => {
+        const octave = Math.floor(pitch / 12) - 1;
+        const noteName = NOTE_NAMES[pitch % 12];
+        return `${noteName}${octave}`;
+    };
+
     // Grid spans the full composition width (like timeline) - allows scrolling freely
     // Clip region is visually highlighted so user knows the clip boundaries
-    const totalWidth = totalBeats * beatWidth;
     const totalHeight = (maxPitch - minPitch + 1) * noteHeight;
 
     // Clip region boundaries (for visual highlight)
@@ -79,6 +111,72 @@ export function SequencerPianoRollGrid({
 
     const pixelsToBeats = (x: number): number => {
         return x / beatWidth;
+    };
+
+    // ========================================================================
+    // NOTE EDITING HANDLERS: Call Zustand actions directly
+    // ========================================================================
+    const handleAddNote = async (pitch: number, startTime: number) => {
+        const newNote: MIDIEvent = {
+            note: pitch,
+            note_name: getNoteName(pitch),
+            start_time: snapEnabled ? Math.round(startTime * gridSize) / gridSize : startTime,
+            duration: snapEnabled ? 1 / gridSize : 0.25,
+            velocity: 100,
+            channel: 0,
+        };
+        await updateClip(clipId, { midi_events: [...notes, newNote] });
+
+        // Preview the note
+        try {
+            await api.audio.previewNote({
+                note: pitch,
+                velocity: 100,
+                duration: 0.5,
+                synthdef: instrument || "sine"
+            });
+        } catch (error) {
+            console.error("Failed to preview note:", error);
+        }
+    };
+
+    const handleMoveNote = async (index: number, newStartTime: number, newPitch: number) => {
+        const updatedNotes = [...notes];
+        const oldPitch = updatedNotes[index].note;
+        updatedNotes[index] = {
+            ...updatedNotes[index],
+            note: newPitch,
+            note_name: getNoteName(newPitch),
+            start_time: snapEnabled ? Math.round(newStartTime * gridSize) / gridSize : newStartTime,
+        };
+        await updateClip(clipId, { midi_events: updatedNotes });
+
+        // Preview the note only if pitch changed
+        if (newPitch !== oldPitch) {
+            try {
+                await api.audio.previewNote({
+                    note: newPitch,
+                    velocity: updatedNotes[index].velocity,
+                    duration: 0.5,
+                    synthdef: instrument || "sine"
+                });
+            } catch (error) {
+                console.error("Failed to preview note:", error);
+            }
+        }
+    };
+
+    const handleResizeNote = async (index: number, newDuration: number) => {
+        const updatedNotes = [...notes];
+        updatedNotes[index] = {
+            ...updatedNotes[index],
+            duration: Math.max(0.0625, snapEnabled ? Math.round(newDuration * gridSize) / gridSize : newDuration),
+        };
+        await updateClip(clipId, { midi_events: updatedNotes });
+    };
+
+    const handleDeleteNote = async (index: number) => {
+        await updateClip(clipId, { midi_events: notes.filter((_, i) => i !== index) });
     };
 
     const handleGridClick = (e: React.MouseEvent) => {
@@ -104,10 +202,10 @@ export function SequencerPianoRollGrid({
 
         if (clickedNoteIndex !== -1) {
             // Note exists - delete it (toggle behavior like FL Studio/Ableton)
-            onDeleteNote(clickedNoteIndex);
+            handleDeleteNote(clickedNoteIndex);
         } else {
             // No note - add one
-            onAddNote(pitch, clipRelativeTime);
+            handleAddNote(pitch, clipRelativeTime);
         }
     };
 
@@ -175,12 +273,12 @@ export function SequencerPianoRollGrid({
                 const newStartTime = Math.max(0, dragStartTime + deltaBeats);
                 const newPitch = Math.max(minPitch, Math.min(maxPitch, dragStartPitch + deltaPitch));
 
-                onMoveNote(isDragging, newStartTime, newPitch);
+                handleMoveNote(isDragging, newStartTime, newPitch);
             } else if (isResizing !== null) {
                 const deltaBeats = deltaX / beatWidth;
                 const newDuration = Math.max(0.0625, dragStartDuration + deltaBeats);
 
-                onResizeNote(isResizing, newDuration);
+                handleResizeNote(isResizing, newDuration);
             }
         };
 
@@ -188,7 +286,7 @@ export function SequencerPianoRollGrid({
             // Click-to-delete: Only delete if we clicked a note (isDragging) without moving the mouse
             // Don't delete if we were resizing (isResizing) - resizing always involves dragging
             if (!hasDragged && isDragging !== null && isResizing === null) {
-                onDeleteNote(isDragging);
+                handleDeleteNote(isDragging);
             }
 
             setIsDragging(null);
@@ -203,19 +301,19 @@ export function SequencerPianoRollGrid({
             document.removeEventListener("mousemove", handleMouseMove);
             document.removeEventListener("mouseup", handleMouseUp);
         };
-    }, [isDragging, isResizing, dragStartX, dragStartY, dragStartTime, dragStartPitch, dragStartDuration, beatWidth, noteHeight, minPitch, maxPitch, hasDragged, onDeleteNote, onMoveNote, onResizeNote]);
+    }, [isDragging, isResizing, dragStartX, dragStartY, dragStartTime, dragStartPitch, dragStartDuration, beatWidth, noteHeight, minPitch, maxPitch, hasDragged, handleDeleteNote, handleMoveNote, handleResizeNote]);
 
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Delete" || e.key === "Backspace") {
-                selectedNotes.forEach(index => onDeleteNote(index));
+                selectedNotes.forEach(index => handleDeleteNote(index));
             }
         };
 
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [selectedNotes, onDeleteNote]);
+    }, [selectedNotes, handleDeleteNote]);
 
     return (
         <div className="flex-1 overflow-auto">
