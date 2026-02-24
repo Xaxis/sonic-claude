@@ -91,11 +91,13 @@ export function SequencerTrackHeader({
     // ========================================================================
     // HANDLERS: Track actions (call Zustand actions directly)
     // ========================================================================
-    const handleToggleMute = async () => {
+    const handleToggleMute = async (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent event bubbling
         await muteTrack(track.id, !track.is_muted);
     };
 
-    const handleToggleSolo = async () => {
+    const handleToggleSolo = async (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent event bubbling
         await soloTrack(track.id, !track.is_solo);
     };
 

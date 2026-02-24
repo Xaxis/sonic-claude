@@ -75,10 +75,11 @@ export interface SequencerTrackButtonProps
 }
 
 export const SequencerTrackButton = React.forwardRef<HTMLButtonElement, SequencerTrackButtonProps>(
-    ({ active = false, variant = "mute", size = "default", bordered = false, className, children, ...props }, ref) => {
+    ({ active = false, variant = "mute", size = "default", bordered = false, className, children, type = "button", ...props }, ref) => {
         return (
             <button
                 ref={ref}
+                type={type}
                 data-slot="track-button"
                 data-active={active}
                 data-variant={variant}
