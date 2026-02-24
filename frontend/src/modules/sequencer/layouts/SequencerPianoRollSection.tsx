@@ -17,7 +17,7 @@ import { SequencerPianoRollGrid } from "../components/PianoRoll/SequencerPianoRo
 import { SequencerPianoRollRuler } from "../components/PianoRoll/SequencerPianoRollRuler.tsx";
 import { SequencerTimelineLoopRegion } from "../components/Timeline/SequencerTimelineLoopRegion.tsx";
 import { useDAWStore } from '@/stores/dawStore';
-import { EditorGridLayout } from "@/components/layout/EditorGridLayout.tsx";
+import { SequencerGridLayout } from "../components/layout/SequencerGridLayout.tsx";
 import type { MIDIEvent } from "../types";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
@@ -101,7 +101,7 @@ export function SequencerPianoRollSection(props: SequencerPianoRollSectionProps)
     const totalWidth = totalBeats * beatWidth + 1000;
 
     return (
-        <EditorGridLayout
+        <SequencerGridLayout
             cornerHeader={
                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
                     Notes

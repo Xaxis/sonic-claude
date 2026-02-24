@@ -17,7 +17,7 @@ import { SampleEditorRuler } from "../components/SampleEditor/SampleEditorRuler.
 import { WaveformDisplay } from "../components/Shared/WaveformDisplay.tsx";
 import { SequencerTimelineLoopRegion } from "../components/Timeline/SequencerTimelineLoopRegion.tsx";
 import { useDAWStore } from '@/stores/dawStore';
-import { EditorGridLayout } from "@/components/layout/EditorGridLayout.tsx";
+import { SequencerGridLayout } from "../components/layout/SequencerGridLayout.tsx";
 
 interface SequencerSampleEditorSectionProps {
     // Waveform data
@@ -69,7 +69,7 @@ export function SequencerSampleEditorSection({
     const waveformWidth = totalBeats * beatWidth + 1000;
 
     return (
-        <EditorGridLayout
+        <SequencerGridLayout
             cornerHeader={
                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
                     Waveform

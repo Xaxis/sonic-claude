@@ -1,8 +1,13 @@
 /**
- * EditorGridLayout - Reusable layout component for timeline-based editors
+ * SequencerGridLayout - Reusable layout component for sequencer timeline-based editors
  *
  * BEST PRACTICE IMPLEMENTATION: Single scroll container with position: sticky
  * This is the industry-standard pattern used by Google Sheets, Airtable, Excel Online, Notion, and all professional DAWs.
+ *
+ * Used by:
+ * - SequencerTimelineSection (timeline + track headers)
+ * - SequencerPianoRollSection (piano roll + keyboard)
+ * - SequencerSampleEditorSection (sample editor + waveform)
  *
  * Architecture:
  * ┌─────────────────┬──────────────────────┐
@@ -25,14 +30,14 @@
  *
  * How it works:
  * - One scrollable container wraps everything
- * - Corner header: position: sticky, top: 0, left: 0, z-index: 3
- * - Ruler: position: sticky, top: 0, z-index: 2
- * - Track headers: position: sticky, left: 0, z-index: 1
- * - Timeline rows: normal flow
+ * - Corner header: position: sticky, top: 0, left: 0, z-index: 40
+ * - Ruler: position: sticky, top: 0, z-index: 20
+ * - Sidebar: position: sticky, left: 0, z-index: 30
+ * - Main content: normal flow
  *
  * Usage:
  * ```tsx
- * <EditorGridLayout
+ * <SequencerGridLayout
  *   cornerHeader={<div>Tracks</div>}
  *   ruler={<TimelineRuler />}
  *   sidebar={<TrackHeaders />}
@@ -48,7 +53,7 @@
 
 import React from "react";
 
-export interface EditorGridLayoutProps {
+export interface SequencerGridLayoutProps {
     // Layout regions (React nodes)
     cornerHeader: React.ReactNode;
     ruler: React.ReactNode;
@@ -69,7 +74,7 @@ export interface EditorGridLayoutProps {
     sidebarScrollDataAttr?: string;
 }
 
-export function EditorGridLayout({
+export function SequencerGridLayout({
     cornerHeader,
     ruler,
     sidebar,
@@ -79,7 +84,7 @@ export function EditorGridLayout({
     contentWidth,
     scrollRef,
     onScroll,
-}: EditorGridLayoutProps) {
+}: SequencerGridLayoutProps) {
     return (
         <div
             ref={scrollRef}
@@ -102,15 +107,14 @@ export function EditorGridLayout({
             >
                 {/* Top-Left: Corner Header - Sticky to top-left corner (FIXED, doesn't scroll) */}
                 <div
-                    className="border-r border-b border-border flex items-center px-3"
+                    className="border-r border-b border-border bg-background flex items-center px-3"
                     style={{
                         position: 'sticky',
                         top: 0,
                         left: 0,
                         width: `${sidebarWidth}px`,
                         height: `${headerHeight}px`,
-                        zIndex: 40, // Highest z-index (on top of everything)
-                        backgroundColor: 'hsl(var(--background))',
+                        zIndex: 40,
                     }}
                 >
                     {cornerHeader}
@@ -118,14 +122,13 @@ export function EditorGridLayout({
 
                 {/* Top-Right: Ruler - Sticky to top, scrolls horizontally UNDER the corner header */}
                 <div
-                    className="border-b border-border"
+                    className="border-b border-border bg-background"
                     style={{
                         position: 'sticky',
                         top: 0,
                         width: `${contentWidth}px`,
                         height: `${headerHeight}px`,
                         zIndex: 20, // Below corner header, above timeline
-                        backgroundColor: 'hsl(var(--background))',
                         overflow: 'hidden', // Prevent ruler content from bleeding out
                     }}
                 >
@@ -134,13 +137,12 @@ export function EditorGridLayout({
 
                 {/* Bottom-Left: Sidebar (Track Headers) - Sticky to left, FIXED horizontally, scrolls vertically */}
                 <div
-                    className="border-r border-border"
+                    className="border-r border-border bg-background"
                     style={{
                         position: 'sticky',
                         left: 0,
                         width: `${sidebarWidth}px`,
                         zIndex: 30, // Above timeline, below corner header
-                        backgroundColor: 'hsl(var(--background))',
                     }}
                 >
                     {sidebar}

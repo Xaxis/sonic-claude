@@ -16,7 +16,7 @@ import { SequencerTimeline } from "../components/Timeline/SequencerTimeline.tsx"
 import { SequencerTimelineRuler } from "../components/Timeline/SequencerTimelineRuler.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { useTimelineCalculations } from "../hooks/useTimelineCalculations.ts";
-import { EditorGridLayout } from "@/components/layout/EditorGridLayout.tsx";
+import { SequencerGridLayout } from "../components/layout/SequencerGridLayout.tsx";
 
 interface SequencerTimelineSectionProps {
     // Scroll
@@ -87,7 +87,7 @@ export function SequencerTimelineSection(props: SequencerTimelineSectionProps) {
     const { totalWidth, rulerMarkers, pixelsPerBeat } = useTimelineCalculations();
 
     return (
-        <EditorGridLayout
+        <SequencerGridLayout
             cornerHeader={
                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
                     Tracks
