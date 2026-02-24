@@ -11,12 +11,12 @@ import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { useAIState } from "./hooks/useAIState";
 import { useAIHandlers } from "./hooks/useAIHandlers";
-import { ChatLayout } from "@/modules/ai/components/Layouts/ChatLayout";
-import { AnalysisLayout } from "@/modules/ai/components/Layouts/AnalysisLayout";
+import { AssistantChatLayout } from "@/modules/assistant/components/Layouts/AssistantChatLayout.tsx";
+import { AssistantAnalysisLayout } from "@/modules/assistant/components/Layouts/AssistantAnalysisLayout.tsx";
 import { api } from "@/services/api";
 import { useDAWStore } from "@/stores/dawStore";
 
-export function AIPanel() {
+export function AssistantPanel() {
     // UI State
     const { state, actions } = useAIState();
 
@@ -65,23 +65,23 @@ export function AIPanel() {
         const loadInitialState = async () => {
             try {
                 actions.setIsLoadingState(true);
-                console.log("AIPanel: Loading initial DAW state and AI context...");
+                console.log("AssistantPanel: Loading initial DAW state and AI context...");
 
                 // Load DAW state
                 const response = await api.ai.getState();
-                console.log("AIPanel: Received state response:", response);
+                console.log("AssistantPanel: Received state response:", response);
                 // Store in local state for display
-                console.log("AIPanel: Set dawState to:", response.full_state || null);
+                console.log("AssistantPanel: Set dawState to:", response.full_state || null);
 
                 // Load AI context (what the LLM sees)
                 try {
                     await api.ai.getContext();
-                    console.log("AIPanel: Loaded AI context");
+                    console.log("AssistantPanel: Loaded AI context");
                 } catch (error) {
-                    console.error("AIPanel: Failed to load AI context:", error);
+                    console.error("AssistantPanel: Failed to load AI context:", error);
                 }
             } catch (error) {
-                console.error("AIPanel: Failed to load initial state:", error);
+                console.error("AssistantPanel: Failed to load initial state:", error);
             } finally {
                 actions.setIsLoadingState(false);
             }
@@ -128,8 +128,8 @@ export function AIPanel() {
 
                     {/* Tab Content */}
                     <div className="flex-1 overflow-hidden bg-gradient-to-b from-background to-background/95">
-                        {state.activeTab === "chat" && <ChatLayout state={state} handlers={handlers} />}
-                        {state.activeTab === "analysis" && <AnalysisLayout state={state} actions={actions} dawState={dawState} aiContext={aiContext} />}
+                        {state.activeTab === "chat" && <AssistantChatLayout state={state} handlers={handlers} />}
+                        {state.activeTab === "analysis" && <AssistantAnalysisLayout state={state} actions={actions} dawState={dawState} aiContext={aiContext} />}
                     </div>
                 </SubPanel>
             </div>

@@ -1,40 +1,54 @@
 /**
  * SampleLibrarySection Layout Component
- * 
- * Smart container that connects useSampleLibrary hook with SampleLibraryBrowser presentation component.
- * Handles search, filtering, and sample management.
+ *
+ * REFACTORED: Pure layout component using Zustand best practices
+ * - Reads samples from Zustand store
+ * - Calls sample actions directly from store
+ * - Only manages local UI state (search, category filter, edit mode, playback)
  */
 
-import { useState, useCallback } from "react";
-import { useSampleLibrary } from "../../hooks/useSampleLibrary.ts";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useDAWStore } from '@/stores/dawStore';
 import { SampleLibraryBrowser } from "../SampleLibraryBrowser.tsx";
 import type { SampleMetadata } from "@/services/api/providers";
+import { toast } from "sonner";
 
-interface SampleLibrarySectionProps {
-    onSampleSelect?: (sample: SampleMetadata) => void;
-}
+export function SampleLibrarySection() {
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
+    const samples = useDAWStore(state => state.samples);
 
-export function SampleLibrarySection({ onSampleSelect }: SampleLibrarySectionProps) {
-    // Local UI state for search and filtering
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
+    const loadSamples = useDAWStore(state => state.loadSamples);
+    const uploadSample = useDAWStore(state => state.uploadSample);
+    const updateSample = useDAWStore(state => state.updateSample);
+    const deleteSample = useDAWStore(state => state.deleteSample);
+
+    // ========================================================================
+    // LOCAL STATE: UI state for search, filtering, editing, and playback
+    // ========================================================================
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
+    const [isUploading, setIsUploading] = useState(false);
+    const [editingSampleId, setEditingSampleId] = useState<string | null>(null);
+    const [editName, setEditName] = useState("");
+    const [editCategory, setEditCategory] = useState("");
 
-    // Use sample library hook
-    const {
-        samples,
-        isUploading,
-        editingSampleId,
-        editName,
-        editCategory,
-        handleUploadSample,
-        handleStartEdit,
-        handleSaveEdit,
-        handleCancelEdit,
-        handleDeleteSample,
-        handlePlaySample,
-        setEditName,
-        setEditCategory,
-    } = useSampleLibrary({ onSampleSelect });
+    // Playback refs
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
+    // Load samples on mount
+    useEffect(() => {
+        loadSamples();
+    }, [loadSamples]);
+
+    // ========================================================================
+    // HANDLERS: Local UI logic
+    // ========================================================================
 
     // Handle file upload
     const handleFileUpload = useCallback(
@@ -42,22 +56,98 @@ export function SampleLibrarySection({ onSampleSelect }: SampleLibrarySectionPro
             const files = event.target.files;
             if (!files) return;
 
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                if (!file.type.startsWith("audio/")) {
-                    console.warn(`${file.name} is not an audio file`);
-                    continue;
-                }
+            setIsUploading(true);
+            try {
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    if (!file.type.startsWith("audio/")) {
+                        console.warn(`${file.name} is not an audio file`);
+                        continue;
+                    }
 
-                const name = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
-                await handleUploadSample(file, name, "Uncategorized");
+                    const name = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+                    await uploadSample(file, name, selectedCategory === "All" ? "Uncategorized" : selectedCategory);
+                }
+            } finally {
+                setIsUploading(false);
+                // Reset input
+                event.target.value = "";
+            }
+        },
+        [uploadSample, selectedCategory]
+    );
+
+    // Start editing sample
+    const handleStartEdit = useCallback((sample: SampleMetadata) => {
+        setEditingSampleId(sample.id);
+        setEditName(sample.name);
+        setEditCategory(sample.category);
+    }, []);
+
+    // Save sample edits
+    const handleSaveEdit = useCallback(async () => {
+        if (!editingSampleId) return;
+
+        try {
+            await updateSample(editingSampleId, editName, editCategory);
+            setEditingSampleId(null);
+        } catch (error) {
+            console.error("Failed to update sample:", error);
+        }
+    }, [editingSampleId, editName, editCategory, updateSample]);
+
+    // Cancel editing
+    const handleCancelEdit = useCallback(() => {
+        setEditingSampleId(null);
+        setEditName("");
+        setEditCategory("");
+    }, []);
+
+    // Delete sample
+    const handleDeleteSample = useCallback(async (sampleId: string) => {
+        try {
+            await deleteSample(sampleId);
+        } catch (error) {
+            console.error("Failed to delete sample:", error);
+        }
+    }, [deleteSample]);
+
+    // Play sample preview
+    const handlePlaySample = useCallback(async (sampleId: string) => {
+        try {
+            // Stop current playback
+            if (audioSourceRef.current) {
+                audioSourceRef.current.stop();
+                audioSourceRef.current = null;
             }
 
-            // Reset input
-            event.target.value = "";
-        },
-        [handleUploadSample]
-    );
+            // Create audio context if needed
+            if (!audioContextRef.current) {
+                audioContextRef.current = new AudioContext();
+            }
+
+            // Fetch and decode audio
+            const url = `/api/samples/${sampleId}/download`;
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+
+            // Create and play source
+            const source = audioContextRef.current.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(audioContextRef.current.destination);
+
+            source.onended = () => {
+                audioSourceRef.current = null;
+            };
+
+            source.start();
+            audioSourceRef.current = source;
+        } catch (error) {
+            console.error("Failed to play sample:", error);
+            toast.error("Failed to play sample");
+        }
+    }, []);
 
     // Handle sample drag start
     const handleSampleDragStart = useCallback((sampleId: string) => {

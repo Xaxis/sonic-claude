@@ -71,7 +71,7 @@ export interface Composition {
 }
 
 // AI & Activity Types
-import type { ChatMessage, AnalysisEvent, DAWStateSnapshot } from '@/modules/ai/types';
+import type { ChatMessage, AnalysisEvent, DAWStateSnapshot } from '@/modules/assistant/types';
 
 export type ActivityStatus = "pending" | "in-progress" | "success" | "error";
 export type ActivityTargetType = "track" | "clip" | "effect" | "mixer" | "tempo" | "playback";

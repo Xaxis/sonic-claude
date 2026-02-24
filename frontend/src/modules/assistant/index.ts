@@ -2,6 +2,6 @@
  * AI Module - Export barrel
  */
 
-export { AIPanel } from "./AIPanel";
+export { AssistantPanel } from "./AssistantPanel.tsx";
 export * from "./types";
 

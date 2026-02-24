@@ -51,7 +51,7 @@ import { LoopVisualizerPanel } from "@/modules/loop-visualizer";
 import { SequencerPanel } from "@/modules/sequencer";
 import { MixerPanel } from "@/modules/mixer";
 import { EffectsPanel } from "@/modules/effects";
-import { AIPanel } from "@/modules/ai";
+import { AssistantPanel } from "@/modules/assistant";
 
 /**
  * Grid Layout Settings
@@ -128,7 +128,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
     {
         id: "ai",
         title: "ASSISTANT",
-        component: createElement(AIPanel),
+        component: createElement(AssistantPanel),
         closeable: false,
         getSubtitle: () => "Chat • State Viewer • Autonomous: Off",
         defaultLayout: { x: 0, y: 38, w: 12, h: 16 },

@@ -14,7 +14,7 @@ import { Send, Sparkles, Music, Zap, Info } from "lucide-react";
 import type { AIState } from "../../hooks/useAIState.ts";
 import type { ChatMessage } from "../../types.ts";
 
-interface ChatLayoutProps {
+interface AssistantChatLayoutProps {
     state: AIState;
     handlers: {
         handleSendMessage: (message: string) => Promise<void>;
@@ -22,7 +22,7 @@ interface ChatLayoutProps {
     };
 }
 
-export function ChatLayout({ state, handlers }: ChatLayoutProps) {
+export function AssistantChatLayout({ state, handlers }: AssistantChatLayoutProps) {
     // Get chat history from Zustand store
     const chatHistory = useDAWStore(state => state.chatHistory);
     const [inputValue, setInputValue] = useState("");

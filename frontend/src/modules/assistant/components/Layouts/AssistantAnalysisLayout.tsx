@@ -15,14 +15,14 @@ import { Button } from "@/components/ui/button.tsx";
 import { Music } from "lucide-react";
 import type { AIState, AIActions } from "../../hooks/useAIState.ts";
 
-interface AnalysisLayoutProps {
+interface AssistantAnalysisLayoutProps {
     state: AIState;
     actions: AIActions;
     dawState: any;
     aiContext: string | null;
 }
 
-export function AnalysisLayout({ state, actions, dawState, aiContext }: AnalysisLayoutProps) {
+export function AssistantAnalysisLayout({ state, actions, dawState, aiContext }: AssistantAnalysisLayoutProps) {
     // Determine display content
     const displayContent = (() => {
         if (!dawState) {
