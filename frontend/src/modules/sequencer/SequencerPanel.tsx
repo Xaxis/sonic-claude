@@ -84,6 +84,8 @@ export function SequencerPanel() {
                         timelineScrollRef={timelineScrollRef}
                         pianoRollScrollRef={pianoRollScrollRef}
                         sampleEditorScrollRef={sampleEditorScrollRef}
+
+                        // @TODO - Is this the best pattern to pass activeNotes or do we access it with our cohesive ws zustand store or some pattern we should best practice implement?
                         activeNotes={activeNotes}
                     />
                 </SubPanel>

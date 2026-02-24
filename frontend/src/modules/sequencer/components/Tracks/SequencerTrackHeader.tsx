@@ -216,14 +216,11 @@ export function SequencerTrackHeader({
 
                     {/* ROW 2: INSTRUMENT & TRANSPORT - Instrument, Mute, Solo, Arm */}
                     <div className="flex items-center gap-2">
-                        {track.type === "midi" && onUpdateTrack && (
+                        {track.type === "midi" && (
                             <div className="flex items-center gap-2">
                                 <SequencerInstrumentSelector
                                     trackId={track.id}
                                     currentInstrument={track.instrument}
-                                    onInstrumentChange={(trackId, instrument) => {
-                                        onUpdateTrack(trackId, { instrument });
-                                    }}
                                 />
                             </div>
                         )}

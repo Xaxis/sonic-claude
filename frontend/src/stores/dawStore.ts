@@ -510,8 +510,15 @@ export const useDAWStore = create<DAWStore>()(
 
         toggleMetronome: async () => {
             try {
-                // Toggle metronome - backend will handle state
-                await api.audio.updateMetronome(undefined, undefined);
+                const { transport } = get();
+                const currentEnabled = transport?.metronome_enabled ?? false;
+                const newEnabled = !currentEnabled;
+
+                // Call backend to toggle metronome
+                await api.audio.updateMetronome({ enabled: newEnabled });
+
+                // Note: State will be updated via WebSocket transport message
+                // No need to update local state here
             } catch (error) {
                 console.error("Failed to toggle metronome:", error);
                 toast.error("Failed to toggle metronome");

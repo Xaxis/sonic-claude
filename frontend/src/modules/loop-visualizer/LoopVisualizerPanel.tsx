@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useDAWStore } from "@/stores/dawStore";
 import { Activity, Waves, BarChart3, AlertTriangle } from "lucide-react";
-import { WaveformDisplay } from "../sequencer/components/Shared/WaveformDisplay.tsx";
+import { WaveformDisplay } from "../../components/ui/waveform-display.tsx";
 
 // Theme colors from globals.css
 const THEME_COLORS = {

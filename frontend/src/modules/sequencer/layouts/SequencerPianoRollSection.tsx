@@ -17,7 +17,7 @@ import { SequencerPianoRollGrid } from "../components/PianoRoll/SequencerPianoRo
 import { SequencerPianoRollRuler } from "../components/PianoRoll/SequencerPianoRollRuler.tsx";
 import { SequencerTimelineLoopRegion } from "../components/Timeline/SequencerTimelineLoopRegion.tsx";
 import { useDAWStore } from '@/stores/dawStore';
-import { SequencerGridLayout } from "../components/layout/SequencerGridLayout.tsx";
+import { SequencerGridLayout } from "./SequencerGridLayout.tsx";
 import type { MIDIEvent } from "../types";
 import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 

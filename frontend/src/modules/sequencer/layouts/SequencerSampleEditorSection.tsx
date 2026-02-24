@@ -14,10 +14,10 @@
 
 import React from "react";
 import { SampleEditorRuler } from "../components/SampleEditor/SampleEditorRuler.tsx";
-import { WaveformDisplay } from "../components/Shared/WaveformDisplay.tsx";
+import { WaveformDisplay } from "../../../components/ui/waveform-display.tsx";
 import { SequencerTimelineLoopRegion } from "../components/Timeline/SequencerTimelineLoopRegion.tsx";
 import { useDAWStore } from '@/stores/dawStore';
-import { SequencerGridLayout } from "../components/layout/SequencerGridLayout.tsx";
+import { SequencerGridLayout } from "./SequencerGridLayout.tsx";
 
 interface SequencerSampleEditorSectionProps {
     // Waveform data

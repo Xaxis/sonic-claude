@@ -6,9 +6,10 @@ from typing import Optional, Dict
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from backend.core.dependencies import get_synthesis_service
+from backend.core.dependencies import get_synthesis_service, get_playback_engine_service
 from backend.core.exceptions import SynthNotFoundError, ServiceError
 from backend.services.daw.synthesis_service import SynthesisService
+from backend.services.daw.playback_engine_service import PlaybackEngineService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -188,16 +189,24 @@ async def preview_note(
 @router.put("/metronome")
 async def update_metronome(
     request: UpdateMetronomeRequest,
-    synthesis_service: SynthesisService = Depends(get_synthesis_service)
+    playback_engine_service: PlaybackEngineService = Depends(get_playback_engine_service)
 ):
     """Update metronome settings"""
     try:
-        # TODO: Implement metronome service
-        # For now, just return success
+        # Update metronome enabled state
+        if request.enabled is not None:
+            # Set to requested state (not toggle)
+            if request.enabled != playback_engine_service.metronome_enabled:
+                playback_engine_service.toggle_metronome()
+
+        # Update metronome volume
+        if request.volume is not None:
+            playback_engine_service.set_metronome_volume(request.volume)
+
         return {
             "status": "ok",
-            "enabled": request.enabled,
-            "volume": request.volume
+            "enabled": playback_engine_service.metronome_enabled,
+            "volume": playback_engine_service.metronome_volume
         }
     except Exception as e:
         logger.error(f"❌ Failed to update metronome: {e}")

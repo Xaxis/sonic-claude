@@ -28,6 +28,7 @@ export function CompositionLoader() {
     const loadComposition = useDAWStore(state => state.loadComposition);
     const loadCompositions = useDAWStore(state => state.loadCompositions);
     const createComposition = useDAWStore(state => state.createComposition);
+    const loadSynthDefs = useDAWStore(state => state.loadSynthDefs);
 
     const [newCompositionName, setNewCompositionName] = useState("");
     const [isCreating, setIsCreating] = useState(false);
@@ -37,6 +38,9 @@ export function CompositionLoader() {
     useEffect(() => {
         const initialize = async () => {
             try {
+                // Load SynthDefs (needed for instrument selector)
+                await loadSynthDefs();
+
                 // Load list of all compositions
                 await loadCompositions();
 

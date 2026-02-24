@@ -19,7 +19,7 @@ import { SequencerTracks } from "../components/Tracks/SequencerTracks.tsx";
 import { SequencerTimeline } from "../components/Timeline/SequencerTimeline.tsx";
 import { SequencerTimelineRuler } from "../components/Timeline/SequencerTimelineRuler.tsx";
 import { useTimelineCalculations } from "../hooks/useTimelineCalculations.ts";
-import { SequencerGridLayout } from "../components/layout/SequencerGridLayout.tsx";
+import { SequencerGridLayout } from "./SequencerGridLayout.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 
 interface SequencerTimelineSectionProps {

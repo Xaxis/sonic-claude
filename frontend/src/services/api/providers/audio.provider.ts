@@ -10,6 +10,7 @@
  * - DELETE /api/audio/synthesis/synths/{synth_id}       (synthesis.py)
  * - DELETE /api/audio/synthesis/synths                  (synthesis.py)
  * - POST   /api/audio/preview                           (synthesis.py)
+ * - PUT    /api/audio/metronome                         (synthesis.py)
  * - GET    /api/audio/synthdefs                         (synthesis.py)
  * - POST   /api/audio/input/device                      (input.py)
  * - POST   /api/audio/input/stop                        (input.py)
@@ -49,6 +50,11 @@ export interface PreviewNoteRequest {
     velocity?: number;
     duration?: number;
     synthdef?: string;
+}
+
+export interface UpdateMetronomeRequest {
+    enabled?: boolean;
+    volume?: number;
 }
 
 export interface SynthInfo {
@@ -102,6 +108,10 @@ export class AudioProvider extends BaseAPIClient {
 
     async previewNote(request: PreviewNoteRequest): Promise<any> {
         return this.post("/api/audio/preview", request);
+    }
+
+    async updateMetronome(request: UpdateMetronomeRequest): Promise<any> {
+        return this.put("/api/audio/metronome", request);
     }
 
     async getSynthDefs(): Promise<SynthDefInfo[]> {

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
 import { cn } from "@/lib/utils.ts";
 import type { MIDIEvent, SequencerClip } from "../../types.ts";
-import { WaveformDisplay } from "../Shared/WaveformDisplay.tsx";
+import { WaveformDisplay } from "../../../../components/ui/waveform-display.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { useWaveformData } from "../../hooks/useWaveformData.ts";
 

@@ -1,17 +1,16 @@
 /**
  * SequencerInstrumentSelector Component
- * 
+ *
  * Dropdown selector for choosing MIDI track instruments (SynthDefs).
  * Displays instrument name with category grouping.
- * 
+ *
  * Architecture:
- * - Fetches available SynthDefs from API
+ * - Reads available SynthDefs from Zustand store
  * - Groups instruments by category
- * - Updates track instrument via API on selection
+ * - Updates track instrument via Zustand action
  * - Shows current instrument or placeholder
  */
 
-import { useEffect, useState } from "react";
 import { Music } from "lucide-react";
 import {
     Select,
@@ -21,41 +20,25 @@ import {
     SelectLabel,
     SelectTrigger,
 } from "@/components/ui/select.tsx";
-import { api } from "@/services/api";
+import { useDAWStore } from "@/stores/dawStore";
 import type { SynthDefInfo } from "../../types.ts";
 
 interface SequencerInstrumentSelectorProps {
     trackId: string;
     currentInstrument?: string;
-    onInstrumentChange: (trackId: string, instrument: string) => void;
     disabled?: boolean;
 }
 
 export function SequencerInstrumentSelector({
     trackId,
     currentInstrument,
-    onInstrumentChange,
     disabled = false,
 }: SequencerInstrumentSelectorProps) {
-    const [synthDefs, setSynthDefs] = useState<SynthDefInfo[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    // Read state from Zustand store
+    const synthDefs = useDAWStore(state => state.synthDefs);
 
-    // Load available SynthDefs on mount
-    useEffect(() => {
-        const loadSynthDefs = async () => {
-            try {
-                setIsLoading(true);
-                const defs = await api.audio.getSynthDefs();
-                setSynthDefs(defs);
-            } catch (error) {
-                console.error("Failed to load SynthDefs:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        loadSynthDefs();
-    }, []);
+    // Get actions from Zustand store
+    const updateTrack = useDAWStore(state => state.updateTrack);
 
     // Group SynthDefs by category
     const groupedSynthDefs = synthDefs.reduce((acc, synthDef) => {
@@ -70,11 +53,13 @@ export function SequencerInstrumentSelector({
     const currentSynthDef = synthDefs.find((def) => def.name === currentInstrument);
     const displayValue = currentSynthDef?.display_name || currentInstrument || "Instrument";
 
+    // Handle selection - call Zustand action directly
     const handleValueChange = (value: string) => {
-        onInstrumentChange(trackId, value);
+        updateTrack(trackId, { instrument: value });
     };
 
-    if (isLoading) {
+    // Show placeholder if no synthDefs loaded yet
+    if (synthDefs.length === 0) {
         return (
             <div className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground">
                 <Music size={12} />
