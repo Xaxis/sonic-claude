@@ -189,7 +189,7 @@ export function SequencerTimelinePlayhead({
     return (
         <div
             ref={playheadRef}
-            className="absolute top-0 bottom-0 w-1 bg-red-500 z-50 cursor-ew-resize pointer-events-auto"
+            className="absolute top-0 bottom-0 w-1 bg-red-500 z-10 cursor-ew-resize pointer-events-auto"
             style={{
                 transform: `translateX(${playheadX}px)`,
                 boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)',
@@ -198,9 +198,9 @@ export function SequencerTimelinePlayhead({
             onMouseDown={handlePlayheadMouseDown}
             title="Drag to scrub"
         >
-            {/* Playhead triangle at top */}
+            {/* Playhead triangle at top - Higher z-index so it appears above ruler */}
             <div
-                className="absolute -top-2 -left-2 w-0 h-0 pointer-events-none"
+                className="absolute -top-2 -left-2 w-0 h-0 pointer-events-none z-30"
                 style={{
                     borderLeft: '10px solid transparent',
                     borderRight: '10px solid transparent',

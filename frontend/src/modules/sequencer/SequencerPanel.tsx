@@ -11,10 +11,9 @@
  * Uses Zustand store for all state and actions.
  */
 
-import { useState, useRef } from "react";
+import { useRef } from "react";
 import { useDAWStore } from '@/stores/dawStore';
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
-import { SequencerSettingsDialog } from "./components/Dialogs/SequencerSettingsDialog.tsx";
 import { SequencerEmptyState } from "./components/States/SequencerEmptyState.tsx";
 import { SequencerTransport } from "./components/Transport/SequencerTransport.tsx";
 import { SequencerToolbar } from "./components/Toolbar/SequencerToolbar.tsx";
@@ -28,9 +27,9 @@ export function SequencerPanel() {
     const activeComposition = useDAWStore(state => state.activeComposition);
 
     // ========================================================================
-    // LOCAL UI STATE: Settings dialog only
+    // LOCAL UI STATE
     // ========================================================================
-    const [showSequenceSettings, setShowSequenceSettings] = useState(false);
+    // @TODO - Consider implementing master settings dialog
 
     // ========================================================================
     // SCROLL REFS: For auto-scroll functionality
@@ -75,7 +74,7 @@ export function SequencerPanel() {
                 </SubPanel>
             </div>
 
-            {/* Main Content Area - NO PROP DRILLING! */}
+            {/* Main Content Area */}
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 <SubPanel title="SEQUENCER" showHeader={false} contentOverflow="hidden">
                     <SequencerSplitLayout
@@ -85,20 +84,6 @@ export function SequencerPanel() {
                     />
                 </SubPanel>
             </div>
-
-            {/* Dialogs */}
-            {showSequenceSettings && activeComposition && (
-                <SequencerSettingsDialog
-                    isOpen={showSequenceSettings}
-                    composition={activeComposition}
-                    onClose={() => setShowSequenceSettings(false)}
-                    onSave={async () => {
-                        // TODO: Implement composition settings update
-                        toast.info("Composition settings update not yet implemented");
-                        setShowSequenceSettings(false);
-                    }}
-                />
-            )}
         </div>
     );
 }
