@@ -47,7 +47,7 @@
 
 import type { PanelConfig } from "@/components/layout";
 import { InputPanel } from "@/modules/input";
-import { LoopVisualizerPanel } from "@/modules/loop-visualizer";
+import { VisualizerPanel } from "@/modules/visualizer";
 import { SequencerPanel } from "@/modules/sequencer";
 import { MixerPanel } from "@/modules/mixer";
 import { EffectsPanel } from "@/modules/effects";
@@ -89,7 +89,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
     {
         id: "loop-visualizer",
         title: "LOOP",
-        component: createElement(LoopVisualizerPanel),
+        component: createElement(VisualizerPanel),
         closeable: false,
         getSubtitle: () => "Active • 120 BPM • 4/4 • Position: 8.2 beats",
         defaultLayout: { x: 6, y: 0, w: 6, h: 10 },

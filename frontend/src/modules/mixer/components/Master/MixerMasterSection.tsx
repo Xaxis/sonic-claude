@@ -45,7 +45,7 @@ export function MixerMasterSection() {
     const peakRight = masterMeter?.peakRight ?? master.meter_peak_right;
 
     return (
-        <div className="flex w-44 flex-shrink-0 flex-col gap-3 rounded-lg border-2 border-primary/60 bg-gradient-to-b from-primary/10 via-card to-card/80 p-4 shadow-2xl">
+        <div className="flex w-56 flex-shrink-0 flex-col gap-3 rounded-lg border-2 border-primary/60 bg-gradient-to-b from-primary/10 via-card to-card/80 p-4 shadow-2xl">
             {/* Master Label */}
             <div className="flex flex-col items-center gap-1.5 border-b-2 border-primary/30 pb-3">
                 <div className="text-center text-sm font-black uppercase tracking-widest text-primary drop-shadow-[0_0_8px_rgba(0,245,255,0.4)]">
@@ -86,26 +86,25 @@ export function MixerMasterSection() {
                         {master.limiter_enabled ? "ON" : "OFF"}
                     </Button>
                 </div>
-                {master.limiter_enabled && (
-                    <div className="space-y-2">
-                        <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-                            Threshold
-                        </Label>
-                        <div className="flex items-center gap-2">
-                            <Slider
-                                value={[master.limiter_threshold]}
-                                onValueChange={(values) => setLimiterThreshold(values[0])}
-                                min={-12}
-                                max={0}
-                                step={0.1}
-                                className="flex-1"
-                            />
-                            <span className="w-14 text-right text-[10px] font-mono font-bold text-primary">
-                                {formatDb(master.limiter_threshold)}
-                            </span>
-                        </div>
+                <div className={cn("space-y-2", !master.limiter_enabled && "opacity-50 pointer-events-none")}>
+                    <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                        Threshold
+                    </Label>
+                    <div className="flex items-center gap-2">
+                        <Slider
+                            value={[master.limiter_threshold]}
+                            onValueChange={(values) => setLimiterThreshold(values[0])}
+                            min={-12}
+                            max={0}
+                            step={0.1}
+                            className="flex-1"
+                            disabled={!master.limiter_enabled}
+                        />
+                        <span className="w-14 text-right text-[10px] font-mono font-bold text-primary">
+                            {formatDb(master.limiter_threshold)}
+                        </span>
                     </div>
-                )}
+                </div>
             </div>
 
             {/* Fader Section */}

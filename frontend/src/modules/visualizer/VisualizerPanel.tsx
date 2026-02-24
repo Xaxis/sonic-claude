@@ -37,7 +37,7 @@ interface AudioStats {
     isClipping: boolean;
 }
 
-export function LoopVisualizerPanel() {
+export function VisualizerPanel() {
     // Get spectrum and waveform from Zustand store
     const spectrum = useDAWStore(state => state.spectrum);
     const waveform = useDAWStore(state => state.waveform);
@@ -142,8 +142,6 @@ export function LoopVisualizerPanel() {
             ctx.fillRect(x, y, Math.max(1, barWidth - 1), barHeight);
         });
     }, [spectrum]);
-
-
 
     return (
         <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
