@@ -78,9 +78,7 @@ export function SequencerSampleEditor({
     const handleGainChange = async (value: number[]) => {
         const newGain = value[0];
         setLocalGain(newGain);
-        if (activeComposition) {
-            await updateClip(activeComposition.id, clipId, { gain: newGain });
-        }
+        await updateClip(clipId, { gain: newGain });
     };
 
     const handleClose = () => {

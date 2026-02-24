@@ -1,28 +1,26 @@
 /**
  * SequencerSampleEditorWrapper Component
  *
- * REFACTORED: Uses Zustand best practices
- * - Receives clip, clipDragState, totalBeats, and scroll ref from parent
- * - Handles validation and empty states
- * - Force re-render when clip changes
+ * REFACTORED: Minimal wrapper for sample editor
+ * - SequencerSampleEditor now reads from Zustand directly (transport, etc.)
+ * - This wrapper only handles empty states and clip validation
+ * - No adapter layer needed - SequencerSampleEditor is self-contained
  *
- * This is the "glue" layer between SequencerSplitLayout and SequencerSampleEditor.
+ * Responsibilities:
+ * 1. Empty state when no clip is selected
+ * 2. Clip type validation (audio vs MIDI)
+ * 3. Drag state sync with timeline (for real-time visual updates)
  */
 
 import { SequencerSampleEditor } from "./SequencerSampleEditor.tsx";
 import { Music } from "lucide-react";
-import type { Clip } from '@/types/daw.types';
-
-interface ClipDragState {
-    startTime: number;
-    duration: number;
-}
+import type { SequencerClip } from "../../types.ts";
 
 interface SequencerSampleEditorWrapperProps {
-    clip: Clip | undefined; // ✅ Data from parent - acceptable
-    clipDragState: ClipDragState | null; // ✅ Data from parent - acceptable
-    totalBeats: number; // ✅ Calculation from parent - acceptable
-    sampleEditorScrollRef: React.RefObject<HTMLDivElement | null>; // ✅ Scroll ref - acceptable
+    clip: SequencerClip | undefined;
+    clipDragState?: { startTime: number; duration: number } | null;
+    totalBeats: number;
+    sampleEditorScrollRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export function SequencerSampleEditorWrapper({
@@ -31,6 +29,7 @@ export function SequencerSampleEditorWrapper({
     totalBeats,
     sampleEditorScrollRef,
 }: SequencerSampleEditorWrapperProps) {
+    // No adapter layer needed - SequencerSampleEditor reads from Zustand directly
     // Suppress unused variable warnings - will be used when needed
     void totalBeats;
 

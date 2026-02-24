@@ -168,6 +168,8 @@ interface DAWStore {
     showSequenceSettings: boolean;
     showPianoRoll: boolean;
     pianoRollClipId: string | null;
+    showSampleEditor: boolean;
+    sampleEditorClipId: string | null;
 
     // Mixer UI
     showMeters: boolean;
@@ -317,6 +319,8 @@ interface DAWStore {
     setShowSequenceSettings: (show: boolean) => void;
     openPianoRoll: (clipId: string) => void;
     closePianoRoll: () => void;
+    openSampleEditor: (clipId: string) => void;
+    closeSampleEditor: () => void;
     setShowMeters: (show: boolean) => void;
     setMeterMode: (mode: "peak" | "rms" | "both") => void;
     setSelectedChannelId: (id: string | null) => void;
@@ -412,6 +416,8 @@ export const useDAWStore = create<DAWStore>()(
         showSequenceSettings: false,
         showPianoRoll: false,
         pianoRollClipId: null,
+        showSampleEditor: false,
+        sampleEditorClipId: null,
         showMeters: true,
         meterMode: "both",
         selectedChannelId: null,
@@ -1624,6 +1630,16 @@ export const useDAWStore = create<DAWStore>()(
         closePianoRoll: () => set({
             showPianoRoll: false,
             pianoRollClipId: null
+        }),
+
+        openSampleEditor: (clipId) => set({
+            showSampleEditor: true,
+            sampleEditorClipId: clipId
+        }),
+
+        closeSampleEditor: () => set({
+            showSampleEditor: false,
+            sampleEditorClipId: null
         }),
 
         setShowMeters: (show) => set({ showMeters: show }),
