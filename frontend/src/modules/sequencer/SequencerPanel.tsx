@@ -246,8 +246,8 @@ export function SequencerPanel() {
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 overflow-hidden">
-                <SubPanel title="SEQUENCER" showHeader={false}>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                <SubPanel title="SEQUENCER" showHeader={false} contentOverflow="hidden">
                     <SequencerSplitLayout
                         activeNotes={activeNotes}
                         onToggleMute={handleToggleMute}

@@ -173,8 +173,8 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden sequencer-split-container">
             {/* Timeline Section - Top (resizable) */}
             <div
-                className="min-h-0 flex relative overflow-hidden"
-                style={{ height: `${timelineHeightPercent}%` }}
+                className="min-h-0 overflow-hidden"
+                style={{ flexGrow: timelineHeightPercent, flexShrink: 1, flexBasis: 0 }}
             >
                 <SequencerTimelineSection
                     {...timelineSectionProps}
@@ -187,7 +187,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
 
             {/* Resizable Divider */}
             <div
-                className={`h-1 border-t border-border bg-background hover:bg-accent cursor-row-resize flex items-center justify-center group ${isDragging ? 'bg-accent' : ''}`}
+                className={`h-1 flex-shrink-0 border-t border-border bg-background hover:bg-accent cursor-row-resize flex items-center justify-center group ${isDragging ? 'bg-accent' : ''}`}
                 onMouseDown={handleDividerMouseDown}
                 onDoubleClick={handleDividerDoubleClick}
                 title="Drag to resize, double-click to reset"
@@ -198,7 +198,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
             {/* Editor Section - Bottom (resizable) - Piano Roll or Sample Editor */}
             <div
                 className="min-h-0 overflow-hidden"
-                style={{ height: `${100 - timelineHeightPercent}%` }}
+                style={{ flexGrow: 100 - timelineHeightPercent, flexShrink: 1, flexBasis: 0 }}
             >
                 <div className="h-full flex flex-col overflow-hidden">
                     {showPianoRoll ? (
