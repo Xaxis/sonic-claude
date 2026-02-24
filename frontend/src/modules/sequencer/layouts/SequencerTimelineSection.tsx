@@ -3,9 +3,8 @@
  *
  * REFACTORED: Pure layout component using Zustand best practices
  * - No prop drilling - child components read from store directly
- * - Only manages local UI state
- * @TODO - Investigate why drag state is still being prop drilled here
- * - Only receives scroll ref and drag state callback
+ * - Only manages local UI state (expandedTracks)
+ * - Only receives scroll ref
  *
  * Shared layout component for timeline + track list.
  * Used by both timeline-only and split-view modes.
@@ -26,14 +25,10 @@ import { useDAWStore } from '@/stores/dawStore';
 interface SequencerTimelineSectionProps {
     // Scroll ref for auto-scroll functionality
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
-
-    // Drag state handler (for piano roll sync)
-    onClipDragStateChange?: (clipId: string, dragState: { startTime: number; duration: number } | null) => void;
 }
 
 export function SequencerTimelineSection({
     timelineScrollRef,
-    onClipDragStateChange,
 }: SequencerTimelineSectionProps) {
     // ========================================================================
     // ACTIONS: Get scroll action from Zustand store
@@ -78,7 +73,6 @@ export function SequencerTimelineSection({
                 <SequencerTimeline
                     expandedTracks={expandedTracks}
                     scrollContainerRef={timelineScrollRef}
-                    onClipDragStateChange={onClipDragStateChange}
                 />
             }
             sidebarWidth={256}

@@ -48,23 +48,10 @@ export function SequencerSplitLayout({
     });
     const [isDragging, setIsDragging] = useState(false);
 
-    // Track clip drag states for piano roll sync
-    const [clipDragStates, setClipDragStates] = useState<Map<string, { startTime: number; duration: number } | null>>(new Map());
-
     // ========================================================================
-    // HANDLERS: Clip drag state sync
+    // STATE: Read clip drag states from Zustand
     // ========================================================================
-    const handleClipDragStateChange = useCallback((clipId: string, dragState: { startTime: number; duration: number } | null) => {
-        setClipDragStates(prev => {
-            const next = new Map(prev);
-            if (dragState === null) {
-                next.delete(clipId);
-            } else {
-                next.set(clipId, dragState);
-            }
-            return next;
-        });
-    }, []);
+    const clipDragStates = useDAWStore(state => state.clipDragStates);
 
     // Save split ratio to localStorage
     useEffect(() => {
@@ -138,7 +125,6 @@ export function SequencerSplitLayout({
             >
                 <SequencerTimelineSection
                     timelineScrollRef={timelineScrollRef}
-                    onClipDragStateChange={handleClipDragStateChange}
                 />
             </div>
 

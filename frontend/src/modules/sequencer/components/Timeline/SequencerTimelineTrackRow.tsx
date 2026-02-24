@@ -45,7 +45,6 @@ interface SequencerTimelineTrackRowProps {
     onUpdateClip?: (clipId: string, updates: { gain?: number; audio_offset?: number }) => void;
     onOpenPianoRoll?: (clipId: string) => void;
     onOpenSampleEditor?: (clipId: string) => void;
-    onClipDragStateChange?: (clipId: string, dragState: { startTime: number; duration: number } | null) => void;
 }
 
 export function SequencerTimelineTrackRow({
@@ -62,7 +61,6 @@ export function SequencerTimelineTrackRow({
     onUpdateClip,
     onOpenPianoRoll,
     onOpenSampleEditor,
-    onClipDragStateChange,
 }: SequencerTimelineTrackRowProps) {
     // Get state from Zustand store
     const zoom = useDAWStore(state => state.zoom);
@@ -141,7 +139,6 @@ export function SequencerTimelineTrackRow({
                         onUpdateClip={onUpdateClip}
                         onOpenPianoRoll={onOpenPianoRoll}
                         onOpenSampleEditor={onOpenSampleEditor}
-                        onClipDragStateChange={onClipDragStateChange}
                     />
                 ))}
         </div>

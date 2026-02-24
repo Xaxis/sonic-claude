@@ -30,7 +30,6 @@ interface SequencerClipProps {
     onUpdateClip?: (clipId: string, updates: { gain?: number; audio_offset?: number; midi_events?: MIDIEvent[] }) => void; // Update clip properties
     onOpenPianoRoll?: (clipId: string) => void; // Open piano roll for MIDI clips
     onOpenSampleEditor?: (clipId: string) => void; // Open sample editor for audio clips
-    onClipDragStateChange?: (clipId: string, dragState: { startTime: number; duration: number } | null) => void; // Report live drag state for piano roll sync
 }
 
 export function SequencerClip({
@@ -48,9 +47,10 @@ export function SequencerClip({
     onUpdateClip,
     onOpenPianoRoll,
     onOpenSampleEditor,
-    onClipDragStateChange,
 }: SequencerClipProps) {
-    // Get state from Zustand store
+    // ========================================================================
+    // STATE: Read from Zustand store
+    // ========================================================================
     const activeComposition = useDAWStore(state => state.activeComposition);
     const tempo = activeComposition?.tempo ?? 120;
     const zoom = useDAWStore(state => state.zoom);
@@ -58,6 +58,11 @@ export function SequencerClip({
     const gridSize = useDAWStore(state => state.gridSize);
     const selectedClipId = useDAWStore(state => state.selectedClipId);
     const isSelected = selectedClipId === clip.id;
+
+    // ========================================================================
+    // ACTIONS: Get from Zustand store
+    // ========================================================================
+    const setClipDragState = useDAWStore(state => state.setClipDragState);
 
     // Load waveform data using hook (200 samples for clip preview)
     const { leftData: waveformData } = useWaveformData({
@@ -74,15 +79,15 @@ export function SequencerClip({
     const [dragStartDuration, setDragStartDuration] = useState(0);
     const [lastClickTime, setLastClickTime] = useState(0);
 
-    // Drag state - use state instead of ref so it triggers re-renders
+    // ========================================================================
+    // LOCAL STATE: Drag state for live updates
+    // ========================================================================
     const [dragState, setDragState] = useState<{ startTime: number; duration: number } | null>(null);
 
-    // Report drag state changes to parent (for piano roll sync)
+    // Report drag state changes to Zustand (for piano roll sync)
     useEffect(() => {
-        if (onClipDragStateChange) {
-            onClipDragStateChange(clip.id, dragState);
-        }
-    }, [dragState, clip.id, onClipDragStateChange]);
+        setClipDragState(clip.id, dragState);
+    }, [dragState, clip.id, setClipDragState]);
 
     // Clear drag state when backend syncs (clip props match drag state)
     useEffect(() => {

@@ -399,6 +399,9 @@ export const useDAWStore = create<DAWStore>()(
         loopEnd: 16,
         selectedClipId: null,
 
+        // Clip Drag State
+        clipDragStates: new Map(),
+
         // Scroll State
         timelineScrollLeft: 0,
         pianoRollScrollLeft: 0,
@@ -1574,6 +1577,35 @@ export const useDAWStore = create<DAWStore>()(
             }
         },
         setSelectedClipId: (id) => set({ selectedClipId: id }),
+
+        // Clip drag state actions - for live updates during drag operations
+        setClipDragState: (clipId, dragState) => {
+            if (dragState === null) {
+                // Remove drag state
+                set((state) => {
+                    const newMap = new Map(state.clipDragStates);
+                    newMap.delete(clipId);
+                    return { clipDragStates: newMap };
+                });
+            } else {
+                // Set drag state
+                set((state) => {
+                    const newMap = new Map(state.clipDragStates);
+                    newMap.set(clipId, dragState);
+                    return { clipDragStates: newMap };
+                });
+            }
+        },
+        clearClipDragState: (clipId) => {
+            set((state) => {
+                const newMap = new Map(state.clipDragStates);
+                newMap.delete(clipId);
+                return { clipDragStates: newMap };
+            });
+        },
+        clearAllClipDragStates: () => {
+            set({ clipDragStates: new Map() });
+        },
 
         // Scroll actions - simple state updates, no side effects
         setTimelineScrollLeft: (scrollLeft) => set({ timelineScrollLeft: scrollLeft }),

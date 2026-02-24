@@ -24,13 +24,11 @@ import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts"
 interface SequencerTimelineProps {
     expandedTracks?: Set<string>; // Track header expansion state (local UI state, not in Zustand)
     scrollContainerRef?: React.RefObject<HTMLDivElement | null>; // Ref to scroll container for auto-scroll
-    onClipDragStateChange?: (clipId: string, dragState: { startTime: number; duration: number } | null) => void; // For piano roll sync
 }
 
 export function SequencerTimeline({
     expandedTracks,
     scrollContainerRef,
-    onClipDragStateChange,
 }: SequencerTimelineProps) {
     // ========================================================================
     // STATE: Read directly from Zustand store
@@ -158,7 +156,6 @@ export function SequencerTimeline({
                             onUpdateClip={handleUpdateClip}
                             onOpenPianoRoll={openPianoRoll}
                             onOpenSampleEditor={() => {}} // TODO: Implement sample editor
-                            onClipDragStateChange={onClipDragStateChange}
                         />
                     ))}
 
