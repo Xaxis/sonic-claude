@@ -33,6 +33,10 @@ export function WebSocketSync() {
     // Sync transport data
     useEffect(() => {
         if (transport) {
+            // Debug: Log active notes when transport updates (only when notes are active)
+            if (transport.active_notes && transport.active_notes.length > 0) {
+                console.log('📡 WebSocket transport update - active_notes:', transport.active_notes);
+            }
             setTransport(transport);
         }
     }, [transport, setTransport]);

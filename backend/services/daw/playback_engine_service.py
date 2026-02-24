@@ -152,15 +152,31 @@ class PlaybackEngineService:
 
                 # Handle loop region: if loop is enabled and we've passed loop_end, jump back to loop_start
                 if composition.loop_enabled and self.playhead_position >= composition.loop_end:
+                    logger.info(f"🔁 Looping back: {composition.loop_end:.2f} → {composition.loop_start:.2f} beats")
+
                     # Free all active synths before looping back
                     if self.engine_manager:
                         for clip_id, node_id in list(self.active_synths.items()):
                             self.engine_manager.send_message("/n_free", node_id)
                         self.active_synths.clear()
 
+                    # FIX: Cancel all MIDI note tasks before looping
+                    logger.info(f"🔁 Cancelling {len(self.midi_note_tasks)} MIDI note tasks for loop")
+                    for task in list(self.midi_note_tasks):
+                        task.cancel()
+                    # Wait for all tasks to be cancelled
+                    if self.midi_note_tasks:
+                        await asyncio.gather(*self.midi_note_tasks, return_exceptions=True)
+                    self.midi_note_tasks.clear()
+
+                    # FIX: Free all active MIDI notes
+                    if self.engine_manager:
+                        for node_id in list(self.active_midi_notes.keys()):
+                            self.engine_manager.send_message("/n_free", node_id)
+                    self.active_midi_notes.clear()
+
                     # Jump back to loop start
                     self.playhead_position = composition.loop_start
-                    logger.info(f"🔁 Looping back: {composition.loop_end:.2f} → {composition.loop_start:.2f} beats")
 
                 # Update composition position
                 composition.current_position = self.playhead_position
@@ -527,10 +543,15 @@ class PlaybackEngineService:
                         logger.info(f"      ✅ SCHEDULED! node={node_id}, freq={freq:.2f}Hz, amp={amp:.2f}, delay={delay_seconds:.2f}s, bus={track_bus}")
 
                         # Schedule note start and release
-                        async def play_note(nid, freq_val, amp_val, synth, delay, dur_beats, note_pitch, clip_id_val, out_bus):
+                        # FIX: Pass note_start_time as parameter to avoid Python closure bug
+                        async def play_note(nid, freq_val, amp_val, synth, delay, dur_beats, note_pitch, note_start_time, clip_id_val, out_bus):
                             try:
+                                logger.info(f"⏰ MIDI Note Task Started: nid={nid}, delay={delay:.3f}s, synth={synth}, freq={freq_val:.2f}Hz, amp={amp_val:.3f}, bus={out_bus}")
                                 await asyncio.sleep(delay)
+
                                 if self.engine_manager and self.is_playing:
+                                    logger.info(f"🎵 TRIGGERING MIDI NOTE: nid={nid}, synth={synth}, freq={freq_val:.2f}Hz, amp={amp_val:.3f}, gate=1, out={out_bus}")
+
                                     # Start the note
                                     self.engine_manager.send_message(
                                         "/s_new",
@@ -543,32 +564,45 @@ class PlaybackEngineService:
                                         "gate", 1,
                                         "out", out_bus  # Route to track bus
                                     )
+
                                     # Track active note for visual feedback
                                     self.active_midi_notes[nid] = {
                                         "clip_id": clip_id_val,
                                         "note": note_pitch,
-                                        "start_time": note.start_time,  # Position in clip (beats)
+                                        "start_time": note_start_time,  # FIX: Use parameter instead of closure variable
                                         "wall_time": time.time()  # Wall clock time for debugging
                                     }
+                                    logger.info(f"✅ MIDI note {nid} STARTED: pitch={note_pitch}, start_time={note_start_time}, clip={clip_id_val}")
+
                                     # Schedule release
                                     note_duration = dur_beats * (60.0 / self.tempo)
+                                    logger.info(f"⏱️  MIDI note {nid} will release in {note_duration:.3f}s")
                                     await asyncio.sleep(note_duration)
+
                                     if self.engine_manager:
+                                        logger.info(f"🔇 RELEASING MIDI note {nid}: sending gate=0")
                                         self.engine_manager.send_message("/n_set", nid, "gate", 0)
+
                                     # Remove from active notes
                                     if nid in self.active_midi_notes:
                                         del self.active_midi_notes[nid]
-                                    logger.debug(f"🔇 Released MIDI note {nid}")
+                                    logger.info(f"✅ MIDI note {nid} RELEASED")
+                                else:
+                                    logger.warning(f"⚠️  MIDI note {nid} NOT triggered: engine_manager={self.engine_manager is not None}, is_playing={self.is_playing}")
+
                             except asyncio.CancelledError:
                                 # Task was cancelled (pause/stop was called)
+                                logger.info(f"🛑 MIDI note {nid} task CANCELLED")
                                 # Free the synth if it was started
                                 if nid in self.active_midi_notes:
                                     if self.engine_manager:
                                         self.engine_manager.send_message("/n_free", nid)
                                     del self.active_midi_notes[nid]
                                 raise  # Re-raise to mark task as cancelled
+                            except Exception as e:
+                                logger.error(f"❌ MIDI note {nid} task FAILED: {e}", exc_info=True)
 
-                        task = asyncio.create_task(play_note(node_id, freq, amp, synthdef, delay_seconds, note.duration, note.note, clip.id, track_bus))
+                        task = asyncio.create_task(play_note(node_id, freq, amp, synthdef, delay_seconds, note.duration, note.note, note.start_time, clip.id, track_bus))
                         self.midi_note_tasks.add(task)
                         # Remove task from set when it completes
                         task.add_done_callback(self.midi_note_tasks.discard)

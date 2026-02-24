@@ -13,6 +13,7 @@ export interface BaseWebSocketMessage {
 
 /**
  * Active Note (for transport messages)
+ * Represents a MIDI note that is currently playing
  */
 export interface ActiveNote {
     clip_id: string;

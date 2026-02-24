@@ -62,6 +62,13 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     // Transport state
     const activeNotes = transport?.active_notes || [];
 
+    // Debug: Log active notes when they change (only in development)
+    useEffect(() => {
+        if (activeNotes.length > 0) {
+            console.log('🎵 Active notes:', activeNotes);
+        }
+    }, [activeNotes]);
+
     // Piano roll settings (constants)
     const minPitch = 21; // A0 - Full piano range
     const maxPitch = 108; // C8

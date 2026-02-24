@@ -100,12 +100,18 @@ class AudioEngineManager:
             raise RuntimeError("Not connected to SuperCollider")
 
         try:
-            # Log /n_free and /n_set messages to debug pause issue
-            if address in ["/n_free", "/n_set"]:
-                logger.info(f"📤 Sending OSC: {address} {args}")
-            self.scsynth_client.send_message(address, args if args else [])
+            # Convert args tuple to list for python-osc
+            args_list = list(args) if args else []
+
+            # Log ALL OSC messages for debugging
+            logger.info(f"📤 OSC → {address} {args_list}")
+
+            # Send to SuperCollider
+            self.scsynth_client.send_message(address, args_list)
+
         except Exception as e:
-            logger.error(f"❌ Failed to send OSC message {address}: {e}")
+            logger.error(f"❌ Failed to send OSC message {address} {args_list}: {e}")
+            logger.error(f"   Args type: {type(args)}, Args list type: {type(args_list)}")
             raise
     
     def allocate_node_id(self) -> int:

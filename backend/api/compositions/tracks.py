@@ -169,9 +169,9 @@ async def delete_track(
 ):
     """Delete a track from the composition"""
     try:
-        success = composition_state_service.delete_track(composition_id, track_id)
+        success = composition_state_service.delete_track(track_id)
         if not success:
-            raise ResourceNotFoundError(f"Track {track_id} not found in composition {composition_id}")
+            raise ResourceNotFoundError(f"Track {track_id} not found")
 
         # AUTO-PERSIST: Keep current.json in sync with memory
         composition_service.auto_persist_composition(
