@@ -1,24 +1,34 @@
 /**
  * EditorGridLayout - Reusable layout component for timeline-based editors
  *
- * Implements the industry-standard CSS Grid (2x2) synchronized scroll pattern
- * used by Google Sheets, Airtable, Excel Online, and Notion.
+ * BEST PRACTICE IMPLEMENTATION: Single scroll container with position: sticky
+ * This is the industry-standard pattern used by Google Sheets, Airtable, Excel Online, Notion, and all professional DAWs.
  *
  * Architecture:
  * ┌─────────────────┬──────────────────────┐
- * │ Corner Header   │ Ruler (H-scroll)     │ ← Fixed row (headerHeight)
+ * │ Corner Header   │ Ruler                │ ← position: sticky (top: 0)
+ * │ (sticky)        │ (sticky top)         │
  * ├─────────────────┼──────────────────────┤
- * │ Sidebar         │ Main Content         │
- * │ (V-scroll only) │ (H+V scroll, master) │ ← Scrollable row
+ * │ Track Header 1  │ Timeline Row 1       │
+ * │ (sticky left)   │                      │
+ * ├─────────────────┼──────────────────────┤
+ * │ Track Header 2  │ Timeline Row 2       │
+ * │ (sticky left)   │                      │
  * └─────────────────┴──────────────────────┘
- *       ↑                    ↑
- *   sidebarWidth          Flexible
  *
- * Scroll Synchronization:
- * - Main content scrolls → syncs sidebar vertical scroll
- * - Main content scrolls → syncs ruler horizontal scroll
- * - Minimal JavaScript overhead, GPU-accelerated
- * - No jumpy/laggy scroll behavior
+ * Key Benefits:
+ * - SINGLE scroll container (no JavaScript scroll synchronization needed!)
+ * - Perfect scroll sync (CSS handles it natively)
+ * - GPU-accelerated (position: sticky is hardware-accelerated)
+ * - No lag, no jank, no out-of-sync issues
+ * - Simpler code, better performance
+ *
+ * How it works:
+ * - One scrollable container wraps everything
+ * - Corner header: position: sticky, top: 0, left: 0, z-index: 3
+ * - Ruler: position: sticky, top: 0, z-index: 2
+ * - Track headers: position: sticky, left: 0, z-index: 1
+ * - Timeline rows: normal flow
  *
  * Usage:
  * ```tsx
@@ -36,7 +46,7 @@
  * ```
  */
 
-import React, { useCallback, useRef, useEffect } from "react";
+import React from "react";
 
 export interface EditorGridLayoutProps {
     // Layout regions (React nodes)
@@ -54,9 +64,9 @@ export interface EditorGridLayoutProps {
     scrollRef: React.RefObject<HTMLDivElement | null>;
     onScroll: (e: React.UIEvent<HTMLDivElement>) => void;
 
-    // Data attributes for scroll sync (optional, defaults provided)
-    rulerScrollDataAttr?: string; // Default: "data-ruler-scroll"
-    sidebarScrollDataAttr?: string; // Default: "data-sidebar-scroll"
+    // Data attributes (kept for compatibility, but not used for scroll sync anymore)
+    rulerScrollDataAttr?: string;
+    sidebarScrollDataAttr?: string;
 }
 
 export function EditorGridLayout({
@@ -69,115 +79,71 @@ export function EditorGridLayout({
     contentWidth,
     scrollRef,
     onScroll,
-    rulerScrollDataAttr = "data-ruler-scroll",
-    sidebarScrollDataAttr = "data-sidebar-scroll",
 }: EditorGridLayoutProps) {
-    // Use refs instead of querySelector for better performance (Google Sheets pattern)
-    const rulerRef = useRef<HTMLDivElement>(null);
-    const sidebarRef = useRef<HTMLDivElement>(null);
-    const rafRef = useRef<number | null>(null);
-
-    /**
-     * BEST PRACTICE: Use requestAnimationFrame for scroll synchronization
-     * This is the pattern used by Google Sheets, Airtable, Excel Online, and Notion
-     *
-     * Benefits:
-     * 1. Batches scroll updates with browser's paint cycle (60fps)
-     * 2. Prevents layout thrashing by batching DOM reads/writes
-     * 3. GPU-accelerated, smooth scrolling
-     * 4. Automatically throttled to display refresh rate
-     */
-    const handleMainScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-        // CRITICAL: Capture scroll values immediately (e.currentTarget becomes null in rAF)
-        const scrollTop = e.currentTarget.scrollTop;
-        const scrollLeft = e.currentTarget.scrollLeft;
-
-        // Cancel any pending animation frame to avoid stacking updates
-        if (rafRef.current !== null) {
-            cancelAnimationFrame(rafRef.current);
-        }
-
-        // Schedule scroll sync for next animation frame
-        rafRef.current = requestAnimationFrame(() => {
-            // Sync sidebar vertical scroll (use ref for better performance)
-            if (sidebarRef.current && sidebarRef.current.scrollTop !== scrollTop) {
-                sidebarRef.current.scrollTop = scrollTop;
-            }
-
-            // Sync ruler horizontal scroll (use ref for better performance)
-            if (rulerRef.current && rulerRef.current.scrollLeft !== scrollLeft) {
-                rulerRef.current.scrollLeft = scrollLeft;
-            }
-
-            rafRef.current = null;
-        });
-
-        // Call parent handler for additional sync (e.g., cross-editor sync)
-        onScroll(e);
-    }, [onScroll]);
-
-    // Cleanup animation frame on unmount
-    useEffect(() => {
-        return () => {
-            if (rafRef.current !== null) {
-                cancelAnimationFrame(rafRef.current);
-            }
-        };
-    }, []);
-
     return (
         <div
-            className="flex-1 min-h-0"
+            ref={scrollRef}
+            className="flex-1 min-h-0 overflow-auto"
+            onScroll={onScroll}
             style={{
-                display: 'grid',
-                gridTemplateColumns: `${sidebarWidth}px 1fr`,
-                gridTemplateRows: `${headerHeight}px 1fr`,
+                // BEST PRACTICE: Single scroll container
+                position: 'relative',
+                height: '100%',
             }}
         >
-            {/* Top-Left: Corner Header - Fixed, no scroll */}
-            <div className="border-r border-b border-border bg-muted/30 flex items-center px-3">
-                {cornerHeader}
-            </div>
-
-            {/* Top-Right: Ruler - Scrolls horizontally only, synced with main content */}
+            {/* BEST PRACTICE: Use CSS Grid for layout */}
             <div
-                ref={rulerRef}
-                {...{ [rulerScrollDataAttr]: "" }}
-                className="border-b border-border overflow-x-auto overflow-y-hidden scrollbar-hide"
                 style={{
-                    // BEST PRACTICE: Use will-change for GPU acceleration (Google Sheets pattern)
-                    willChange: 'scroll-position',
+                    display: 'grid',
+                    gridTemplateColumns: `${sidebarWidth}px ${contentWidth}px`,
+                    gridAutoRows: 'auto',
+                    minWidth: `${sidebarWidth + contentWidth}px`,
                 }}
             >
-                <div style={{ width: `${contentWidth}px`, minWidth: `${contentWidth}px` }}>
+                {/* Top-Left: Corner Header - Sticky to top-left corner */}
+                <div
+                    className="border-r border-b border-border bg-muted/30 flex items-center px-3"
+                    style={{
+                        position: 'sticky',
+                        top: 0,
+                        left: 0,
+                        height: `${headerHeight}px`,
+                        zIndex: 30, // Highest z-index (on top of everything)
+                        backgroundColor: 'hsl(var(--muted) / 0.3)',
+                    }}
+                >
+                    {cornerHeader}
+                </div>
+
+                {/* Top-Right: Ruler - Sticky to top */}
+                <div
+                    className="border-b border-border"
+                    style={{
+                        position: 'sticky',
+                        top: 0,
+                        height: `${headerHeight}px`,
+                        zIndex: 20, // Below corner header
+                        backgroundColor: 'hsl(var(--background))',
+                    }}
+                >
                     {ruler}
                 </div>
-            </div>
 
-            {/* Bottom-Left: Sidebar - Scrolls vertically only, synced with main content */}
-            <div
-                ref={sidebarRef}
-                {...{ [sidebarScrollDataAttr]: "" }}
-                className="border-r border-border bg-background overflow-y-auto overflow-x-hidden scrollbar-hide"
-                style={{
-                    // BEST PRACTICE: Use will-change for GPU acceleration (Google Sheets pattern)
-                    willChange: 'scroll-position',
-                }}
-            >
-                {sidebar}
-            </div>
+                {/* Bottom-Left: Sidebar (Track Headers) - Sticky to left */}
+                <div
+                    className="border-r border-border bg-background"
+                    style={{
+                        position: 'sticky',
+                        left: 0,
+                        zIndex: 10, // Below ruler and corner
+                        backgroundColor: 'hsl(var(--background))',
+                    }}
+                >
+                    {sidebar}
+                </div>
 
-            {/* Bottom-Right: Main Content - Scrolls both directions, has scrollbar */}
-            <div
-                ref={scrollRef}
-                className="overflow-auto"
-                onScroll={handleMainScroll}
-                style={{
-                    // BEST PRACTICE: Use will-change for GPU acceleration (Google Sheets pattern)
-                    willChange: 'scroll-position',
-                }}
-            >
-                <div style={{ width: `${contentWidth}px`, minWidth: `${contentWidth}px` }}>
+                {/* Bottom-Right: Main Content (Timeline) - Normal flow */}
+                <div>
                     {mainContent}
                 </div>
             </div>

@@ -173,7 +173,7 @@ export function SequencerSplitLayout(props: SequencerSplitLayoutProps) {
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden sequencer-split-container">
             {/* Timeline Section - Top (resizable) */}
             <div
-                className="min-h-0 overflow-hidden"
+                className="min-h-0 flex flex-col overflow-hidden"
                 style={{ flexGrow: timelineHeightPercent, flexShrink: 1, flexBasis: 0 }}
             >
                 <SequencerTimelineSection
