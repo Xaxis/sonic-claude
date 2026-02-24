@@ -1,115 +1,102 @@
 /**
  * SequencerPianoRoll - Piano roll MIDI editor (bottom panel)
  *
- * REFACTORED: Uses Zustand best practices
- * - Reads state directly from store (transport, activeNotes, etc.)
- * - Calls actions directly from store (updateClip, seek, setLoopStart, etc.)
- * - Only receives clip data props (no callback props)
- *
- * Shows when a MIDI clip is selected. Allows visual editing of MIDI notes.
- * Displays as a bottom panel in the sequencer (like Ableton's clip view).
+ * REFACTORED: Self-contained component following Zustand best practices
+ * - Reads ALL state from Zustand (no prop drilling)
+ * - Composes SequencerGridLayout with keyboard, ruler, and grid
  */
 
-import { useState, useEffect } from "react";
-import { X, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button.tsx";
+import { X, Music } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
-import { SequencerPianoRollSection } from "@/modules/sequencer/components/PianoRoll/SequencerPianoRollSection.tsx";
+import { SequencerPianoRollKeyboard } from "./SequencerPianoRollKeyboard.tsx";
+import { SequencerPianoRollGrid } from "./SequencerPianoRollGrid.tsx";
+import { SequencerPianoRollRuler } from "./SequencerPianoRollRuler.tsx";
+import { SequencerTimelineLoopRegion } from "../Timeline/SequencerTimelineLoopRegion.tsx";
+import { SequencerGridLayout } from "../Layouts/SequencerGridLayout.tsx";
 import { useDAWStore } from '@/stores/dawStore';
-import type { MIDIEvent } from "../../types.ts";
+import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
 
 interface SequencerPianoRollProps {
-    // Clip data (read-only props)
-    clipId: string;
-    clipName: string;
-    clipDuration: number; // beats
-    clipStartTime: number; // beats - position in sequence
-    midiEvents: MIDIEvent[];
-    totalBeats: number; // Total composition length in beats
-    instrument?: string; // Instrument/synthdef for note preview
-
-    // Scroll ref (for scroll sync)
+    // Only receives scroll ref (follows SequencerTimelineSection pattern)
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export function SequencerPianoRoll({
-    clipId,
-    clipName,
-    midiEvents,
     pianoRollScrollRef,
 }: SequencerPianoRollProps) {
     // ========================================================================
     // STATE: Read from Zustand store
     // ========================================================================
+    const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
     const clips = useDAWStore(state => state.clips);
 
     // ========================================================================
-    // ACTIONS: Get directly from Zustand store
+    // ACTIONS: Get from Zustand store
     // ========================================================================
     const closePianoRoll = useDAWStore(state => state.closePianoRoll);
-    const updateClip = useDAWStore(state => state.updateClip);
+    const setPianoRollScrollLeft = useDAWStore(state => state.setPianoRollScrollLeft);
 
     // ========================================================================
-    // DERIVED STATE: Get clip data for header display
+    // SHARED TIMELINE CALCULATIONS
     // ========================================================================
-    const clip = clips.find(c => c.id === clipId);
-    const clipStartTime = clip?.start_time || 0;
-    const clipDuration = clip?.duration || 0;
+    const { totalWidth } = useTimelineCalculations();
 
     // ========================================================================
     // LOCAL UI STATE (not persisted to store)
     // ========================================================================
-    const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
-    const [copiedNotes, setCopiedNotes] = useState<MIDIEvent[]>([]);
+    // Note: selectedNotes and copiedNotes are now managed in SequencerPianoRollGrid
 
     // ========================================================================
-    // HANDLERS: Local UI state management only
+    // DERIVED STATE: Get clip data
     // ========================================================================
-    const handleDeleteSelected = async () => {
-        await updateClip(clipId, { midi_events: midiEvents.filter((_, i) => !selectedNotes.has(i)) });
-        setSelectedNotes(new Set());
+    const clip = pianoRollClipId ? clips.find(c => c.id === pianoRollClipId) : undefined;
+    const midiEvents = clip?.type === 'midi' ? (clip.midi_events || []) : [];
+
+    // ========================================================================
+    // HANDLERS: Scroll synchronization
+    // ========================================================================
+    const handlePianoRollScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const scrollLeft = e.currentTarget.scrollLeft;
+        setPianoRollScrollLeft(scrollLeft);
     };
 
-    const handleCopyNotes = () => {
-        const notesToCopy = Array.from(selectedNotes).map(i => midiEvents[i]);
-        setCopiedNotes(notesToCopy);
-    };
+    // ========================================================================
+    // EMPTY STATES
+    // ========================================================================
 
-    const handlePasteNotes = async () => {
-        if (copiedNotes.length === 0) return;
+    // No clip selected
+    if (!clip) {
+        return (
+            <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center overflow-hidden min-h-0 min-w-0">
+                <div className="text-muted-foreground">
+                    <Music size={48} className="mx-auto mb-4 opacity-20" />
+                    <div className="text-base font-medium mb-1">No MIDI Clip Selected</div>
+                    <div className="text-xs text-muted-foreground/70">
+                        Double-click a MIDI clip in the timeline above to open it in the piano roll editor.
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
-        // Find the earliest start time in copied notes
-        const minStartTime = Math.min(...copiedNotes.map(n => n.start_time));
+    // Invalid clip type (audio clip)
+    if (clip.type !== "midi") {
+        return (
+            <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center overflow-hidden min-h-0 min-w-0">
+                <div className="text-muted-foreground">
+                    <Music size={48} className="mx-auto mb-4 opacity-20" />
+                    <div className="text-base font-medium mb-1">Audio Clip Selected</div>
+                    <div className="text-xs text-muted-foreground/70">
+                        Piano roll only works with MIDI clips. The selected clip is an audio clip.
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
-        // Paste notes at the current playhead position (or start of clip)
-        const pasteOffset = 0 - minStartTime; // Paste at beginning for now
-
-        const pastedNotes = copiedNotes.map(note => ({
-            ...note,
-            start_time: note.start_time + pasteOffset,
-        }));
-
-        await updateClip(clipId, { midi_events: [...midiEvents, ...pastedNotes] });
-    };
-
-    // Keyboard shortcuts for copy/paste/delete
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedNotes.size > 0) {
-                e.preventDefault();
-                handleCopyNotes();
-            } else if ((e.ctrlKey || e.metaKey) && e.key === 'v' && copiedNotes.length > 0) {
-                e.preventDefault();
-                handlePasteNotes();
-            } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNotes.size > 0) {
-                e.preventDefault();
-                handleDeleteSelected();
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [selectedNotes, copiedNotes, midiEvents]);
+    // ========================================================================
+    // RENDER: Piano Roll UI
+    // ========================================================================
 
     return (
         <div className="flex flex-col h-full bg-background">
@@ -125,21 +112,15 @@ export function SequencerPianoRoll({
                 {/* Right Column - Scrollable content area (matches grid) */}
                 <div className="flex-1 px-4 py-2 pl-[17rem] flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <span className="text-sm font-semibold">{clipName}</span>
+                        <span className="text-sm font-semibold">{clip.name}</span>
                         <span className="text-xs text-muted-foreground">
                             {midiEvents.length} {midiEvents.length === 1 ? 'note' : 'notes'}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                            • Bar {Math.floor(clipStartTime / 4) + 1} • {clipDuration} beats
+                            • Bar {Math.floor(clip.start_time / 4) + 1} • {clip.duration} beats
                         </span>
                     </div>
                     <div className="flex items-center gap-2">
-                        {/* Delete selected */}
-                        <Button onClick={handleDeleteSelected} size="sm" variant="ghost" disabled={selectedNotes.size === 0}>
-                            <Trash2 size={14} className="mr-1" />
-                            Delete ({selectedNotes.size})
-                        </Button>
-
                         {/* Close */}
                         <IconButton
                             icon={X}
@@ -152,20 +133,34 @@ export function SequencerPianoRoll({
                 </div>
             </div>
 
-            {/* Piano Roll Content */}
-            <SequencerPianoRollSection
-                pianoRollScrollRef={pianoRollScrollRef}
-                selectedNotes={selectedNotes}
-                onSelectNote={(index: number) => setSelectedNotes(new Set([index]))}
-                onToggleSelectNote={(index: number) => {
-                    const newSelected = new Set(selectedNotes);
-                    if (newSelected.has(index)) {
-                        newSelected.delete(index);
-                    } else {
-                        newSelected.add(index);
-                    }
-                    setSelectedNotes(newSelected);
-                }}
+            {/* Piano Roll Content - Grid Layout */}
+            <SequencerGridLayout
+                cornerHeader={
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+                        Notes
+                    </span>
+                }
+                ruler={
+                    <SequencerPianoRollRuler />
+                }
+                sidebar={
+                    <SequencerPianoRollKeyboard />
+                }
+                mainContent={
+                    <div className="relative">
+                        <SequencerPianoRollGrid />
+
+                        {/* Loop Region - Overlaid on grid */}
+                        <SequencerTimelineLoopRegion />
+                    </div>
+                }
+                sidebarWidth={256}
+                headerHeight={32}
+                contentWidth={totalWidth}
+                scrollRef={pianoRollScrollRef}
+                onScroll={handlePianoRollScroll}
+                rulerScrollDataAttr="data-piano-ruler-scroll"
+                sidebarScrollDataAttr="data-piano-keyboard"
             />
         </div>
     );

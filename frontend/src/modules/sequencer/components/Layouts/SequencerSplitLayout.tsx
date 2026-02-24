@@ -13,7 +13,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { Music } from "lucide-react";
 import { SequencerTimelineSection } from "../Timeline/SequencerTimelineSection.tsx";
-import { SequencerPianoRollWrapper } from "../PianoRoll/SequencerPianoRollWrapper.tsx";
+import { SequencerPianoRoll } from "../PianoRoll/SequencerPianoRoll.tsx";
 import { SequencerSampleEditorWrapper } from "../SampleEditor/SequencerSampleEditorWrapper.tsx";
 import { useDAWStore } from '@/stores/dawStore.ts';
 import { statePersistence } from "@/services/state-persistence/state-persistence.service.ts";
@@ -147,11 +147,7 @@ export function SequencerSplitLayout({
             >
                 <div className="h-full flex flex-col overflow-hidden">
                     {showPianoRoll ? (
-                        <SequencerPianoRollWrapper
-                            clip={pianoRollClip}
-                            track={pianoRollTrack}
-                            clipDragState={pianoRollClipDragState}
-                            totalBeats={totalBeats}
+                        <SequencerPianoRoll
                             pianoRollScrollRef={pianoRollScrollRef}
                         />
                     ) : showSampleEditor ? (

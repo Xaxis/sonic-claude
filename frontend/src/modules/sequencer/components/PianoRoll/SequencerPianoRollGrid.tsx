@@ -1,11 +1,12 @@
 /**
  * SequencerPianoRollGrid - Piano roll note grid with editing capabilities
  *
- * REFACTORED: Pure component that reads everything from Zustand
- * - Reads pianoRollClipId from Zustand
- * - Reads ALL state from Zustand (clip data, settings, transport)
+ * REFACTORED: Self-contained component following Zustand best practices
+ * - Reads ALL state from Zustand (pianoRollClipId, clips, tracks, settings, transport)
  * - Calls updateClip() directly for all note editing operations
- * - Only receives local UI callbacks (onSelectNote, onToggleSelectNote)
+ * - Manages local UI state (selectedNotes, copiedNotes, drag state)
+ * - Handles keyboard shortcuts (Ctrl+C, Ctrl+V, Delete)
+ * - No props needed - completely self-contained!
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -18,17 +19,10 @@ import type { MIDIEvent } from "../../types";
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 interface SequencerPianoRollGridProps {
-    // Local UI callbacks (for parent component's local state)
-    selectedNotes: Set<number>;
-    onSelectNote: (index: number) => void;
-    onToggleSelectNote: (index: number) => void;
+    // No props needed - reads everything from Zustand!
 }
 
-export function SequencerPianoRollGrid({
-    selectedNotes,
-    onSelectNote,
-    onToggleSelectNote,
-}: SequencerPianoRollGridProps) {
+export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     // ========================================================================
     // STATE: Read from Zustand store
     // ========================================================================
@@ -74,7 +68,7 @@ export function SequencerPianoRollGrid({
     const noteHeight = 20; // pixels per note row
 
     // ========================================================================
-    // LOCAL STATE
+    // LOCAL STATE (UI state - not persisted)
     // ========================================================================
     const gridRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState<number | null>(null);
@@ -85,6 +79,11 @@ export function SequencerPianoRollGrid({
     const [dragStartPitch, setDragStartPitch] = useState(0);
     const [dragStartDuration, setDragStartDuration] = useState(0);
     const [hasDragged, setHasDragged] = useState(false); // Track if mouse moved during mousedown
+    const justFinishedDragRef = useRef(false); // Ref to prevent click handler after drag/resize
+
+    // Note selection state (local UI state)
+    const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
+    const [copiedNotes, setCopiedNotes] = useState<MIDIEvent[]>([]);
 
     // ========================================================================
     // HELPER FUNCTIONS
@@ -178,10 +177,39 @@ export function SequencerPianoRollGrid({
         await updateClip(clipId, { midi_events: notes.filter((_, i) => i !== index) });
     };
 
+    const handleDeleteSelected = async () => {
+        if (selectedNotes.size === 0) return;
+        await updateClip(clipId, { midi_events: notes.filter((_, i) => !selectedNotes.has(i)) });
+        setSelectedNotes(new Set());
+    };
+
+    const handleCopyNotes = () => {
+        if (selectedNotes.size === 0) return;
+        const notesToCopy = Array.from(selectedNotes).map(i => notes[i]);
+        setCopiedNotes(notesToCopy);
+    };
+
+    const handlePasteNotes = async () => {
+        if (copiedNotes.length === 0) return;
+
+        // Find the earliest start time in copied notes
+        const minStartTime = Math.min(...copiedNotes.map(n => n.start_time));
+
+        // Paste notes at the current playhead position (or start of clip)
+        const pasteOffset = 0 - minStartTime; // Paste at beginning for now
+
+        const pastedNotes = copiedNotes.map(note => ({
+            ...note,
+            start_time: note.start_time + pasteOffset,
+        }));
+
+        await updateClip(clipId, { midi_events: [...notes, ...pastedNotes] });
+    };
+
     const handleGridClick = (e: React.MouseEvent) => {
         // Don't add/delete notes if we just finished dragging/resizing
-        // hasDragged persists after mouseup, so we can detect if this click was part of a drag
-        if (isDragging !== null || isResizing !== null || hasDragged) return;
+        // Use ref to prevent click handler from firing after drag/resize completes
+        if (isDragging !== null || isResizing !== null || justFinishedDragRef.current) return;
 
         const rect = gridRef.current?.getBoundingClientRect();
         if (!rect) return;
@@ -226,6 +254,15 @@ export function SequencerPianoRollGrid({
         });
     };
 
+    const handleNoteClick = (e: React.MouseEvent, index: number) => {
+        e.stopPropagation();
+
+        // Only delete if we didn't just finish dragging
+        if (!justFinishedDragRef.current) {
+            handleDeleteNote(index);
+        }
+    };
+
     const handleNoteMouseDown = (e: React.MouseEvent, index: number, action: "move" | "resize") => {
         e.stopPropagation();
 
@@ -239,10 +276,19 @@ export function SequencerPianoRollGrid({
 
         if (action === "move") {
             setIsDragging(index);
+            // Handle selection
             if (!e.shiftKey) {
-                onSelectNote(index);
+                // Single select
+                setSelectedNotes(new Set([index]));
             } else {
-                onToggleSelectNote(index);
+                // Toggle select (Shift+click)
+                const newSelected = new Set(selectedNotes);
+                if (newSelected.has(index)) {
+                    newSelected.delete(index);
+                } else {
+                    newSelected.add(index);
+                }
+                setSelectedNotes(newSelected);
             }
         } else {
             setIsResizing(index);
@@ -283,10 +329,13 @@ export function SequencerPianoRollGrid({
         };
 
         const handleMouseUp = () => {
-            // Click-to-delete: Only delete if we clicked a note (isDragging) without moving the mouse
-            // Don't delete if we were resizing (isResizing) - resizing always involves dragging
-            if (!hasDragged && isDragging !== null && isResizing === null) {
-                handleDeleteNote(isDragging);
+            // If we actually dragged/resized, set the ref to prevent click handler
+            if (hasDragged) {
+                justFinishedDragRef.current = true;
+                // Clear the flag after a short delay (after click event would have fired)
+                setTimeout(() => {
+                    justFinishedDragRef.current = false;
+                }, 50);
             }
 
             setIsDragging(null);
@@ -303,17 +352,24 @@ export function SequencerPianoRollGrid({
         };
     }, [isDragging, isResizing, dragStartX, dragStartY, dragStartTime, dragStartPitch, dragStartDuration, beatWidth, noteHeight, minPitch, maxPitch, hasDragged, handleDeleteNote, handleMoveNote, handleResizeNote]);
 
-    // Keyboard shortcuts
+    // Keyboard shortcuts: Copy/Paste/Delete
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Delete" || e.key === "Backspace") {
-                selectedNotes.forEach(index => handleDeleteNote(index));
+            if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedNotes.size > 0) {
+                e.preventDefault();
+                handleCopyNotes();
+            } else if ((e.ctrlKey || e.metaKey) && e.key === 'v' && copiedNotes.length > 0) {
+                e.preventDefault();
+                handlePasteNotes();
+            } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNotes.size > 0) {
+                e.preventDefault();
+                handleDeleteSelected();
             }
         };
 
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [selectedNotes, handleDeleteNote]);
+    }, [selectedNotes, copiedNotes, notes, handleDeleteSelected, handleCopyNotes, handlePasteNotes]);
 
     return (
         <div className="flex-1 overflow-auto">
@@ -380,6 +436,7 @@ export function SequencerPianoRollGrid({
                                     : `rgba(8, 145, 178, ${velocityOpacity})`,
                                 boxShadow: isPlaying ? '0 0 20px rgba(6, 182, 212, 0.8)' : undefined,
                             }}
+                            onClick={(e) => handleNoteClick(e, index)}
                             onMouseDown={(e) => handleNoteMouseDown(e, index, "move")}
                             title={`Velocity: ${note.velocity}`}
                         >
