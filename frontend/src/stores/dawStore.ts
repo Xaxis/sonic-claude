@@ -154,6 +154,9 @@ interface DAWStore {
     loopEnd: number;
     selectedClipId: string | null;
 
+    // Clip Drag State (for live updates during drag operations)
+    clipDragStates: Map<string, { startTime: number; duration: number }>;
+
     // Scroll State (for synchronized scrolling between timeline/piano roll/sample editor)
     timelineScrollLeft: number;
     pianoRollScrollLeft: number;
@@ -298,6 +301,11 @@ interface DAWStore {
     setLoopStart: (start: number) => void;
     setLoopEnd: (end: number) => void;
     setSelectedClipId: (id: string | null) => void;
+
+    // Clip drag state actions (for live updates during drag operations)
+    setClipDragState: (clipId: string, dragState: { startTime: number; duration: number } | null) => void;
+    clearClipDragState: (clipId: string) => void;
+    clearAllClipDragStates: () => void;
 
     // Scroll actions (for synchronized scrolling)
     setTimelineScrollLeft: (scrollLeft: number) => void;

@@ -4,33 +4,21 @@
  * REFACTORED: Uses Zustand best practices
  * - Reads zoom, snapEnabled, gridSize from store
  * - Calls seek action directly from store
- * - Only receives calculated values (rulerMarkers, totalWidth, pixelsPerBeat)
+ * - Uses useTimelineCalculations() hook for shared calculations
+ * - No props needed!
  *
  * Displays measure numbers and beat markers at the top of the timeline.
  * Supports click-to-seek functionality.
  */
 
 import { useDAWStore } from '@/stores/dawStore';
-
-interface RulerMarker {
-    beat: number;
-    x: number;
-    isMeasure: boolean;
-    isBeat?: boolean;
-    label: string;
-}
+import { useTimelineCalculations } from '../../hooks/useTimelineCalculations';
 
 interface SequencerTimelineRulerProps {
-    rulerMarkers: RulerMarker[];
-    totalWidth: number;
-    pixelsPerBeat: number;
+    // No props needed - reads everything from Zustand!
 }
 
-export function SequencerTimelineRuler({
-    rulerMarkers,
-    totalWidth,
-    pixelsPerBeat,
-}: SequencerTimelineRulerProps) {
+export function SequencerTimelineRuler({}: SequencerTimelineRulerProps) {
     // ========================================================================
     // STATE: Read directly from Zustand store
     // ========================================================================
@@ -42,6 +30,11 @@ export function SequencerTimelineRuler({
     // ACTIONS: Get directly from Zustand store
     // ========================================================================
     const seek = useDAWStore(state => state.seek);
+
+    // ========================================================================
+    // SHARED TIMELINE CALCULATIONS: Use the same hook as timeline for consistency!
+    // ========================================================================
+    const { pixelsPerBeat, totalWidth, rulerMarkers } = useTimelineCalculations();
 
     const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();

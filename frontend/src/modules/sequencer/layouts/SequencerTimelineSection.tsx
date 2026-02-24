@@ -46,9 +46,9 @@ export function SequencerTimelineSection({
     const [expandedTracks, setExpandedTracks] = useState<Set<string>>(new Set());
 
     // ========================================================================
-    // CALCULATIONS: Timeline dimensions
+    // CALCULATIONS: Timeline dimensions (only need totalWidth for layout)
     // ========================================================================
-    const { totalWidth, rulerMarkers, pixelsPerBeat } = useTimelineCalculations();
+    const { totalWidth } = useTimelineCalculations();
 
     // ========================================================================
     // HANDLERS: Scroll synchronization
@@ -66,11 +66,7 @@ export function SequencerTimelineSection({
                 </span>
             }
             ruler={
-                <SequencerTimelineRuler
-                    rulerMarkers={rulerMarkers}
-                    totalWidth={totalWidth}
-                    pixelsPerBeat={pixelsPerBeat}
-                />
+                <SequencerTimelineRuler />
             }
             sidebar={
                 <SequencerTracks
