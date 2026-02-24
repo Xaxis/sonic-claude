@@ -49,6 +49,22 @@ import type { EffectDefinition, TrackEffectChain } from '@/services/api/provider
 import type { SampleMetadata } from '@/services/api/providers/samples.provider';
 import type { CompositionMetadata } from '@/services/api/providers/compositions.provider';
 
+// Scene definition for clip launcher
+export interface Scene {
+    id: string;
+    name: string;
+    color: string;
+    tempo?: number;  // Optional tempo override
+}
+
+// Clip launch state (real-time WebSocket data)
+export interface ClipLaunchState {
+    clipId: string;
+    state: 'stopped' | 'triggered' | 'playing' | 'stopping';
+    progress: number;  // 0-1, loop position
+    quantizedLaunchTime?: number;  // beats until launch
+}
+
 // Composition (complete project state)
 // This contains EVERYTHING needed to recreate the exact state
 export interface Composition {
@@ -75,6 +91,11 @@ export interface Composition {
     mixer_state: any;
     track_effects: TrackEffectChain[];
     sample_assignments: Record<string, string>;
+
+    // === CLIP LAUNCHER (Performance Mode) ===
+    clip_slots?: (string | null)[][];  // [trackIndex][slotIndex] - clip IDs
+    scenes?: Scene[];
+    launch_quantization?: 'none' | '1/4' | '1/2' | '1' | '2' | '4';
 
     // === AI CONTEXT ===
     chat_history: any[];
@@ -124,6 +145,7 @@ interface DAWStore {
     spectrum: number[];
     waveform: WaveformData | null;
     analytics: AnalyticsData | null;
+    clipLaunchStates: Record<string, ClipLaunchState>;  // clipId -> launch state
 
     // ========================================================================
     // APPLICATION STATE (HTTP CRUD)
@@ -275,6 +297,20 @@ interface DAWStore {
     loadSynthDefs: () => Promise<void>;
 
     // ========================================================================
+    // CLIP LAUNCHER ACTIONS (Performance Mode)
+    // ========================================================================
+    setClipLaunchState: (clipId: string, state: ClipLaunchState) => void;
+    launchClip: (clipId: string) => Promise<void>;
+    launchScene: (sceneId: string) => Promise<void>;
+    stopClip: (clipId: string) => Promise<void>;
+    stopAllClips: () => Promise<void>;
+    assignClipToSlot: (trackIndex: number, slotIndex: number, clipId: string | null) => Promise<void>;
+    createScene: (name: string, color?: string, tempo?: number) => Promise<void>;
+    updateScene: (sceneId: string, name?: string, color?: string, tempo?: number) => Promise<void>;
+    deleteScene: (sceneId: string) => Promise<void>;
+    setLaunchQuantization: (quantization: 'none' | '1/4' | '1/2' | '1' | '2' | '4') => Promise<void>;
+
+    // ========================================================================
     // MIXER ACTIONS
     // ========================================================================
     loadChannels: (sequenceId: string) => Promise<void>;
@@ -424,6 +460,7 @@ export const useDAWStore = create<DAWStore>()(
                 spectrum: [],
                 waveform: null,
                 analytics: null,
+                clipLaunchStates: {},
 
                 // Application State - Composition First
                 activeComposition: null,
@@ -959,6 +996,182 @@ export const useDAWStore = create<DAWStore>()(
             } catch (error) {
                 console.error("Failed to load synth defs:", error);
                 toast.error("Failed to load synth defs");
+            }
+        },
+
+        // ====================================================================
+        // CLIP LAUNCHER ACTIONS (Performance Mode)
+        // ====================================================================
+
+        setClipLaunchState: (clipId, state) => {
+            set((store) => ({
+                clipLaunchStates: {
+                    ...store.clipLaunchStates,
+                    [clipId]: state,
+                },
+            }));
+        },
+
+        launchClip: async (clipId) => {
+            try {
+                const { activeComposition } = get();
+                if (!activeComposition) return;
+
+                await api.compositions.launchClip(activeComposition.id, clipId);
+
+                // Update clip launch state
+                set((state) => ({
+                    clipLaunchStates: {
+                        ...state.clipLaunchStates,
+                        [clipId]: { clipId, state: 'playing', progress: 0 }
+                    }
+                }));
+            } catch (error) {
+                console.error("Failed to launch clip:", error);
+                toast.error("Failed to launch clip");
+            }
+        },
+
+        launchScene: async (sceneId) => {
+            try {
+                const { activeComposition } = get();
+                if (!activeComposition) return;
+
+                await api.compositions.launchScene(activeComposition.id, sceneId);
+                toast.success("Scene launched");
+            } catch (error) {
+                console.error("Failed to launch scene:", error);
+                toast.error("Failed to launch scene");
+            }
+        },
+
+        stopClip: async (clipId) => {
+            try {
+                const { activeComposition } = get();
+                if (!activeComposition) return;
+
+                await api.compositions.stopClip(activeComposition.id, clipId);
+
+                // Update clip launch state
+                set((state) => {
+                    const newStates = { ...state.clipLaunchStates };
+                    delete newStates[clipId];
+                    return { clipLaunchStates: newStates };
+                });
+            } catch (error) {
+                console.error("Failed to stop clip:", error);
+                toast.error("Failed to stop clip");
+            }
+        },
+
+        stopAllClips: async () => {
+            try {
+                const { activeComposition } = get();
+                if (!activeComposition) return;
+
+                await api.compositions.stopAllClips(activeComposition.id);
+
+                // Clear all clip launch states
+                set({ clipLaunchStates: {} });
+            } catch (error) {
+                console.error("Failed to stop all clips:", error);
+                toast.error("Failed to stop all clips");
+            }
+        },
+
+        assignClipToSlot: async (trackIndex, slotIndex, clipId) => {
+            try {
+                const { activeComposition } = get();
+                if (!activeComposition) return;
+
+                await api.compositions.assignClipToSlot({
+                    composition_id: activeComposition.id,
+                    track_index: trackIndex,
+                    slot_index: slotIndex,
+                    clip_id: clipId,
+                });
+
+                // Reload composition to get updated clip_slots
+                await get().loadComposition(activeComposition.id);
+            } catch (error) {
+                console.error("Failed to assign clip to slot:", error);
+                toast.error("Failed to assign clip to slot");
+            }
+        },
+
+        createScene: async (name, color = "#f39c12", tempo) => {
+            try {
+                const { activeComposition } = get();
+                if (!activeComposition) return;
+
+                await api.compositions.createScene({
+                    composition_id: activeComposition.id,
+                    name,
+                    color,
+                    tempo,
+                });
+
+                // Reload composition to get updated scenes
+                await get().loadComposition(activeComposition.id);
+                toast.success(`Scene "${name}" created`);
+            } catch (error) {
+                console.error("Failed to create scene:", error);
+                toast.error("Failed to create scene");
+            }
+        },
+
+        updateScene: async (sceneId, name, color, tempo) => {
+            try {
+                const { activeComposition } = get();
+                if (!activeComposition) return;
+
+                await api.compositions.updateScene({
+                    composition_id: activeComposition.id,
+                    scene_id: sceneId,
+                    name,
+                    color,
+                    tempo,
+                });
+
+                // Reload composition to get updated scenes
+                await get().loadComposition(activeComposition.id);
+            } catch (error) {
+                console.error("Failed to update scene:", error);
+                toast.error("Failed to update scene");
+            }
+        },
+
+        deleteScene: async (sceneId) => {
+            try {
+                const { activeComposition } = get();
+                if (!activeComposition) return;
+
+                await api.compositions.deleteScene(activeComposition.id, sceneId);
+
+                // Reload composition to get updated scenes
+                await get().loadComposition(activeComposition.id);
+                toast.success("Scene deleted");
+            } catch (error) {
+                console.error("Failed to delete scene:", error);
+                toast.error("Failed to delete scene");
+            }
+        },
+
+        setLaunchQuantization: async (quantization) => {
+            try {
+                const { activeComposition } = get();
+                if (!activeComposition) return;
+
+                await api.compositions.setLaunchQuantization({
+                    composition_id: activeComposition.id,
+                    quantization,
+                });
+
+                // Reload composition to get updated quantization
+                await get().loadComposition(activeComposition.id);
+            } catch (error) {
+                console.error("Failed to set launch quantization:", error);
+                toast.error("Failed to set launch quantization");
             }
         },
 

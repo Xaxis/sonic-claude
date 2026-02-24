@@ -38,6 +38,19 @@ class ChatMessage(BaseModel):
     )
 
 
+class Scene(BaseModel):
+    """Scene definition for clip launcher - triggers a horizontal row of clips"""
+    id: str = Field(description="Unique scene ID")
+    name: str = Field(description="Scene name (e.g., 'Intro', 'Verse', 'Chorus')")
+    color: str = Field(default="#f39c12", description="Scene color for UI")
+    tempo: Optional[float] = Field(
+        default=None,
+        gt=0,
+        le=300,
+        description="Optional tempo override when scene is launched"
+    )
+
+
 class Composition(BaseModel):
     """
     Complete composition - THE COMPLETE project state
@@ -73,6 +86,20 @@ class Composition(BaseModel):
     sample_assignments: Dict[str, str] = Field(
         default_factory=dict,
         description="Sample file assignments for sample tracks (track_id -> sample_path)"
+    )
+
+    # === CLIP LAUNCHER (Performance Mode) ===
+    clip_slots: Optional[List[List[Optional[str]]]] = Field(
+        default=None,
+        description="2D array of clip IDs [trackIndex][slotIndex]. null = empty slot"
+    )
+    scenes: List[Scene] = Field(
+        default_factory=list,
+        description="Scene definitions for horizontal triggering"
+    )
+    launch_quantization: str = Field(
+        default="1",
+        description="Launch quantization: 'none', '1/4', '1/2', '1', '2', '4' bars"
     )
 
     # === AI CONTEXT ===

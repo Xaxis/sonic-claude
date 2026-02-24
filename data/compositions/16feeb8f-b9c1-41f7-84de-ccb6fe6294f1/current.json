@@ -508,6 +508,9 @@
     }
   ],
   "sample_assignments": {},
+  "clip_slots": null,
+  "scenes": [],
+  "launch_quantization": "1",
   "chat_history": [
     {
       "role": "user",
@@ -709,5 +712,5 @@
     "source": "manual_save"
   },
   "created_at": "2026-02-24T10:28:25.040077",
-  "updated_at": "2026-02-24T12:10:25.806380"
+  "updated_at": "2026-02-24T14:09:33.236067"
 }

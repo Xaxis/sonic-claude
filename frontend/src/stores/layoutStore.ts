@@ -386,12 +386,20 @@ export const useLayoutStore = create<LayoutStore>()(
                 }),
 
                 // Merge: Restore persisted state on hydration
-                merge: (persistedState: any, currentState) => ({
-                    ...currentState,
-                    ...persistedState,
-                    // IMPORTANT: Always start with no popouts (windows are closed on page load)
-                    poppedOutTabs: new Set(),
-                }),
+                merge: (persistedState: any, currentState) => {
+                    // Merge tabs: Add any new tabs from DEFAULT_LAYOUT_STATE that aren't in persisted state
+                    const persistedTabIds = new Set((persistedState.tabs || []).map((t: TabConfig) => t.id));
+                    const newTabs = DEFAULT_LAYOUT_STATE.tabs.filter(t => !persistedTabIds.has(t.id));
+                    const mergedTabs = [...(persistedState.tabs || []), ...newTabs];
+
+                    return {
+                        ...currentState,
+                        ...persistedState,
+                        tabs: mergedTabs,
+                        // IMPORTANT: Always start with no popouts (windows are closed on page load)
+                        poppedOutTabs: new Set(),
+                    };
+                },
 
                 // onRehydrateStorage: Called after hydration completes
                 onRehydrateStorage: () => {

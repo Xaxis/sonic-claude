@@ -52,6 +52,7 @@ import { SequencerPanel } from "@/modules/sequencer";
 import { MixerPanel } from "@/modules/mixer";
 import { EffectsPanel } from "@/modules/effects";
 import { AssistantPanel } from "@/modules/assistant";
+import { ClipLauncherPanel } from "@/modules/clip-launcher";
 
 /**
  * Grid Layout Settings
@@ -134,6 +135,18 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         defaultLayout: { x: 0, y: 38, w: 12, h: 16 },
     },
 
+    // ===== PERFORM TAB =====
+    // Live performance mode
+
+    {
+        id: "clip-launcher",
+        title: "CLIP LAUNCHER",
+        component: createElement(ClipLauncherPanel),
+        closeable: false,
+        getSubtitle: () => "Performance Mode • 0 scenes",
+        defaultLayout: { x: 0, y: 0, w: 12, h: 20 },
+    },
+
 ];
 
 /**
@@ -158,6 +171,14 @@ export const DEFAULT_TABS = [
             "input",
             "loop-visualizer",
             "ai"
+        ],
+    },
+    {
+        id: "perform",
+        name: "PERFORM",
+        panelIds: [
+            "clip-launcher",
+            "loop-visualizer",
         ],
     },
 ];

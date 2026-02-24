@@ -836,3 +836,197 @@ class PlaybackEngineService:
         composition.updated_at = datetime.now()
         logger.info(f"🔁 Set loop: enabled={enabled}, start={composition.loop_start}, end={composition.loop_end}")
 
+    # ========================================================================
+    # CLIP LAUNCHER (PERFORMANCE MODE)
+    # ========================================================================
+
+    async def launch_clip(self, composition_id: str, clip_id: str) -> None:
+        """
+        Launch a clip in performance mode
+
+        The clip will loop continuously until stopped.
+        This is different from timeline playback - clips play independently.
+        """
+        composition = self.composition_state_service.get_composition(composition_id)
+        if not composition:
+            logger.error(f"❌ Composition {composition_id} not found")
+            return
+
+        # Find clip
+        clip = next((c for c in composition.clips if c.id == clip_id), None)
+        if not clip:
+            logger.error(f"❌ Clip {clip_id} not found")
+            return
+
+        # If clip is already playing, restart it
+        if clip_id in self.active_synths:
+            await self.stop_clip(clip_id)
+
+        logger.info(f"🎬 Launching clip '{clip.name}' (ID: {clip_id}, type: {clip.type})")
+
+        # Get track for bus routing
+        track = next((t for t in composition.tracks if t.id == clip.track_id), None)
+        if not track:
+            logger.error(f"❌ Track {clip.track_id} not found for clip {clip_id}")
+            return
+
+        # Get track bus from mixer
+        track_bus = self.mixer_service.get_track_bus(track.id) if self.mixer_service else 0
+
+        if clip.type == "audio":
+            # Launch audio clip
+            await self._launch_audio_clip(clip, track_bus)
+        elif clip.type == "midi":
+            # Launch MIDI clip
+            await self._launch_midi_clip(clip, track_bus, composition.tempo)
+
+        logger.info(f"✅ Clip '{clip.name}' launched successfully")
+
+    async def _launch_audio_clip(self, clip, bus: int) -> None:
+        """Launch an audio clip (sample playback with looping)"""
+        try:
+            # Allocate node ID
+            node_id = self.engine_manager.allocate_node_id()
+
+            # Get sample buffer ID
+            # TODO: Implement buffer management for samples
+            # For now, use a placeholder
+            buffer_id = 0  # This should come from buffer manager
+
+            # Create looping sample player synth
+            # Using 'samplePlayer' SynthDef (should be defined in playback.scd)
+            self.engine_manager.send_message(
+                "/s_new",
+                "samplePlayer",  # SynthDef name
+                node_id,
+                0,  # addAction: addToHead
+                1,  # target: default group
+                "bufnum", buffer_id,
+                "rate", 1.0,
+                "amp", 0.8,
+                "loop", 1,  # Enable looping
+                "out", bus
+            )
+
+            # Store active synth
+            self.active_synths[clip.id] = node_id
+
+            logger.info(f"🎵 Audio clip launched: node={node_id}, buffer={buffer_id}, bus={bus}")
+
+        except Exception as e:
+            logger.error(f"❌ Failed to launch audio clip: {e}")
+
+    async def _launch_midi_clip(self, clip, bus: int, tempo: float) -> None:
+        """Launch a MIDI clip (looping MIDI pattern)"""
+        try:
+            # For MIDI clips, we need to continuously trigger notes in a loop
+            # This is more complex than audio - we'll schedule note events
+
+            if not clip.midi_events:
+                logger.warning(f"⚠️  MIDI clip {clip.id} has no MIDI events")
+                return
+
+            # Calculate clip duration in seconds
+            clip_duration_beats = clip.duration
+            clip_duration_seconds = (clip_duration_beats / tempo) * 60.0
+
+            # Create a task that loops the MIDI pattern
+            async def midi_loop_task():
+                while clip.id in self.active_synths:
+                    # Trigger all notes in the clip
+                    for note in clip.midi_events:
+                        if clip.id not in self.active_synths:
+                            break
+
+                        # Calculate note timing relative to clip start
+                        note_time_beats = note.time - clip.start_time
+                        note_delay = (note_time_beats / tempo) * 60.0
+
+                        # Schedule note
+                        await asyncio.sleep(note_delay)
+
+                        if clip.id in self.active_synths:
+                            # Trigger note
+                            await self._trigger_midi_note(note, bus, tempo)
+
+                    # Wait for clip to finish, then loop
+                    await asyncio.sleep(clip_duration_seconds)
+
+            # Start the loop task
+            task = asyncio.create_task(midi_loop_task())
+            self.midi_note_tasks.add(task)
+
+            # Mark clip as active (use a placeholder node ID)
+            self.active_synths[clip.id] = -1  # Negative ID for MIDI clips
+
+            logger.info(f"🎹 MIDI clip loop started: duration={clip_duration_seconds:.2f}s, notes={len(clip.midi_events)}")
+
+        except Exception as e:
+            logger.error(f"❌ Failed to launch MIDI clip: {e}")
+
+    async def _trigger_midi_note(self, note, bus: int, tempo: float) -> None:
+        """Trigger a single MIDI note"""
+        try:
+            # Allocate node ID
+            node_id = self.engine_manager.allocate_node_id()
+
+            # Convert MIDI note to frequency
+            freq = 440.0 * (2.0 ** ((note.pitch - 69) / 12.0))
+
+            # Calculate duration in seconds
+            duration_seconds = (note.duration / tempo) * 60.0
+
+            # Get synth name (default to sine wave)
+            synth_name = "sine"  # TODO: Get from track instrument
+
+            # Trigger note
+            self.engine_manager.send_message(
+                "/s_new",
+                synth_name,
+                node_id,
+                0,  # addAction
+                1,  # target
+                "freq", freq,
+                "amp", note.velocity / 127.0,
+                "gate", 1,
+                "out", bus
+            )
+
+            # Schedule note release
+            await asyncio.sleep(duration_seconds)
+            self.engine_manager.send_message("/n_set", node_id, "gate", 0)
+
+        except Exception as e:
+            logger.error(f"❌ Failed to trigger MIDI note: {e}")
+
+    async def stop_clip(self, clip_id: str) -> None:
+        """Stop a playing clip"""
+        if clip_id not in self.active_synths:
+            logger.warning(f"⚠️  Clip {clip_id} is not playing")
+            return
+
+        node_id = self.active_synths[clip_id]
+
+        # Free the synth (if it's an audio clip with positive node ID)
+        if node_id > 0:
+            self.engine_manager.send_message("/n_free", node_id)
+
+        # Remove from active synths
+        del self.active_synths[clip_id]
+
+        logger.info(f"⏹️  Stopped clip {clip_id}")
+
+    async def stop_all_clips(self) -> None:
+        """Stop all playing clips"""
+        clip_ids = list(self.active_synths.keys())
+
+        for clip_id in clip_ids:
+            await self.stop_clip(clip_id)
+
+        # Cancel all MIDI note tasks
+        for task in self.midi_note_tasks:
+            task.cancel()
+        self.midi_note_tasks.clear()
+
+        logger.info(f"⏹️  Stopped all clips ({len(clip_ids)} clips)")
+

@@ -34,6 +34,11 @@ export type {
     SoloTrackRequest,
     AddClipRequest,
     UpdateClipRequest,
+    // Clip Launcher types
+    AssignClipToSlotRequest,
+    CreateSceneRequest,
+    UpdateSceneRequest,
+    SetLaunchQuantizationRequest,
 } from "./compositions.provider";
 
 export type {

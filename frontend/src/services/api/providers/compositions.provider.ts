@@ -157,6 +157,37 @@ export interface UpdateClipRequest {
 }
 
 // ============================================================================
+// CLIP LAUNCHER TYPES
+// ============================================================================
+
+export interface AssignClipToSlotRequest {
+    composition_id: string;  // Used to construct URL
+    track_index: number;     // Used to construct URL
+    slot_index: number;      // Used to construct URL
+    clip_id: string | null;  // Clip ID to assign (null to clear slot)
+}
+
+export interface CreateSceneRequest {
+    composition_id: string;  // Used to construct URL
+    name: string;
+    color?: string;
+    tempo?: number;
+}
+
+export interface UpdateSceneRequest {
+    composition_id: string;  // Used to construct URL
+    scene_id: string;        // Used to construct URL
+    name?: string;
+    color?: string;
+    tempo?: number;
+}
+
+export interface SetLaunchQuantizationRequest {
+    composition_id: string;  // Used to construct URL
+    quantization: 'none' | '1/4' | '1/2' | '1' | '2' | '4';
+}
+
+// ============================================================================
 // COMPOSITIONS PROVIDER (HTTP CLIENT ONLY - NO BUSINESS LOGIC)
 // ============================================================================
 
@@ -386,6 +417,101 @@ export class CompositionsProvider extends BaseAPIClient {
      */
     async deleteClip(compositionId: string, clipId: string): Promise<any> {
         return this.delete(`/api/compositions/${compositionId}/clips/${clipId}`);
+    }
+
+    // ========================================================================
+    // CLIP LAUNCHER (PERFORMANCE MODE)
+    // ========================================================================
+
+    /**
+     * Assign a clip to a slot in the clip launcher grid
+     * PUT /api/compositions/{composition_id}/clip-launcher/slots/{track_index}/{slot_index}
+     */
+    async assignClipToSlot(request: AssignClipToSlotRequest): Promise<any> {
+        const { composition_id, track_index, slot_index, clip_id } = request;
+        return this.put(
+            `/api/compositions/${composition_id}/clip-launcher/slots/${track_index}/${slot_index}`,
+            { clip_id }
+        );
+    }
+
+    /**
+     * Get all clip slots for a composition
+     * GET /api/compositions/{composition_id}/clip-launcher/slots
+     */
+    async getClipSlots(compositionId: string): Promise<any> {
+        return this.get(`/api/compositions/${compositionId}/clip-launcher/slots`);
+    }
+
+    /**
+     * Create a new scene
+     * POST /api/compositions/{composition_id}/clip-launcher/scenes
+     */
+    async createScene(request: CreateSceneRequest): Promise<any> {
+        const { composition_id, ...body } = request;
+        return this.post(`/api/compositions/${composition_id}/clip-launcher/scenes`, body);
+    }
+
+    /**
+     * Update a scene
+     * PUT /api/compositions/{composition_id}/clip-launcher/scenes/{scene_id}
+     */
+    async updateScene(request: UpdateSceneRequest): Promise<any> {
+        const { composition_id, scene_id, ...body } = request;
+        return this.put(`/api/compositions/${composition_id}/clip-launcher/scenes/${scene_id}`, body);
+    }
+
+    /**
+     * Delete a scene
+     * DELETE /api/compositions/{composition_id}/clip-launcher/scenes/{scene_id}
+     */
+    async deleteScene(compositionId: string, sceneId: string): Promise<any> {
+        return this.delete(`/api/compositions/${compositionId}/clip-launcher/scenes/${sceneId}`);
+    }
+
+    /**
+     * Set launch quantization
+     * PUT /api/compositions/{composition_id}/clip-launcher/quantization
+     */
+    async setLaunchQuantization(request: SetLaunchQuantizationRequest): Promise<any> {
+        const { composition_id, quantization } = request;
+        return this.put(`/api/compositions/${composition_id}/clip-launcher/quantization`, { quantization });
+    }
+
+    // ========================================================================
+    // CLIP LAUNCHER PLAYBACK
+    // ========================================================================
+
+    /**
+     * Launch a clip (start playing with looping)
+     * POST /api/compositions/{composition_id}/clip-launcher/clips/{clip_id}/launch
+     */
+    async launchClip(compositionId: string, clipId: string): Promise<any> {
+        return this.post(`/api/compositions/${compositionId}/clip-launcher/clips/${clipId}/launch`, {});
+    }
+
+    /**
+     * Stop a playing clip
+     * POST /api/compositions/{composition_id}/clip-launcher/clips/{clip_id}/stop
+     */
+    async stopClip(compositionId: string, clipId: string): Promise<any> {
+        return this.post(`/api/compositions/${compositionId}/clip-launcher/clips/${clipId}/stop`, {});
+    }
+
+    /**
+     * Launch a scene (all clips in that row)
+     * POST /api/compositions/{composition_id}/clip-launcher/scenes/{scene_id}/launch
+     */
+    async launchScene(compositionId: string, sceneId: string): Promise<any> {
+        return this.post(`/api/compositions/${compositionId}/clip-launcher/scenes/${sceneId}/launch`, {});
+    }
+
+    /**
+     * Stop all playing clips
+     * POST /api/compositions/{composition_id}/clip-launcher/clips/stop-all
+     */
+    async stopAllClips(compositionId: string): Promise<any> {
+        return this.post(`/api/compositions/${compositionId}/clip-launcher/clips/stop-all`, {});
     }
 }
 

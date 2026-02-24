@@ -17,6 +17,11 @@ import { DEFAULT_PANELS } from "@/config/layout.config";
 export default function App() {
     const { tabs, activeTab, setActiveTab, createTab, deleteTab, popoutTab } = useLayoutStore();
 
+    // Initialize DAW store on mount (loads compositions + auto-loads last active composition)
+    useEffect(() => {
+        useDAWStore.getState().initialize();
+    }, []);
+
     // Enable autosave
     useAutosave();
 
