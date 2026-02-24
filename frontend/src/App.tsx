@@ -4,6 +4,7 @@
  * Main application component.
  */
 
+import { useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { TabbedWrapper } from "@/components/layout/TabbedWrapper";
 import { ActivityContainer } from "@/components/activity";
@@ -18,6 +19,43 @@ export default function App() {
 
     // Enable autosave
     useAutosave();
+
+    // Get undo/redo actions from store
+    const undo = useDAWStore(state => state.undo);
+    const redo = useDAWStore(state => state.redo);
+    const canUndo = useDAWStore(state => state.canUndo);
+    const canRedo = useDAWStore(state => state.canRedo);
+
+    // Global keyboard shortcuts for undo/redo
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Check if we're in an input field (don't trigger undo/redo while typing)
+            const target = e.target as HTMLElement;
+            const isInputField = target.tagName === 'INPUT' ||
+                                target.tagName === 'TEXTAREA' ||
+                                target.isContentEditable;
+
+            if (isInputField) return;
+
+            // Cmd/Ctrl + Z = Undo
+            if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+                if (canUndo()) {
+                    e.preventDefault();
+                    undo();
+                }
+            }
+            // Cmd/Ctrl + Shift + Z = Redo
+            else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') {
+                if (canRedo()) {
+                    e.preventDefault();
+                    redo();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [undo, redo, canUndo, canRedo]);
 
     // Get state from Zustand store
     const analytics = useDAWStore(state => state.analytics);

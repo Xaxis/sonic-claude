@@ -15,8 +15,8 @@ import { useRef } from "react";
 import { useDAWStore } from '@/stores/dawStore';
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { SequencerEmptyState } from "./components/States/SequencerEmptyState.tsx";
-import { SequencerTransport } from "./components/Transport/SequencerTransport.tsx";
-import { SequencerToolbar } from "./components/Toolbar/SequencerToolbar.tsx";
+import { SequencerTransportToolbar } from "./components/Toolbars/SequencerTransportToolbar.tsx";
+import { SequencerActionToolbar } from "@/modules/sequencer/components/Toolbars/SequencerActionToolbar.tsx";
 import { SequencerSplitLayout } from "@/modules/sequencer/components/Layouts/SequencerSplitLayout.tsx";
 import { toast } from "sonner";
 
@@ -66,10 +66,10 @@ export function SequencerPanel() {
                 <SubPanel title="TRANSPORT" showHeader={false}>
                     <div className="px-4 py-3 bg-gradient-to-r from-muted/20 to-muted/10 flex items-center justify-between">
                         {/* Left: Transport Controls */}
-                        <SequencerTransport />
+                        <SequencerTransportToolbar />
 
                         {/* Right: Toolbar Controls */}
-                        <SequencerToolbar />
+                        <SequencerActionToolbar />
                     </div>
                 </SubPanel>
             </div>

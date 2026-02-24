@@ -1,5 +1,5 @@
 /**
- * SequencerTransport - Transport controls for sequencer
+ * SequencerTransportToolbar - Transport controls for sequencer
  *
  * REFACTORED: Uses Zustand best practices
  * - Reads state directly from store (no prop drilling)
@@ -12,11 +12,11 @@ import { Play, Pause, SkipBack, Circle, Repeat, Music } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
-import { useDAWStore } from '@/stores/dawStore';
+import { useDAWStore } from '@/stores/dawStore.ts';
 import { toast } from "sonner";
-import { SequencerTempoControl } from './SequencerTempoControl.tsx';
+import { SequencerTransportTempoToolbar } from './SequencerTransportTempoToolbar.tsx';
 
-export function SequencerTransport() {
+export function SequencerTransportToolbar() {
     // ========================================================================
     // STATE: Read directly from Zustand store
     // ========================================================================
@@ -126,7 +126,7 @@ export function SequencerTransport() {
             </div>
 
             {/* Tempo Control */}
-            <SequencerTempoControl />
+            <SequencerTransportTempoToolbar />
         </div>
     );
 }

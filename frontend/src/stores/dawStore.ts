@@ -73,6 +73,21 @@ export interface Composition {
 // AI & Activity Types
 import type { ChatMessage, AnalysisEvent, DAWStateSnapshot } from '@/modules/assistant/types';
 
+// Undo/Redo Types
+import type { UndoableCommand } from '@/services/undo/types';
+import {
+    createTrackCommand,
+    deleteTrackCommand,
+    renameTrackCommand,
+    updateTrackCommand,
+    muteTrackCommand,
+    soloTrackCommand,
+    createClipCommand,
+    deleteClipCommand,
+    updateClipCommand,
+    updateTempoCommand,
+} from '@/services/undo/commands';
+
 export type ActivityStatus = "pending" | "in-progress" | "success" | "error";
 export type ActivityTargetType = "track" | "clip" | "effect" | "mixer" | "tempo" | "playback";
 
@@ -195,6 +210,13 @@ interface DAWStore {
     activities: AIActivity[];
     activityHistory: AIActivity[];
     isAIActive: boolean;
+
+    // Undo/Redo State
+    undoStack: UndoableCommand[];
+    redoStack: UndoableCommand[];
+    maxUndoHistory: number;
+    isUndoing: boolean;
+    isRedoing: boolean;
 
     // ========================================================================
     // AUDIO ENGINE ACTIONS (WebSocket Updates)
@@ -370,6 +392,16 @@ interface DAWStore {
     getActivitiesForTarget: (targetId: string) => AIActivity[];
     getActivitiesForTab: (tabId: string) => AIActivity[];
     getActivityById: (id: string) => AIActivity | undefined;
+
+    // ========================================================================
+    // UNDO/REDO ACTIONS
+    // ========================================================================
+    undo: () => Promise<void>;
+    redo: () => Promise<void>;
+    canUndo: () => boolean;
+    canRedo: () => boolean;
+    clearHistory: () => void;
+    pushCommand: (command: UndoableCommand) => void;
 }
 
 // ============================================================================
@@ -452,6 +484,13 @@ export const useDAWStore = create<DAWStore>()(
         activityHistory: [],
         isAIActive: false,
 
+        // Undo/Redo State
+        undoStack: [],
+        redoStack: [],
+        maxUndoHistory: 100,
+        isUndoing: false,
+        isRedoing: false,
+
         // ====================================================================
         // AUDIO ENGINE ACTIONS (WebSocket Updates)
         // ====================================================================
@@ -523,19 +562,30 @@ export const useDAWStore = create<DAWStore>()(
         setTempo: async (tempo) => {
             try {
                 const { activeComposition } = get();
-                if (activeComposition) {
-                    await api.playback.setTempo({ tempo });
-
-                    // Update local state
-                    // Backend auto-persists, so just update local state
-                    set((state) => ({
-                        activeComposition: state.activeComposition ? {
-                            ...state.activeComposition,
-                            tempo
-                        } : null,
-                    }));
-
+                if (!activeComposition) {
+                    toast.error("No active composition");
+                    return;
                 }
+
+                // Create undoable command
+                const command = updateTempoCommand(
+                    activeComposition.id,
+                    activeComposition.tempo,
+                    tempo,
+                    // onExecute callback - refresh state after updating tempo
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    },
+                    // onUndo callback - refresh state after reverting tempo
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    }
+                );
+
+                // Execute and push to undo stack
+                await command.execute();
+                get().pushCommand(command);
+
             } catch (error) {
                 console.error("Failed to set tempo:", error);
                 toast.error("Failed to set tempo");
@@ -585,19 +635,26 @@ export const useDAWStore = create<DAWStore>()(
                     return;
                 }
 
-                const track = await api.compositions.createTrack({
-                    composition_id: activeComposition.id,
+                // Create undoable command
+                const command = createTrackCommand(
+                    activeComposition.id,
                     name,
-                    type: type as "midi" | "audio" | "sample",
+                    type,
                     instrument,
-                });
+                    // onExecute callback - refresh state after creating track
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    },
+                    // onUndo callback - refresh state after deleting track
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    }
+                );
 
-                // Backend auto-persists, so just update local state
-                set((state) => ({
-                    tracks: [...state.tracks, track],
-                }));
+                // Execute and push to undo stack
+                await command.execute();
+                get().pushCommand(command);
 
-                windowManager.broadcastState('tracks', get().tracks);
                 toast.success(`Created track: ${name}`);
             } catch (error) {
                 console.error("Failed to create track:", error);
@@ -607,22 +664,38 @@ export const useDAWStore = create<DAWStore>()(
 
         deleteTrack: async (trackId) => {
             try {
-                const { activeComposition } = get();
+                const { activeComposition, tracks } = get();
                 if (!activeComposition) {
                     toast.error("No active composition");
                     return;
                 }
 
-                await api.compositions.deleteTrack(activeComposition.id, trackId);
+                // Find the track to capture its state for undo
+                const track = tracks.find(t => t.id === trackId);
+                if (!track) {
+                    toast.error("Track not found");
+                    return;
+                }
 
-                // Backend auto-persists, so just update local state
-                set((state) => ({
-                    tracks: state.tracks.filter(t => t.id !== trackId),
-                    clips: state.clips.filter(c => c.track_id !== trackId),
-                }));
+                // Create undoable command
+                const command = deleteTrackCommand(
+                    activeComposition.id,
+                    trackId,
+                    track,
+                    // onExecute callback - refresh state after deleting track
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    },
+                    // onUndo callback - refresh state after recreating track
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    }
+                );
 
-                windowManager.broadcastState('tracks', get().tracks);
-                windowManager.broadcastState('clips', get().clips);
+                // Execute and push to undo stack
+                await command.execute();
+                get().pushCommand(command);
+
                 toast.success("Track deleted");
             } catch (error) {
                 console.error("Failed to delete track:", error);
@@ -632,15 +705,35 @@ export const useDAWStore = create<DAWStore>()(
 
         renameTrack: async (trackId, name) => {
             try {
-                const { activeComposition } = get();
+                const { activeComposition, tracks } = get();
                 if (!activeComposition) return;
 
-                await api.compositions.updateTrack(activeComposition.id, trackId, { name });
+                // Find the track to capture old name for undo
+                const track = tracks.find(t => t.id === trackId);
+                if (!track) {
+                    toast.error("Track not found");
+                    return;
+                }
 
-                // Backend auto-persists, so just update local state
-                set((state) => ({
-                    tracks: state.tracks.map(t => t.id === trackId ? { ...t, name } : t),
-                }));
+                // Create undoable command
+                const command = renameTrackCommand(
+                    activeComposition.id,
+                    trackId,
+                    track.name,
+                    name,
+                    // onExecute callback - refresh state after renaming
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    },
+                    // onUndo callback - refresh state after reverting name
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    }
+                );
+
+                // Execute and push to undo stack
+                await command.execute();
+                get().pushCommand(command);
 
             } catch (error) {
                 console.error("Failed to rename track:", error);
@@ -650,15 +743,41 @@ export const useDAWStore = create<DAWStore>()(
 
         updateTrack: async (trackId, updates) => {
             try {
-                const { activeComposition } = get();
+                const { activeComposition, tracks } = get();
                 if (!activeComposition) return;
 
-                await api.compositions.updateTrack(activeComposition.id, trackId, updates);
+                // Find the track to capture old values for undo
+                const track = tracks.find(t => t.id === trackId);
+                if (!track) {
+                    toast.error("Track not found");
+                    return;
+                }
 
-                // Backend auto-persists, so just update local state
-                set((state) => ({
-                    tracks: state.tracks.map(t => t.id === trackId ? { ...t, ...updates } : t),
-                }));
+                // Capture old values
+                const oldUpdates: { volume?: number; pan?: number; instrument?: string } = {};
+                if (updates.volume !== undefined) oldUpdates.volume = track.volume;
+                if (updates.pan !== undefined) oldUpdates.pan = track.pan;
+                if (updates.instrument !== undefined) oldUpdates.instrument = track.instrument;
+
+                // Create undoable command
+                const command = updateTrackCommand(
+                    activeComposition.id,
+                    trackId,
+                    oldUpdates,
+                    updates,
+                    // onExecute callback - refresh state after updating
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    },
+                    // onUndo callback - refresh state after reverting
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    }
+                );
+
+                // Execute and push to undo stack
+                await command.execute();
+                get().pushCommand(command);
 
             } catch (error) {
                 console.error("Failed to update track:", error);
@@ -702,19 +821,36 @@ export const useDAWStore = create<DAWStore>()(
 
         muteTrack: async (trackId, muted) => {
             try {
-                const { activeComposition } = get();
+                const { activeComposition, tracks } = get();
                 if (!activeComposition) return;
 
-                await api.compositions.muteTrack({
-                    composition_id: activeComposition.id,
-                    track_id: trackId,
-                    is_muted: muted,
-                });
+                // Find the track to capture old mute state for undo
+                const track = tracks.find(t => t.id === trackId);
+                if (!track) {
+                    toast.error("Track not found");
+                    return;
+                }
 
-                // Backend auto-persists, so just update local state
-                set((state) => ({
-                    tracks: state.tracks.map(t => t.id === trackId ? { ...t, is_muted: muted } : t),
-                }));
+                // Create undoable command
+                const command = muteTrackCommand(
+                    activeComposition.id,
+                    trackId,
+                    track.is_muted || false,
+                    muted,
+                    // onExecute callback - refresh state after muting
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    },
+                    // onUndo callback - refresh state after reverting mute
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    }
+                );
+
+                // Execute and push to undo stack
+                await command.execute();
+                get().pushCommand(command);
+
             } catch (error) {
                 console.error("Failed to mute track:", error);
                 toast.error("Failed to mute track");
@@ -723,19 +859,36 @@ export const useDAWStore = create<DAWStore>()(
 
         soloTrack: async (trackId, soloed) => {
             try {
-                const { activeComposition } = get();
+                const { activeComposition, tracks } = get();
                 if (!activeComposition) return;
 
-                await api.compositions.soloTrack({
-                    composition_id: activeComposition.id,
-                    track_id: trackId,
-                    is_solo: soloed,
-                });
+                // Find the track to capture old solo state for undo
+                const track = tracks.find(t => t.id === trackId);
+                if (!track) {
+                    toast.error("Track not found");
+                    return;
+                }
 
-                // Backend auto-persists, so just update local state
-                set((state) => ({
-                    tracks: state.tracks.map(t => t.id === trackId ? { ...t, is_solo: soloed } : t),
-                }));
+                // Create undoable command
+                const command = soloTrackCommand(
+                    activeComposition.id,
+                    trackId,
+                    track.is_solo || false,
+                    soloed,
+                    // onExecute callback - refresh state after soloing
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    },
+                    // onUndo callback - refresh state after reverting solo
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    }
+                );
+
+                // Execute and push to undo stack
+                await command.execute();
+                get().pushCommand(command);
+
             } catch (error) {
                 console.error("Failed to solo track:", error);
                 toast.error("Failed to solo track");
@@ -748,14 +901,29 @@ export const useDAWStore = create<DAWStore>()(
 
         addClip: async (request) => {
             try {
-                const clip = await api.compositions.addClip(request);
+                const { activeComposition } = get();
+                if (!activeComposition) {
+                    toast.error("No active composition");
+                    return;
+                }
 
-                // Backend auto-persists, so just update local state
-                set((state) => ({
-                    clips: [...state.clips, clip],
-                }));
+                // Create undoable command
+                const command = createClipCommand(
+                    request,
+                    // onExecute callback - refresh state after creating clip
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    },
+                    // onUndo callback - refresh state after deleting clip
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    }
+                );
 
-                windowManager.broadcastState('clips', get().clips);
+                // Execute and push to undo stack
+                await command.execute();
+                get().pushCommand(command);
+
             } catch (error) {
                 console.error("Failed to add clip:", error);
                 toast.error("Failed to add clip");
@@ -764,17 +932,36 @@ export const useDAWStore = create<DAWStore>()(
 
         updateClip: async (clipId, request) => {
             try {
-                const { activeComposition } = get();
+                const { activeComposition, clips } = get();
                 if (!activeComposition) return;
 
-                const updatedClip = await api.compositions.updateClip(activeComposition.id, clipId, request);
+                // Find the clip to capture old values for undo
+                const clip = clips.find(c => c.id === clipId);
+                if (!clip) {
+                    toast.error("Clip not found");
+                    return;
+                }
 
-                // Backend auto-persists, so just update local state
-                set((state) => ({
-                    clips: state.clips.map(c => c.id === clipId ? updatedClip : c),
-                }));
+                // Create undoable command
+                const command = updateClipCommand(
+                    activeComposition.id,
+                    clipId,
+                    clip,
+                    request,
+                    // onExecute callback - refresh state after updating
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    },
+                    // onUndo callback - refresh state after reverting
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    }
+                );
 
-                windowManager.broadcastState('clips', get().clips);
+                // Execute and push to undo stack
+                await command.execute();
+                get().pushCommand(command);
+
             } catch (error) {
                 console.error("Failed to update clip:", error);
                 toast.error("Failed to update clip");
@@ -783,17 +970,35 @@ export const useDAWStore = create<DAWStore>()(
 
         deleteClip: async (clipId) => {
             try {
-                const { activeComposition } = get();
+                const { activeComposition, clips } = get();
                 if (!activeComposition) return;
 
-                await api.compositions.deleteClip(activeComposition.id, clipId);
+                // Find the clip to capture its state for undo
+                const clip = clips.find(c => c.id === clipId);
+                if (!clip) {
+                    toast.error("Clip not found");
+                    return;
+                }
 
-                // Backend auto-persists, so just update local state
-                set((state) => ({
-                    clips: state.clips.filter(c => c.id !== clipId),
-                }));
+                // Create undoable command
+                const command = deleteClipCommand(
+                    activeComposition.id,
+                    clipId,
+                    clip,
+                    // onExecute callback - refresh state after deleting clip
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    },
+                    // onUndo callback - refresh state after recreating clip
+                    async () => {
+                        await get().loadComposition(activeComposition.id);
+                    }
+                );
 
-                windowManager.broadcastState('clips', get().clips);
+                // Execute and push to undo stack
+                await command.execute();
+                get().pushCommand(command);
+
             } catch (error) {
                 console.error("Failed to delete clip:", error);
                 toast.error("Failed to delete clip");
@@ -1909,6 +2114,127 @@ export const useDAWStore = create<DAWStore>()(
 
         getActivityById: (id) => {
             return get().activities.find(a => a.id === id);
+        },
+
+        // ====================================================================
+        // UNDO/REDO ACTIONS
+        // ====================================================================
+
+        undo: async () => {
+            const { undoStack, redoStack, isUndoing, isRedoing } = get();
+
+            // Prevent concurrent undo/redo operations
+            if (isUndoing || isRedoing) {
+                console.warn('Undo/redo operation already in progress');
+                return;
+            }
+
+            if (undoStack.length === 0) {
+                console.warn('Nothing to undo');
+                return;
+            }
+
+            set({ isUndoing: true });
+
+            try {
+                // Pop command from undo stack
+                const command = undoStack[undoStack.length - 1];
+                const newUndoStack = undoStack.slice(0, -1);
+
+                // Execute undo
+                await command.undo();
+
+                // Push to redo stack
+                const newRedoStack = [...redoStack, command];
+
+                // Update stacks
+                set({
+                    undoStack: newUndoStack,
+                    redoStack: newRedoStack,
+                    isUndoing: false,
+                });
+
+                toast.success(`Undone: ${command.description}`);
+            } catch (error) {
+                console.error('Failed to undo:', error);
+                toast.error('Failed to undo action');
+                set({ isUndoing: false });
+            }
+        },
+
+        redo: async () => {
+            const { undoStack, redoStack, isUndoing, isRedoing } = get();
+
+            // Prevent concurrent undo/redo operations
+            if (isUndoing || isRedoing) {
+                console.warn('Undo/redo operation already in progress');
+                return;
+            }
+
+            if (redoStack.length === 0) {
+                console.warn('Nothing to redo');
+                return;
+            }
+
+            set({ isRedoing: true });
+
+            try {
+                // Pop command from redo stack
+                const command = redoStack[redoStack.length - 1];
+                const newRedoStack = redoStack.slice(0, -1);
+
+                // Execute redo
+                await command.execute();
+
+                // Push to undo stack
+                const newUndoStack = [...undoStack, command];
+
+                // Update stacks
+                set({
+                    undoStack: newUndoStack,
+                    redoStack: newRedoStack,
+                    isRedoing: false,
+                });
+
+                toast.success(`Redone: ${command.description}`);
+            } catch (error) {
+                console.error('Failed to redo:', error);
+                toast.error('Failed to redo action');
+                set({ isRedoing: false });
+            }
+        },
+
+        canUndo: () => {
+            return get().undoStack.length > 0 && !get().isUndoing && !get().isRedoing;
+        },
+
+        canRedo: () => {
+            return get().redoStack.length > 0 && !get().isUndoing && !get().isRedoing;
+        },
+
+        clearHistory: () => {
+            set({
+                undoStack: [],
+                redoStack: [],
+            });
+        },
+
+        pushCommand: (command) => {
+            const { undoStack, maxUndoHistory } = get();
+
+            // Add command to undo stack
+            let newUndoStack = [...undoStack, command];
+
+            // Enforce max history size
+            if (newUndoStack.length > maxUndoHistory) {
+                newUndoStack = newUndoStack.slice(-maxUndoHistory);
+            }
+
+            // Clear redo stack (new action invalidates redo history)
+            set({
+                undoStack: newUndoStack,
+                redoStack: [],
+            });
         },
     }))
 );

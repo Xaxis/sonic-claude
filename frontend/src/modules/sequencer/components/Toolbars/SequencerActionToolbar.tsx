@@ -1,5 +1,5 @@
 /**
- * SequencerToolbar - Toolbar for sequencer operations
+ * SequencerActionToolbar - Toolbar for sequencer operations
  *
  * Handles track management, zoom controls, and grid settings
  * Uses Zustand store for state management
@@ -7,7 +7,7 @@
  */
 
 import { useState, useCallback } from "react";
-import { Plus, ZoomIn, ZoomOut, Grid3x3 } from "lucide-react";
+import { Plus, ZoomIn, ZoomOut, Grid3x3, Undo2, Redo2 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -22,7 +22,7 @@ import { useDAWStore } from '@/stores/dawStore';
 import { SequencerTrackTypeDialog } from "../Dialogs/SequencerTrackTypeDialog.tsx";
 import { SequencerSampleBrowser } from "../Dialogs/SequencerSampleBrowser.tsx";
 
-export function SequencerToolbar() {
+export function SequencerActionToolbar() {
     // Get state and actions from Zustand store
     const activeComposition = useDAWStore(state => state.activeComposition);
     const tracks = useDAWStore(state => state.tracks);
@@ -33,6 +33,12 @@ export function SequencerToolbar() {
     const setSnapEnabled = useDAWStore(state => state.setSnapEnabled);
     const setGridSize = useDAWStore(state => state.setGridSize);
     const createTrack = useDAWStore(state => state.createTrack);
+
+    // Undo/Redo actions
+    const undo = useDAWStore(state => state.undo);
+    const redo = useDAWStore(state => state.redo);
+    const canUndo = useDAWStore(state => state.canUndo());
+    const canRedo = useDAWStore(state => state.canRedo());
 
     // Local dialog state
     const [showTrackTypeDialog, setShowTrackTypeDialog] = useState(false);
@@ -64,13 +70,53 @@ export function SequencerToolbar() {
         setShowSampleBrowser(false);
     }, [activeComposition, tracks.length, createTrack]);
 
+    const handleUndo = useCallback(async () => {
+        await undo();
+    }, [undo]);
+
+    const handleRedo = useCallback(async () => {
+        await redo();
+    }, [redo]);
+
     return (
         <>
             <div className="flex items-center gap-2">
-                <Button onClick={handleAddTrack} size="sm" variant="default" disabled={!hasComposition}>
-                    <Plus size={14} className="mr-1" />
-                    Track
-                </Button>
+
+                {/* Add Track Button */}
+                <div className="flex items-center gap-1 mr-2">
+                    <Button onClick={handleAddTrack} size="sm" variant="default" disabled={!hasComposition}>
+                        <Plus size={14} className="mr-1" />
+                        Track
+                    </Button>
+                </div>
+
+                {/* Divider */}
+                <div className="h-6 w-px bg-border" />
+
+                {/* Undo/Redo Buttons */}
+                <div className="flex items-center gap-1">
+                    <IconButton
+                        icon={Undo2}
+                        tooltip="Undo (Cmd/Ctrl+Z)"
+                        onClick={handleUndo}
+                        variant="ghost"
+                        size="icon-sm"
+                        disabled={!canUndo}
+                    />
+                    <IconButton
+                        icon={Redo2}
+                        tooltip="Redo (Cmd/Ctrl+Shift+Z)"
+                        onClick={handleRedo}
+                        variant="ghost"
+                        size="icon-sm"
+                        disabled={!canRedo}
+                    />
+                </div>
+
+                {/* Divider */}
+                <div className="h-6 w-px bg-border" />
+
+                {/* Zoom Controls */}
                 <div className="flex items-center gap-1">
                     <IconButton
                         icon={ZoomOut}
@@ -92,16 +138,25 @@ export function SequencerToolbar() {
                         disabled={!hasComposition || zoom >= 4}
                     />
                 </div>
-                <IconButton
-                    icon={Grid3x3}
-                    tooltip={snapEnabled ? "Snap to grid: ON" : "Snap to grid: OFF"}
-                    onClick={() => setSnapEnabled(!snapEnabled)}
-                    variant={snapEnabled ? "default" : "ghost"}
-                    size="icon-sm"
-                    className={snapEnabled ? "bg-primary/20 text-primary" : ""}
-                    disabled={!hasComposition}
-                />
-                <div className="flex items-center gap-1">
+
+                {/* Divider */}
+                <div className="h-6 w-px bg-border" />
+
+                {/* Snap to Grid */}
+                <div className="flex items-center gap-1 ml-2">
+                    <IconButton
+                        icon={Grid3x3}
+                        tooltip={snapEnabled ? "Snap to grid: ON" : "Snap to grid: OFF"}
+                        onClick={() => setSnapEnabled(!snapEnabled)}
+                        variant={snapEnabled ? "default" : "ghost"}
+                        size="icon-sm"
+                        className={snapEnabled ? "bg-primary/20 text-primary" : ""}
+                        disabled={!hasComposition}
+                    />
+                </div>
+
+                {/* Grid Size */}
+                <div className="flex items-center gap-1 ml-2">
                     <Label htmlFor="grid-size-select" className="text-xs text-muted-foreground">
                         Grid
                     </Label>

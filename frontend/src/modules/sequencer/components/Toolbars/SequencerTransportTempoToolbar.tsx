@@ -1,5 +1,5 @@
 /**
- * SequencerTempoControl - BPM slider component for transport
+ * SequencerTransportTempoToolbar - BPM slider component for transport
  *
  * Professional DAW-style tempo control with slider and numeric display.
  * Follows established UI/UX patterns with Zustand store integration.
@@ -7,9 +7,9 @@
 
 import { Label } from "@/components/ui/label.tsx";
 import { Slider } from "@/components/ui/slider.tsx";
-import { useDAWStore } from '@/stores/dawStore';
+import { useDAWStore } from '@/stores/dawStore.ts';
 
-export function SequencerTempoControl() {
+export function SequencerTransportTempoToolbar() {
     // Read tempo from Zustand store
     const tempo = useDAWStore((state) => state.activeComposition?.tempo ?? 120);
     

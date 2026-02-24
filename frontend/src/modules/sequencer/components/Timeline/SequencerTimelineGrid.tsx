@@ -20,7 +20,7 @@ export function SequencerTimelineGrid({
     rulerMarkers,
 }: SequencerTimelineGridProps) {
     return (
-        <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: '#0a0a0a' }}>
             {rulerMarkers.map((marker, index) => (
                 <div
                     key={`${marker.beat}-${index}`}
@@ -29,7 +29,10 @@ export function SequencerTimelineGrid({
                             ? "absolute top-0 bottom-0 w-px bg-border"
                             : "absolute top-0 bottom-0 w-px bg-border/20"
                     }
-                    style={{ left: `${marker.x}px`, transform: 'translateX(-0.5px)' }}
+                    style={{
+                        left: `${marker.x}px`,
+                        transform: 'translateX(-0.5px)',
+                }}
                 />
             ))}
         </div>

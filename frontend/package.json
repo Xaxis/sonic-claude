@@ -30,12 +30,14 @@
         "react-router-dom": "^7.13.0",
         "sonner": "^2.0.7",
         "tailwind-merge": "^3.4.0",
+        "uuid": "^13.0.0",
         "zustand": "^5.0.11"
     },
     "devDependencies": {
         "@types/node": "^25.2.2",
         "@types/react": "^19.2.13",
         "@types/react-dom": "^19.2.3",
+        "@types/uuid": "^10.0.0",
         "@vitejs/plugin-react": "^5.1.3",
         "autoprefixer": "^10.4.24",
         "postcss": "^8.5.6",
