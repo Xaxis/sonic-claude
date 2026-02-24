@@ -9,9 +9,9 @@
  * This is the "glue" layer between SequencerSplitLayout and SequencerSampleEditor.
  */
 
-import { SequencerSampleEditor } from "../components/SampleEditor/SequencerSampleEditor.tsx";
+import { SequencerSampleEditor } from "./SequencerSampleEditor.tsx";
 import { Music } from "lucide-react";
-import type { SequencerClip } from "../types";
+import type { SequencerClip } from "../../types.ts";
 
 interface SequencerSampleEditorWrapperProps {
     // Clip data

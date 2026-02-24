@@ -13,36 +13,30 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { Music } from "lucide-react";
 import { SequencerTimelineSection } from "./SequencerTimelineSection.tsx";
-import { SequencerPianoRollWrapper } from "./SequencerPianoRollWrapper.tsx";
+import { SequencerPianoRollWrapper } from "../components/PianoRoll/SequencerPianoRollWrapper.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { statePersistence } from "@/services/state-persistence/state-persistence.service";
-import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
 
 interface SequencerSplitLayoutProps {
     // Scroll refs for auto-scroll functionality
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
     sampleEditorScrollRef: React.RefObject<HTMLDivElement | null>;
-
-    // Active notes for visual feedback
-    activeNotes?: ActiveNote[];
 }
 
 export function SequencerSplitLayout({
     timelineScrollRef,
     pianoRollScrollRef,
-    sampleEditorScrollRef,
-    activeNotes,
+    sampleEditorScrollRef, // TODO: Will be used when sample editor is implemented
 }: SequencerSplitLayoutProps) {
+    // Suppress unused variable warning - will be used when sample editor is implemented
+    void sampleEditorScrollRef;
 
     // ========================================================================
     // STATE: Read directly from Zustand store
     // ========================================================================
     const tracks = useDAWStore(state => state.tracks);
     const clips = useDAWStore(state => state.clips);
-    const transport = useDAWStore(state => state.transport);
-    const currentPosition = transport?.position_beats ?? 0;
-    const isPlaying = transport?.is_playing ?? false;
     const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
     const showPianoRoll = useDAWStore(state => state.showPianoRoll);
 
@@ -170,9 +164,6 @@ export function SequencerSplitLayout({
                             track={pianoRollTrack}
                             clipDragState={pianoRollClipDragState}
                             totalBeats={totalBeats}
-                            activeNotes={activeNotes}
-                            currentPosition={currentPosition}
-                            isPlaying={isPlaying ?? false}
                             pianoRollScrollRef={pianoRollScrollRef}
                         />
                     ) : (

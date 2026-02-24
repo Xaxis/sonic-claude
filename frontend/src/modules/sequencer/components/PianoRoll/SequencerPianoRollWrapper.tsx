@@ -1,42 +1,26 @@
 /**
  * SequencerPianoRollWrapper Component
  *
- * REFACTORED: Uses Zustand best practices
- * - Reads state directly from store (no prop drilling)
- * - Calls actions directly from store (no handler props)
- * - Only receives clip/track data, drag state, and scroll refs
+ * REFACTORED: Minimal wrapper for piano roll
+ * - SequencerPianoRoll now reads from Zustand directly (transport, activeNotes, etc.)
+ * - This wrapper only handles empty states and clip validation
+ * - No adapter layer needed - SequencerPianoRoll is self-contained
  *
- * Smart container for piano roll that handles:
- * 1. Auto-scroll to clip when piano roll opens
- * 2. Empty state when no clip is selected
- * 3. Proper clip data validation
- *
- * This is the "glue" layer between SequencerSplitLayout and SequencerPianoRoll.
+ * Responsibilities:
+ * 1. Empty state when no clip is selected
+ * 2. Clip type validation (MIDI vs audio)
+ * 3. Drag state sync with timeline (for real-time visual updates)
  */
 
-import { SequencerPianoRoll } from "../components/PianoRoll/SequencerPianoRoll.tsx";
+import { SequencerPianoRoll } from "./SequencerPianoRoll.tsx";
 import { Music } from "lucide-react";
-import { useDAWStore } from '@/stores/dawStore';
-import type { SequencerClip, SequencerTrack } from "../types";
-import type { ActiveNote } from "@/hooks/useTransportWebsocket.ts";
+import type { SequencerClip, SequencerTrack } from "../../types.ts";
 
 interface SequencerPianoRollWrapperProps {
-    // Clip data
     clip: SequencerClip | undefined;
-    track: SequencerTrack | undefined; // Track for instrument info
-
-    // Drag state (for real-time sync with timeline)
+    track: SequencerTrack | undefined;
     clipDragState?: { startTime: number; duration: number } | null;
-
-    // State (shared with timeline - Ableton pattern)
     totalBeats: number;
-    activeNotes?: ActiveNote[];
-
-    // Playback state
-    currentPosition: number;
-    isPlaying: boolean;
-
-    // Scroll ref
     pianoRollScrollRef: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -45,32 +29,9 @@ export function SequencerPianoRollWrapper({
     track,
     clipDragState,
     totalBeats,
-    activeNotes,
-    currentPosition,
-    isPlaying,
     pianoRollScrollRef,
 }: SequencerPianoRollWrapperProps) {
-    // ========================================================================
-    // ACTIONS: Get directly from Zustand store
-    // ========================================================================
-    const closePianoRoll = useDAWStore(state => state.closePianoRoll);
-    const updateClip = useDAWStore(state => state.updateClip);
-    const seek = useDAWStore(state => state.seek);
-    const setLoopStart = useDAWStore(state => state.setLoopStart);
-    const setLoopEnd = useDAWStore(state => state.setLoopEnd);
-    const setPianoRollScrollLeft = useDAWStore(state => state.setPianoRollScrollLeft);
-
-    // ========================================================================
-    // HANDLERS: Adapt store actions to component callbacks
-    // ========================================================================
-    const handleUpdateNotes = async (clipId: string, notes: any[]) => {
-        await updateClip(clipId, { midi_events: notes });
-    };
-
-    const handlePianoRollScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        const scrollLeft = e.currentTarget.scrollLeft;
-        setPianoRollScrollLeft(scrollLeft);
-    };
+    // No adapter layer needed - SequencerPianoRoll reads from Zustand directly
 
     // Empty state - no clip selected
     if (!clip) {
@@ -120,16 +81,7 @@ export function SequencerPianoRollWrapper({
             midiEvents={clip.midi_events || []}
             totalBeats={totalBeats}
             instrument={track?.instrument}
-            activeNotes={activeNotes}
-            currentPosition={currentPosition}
-            isPlaying={isPlaying}
             pianoRollScrollRef={pianoRollScrollRef}
-            onPianoRollScroll={handlePianoRollScroll}
-            onClose={closePianoRoll}
-            onUpdateNotes={handleUpdateNotes}
-            onSeek={seek}
-            onLoopStartChange={setLoopStart}
-            onLoopEndChange={setLoopEnd}
         />
     );
 }

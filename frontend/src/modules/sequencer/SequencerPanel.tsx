@@ -26,7 +26,6 @@ export function SequencerPanel() {
     // STATE: Read directly from Zustand store
     // ========================================================================
     const activeComposition = useDAWStore(state => state.activeComposition);
-    const transport = useDAWStore(state => state.transport);
 
     // ========================================================================
     // LOCAL UI STATE: Settings dialog only
@@ -43,7 +42,6 @@ export function SequencerPanel() {
     // ========================================================================
     // DERIVED STATE
     // ========================================================================
-    const activeNotes = transport?.active_notes ?? [];
     const hasNoComposition = !activeComposition;
 
     // ========================================================================
@@ -84,9 +82,6 @@ export function SequencerPanel() {
                         timelineScrollRef={timelineScrollRef}
                         pianoRollScrollRef={pianoRollScrollRef}
                         sampleEditorScrollRef={sampleEditorScrollRef}
-
-                        // @TODO - Is this the best pattern to pass activeNotes or do we access it with our cohesive ws zustand store or some pattern we should best practice implement?
-                        activeNotes={activeNotes}
                     />
                 </SubPanel>
             </div>
