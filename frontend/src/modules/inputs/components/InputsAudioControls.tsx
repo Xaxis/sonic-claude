@@ -1,5 +1,5 @@
 /**
- * AudioInputControls Component
+ * InputsAudioControls Component
  * 
  * Pure presentation component for audio input controls.
  * Displays device selector, spectrum analyzer, level meter, gain control, and recording button.
@@ -36,7 +36,7 @@ interface AudioInputControlsProps {
     onStartRecording: () => void;
 }
 
-export function AudioInputControls({
+export function InputsAudioControls({
     audioInputDevices,
     selectedInputDevice,
     onDeviceChange,

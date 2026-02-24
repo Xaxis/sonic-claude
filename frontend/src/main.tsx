@@ -3,7 +3,6 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import App from "./App";
 import { PopoutWindow } from "@/components/layout";
-import { LayoutProvider } from "./contexts/LayoutContext";
 import { WebSocketProvider } from "./providers/WebSocketProvider.tsx";
 import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,16 +13,14 @@ createRoot(document.getElementById("root")!).render(
         <BrowserRouter>
             <TooltipProvider delayDuration={300}>
                 <ToastProvider>
-                    {/* WebSocket Sync - Wires WebSocket hooks to Zustand store */}
+                    {/* WebSocket Provider - Wires WebSocket hooks to Zustand store */}
                     <WebSocketProvider />
 
-                    {/* Layout & UI State */}
-                    <LayoutProvider>
-                        <Routes>
-                            <Route path="/" element={<App />} />
-                            <Route path="/popout" element={<PopoutWindow />} />
-                        </Routes>
-                    </LayoutProvider>
+                    {/* Routes - Layout state managed by layoutStore (Zustand) */}
+                    <Routes>
+                        <Route path="/" element={<App />} />
+                        <Route path="/popout" element={<PopoutWindow />} />
+                    </Routes>
                 </ToastProvider>
             </TooltipProvider>
         </BrowserRouter>

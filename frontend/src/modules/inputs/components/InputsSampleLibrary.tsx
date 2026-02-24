@@ -1,5 +1,5 @@
 /**
- * SampleLibraryBrowser Component
+ * InputsSampleLibrary Component
  * 
  * Pure presentation component for sample library browsing.
  * Displays search, upload, categories, and sample list with edit/delete/play actions.
@@ -53,7 +53,7 @@ interface SampleLibraryBrowserProps {
     onSampleDragStart: (sampleId: string) => void;
 }
 
-export function SampleLibraryBrowser({
+export function InputsSampleLibrary({
     samples,
     searchQuery,
     onSearchChange,

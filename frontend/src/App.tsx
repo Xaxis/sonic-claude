@@ -9,13 +9,13 @@ import { Header } from "@/components/layout/Header";
 import { TabbedWrapper } from "@/components/layout/TabbedWrapper";
 import { ActivityContainer } from "@/components/activity";
 import { CompositionLoader } from "@/components/composition/CompositionLoader";
-import { useLayout } from "@/contexts/LayoutContext";
+import { useLayoutStore } from "@/stores/layoutStore";
 import { useDAWStore } from "@/stores/dawStore";
 import { useAutosave } from "@/hooks/useAutosave";
 import { DEFAULT_PANELS } from "@/config/layout.config";
 
 export default function App() {
-    const { tabs, activeTab, setActiveTab, createTab, deleteTab, popoutTab } = useLayout();
+    const { tabs, activeTab, setActiveTab, createTab, deleteTab, popoutTab } = useLayoutStore();
 
     // Enable autosave
     useAutosave();

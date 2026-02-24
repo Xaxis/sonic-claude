@@ -9,7 +9,7 @@ import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PanelGrid } from "./PanelGrid";
 import { Header } from "./Header";
-import { useLayout } from "@/contexts/LayoutContext";
+import { useLayoutStore } from "@/stores/layoutStore";
 import { useDAWStore } from "@/stores/dawStore";
 import { DEFAULT_PANELS } from "@/config/layout.config";
 import { BROADCAST_KEYS } from "@/config/layout.config";
@@ -19,7 +19,7 @@ export function PopoutWindow() {
     const tabId = searchParams.get("tab");
     const panelIdsParam = searchParams.get("panels");
 
-    const { tabs, updateTabLayout, closePopout, popoutTab } = useLayout();
+    const { tabs, updateTabLayout, closePopout, popoutTab } = useLayoutStore();
 
     // Get state from Zustand store
     const analytics = useDAWStore(state => state.analytics);

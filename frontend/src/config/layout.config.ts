@@ -46,7 +46,7 @@
  */
 
 import type { PanelConfig } from "@/components/layout";
-import { InputPanel } from "@/modules/input";
+import { InputsPanel } from "@/modules/inputs";
 import { VisualizerPanel } from "@/modules/visualizer";
 import { SequencerPanel } from "@/modules/sequencer";
 import { MixerPanel } from "@/modules/mixer";
@@ -81,7 +81,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
     {
         id: "input",
         title: "INPUT",
-        component: createElement(InputPanel),
+        component: createElement(InputsPanel),
         closeable: false,
         getSubtitle: () => "Library • 4 samples loaded",
         defaultLayout: { x: 0, y: 0, w: 6, h: 10 },

@@ -15,7 +15,7 @@ import { useState, useEffect } from "react";
 import { Plus, X, ExternalLink, Scan } from "lucide-react";
 import { PanelGrid, type PanelConfig } from "./PanelGrid";
 import { ActivityBadge } from "@/components/activity";
-import { useLayout } from "@/contexts/LayoutContext";
+import { useLayoutStore } from "@/stores/layoutStore";
 import { useDAWStore } from "@/stores/dawStore";
 import { IconButton } from "@/components/ui/icon-button";
 import { Slider } from "@/components/ui/slider";
@@ -57,7 +57,7 @@ export function TabbedWrapper({
         enableXray,
         disableXray,
         setXrayOpacity,
-    } = useLayout();
+    } = useLayoutStore();
 
     // Get activities from Zustand store
     const activities = useDAWStore(state => state.activities);

@@ -17,7 +17,7 @@ import { Panel } from "@/components/ui/panel";
 import { GRID_CONFIG } from "@/config/layout.config";
 import type { GridLayoutItem, PanelSnapTarget, PanelAttachment, SnapZone } from "@/types/grid-layout";
 import { verticalCompactor } from "react-grid-layout";
-import { useLayout } from "@/contexts/LayoutContext";
+import { useLayoutStore } from "@/stores/layoutStore";
 
 export interface PanelConfig {
     id: string;
@@ -45,7 +45,7 @@ interface PanelGridProps {
 export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-    const { maximizedPanel, maximizePanel, minimizePanel, attachments, attachPanel, detachPanel } = useLayout();
+    const { maximizedPanel, maximizePanel, minimizePanel, attachments, attachPanel, detachPanel } = useLayoutStore();
     const [activeSnapZone, setActiveSnapZone] = useState<SnapZone | null>(null);
     const [draggingPanelId, setDraggingPanelId] = useState<string | null>(null);
 

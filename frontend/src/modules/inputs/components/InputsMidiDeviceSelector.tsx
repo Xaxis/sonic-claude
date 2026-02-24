@@ -1,5 +1,5 @@
 /**
- * MidiDeviceSelector Component
+ * InputsMidiDeviceSelector Component
  * 
  * Pure presentation component for MIDI device selection and settings.
  * Displays device selector, activity monitor, and MIDI settings.
@@ -27,7 +27,7 @@ interface MidiDeviceSelectorProps {
     onQuantizeChange: (enabled: boolean) => void;
 }
 
-export function MidiDeviceSelector({
+export function InputsMidiDeviceSelector({
     midiInputDevices,
     selectedMidiDevice,
     onDeviceChange,

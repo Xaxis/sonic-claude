@@ -15,11 +15,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Mic, Piano, Folder } from "lucide-react";
-import { AudioInputSection } from "@/modules/input/components/Layouts/AudioInputSection.tsx";
-import { SampleLibrarySection } from "@/modules/input/components/Layouts/SampleLibrarySection.tsx";
-import { MidiInputSection } from "@/modules/input/components/Layouts/MidiInputSection.tsx";
+import { AudioInputSection } from "@/modules/inputs/components/Layouts/AudioInputSection.tsx";
+import { SampleLibrarySection } from "@/modules/inputs/components/Layouts/SampleLibrarySection.tsx";
+import { MidiInputSection } from "@/modules/inputs/components/Layouts/MidiInputSection.tsx";
 
-export function InputPanel() {
+export function InputsPanel() {
     // Tab state
     const [activeTab, setActiveTab] = useState<"audio" | "midi" | "library">("audio");
 
