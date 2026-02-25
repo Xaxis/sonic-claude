@@ -4,5 +4,6 @@ node_modules
 __pycache__
 .env
 .vite
+frontend/dist
 data/compositions
 data/samples

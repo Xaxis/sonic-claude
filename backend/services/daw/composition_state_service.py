@@ -86,7 +86,21 @@ class CompositionStateService:
         Returns:
             Created composition
         """
+        from backend.models.composition import Scene
+
         composition_id = str(uuid.uuid4())
+
+        # Initialize 8 default scenes for clip launcher
+        default_scenes = [
+            Scene(
+                id=f"scene-{uuid.uuid4().hex[:8]}",
+                name=f"Scene {i+1}",
+                color="#f39c12",  # Orange default
+                tempo=None
+            )
+            for i in range(8)
+        ]
+
         composition = Composition(
             id=composition_id,
             name=name,
@@ -94,12 +108,13 @@ class CompositionStateService:
             time_signature=time_signature,
             tracks=[],
             clips=[],
+            scenes=default_scenes,  # Initialize with 8 default scenes
             created_at=datetime.now(),
             updated_at=datetime.now()
         )
         self.compositions[composition_id] = composition
         self.current_composition_id = composition_id
-        logger.info(f"✅ Created composition: {name} (ID: {composition_id})")
+        logger.info(f"✅ Created composition: {name} (ID: {composition_id}) with {len(default_scenes)} default scenes")
         return composition
 
     def get_composition(self, composition_id: str) -> Optional[Composition]:
