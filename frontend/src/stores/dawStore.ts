@@ -204,6 +204,9 @@ interface DAWStore {
     pianoRollScrollLeft: number;
     sampleEditorScrollLeft: number;
 
+    // Scroll Refs (for programmatic scrolling)
+    pianoRollScrollRef: React.RefObject<HTMLDivElement> | null;
+
     // Modals
     showSampleBrowser: boolean;
     showSequenceManager: boolean;
@@ -399,6 +402,8 @@ interface DAWStore {
     setTimelineScrollLeft: (scrollLeft: number) => void;
     setPianoRollScrollLeft: (scrollLeft: number) => void;
     setSampleEditorScrollLeft: (scrollLeft: number) => void;
+    setPianoRollScrollRef: (ref: React.RefObject<HTMLDivElement> | null) => void;
+    scrollPianoRollToNotes: (clipId: string) => void;
 
     setShowSampleBrowser: (show: boolean) => void;
     setShowSequenceManager: (show: boolean) => void;
@@ -524,6 +529,9 @@ export const useDAWStore = create<DAWStore>()(
                 timelineScrollLeft: 0,
                 pianoRollScrollLeft: 0,
                 sampleEditorScrollLeft: 0,
+
+                // Scroll Refs (EPHEMERAL)
+                pianoRollScrollRef: null,
 
                 // Panel Visibility (PERSISTED)
                 showSampleBrowser: false,
@@ -936,12 +944,17 @@ export const useDAWStore = create<DAWStore>()(
         updateClip: async (clipId, request) => {
             try {
                 const { activeComposition, clips } = get();
-                if (!activeComposition) return;
+                if (!activeComposition) {
+                    console.warn("Cannot update clip: no active composition");
+                    return;
+                }
 
-                // Find the clip
+                // Find the clip in current state
                 const clip = clips.find(c => c.id === clipId);
                 if (!clip) {
-                    toast.error("Clip not found");
+                    console.warn(`Cannot update clip: clip ${clipId} not found in current composition`);
+                    // Reload composition to sync state
+                    await get().loadComposition(activeComposition.id);
                     return;
                 }
 
@@ -954,21 +967,36 @@ export const useDAWStore = create<DAWStore>()(
                 // Refresh undo/redo status
                 await get().refreshUndoRedoStatus();
 
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Failed to update clip:", error);
-                toast.error("Failed to update clip");
+
+                // If clip not found on backend, reload composition to sync state
+                if (error?.response?.status === 404 || error?.message?.includes('not found')) {
+                    console.warn('Clip not found on backend, reloading composition to sync state');
+                    const { activeComposition } = get();
+                    if (activeComposition) {
+                        await get().loadComposition(activeComposition.id);
+                    }
+                } else {
+                    toast.error("Failed to update clip");
+                }
             }
         },
 
         deleteClip: async (clipId) => {
             try {
                 const { activeComposition, clips } = get();
-                if (!activeComposition) return;
+                if (!activeComposition) {
+                    console.warn("Cannot delete clip: no active composition");
+                    return;
+                }
 
-                // Find the clip
+                // Find the clip in current state
                 const clip = clips.find(c => c.id === clipId);
                 if (!clip) {
-                    toast.error("Clip not found");
+                    console.warn(`Cannot delete clip: clip ${clipId} not found in current composition`);
+                    // Reload composition to sync state
+                    await get().loadComposition(activeComposition.id);
                     return;
                 }
 
@@ -981,9 +1009,19 @@ export const useDAWStore = create<DAWStore>()(
                 // Refresh undo/redo status
                 await get().refreshUndoRedoStatus();
 
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Failed to delete clip:", error);
-                toast.error("Failed to delete clip");
+
+                // If clip not found on backend, reload composition to sync state
+                if (error?.response?.status === 404 || error?.message?.includes('not found')) {
+                    console.warn('Clip not found on backend, reloading composition to sync state');
+                    const { activeComposition } = get();
+                    if (activeComposition) {
+                        await get().loadComposition(activeComposition.id);
+                    }
+                } else {
+                    toast.error("Failed to delete clip");
+                }
             }
         },
 
@@ -2154,15 +2192,92 @@ export const useDAWStore = create<DAWStore>()(
         setTimelineScrollLeft: (scrollLeft) => set({ timelineScrollLeft: scrollLeft }),
         setPianoRollScrollLeft: (scrollLeft) => set({ pianoRollScrollLeft: scrollLeft }),
         setSampleEditorScrollLeft: (scrollLeft) => set({ sampleEditorScrollLeft: scrollLeft }),
+        setPianoRollScrollRef: (ref) => set({ pianoRollScrollRef: ref }),
+
+        /**
+         * Auto-scroll piano roll to show notes vertically
+         *
+         * Calculates the vertical center of all notes in the clip and scrolls
+         * the piano roll to center that range in the viewport.
+         *
+         * Piano roll constants (must match SequencerPianoRollGrid):
+         * - minPitch: 21 (A0)
+         * - maxPitch: 108 (C8)
+         * - noteHeight: 20px per note row
+         *
+         * @param clipId - The clip ID to scroll to
+         */
+        scrollPianoRollToNotes: (clipId: string) => {
+            try {
+                const state = get();
+                const clip = state.clips.find(c => c.id === clipId);
+
+                // Only scroll if clip exists, is MIDI, and has notes
+                if (!clip || clip.type !== 'midi' || !clip.midi_events || clip.midi_events.length === 0) {
+                    console.log('Piano roll auto-scroll skipped: no notes or invalid clip');
+                    return;
+                }
+
+                // Get the scroll container ref
+                const scrollRef = state.pianoRollScrollRef;
+                if (!scrollRef || !scrollRef.current) {
+                    console.log('Piano roll auto-scroll skipped: scroll ref not available');
+                    return;
+                }
+
+                // Piano roll constants (must match SequencerPianoRollGrid)
+                const minPitch = 21;  // A0
+                const maxPitch = 108; // C8
+                const noteHeight = 20; // pixels per note row
+
+                // Find the range of notes (min and max pitch)
+                const notes = clip.midi_events;
+                const pitches = notes.map(note => note.note);
+                const minNotePitch = Math.min(...pitches);
+                const maxNotePitch = Math.max(...pitches);
+
+                // Calculate the center pitch of the note range
+                const centerPitch = (minNotePitch + maxNotePitch) / 2;
+
+                // Calculate the Y position of the center pitch
+                // Notes are rendered from top (maxPitch) to bottom (minPitch)
+                const centerY = (maxPitch - centerPitch) * noteHeight;
+
+                // Get viewport height
+                const viewportHeight = scrollRef.current.clientHeight;
+
+                // Calculate scroll position to center the notes in viewport
+                // Subtract half viewport height to center the notes
+                const scrollTop = centerY - (viewportHeight / 2);
+
+                // Scroll to the calculated position (with smooth behavior)
+                scrollRef.current.scrollTo({
+                    top: Math.max(0, scrollTop), // Don't scroll negative
+                    behavior: 'smooth'
+                });
+
+                console.log(`Piano roll auto-scrolled to notes (pitch range: ${minNotePitch}-${maxNotePitch})`);
+            } catch (error) {
+                console.error('Failed to auto-scroll piano roll:', error);
+                // Silently fail - don't break the UI
+            }
+        },
 
         setShowSampleBrowser: (show) => set({ showSampleBrowser: show }),
         setShowSequenceManager: (show) => set({ showSequenceManager: show }),
         setShowSequenceSettings: (show) => set({ showSequenceSettings: show }),
 
-        openPianoRoll: (clipId) => set({
-            showPianoRoll: true,
-            pianoRollClipId: clipId
-        }),
+        openPianoRoll: (clipId) => {
+            set({
+                showPianoRoll: true,
+                pianoRollClipId: clipId
+            });
+
+            // Auto-scroll to notes after a brief delay to ensure DOM is ready
+            setTimeout(() => {
+                get().scrollPianoRollToNotes(clipId);
+            }, 100);
+        },
 
         closePianoRoll: () => set({
             showPianoRoll: false,

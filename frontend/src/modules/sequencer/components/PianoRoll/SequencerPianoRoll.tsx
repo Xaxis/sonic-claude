@@ -6,6 +6,7 @@
  * - Composes SequencerGridLayout with keyboard, ruler, and grid
  */
 
+import { useEffect } from "react";
 import { X, Music } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { SequencerPianoRollKeyboard } from "./SequencerPianoRollKeyboard.tsx";
@@ -35,6 +36,20 @@ export function SequencerPianoRoll({
     // ========================================================================
     const closePianoRoll = useDAWStore(state => state.closePianoRoll);
     const setPianoRollScrollLeft = useDAWStore(state => state.setPianoRollScrollLeft);
+    const setPianoRollScrollRef = useDAWStore(state => state.setPianoRollScrollRef);
+
+    // ========================================================================
+    // EFFECTS: Set scroll ref when component mounts
+    // ========================================================================
+    useEffect(() => {
+        // Register the scroll ref with the store for programmatic scrolling
+        setPianoRollScrollRef(pianoRollScrollRef);
+
+        // Cleanup: unregister ref when component unmounts
+        return () => {
+            setPianoRollScrollRef(null);
+        };
+    }, [pianoRollScrollRef, setPianoRollScrollRef]);
 
     // ========================================================================
     // SHARED TIMELINE CALCULATIONS

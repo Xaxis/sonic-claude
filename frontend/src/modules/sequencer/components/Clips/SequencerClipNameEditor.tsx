@@ -1,12 +1,12 @@
 /**
- * ClipNameEditor - Inline editing component for clip names
+ * SequencerClipNameEditor - Inline editing component for clip names
  * 
  * Displays clip name with pencil icon button.
  * Click pencil → inline text field appears
  * Type new name → press Enter or click checkmark to save
  * Press Escape to cancel
  * 
- * BRILLIANT UI/UX:
+ * FEATURES:
  * - Seamless inline editing
  * - Clear visual feedback
  * - Keyboard shortcuts (Enter to save, Escape to cancel)
@@ -18,7 +18,7 @@ import { useState, useRef, useEffect } from "react";
 import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface ClipNameEditorProps {
+interface SequencerClipNameEditorProps {
     clipId: string;
     clipName: string;
     onSave: (clipId: string, newName: string) => void;
@@ -28,14 +28,14 @@ interface ClipNameEditorProps {
     onEditModeChange?: (isEditing: boolean) => void;  // Callback when edit mode changes
 }
 
-export function ClipNameEditor({
+export function SequencerClipNameEditor({
     clipId,
     clipName,
     onSave,
     className,
     externalEditMode,
     onEditModeChange
-}: ClipNameEditorProps) {
+}: SequencerClipNameEditorProps) {
     const [internalEditMode, setInternalEditMode] = useState(false);
     const [editValue, setEditValue] = useState(clipName);
     const inputRef = useRef<HTMLInputElement>(null);

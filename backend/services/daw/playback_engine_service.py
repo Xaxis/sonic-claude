@@ -77,16 +77,15 @@ class PlaybackEngineService:
 
         # Playback task tracking
         self.playback_task: Optional[asyncio.Task] = None
-        self.active_synths: Dict[str, int] = {}  # clip_id -> node_id
 
-        # Active MIDI notes (for visual feedback in piano roll)
-        self.active_midi_notes: Dict[int, ActiveMIDINote] = {}
+        # TIMELINE PLAYBACK STATE (sequencer mode)
+        self.timeline_active_synths: Dict[str, int] = {}  # clip_id -> node_id (for timeline playback)
+        self.timeline_active_midi_notes: Dict[int, ActiveMIDINote] = {}  # node_id -> note data
+        self.timeline_midi_note_tasks: Set[asyncio.Task] = set()  # MIDI note tasks for timeline
 
-        # Track all MIDI note tasks so we can cancel them on pause/stop
-        self.midi_note_tasks: Set[asyncio.Task] = set()
-
-        # Track triggered clips (waiting for quantization)
-        self.triggered_clips: Dict[str, asyncio.Task] = {}  # clip_id -> launch_task
+        # CLIP LAUNCHER STATE (performance mode)
+        self.launcher_active_synths: Dict[str, int] = {}  # clip_id -> node_id (for clip launcher)
+        self.triggered_clips: Dict[str, asyncio.Task] = {}  # clip_id -> launch_task (waiting for quantization)
 
         logger.info("✅ PlaybackEngineService initialized")
 
@@ -163,26 +162,26 @@ class PlaybackEngineService:
                 if composition.loop_enabled and self.playhead_position >= composition.loop_end:
                     logger.info(f"🔁 Looping back: {composition.loop_end:.2f} → {composition.loop_start:.2f} beats")
 
-                    # Free all active synths before looping back
+                    # Free all active synths before looping back (TIMELINE ONLY)
                     if self.engine_manager:
-                        for clip_id, node_id in list(self.active_synths.items()):
+                        for clip_id, node_id in list(self.timeline_active_synths.items()):
                             self.engine_manager.send_message("/n_free", node_id)
-                        self.active_synths.clear()
+                        self.timeline_active_synths.clear()
 
-                    # FIX: Cancel all MIDI note tasks before looping
-                    logger.info(f"🔁 Cancelling {len(self.midi_note_tasks)} MIDI note tasks for loop")
-                    for task in list(self.midi_note_tasks):
+                    # FIX: Cancel all MIDI note tasks before looping (TIMELINE ONLY)
+                    logger.info(f"🔁 Cancelling {len(self.timeline_midi_note_tasks)} MIDI note tasks for loop")
+                    for task in list(self.timeline_midi_note_tasks):
                         task.cancel()
                     # Wait for all tasks to be cancelled
-                    if self.midi_note_tasks:
-                        await asyncio.gather(*self.midi_note_tasks, return_exceptions=True)
-                    self.midi_note_tasks.clear()
+                    if self.timeline_midi_note_tasks:
+                        await asyncio.gather(*self.timeline_midi_note_tasks, return_exceptions=True)
+                    self.timeline_midi_note_tasks.clear()
 
-                    # FIX: Free all active MIDI notes
+                    # FIX: Free all active MIDI notes (TIMELINE ONLY)
                     if self.engine_manager:
-                        for node_id in list(self.active_midi_notes.keys()):
+                        for node_id in list(self.timeline_active_midi_notes.keys()):
                             self.engine_manager.send_message("/n_free", node_id)
-                    self.active_midi_notes.clear()
+                    self.timeline_active_midi_notes.clear()
 
                     # Jump back to loop start
                     self.playhead_position = composition.loop_start
@@ -224,10 +223,10 @@ class PlaybackEngineService:
                     time_sig_num = int(time_sig_parts[0]) if len(time_sig_parts) > 0 else 4
                     time_sig_den = int(time_sig_parts[1]) if len(time_sig_parts) > 1 else 4
 
-                    # Build active notes list for visual feedback
+                    # Build active notes list for visual feedback (TIMELINE ONLY)
                     active_notes_list = [
                         {"clip_id": note_data["clip_id"], "note": note_data["note"], "start_time": note_data["start_time"]}
-                        for note_data in self.active_midi_notes.values()
+                        for note_data in self.timeline_active_midi_notes.values()
                     ]
 
                     transport_data = {
@@ -244,8 +243,8 @@ class PlaybackEngineService:
                         "loop_end": composition.loop_end,
                         "metronome_enabled": self.metronome_enabled,
                         "active_notes": active_notes_list,
-                        # Clip launcher state (for real-time UI updates)
-                        "playing_clips": list(self.active_synths.keys()),
+                        # Clip launcher state (for real-time UI updates) - SEPARATE from timeline
+                        "playing_clips": list(self.launcher_active_synths.keys()),
                         "triggered_clips": list(self.triggered_clips.keys()),
                     }
                     if loop_count == 1:
@@ -266,7 +265,7 @@ class PlaybackEngineService:
 
     async def _check_and_trigger_clips(self, composition: Composition, position: float) -> None:
         """
-        Check if any clips should be triggered at the current position
+        Check if any clips should be triggered at the current position (TIMELINE PLAYBACK)
 
         Args:
             composition: Composition being played
@@ -274,7 +273,7 @@ class PlaybackEngineService:
         """
         # First, stop any clips that are playing but shouldn't be (playhead moved outside their range)
         clips_to_stop = []
-        for clip_id, node_id in list(self.active_synths.items()):
+        for clip_id, node_id in list(self.timeline_active_synths.items()):
             # Find the clip
             clip = next((c for c in composition.clips if c.id == clip_id), None)
             if clip:
@@ -290,7 +289,7 @@ class PlaybackEngineService:
             logger.info(f"🛑 Stopping clip {clip_id} (node {node_id}) - playhead outside range")
             if self.engine_manager:
                 self.engine_manager.send_message("/n_free", node_id)
-            del self.active_synths[clip_id]
+            del self.timeline_active_synths[clip_id]
 
         # Now check for clips that should start playing
         for clip in composition.clips:
@@ -315,7 +314,7 @@ class PlaybackEngineService:
             # Check if playhead is within clip range
             if clip_start <= position < clip_end:
                 # Check if this clip is already playing
-                if clip.id not in self.active_synths:
+                if clip.id not in self.timeline_active_synths:
                     # Calculate offset within the clip
                     offset = position - clip_start
                     logger.info(f"🎯 Triggering clip {clip.id} at position {position:.2f} (clip range: {clip_start:.2f}-{clip_end:.2f})")
@@ -418,8 +417,8 @@ class PlaybackEngineService:
                     "out", track_bus  # Route to track bus
                 )
 
-                # Track active synth
-                self.active_synths[clip.id] = node_id
+                # Track active synth (TIMELINE PLAYBACK)
+                self.timeline_active_synths[clip.id] = node_id
 
                 logger.info(f"🎵 Triggered sample clip {clip.id} (node {node_id}, buffer {buffer_num}, sample: {track.sample_name})")
                 logger.info(f"   Volume: track={track.volume:.2f}, clip_gain={clip.gain:.2f}, final_amp={0.8 * clip.gain * track.volume:.2f}")
@@ -495,8 +494,8 @@ class PlaybackEngineService:
                     "out", track_bus  # Route to track bus
                 )
 
-                # Track active synth
-                self.active_synths[clip.id] = node_id
+                # Track active synth (TIMELINE PLAYBACK)
+                self.timeline_active_synths[clip.id] = node_id
 
                 logger.info(f"🎵 Triggered audio clip {clip.id} (node {node_id}, buffer {buffer_num})")
                 logger.info(f"   Volume: track={track.volume:.2f}, clip_gain={clip.gain:.2f}, final_amp={0.8 * clip.gain * track.volume:.2f}")
@@ -577,8 +576,8 @@ class PlaybackEngineService:
                                         "out", out_bus  # Route to track bus
                                     )
 
-                                    # Track active note for visual feedback
-                                    self.active_midi_notes[nid] = {
+                                    # Track active note for visual feedback (TIMELINE PLAYBACK)
+                                    self.timeline_active_midi_notes[nid] = {
                                         "clip_id": clip_id_val,
                                         "note": note_pitch,
                                         "start_time": note_start_time,  # FIX: Use parameter instead of closure variable
@@ -595,9 +594,9 @@ class PlaybackEngineService:
                                         logger.info(f"🔇 RELEASING MIDI note {nid}: sending gate=0")
                                         self.engine_manager.send_message("/n_set", nid, "gate", 0)
 
-                                    # Remove from active notes
-                                    if nid in self.active_midi_notes:
-                                        del self.active_midi_notes[nid]
+                                    # Remove from active notes (TIMELINE PLAYBACK)
+                                    if nid in self.timeline_active_midi_notes:
+                                        del self.timeline_active_midi_notes[nid]
                                     logger.info(f"✅ MIDI note {nid} RELEASED")
                                 else:
                                     logger.warning(f"⚠️  MIDI note {nid} NOT triggered: engine_manager={self.engine_manager is not None}, is_playing={self.is_playing}")
@@ -605,26 +604,26 @@ class PlaybackEngineService:
                             except asyncio.CancelledError:
                                 # Task was cancelled (pause/stop was called)
                                 logger.info(f"🛑 MIDI note {nid} task CANCELLED")
-                                # Free the synth if it was started
-                                if nid in self.active_midi_notes:
+                                # Free the synth if it was started (TIMELINE PLAYBACK)
+                                if nid in self.timeline_active_midi_notes:
                                     if self.engine_manager:
                                         self.engine_manager.send_message("/n_free", nid)
-                                    del self.active_midi_notes[nid]
+                                    del self.timeline_active_midi_notes[nid]
                                 raise  # Re-raise to mark task as cancelled
                             except Exception as e:
                                 logger.error(f"❌ MIDI note {nid} task FAILED: {e}", exc_info=True)
 
                         task = asyncio.create_task(play_note(node_id, freq, amp, synthdef, delay_seconds, note.duration, note.note, note.start_time, clip.id, track_bus))
-                        self.midi_note_tasks.add(task)
+                        self.timeline_midi_note_tasks.add(task)
                         # Remove task from set when it completes
-                        task.add_done_callback(self.midi_note_tasks.discard)
+                        task.add_done_callback(self.timeline_midi_note_tasks.discard)
                     else:
                         logger.info(f"      ❌ SKIPPED (note already passed: offset={offset:.2f}, note_start={note.start_time:.2f})")
 
                 logger.info(f"   Total notes scheduled: {triggered_count}/{len(clip.midi_events)}")
 
-                # Track that this MIDI clip is active (for stopping when playhead leaves clip range)
-                self.active_synths[clip.id] = self.engine_manager.allocate_node_id()  # Dummy node ID for tracking
+                # Track that this MIDI clip is active (for stopping when playhead leaves clip range) - TIMELINE PLAYBACK
+                self.timeline_active_synths[clip.id] = self.engine_manager.allocate_node_id()  # Dummy node ID for tracking
 
         except Exception as e:
             logger.error(f"❌ Failed to trigger clip {clip.id}: {e}")
@@ -653,24 +652,24 @@ class PlaybackEngineService:
                 pass
             self.playback_task = None
 
-        # Stop all active synths (sample/audio clips)
+        # Stop all active synths (sample/audio clips) - TIMELINE PLAYBACK
         if self.engine_manager:
-            for node_id in self.active_synths.values():
+            for node_id in self.timeline_active_synths.values():
                 self.engine_manager.send_message("/n_free", node_id)
-        self.active_synths.clear()
+        self.timeline_active_synths.clear()
 
-        # Cancel all scheduled MIDI note tasks
-        for task in self.midi_note_tasks:
+        # Cancel all scheduled MIDI note tasks - TIMELINE PLAYBACK
+        for task in self.timeline_midi_note_tasks:
             task.cancel()
-        if self.midi_note_tasks:
-            await asyncio.gather(*self.midi_note_tasks, return_exceptions=True)
-        self.midi_note_tasks.clear()
+        if self.timeline_midi_note_tasks:
+            await asyncio.gather(*self.timeline_midi_note_tasks, return_exceptions=True)
+        self.timeline_midi_note_tasks.clear()
 
-        # Stop all active MIDI notes (use /n_free for immediate silence)
+        # Stop all active MIDI notes (use /n_free for immediate silence) - TIMELINE PLAYBACK
         if self.engine_manager:
-            for node_id in self.active_midi_notes.keys():
+            for node_id in self.timeline_active_midi_notes.keys():
                 self.engine_manager.send_message("/n_free", node_id)
-        self.active_midi_notes.clear()
+        self.timeline_active_midi_notes.clear()
 
         # Broadcast stopped state via WebSocket
         if self.websocket_manager and self.composition_state_service.current_composition_id:
@@ -696,7 +695,7 @@ class PlaybackEngineService:
                     "loop_end": composition.loop_end,
                     "metronome_enabled": self.metronome_enabled,
                     "active_notes": [],
-                    "playing_clips": list(self.active_synths.keys()),
+                    "playing_clips": list(self.launcher_active_synths.keys()),
                     "triggered_clips": list(self.triggered_clips.keys()),
                 }
                 await self.websocket_manager.broadcast_transport(transport_data)
@@ -718,32 +717,32 @@ class PlaybackEngineService:
                     pass
                 self.playback_task = None
 
-            # Stop all active synths (sample/audio clips)
-            logger.info(f"🛑 Stopping {len(self.active_synths)} active sample/audio synths")
+            # Stop all active synths (sample/audio clips) - TIMELINE PLAYBACK
+            logger.info(f"🛑 Stopping {len(self.timeline_active_synths)} active sample/audio synths")
             if self.engine_manager:
-                for clip_id, node_id in self.active_synths.items():
+                for clip_id, node_id in self.timeline_active_synths.items():
                     logger.info(f"🛑 Freeing synth node {node_id} for clip {clip_id}")
                     self.engine_manager.send_message("/n_free", node_id)
             else:
                 logger.warning("⚠️ No engine_manager available to free synths!")
-            self.active_synths.clear()
+            self.timeline_active_synths.clear()
 
-            # Cancel all scheduled MIDI note tasks
-            logger.info(f"🛑 Cancelling {len(self.midi_note_tasks)} MIDI note tasks")
-            for task in self.midi_note_tasks:
+            # Cancel all scheduled MIDI note tasks - TIMELINE PLAYBACK
+            logger.info(f"🛑 Cancelling {len(self.timeline_midi_note_tasks)} MIDI note tasks")
+            for task in self.timeline_midi_note_tasks:
                 task.cancel()
             # Wait for all tasks to be cancelled
-            if self.midi_note_tasks:
-                await asyncio.gather(*self.midi_note_tasks, return_exceptions=True)
-            self.midi_note_tasks.clear()
+            if self.timeline_midi_note_tasks:
+                await asyncio.gather(*self.timeline_midi_note_tasks, return_exceptions=True)
+            self.timeline_midi_note_tasks.clear()
 
-            # Stop all active MIDI notes (use /n_free for immediate silence)
-            logger.info(f"🛑 Stopping {len(self.active_midi_notes)} active MIDI notes")
+            # Stop all active MIDI notes (use /n_free for immediate silence) - TIMELINE PLAYBACK
+            logger.info(f"🛑 Stopping {len(self.timeline_active_midi_notes)} active MIDI notes")
             if self.engine_manager:
-                for node_id, note_info in self.active_midi_notes.items():
+                for node_id, note_info in self.timeline_active_midi_notes.items():
                     logger.info(f"🛑 Freeing MIDI note node {node_id} (note={note_info['note']}, clip={note_info['clip_id']})")
                     self.engine_manager.send_message("/n_free", node_id)
-            self.active_midi_notes.clear()
+            self.timeline_active_midi_notes.clear()
 
             # Broadcast paused state via WebSocket
             if self.websocket_manager and self.composition_state_service.current_composition_id:
@@ -942,13 +941,13 @@ class PlaybackEngineService:
                         "metronome_enabled": self.metronome_enabled,
                         "active_notes": [],
                         # Clip launcher state (CRITICAL for UI updates)
-                        "playing_clips": list(self.active_synths.keys()),
+                        "playing_clips": list(self.launcher_active_synths.keys()),
                         "triggered_clips": list(self.triggered_clips.keys()),
                     }
                     await self.websocket_manager.broadcast_transport(transport_data)
 
                 # Check if we should stop the loop (no more active clips)
-                if not self.active_synths and not self.triggered_clips:
+                if not self.launcher_active_synths and not self.triggered_clips:
                     logger.info("🛑 No more active clips - stopping clip launcher loop")
                     self.clip_launcher_active = False
                     self.clip_launcher_beat_position = 0.0  # Reset beat position
@@ -1047,8 +1046,8 @@ class PlaybackEngineService:
             logger.info(f"🛑 Stopping clip {clip_id_to_stop} (exclusive playback - same track)")
             await self.stop_clip(clip_id_to_stop)
 
-        # If this specific clip is already playing or triggered, cancel and restart
-        if clip_id in self.active_synths:
+        # If this specific clip is already playing or triggered, cancel and restart - CLIP LAUNCHER
+        if clip_id in self.launcher_active_synths:
             await self.stop_clip(clip_id)
         if clip_id in self.triggered_clips:
             self.triggered_clips[clip_id].cancel()
@@ -1198,8 +1197,8 @@ class PlaybackEngineService:
                 "out", bus
             )
 
-            # Store active synth
-            self.active_synths[clip.id] = node_id
+            # Store active synth - CLIP LAUNCHER
+            self.launcher_active_synths[clip.id] = node_id
 
             logger.info(f"🎵 Audio clip launched: node={node_id}, buffer={buffer_id}, bus={bus}")
 
@@ -1220,16 +1219,16 @@ class PlaybackEngineService:
             clip_duration_beats = clip.duration
             clip_duration_seconds = (clip_duration_beats / tempo) * 60.0
 
-            # Create a task that loops the MIDI pattern
+            # Create a task that loops the MIDI pattern - CLIP LAUNCHER
             async def midi_loop_task():
                 loop_count = 0
-                while clip.id in self.active_synths:
+                while clip.id in self.launcher_active_synths:
                     loop_count += 1
                     logger.info(f"🔁 MIDI clip loop iteration {loop_count} for clip {clip.id}")
 
                     # Trigger all notes in the clip
                     for i, note in enumerate(clip.midi_events):
-                        if clip.id not in self.active_synths:
+                        if clip.id not in self.launcher_active_synths:
                             logger.info(f"🛑 Clip {clip.id} stopped during loop")
                             break
 
@@ -1243,7 +1242,7 @@ class PlaybackEngineService:
                         if note_delay > 0:
                             await asyncio.sleep(note_delay)
 
-                        if clip.id in self.active_synths:
+                        if clip.id in self.launcher_active_synths:
                             # Trigger note
                             await self._trigger_midi_note(note, bus, tempo)
 
@@ -1253,10 +1252,10 @@ class PlaybackEngineService:
 
             # Start the loop task
             task = asyncio.create_task(midi_loop_task())
-            self.midi_note_tasks.add(task)
+            self.timeline_midi_note_tasks.add(task)  # Note: MIDI clip launcher uses timeline tasks for now
 
-            # Mark clip as active (use a placeholder node ID)
-            self.active_synths[clip.id] = -1  # Negative ID for MIDI clips
+            # Mark clip as active (use a placeholder node ID) - CLIP LAUNCHER
+            self.launcher_active_synths[clip.id] = -1  # Negative ID for MIDI clips
 
             logger.info(f"🎹 MIDI clip loop started: duration={clip_duration_seconds:.2f}s, notes={len(clip.midi_events)}")
 
@@ -1302,7 +1301,7 @@ class PlaybackEngineService:
             logger.error(f"❌ Failed to trigger MIDI note: {e}", exc_info=True)
 
     async def stop_clip(self, clip_id: str) -> None:
-        """Stop a playing or triggered clip"""
+        """Stop a playing or triggered clip - CLIP LAUNCHER"""
         # Cancel triggered clip if waiting for quantization
         if clip_id in self.triggered_clips:
             self.triggered_clips[clip_id].cancel()
@@ -1311,38 +1310,38 @@ class PlaybackEngineService:
             return
 
         # Stop playing clip
-        if clip_id not in self.active_synths:
+        if clip_id not in self.launcher_active_synths:
             logger.warning(f"⚠️  Clip {clip_id} is not playing or triggered")
             return
 
-        node_id = self.active_synths[clip_id]
+        node_id = self.launcher_active_synths[clip_id]
 
         # Free the synth (if it's an audio clip with positive node ID)
         if node_id > 0:
             self.engine_manager.send_message("/n_free", node_id)
 
-        # Remove from active synths
-        del self.active_synths[clip_id]
+        # Remove from active synths - CLIP LAUNCHER
+        del self.launcher_active_synths[clip_id]
 
         logger.info(f"⏹️  Stopped clip {clip_id}")
 
     async def stop_all_clips(self) -> None:
-        """Stop all playing and triggered clips"""
+        """Stop all playing and triggered clips - CLIP LAUNCHER"""
         # Cancel all triggered clips
         triggered_count = len(self.triggered_clips)
         for task in self.triggered_clips.values():
             task.cancel()
         self.triggered_clips.clear()
 
-        # Stop all playing clips
-        clip_ids = list(self.active_synths.keys())
+        # Stop all playing clips - CLIP LAUNCHER
+        clip_ids = list(self.launcher_active_synths.keys())
         for clip_id in clip_ids:
             await self.stop_clip(clip_id)
 
-        # Cancel all MIDI note tasks
-        for task in self.midi_note_tasks:
+        # Cancel all MIDI note tasks (timeline tasks used for clip launcher MIDI)
+        for task in self.timeline_midi_note_tasks:
             task.cancel()
-        self.midi_note_tasks.clear()
+        self.timeline_midi_note_tasks.clear()
 
         total_stopped = len(clip_ids) + triggered_count
         logger.info(f"⏹️  Stopped all clips ({len(clip_ids)} playing, {triggered_count} triggered)")

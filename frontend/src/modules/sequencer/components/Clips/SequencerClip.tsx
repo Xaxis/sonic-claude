@@ -11,14 +11,13 @@
  */
 
 import { useEffect, useState } from "react";
-import { Copy, Trash2, Volume2, Scissors, Pencil } from "lucide-react";
-import { Slider } from "@/components/ui/slider.tsx";
 import { cn } from "@/lib/utils.ts";
 import type { SequencerClip } from "../../types.ts";
 import { WaveformDisplay } from "../../../../components/ui/waveform-display.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { useWaveformData } from "../../hooks/useWaveformData.ts";
-import { ClipNameEditor } from "./ClipNameEditor.tsx";
+import { SequencerClipNameEditor } from "./SequencerClipNameEditor.tsx";
+import { SequencerClipActionsMenu } from "./SequencerClipActionsMenu.tsx";
 import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
 
 interface SequencerClipProps {
@@ -87,7 +86,6 @@ export function SequencerClip({
     const [dragStartX, setDragStartX] = useState(0);
     const [dragStartTime, setDragStartTime] = useState(0);
     const [dragStartDuration, setDragStartDuration] = useState(0);
-    const [lastClickTime, setLastClickTime] = useState(0);
 
     // ========================================================================
     // LOCAL STATE: Drag state for live updates
@@ -216,23 +214,22 @@ export function SequencerClip({
 
         e.stopPropagation(); // Prevent timeline background click
 
-        const now = Date.now();
-        const timeSinceLastClick = now - lastClickTime;
+        // Single-click: select clip
+        setSelectedClipId(clip.id);
 
-        // Double-click detection (within 300ms)
-        if (timeSinceLastClick < 300) {
-            // Double-click: open editor
-            if (clip.type === "midi") {
+        // Open piano roll for MIDI clips (only if clip still exists in store)
+        if (clip.type === "midi") {
+            // Verify clip exists in current composition before opening
+            const currentClips = useDAWStore.getState().clips;
+            const clipExists = currentClips.some(c => c.id === clip.id);
+
+            if (clipExists) {
                 openPianoRoll(clip.id);
+            } else {
+                console.warn(`Clip ${clip.id} no longer exists in composition`);
             }
-            // TODO: Implement sample editor for audio clips
-            // Reset click time to prevent triple-click issues
-            setLastClickTime(0);
-        } else {
-            // Single-click: select clip
-            setSelectedClipId(clip.id);
-            setLastClickTime(now);
         }
+        // TODO: Implement sample editor for audio clips
     };
 
     return (
@@ -305,7 +302,7 @@ export function SequencerClip({
                     isEditingName ? "z-40 pointer-events-auto" : "z-10 pointer-events-none"
                 )}>
                     <div className="flex items-center justify-between gap-2">
-                        <ClipNameEditor
+                        <SequencerClipNameEditor
                             clipId={clip.id}
                             clipName={clip.name}
                             onSave={handleRename}
@@ -327,7 +324,7 @@ export function SequencerClip({
                     "relative px-2 py-1",
                     isEditingName ? "z-40 pointer-events-auto" : "z-10 pointer-events-none"
                 )}>
-                    <ClipNameEditor
+                    <SequencerClipNameEditor
                         clipId={clip.id}
                         clipName={clip.name}
                         onSave={handleRename}
@@ -338,102 +335,33 @@ export function SequencerClip({
                 </div>
             )}
 
-            {/* Actions (show on hover/select, hide when editing name) */}
+            {/* Actions - Always show dropdown menu */}
             {isSelected && !isEditingName && (
                 <div className="absolute top-1 right-1 flex gap-1 z-30">
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setIsEditingName(true);
-                        }}
-                        onMouseDown={(e) => {
-                            e.stopPropagation();
-                        }}
-                        className="h-5 w-5 flex items-center justify-center rounded bg-black/60 hover:bg-black/80 transition-colors cursor-pointer"
-                        title="Rename clip"
-                    >
-                        <Pencil size={10} className="text-white" />
-                    </button>
-                    <button
-                        onClick={async (e) => {
-                            e.stopPropagation();
+                    <SequencerClipActionsMenu
+                        onEdit={() => setIsEditingName(true)}
+                        onCopy={async () => {
                             if (activeComposition) {
                                 await duplicateClip(activeComposition.id, clip.id);
                             }
                         }}
-                        onMouseDown={(e) => {
-                            e.stopPropagation();
-                        }}
-                        className="h-5 w-5 flex items-center justify-center rounded bg-black/60 hover:bg-black/80 transition-colors cursor-pointer"
-                        title="Copy clip"
-                    >
-                        <Copy size={10} className="text-white" />
-                    </button>
-                    <button
-                        onClick={async (e) => {
-                            e.stopPropagation();
+                        onDelete={async () => {
                             await deleteClip(clip.id);
                         }}
-                        onMouseDown={(e) => {
-                            e.stopPropagation();
-                        }}
-                        className="h-5 w-5 flex items-center justify-center rounded bg-black/60 hover:bg-black/80 transition-colors cursor-pointer"
-                        title="Delete clip"
-                    >
-                        <Trash2 size={10} className="text-white" />
-                    </button>
-                </div>
-            )}
-
-            {/* Audio Offset/Trim Control (show when selected, audio clip, and wide enough) */}
-            {isSelected && width > 100 && clip.type === "audio" && (
-                <div
-                    className="absolute bottom-8 left-2 right-2 flex items-center gap-1 z-20 bg-background/90 rounded px-2 py-1"
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
-                >
-                    <Scissors size={12} className="text-white flex-shrink-0" />
-                    <Slider
-                        value={[(clip.audio_offset || 0) * 10]}
-                        onValueChange={async (values) => {
-                            const newOffset = values[0] / 10;
-                            await updateClip(clip.id, { audio_offset: newOffset });
-                        }}
-                        min={0}
-                        max={100}
-                        step={1}
-                        className="flex-1"
-                    />
-                    <span className="text-[10px] text-white/80 w-10 text-right flex-shrink-0">
-                        {((clip.audio_offset || 0)).toFixed(1)}s
-                    </span>
-                </div>
-            )}
-
-            {/* Gain Control (show when selected and wide enough) */}
-            {isSelected && width > 100 && (
-                <div
-                    className="absolute bottom-1 left-2 right-2 flex items-center gap-1 z-20 bg-background/90 rounded px-2 py-1"
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
-                >
-                    <Volume2 size={12} className="text-white flex-shrink-0" />
-                    <Slider
-                        value={[clip.gain * 100]}
-                        onValueChange={async (values) => {
-                            const newGain = values[0] / 100;
+                        onVolumeChange={async (newGain) => {
                             await updateClip(clip.id, { gain: newGain });
                         }}
-                        min={0}
-                        max={200}
-                        step={1}
-                        className="flex-1"
+                        onAudioOffsetChange={clip.type === "audio" ? async (newOffset) => {
+                            await updateClip(clip.id, { audio_offset: newOffset });
+                        } : undefined}
+                        volume={clip.gain}
+                        audioOffset={clip.type === "audio" ? (clip.audio_offset || 0) : undefined}
+                        clipType={clip.type}
                     />
-                    <span className="text-[10px] text-white/80 w-8 text-right flex-shrink-0">
-                        {Math.round(clip.gain * 100)}%
-                    </span>
                 </div>
             )}
+
+            {/* Volume and audio offset controls are now in the dropdown menu only */}
             </div>
         </>
     );
