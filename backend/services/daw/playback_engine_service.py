@@ -68,6 +68,7 @@ class PlaybackEngineService:
         self.clip_launcher_active = False  # True if ANY clips are playing
         self.clip_launcher_task: Optional[asyncio.Task] = None  # Background loop for clip launcher
         self.clip_launcher_start_time = 0.0  # When clip launcher started (for timing)
+        self.clip_launcher_beat_position = 0.0  # Current beat position in clip launcher
 
         # Metronome state
         self.metronome_enabled = False
@@ -869,7 +870,10 @@ class PlaybackEngineService:
         try:
             logger.info("🎬 Starting clip launcher playback loop")
             self.clip_launcher_start_time = time.time()
+            self.clip_launcher_beat_position = 0.0
+            self.last_metronome_beat = -1  # Reset metronome
             loop_count = 0
+            last_update_time = self.clip_launcher_start_time
 
             while self.clip_launcher_active:
                 loop_start = time.time()
@@ -883,6 +887,43 @@ class PlaybackEngineService:
 
                 # Use composition tempo
                 self.tempo = composition.tempo
+
+                # Update beat position based on elapsed time
+                current_time = time.time()
+                elapsed_seconds = current_time - last_update_time
+                elapsed_beats = (elapsed_seconds / 60.0) * self.tempo
+                self.clip_launcher_beat_position += elapsed_beats
+                last_update_time = current_time
+
+                # Log beat position every 4 beats (1 bar in 4/4)
+                if loop_count % 60 == 0:  # Every ~1 second at 60Hz
+                    logger.debug(f"🎵 Clip launcher beat: {self.clip_launcher_beat_position:.2f}")
+
+                # Trigger metronome clicks on beat boundaries
+                if self.metronome_enabled and self.engine_manager:
+                    current_beat_int = int(self.clip_launcher_beat_position)
+                    if current_beat_int != self.last_metronome_beat:
+                        self.last_metronome_beat = current_beat_int
+
+                        # Determine if this is a downbeat (first beat of bar)
+                        is_downbeat = (current_beat_int % 4) == 0
+
+                        # Trigger metronome click
+                        node_id = self.engine_manager.allocate_node_id()
+                        freq = 1200.0 if is_downbeat else 800.0  # Higher pitch for downbeat
+
+                        self.engine_manager.send_message(
+                            "/s_new",
+                            "metronome",
+                            node_id,
+                            0,  # addAction
+                            1,  # target
+                            "freq", freq,
+                            "amp", self.metronome_volume,
+                            "out", 0  # Master output
+                        )
+
+                        logger.debug(f"🎵 Metronome click: beat {current_beat_int} {'(DOWNBEAT)' if is_downbeat else ''}")
 
                 # Send WebSocket updates (every 60Hz = ~16ms)
                 if self.websocket_manager and loop_count % 1 == 0:
@@ -910,6 +951,8 @@ class PlaybackEngineService:
                 if not self.active_synths and not self.triggered_clips:
                     logger.info("🛑 No more active clips - stopping clip launcher loop")
                     self.clip_launcher_active = False
+                    self.clip_launcher_beat_position = 0.0  # Reset beat position
+                    self.last_metronome_beat = -1  # Reset metronome
                     break
 
                 # Sleep to maintain ~60Hz update rate
@@ -1014,18 +1057,79 @@ class PlaybackEngineService:
         # Get quantization setting
         quantization = composition.launch_quantization or 'none'
 
-        # CLIP LAUNCHER ALWAYS LAUNCHES IMMEDIATELY (for now)
-        # TODO: Implement quantization with clip launcher clock
-        logger.info(f"🎬 Launching clip '{clip.name}' immediately (clip launcher mode)")
-        await self._launch_clip_immediately(composition_id, clip_id)
+        # Launch with quantization
+        if quantization == 'none' or not self.clip_launcher_active:
+            # Launch immediately if no quantization or clip launcher not running yet
+            logger.info(f"🎬 Launching clip '{clip.name}' immediately (quantization: {quantization})")
+            await self._launch_clip_immediately(composition_id, clip_id)
+        else:
+            # Schedule launch for next quantization boundary
+            logger.info(f"⏱️  Scheduling clip '{clip.name}' for next {quantization} bar boundary")
+
+            # Create a task that waits for the quantization boundary
+            async def quantized_launch():
+                # Wait for next quantization boundary
+                await self._wait_for_quantization_boundary(composition_id, quantization)
+                # Launch the clip
+                if clip_id in self.triggered_clips:  # Check if still triggered
+                    await self._launch_clip_immediately(composition_id, clip_id)
+                    # Remove from triggered clips
+                    if clip_id in self.triggered_clips:
+                        del self.triggered_clips[clip_id]
+
+            # Store the task in triggered_clips
+            task = asyncio.create_task(quantized_launch())
+            self.triggered_clips[clip_id] = task
 
         # Start clip launcher playback loop if not already running
         if not self.clip_launcher_active:
             logger.info("🚀 Starting clip launcher playback loop")
             self.clip_launcher_active = True
+            self.clip_launcher_start_time = time.time()
             self.clip_launcher_task = asyncio.create_task(
                 self._clip_launcher_playback_loop(composition_id)
             )
+
+    async def _wait_for_quantization_boundary(self, composition_id: str, quantization: str) -> None:
+        """
+        Wait until the next quantization boundary
+
+        Quantization values:
+        - '1/4': Next quarter note (0.25 bars)
+        - '1/2': Next half note (0.5 bars)
+        - '1': Next bar (1 bar)
+        - '2': Next 2 bars
+        - '4': Next 4 bars
+        """
+        composition = self.composition_state_service.get_composition(composition_id)
+        if not composition:
+            return
+
+        # Parse quantization value
+        quant_bars = {
+            '1/4': 0.25,
+            '1/2': 0.5,
+            '1': 1.0,
+            '2': 2.0,
+            '4': 4.0,
+        }.get(quantization, 1.0)
+
+        # Calculate next boundary using clip launcher beat position
+        beats_per_bar = 4.0  # Assuming 4/4 time signature
+        quant_beats = quant_bars * beats_per_bar
+
+        # Find next boundary
+        current_beat = self.clip_launcher_beat_position
+        current_position_in_cycle = current_beat % quant_beats
+        beats_until_boundary = quant_beats - current_position_in_cycle
+
+        # Convert to seconds
+        seconds_until_boundary = (beats_until_boundary / composition.tempo) * 60.0
+
+        logger.info(f"⏱️  Current beat: {current_beat:.2f}, waiting {seconds_until_boundary:.3f}s ({beats_until_boundary:.2f} beats) until next {quantization} boundary")
+
+        # Wait
+        await asyncio.sleep(seconds_until_boundary)
 
     async def _launch_clip_immediately(self, composition_id: str, clip_id: str) -> None:
         """

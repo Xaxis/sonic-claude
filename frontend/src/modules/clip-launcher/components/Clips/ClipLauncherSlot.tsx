@@ -205,12 +205,13 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                             : `1px solid rgba(255,255,255,0.1)`,
                     }}
                 >
-                    {/* Subtle pulse when playing */}
+                    {/* Pulsing glow when playing */}
                     {isPlaying && (
                         <div
-                            className="absolute inset-0 rounded-md animate-pulse"
+                            className="absolute inset-0 rounded-md"
                             style={{
-                                background: `radial-gradient(circle at center, rgba(255,255,255,0.3) 0%, transparent 60%)`,
+                                background: `radial-gradient(circle at center, rgba(255,255,255,0.4) 0%, transparent 70%)`,
+                                animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                             }}
                         />
                     )}
