@@ -218,6 +218,9 @@ interface DAWStore {
     meterMode: "peak" | "rms" | "both";
     selectedChannelId: string | null;
 
+    // Clip Launcher UI
+    selectedClipSlot: { trackIndex: number; slotIndex: number } | null;
+
     // Effects UI
     selectedEffectId: string | null;
     showEffectBrowser: boolean;
@@ -404,6 +407,9 @@ interface DAWStore {
     setShowMeters: (show: boolean) => void;
     setMeterMode: (mode: "peak" | "rms" | "both") => void;
     setSelectedChannelId: (id: string | null) => void;
+
+    // Clip Launcher UI actions
+    setSelectedClipSlot: (slot: { trackIndex: number; slotIndex: number } | null) => void;
     setSelectedEffectId: (id: string | null) => void;
     setShowEffectBrowser: (show: boolean) => void;
 
@@ -529,6 +535,7 @@ export const useDAWStore = create<DAWStore>()(
 
                 // Clip Launcher UI State (PERSISTED)
                 numClipSlots: 8,  // Default 8 scenes
+                selectedClipSlot: null,
                 playingClips: [],
                 playingScenes: [],
 
@@ -2156,6 +2163,7 @@ export const useDAWStore = create<DAWStore>()(
         setShowMeters: (show) => set({ showMeters: show }),
         setMeterMode: (mode) => set({ meterMode: mode }),
         setSelectedChannelId: (id) => set({ selectedChannelId: id }),
+        setSelectedClipSlot: (slot) => set({ selectedClipSlot: slot }),
         setSelectedEffectId: (id) => set({ selectedEffectId: id }),
         setShowEffectBrowser: (show) => set({ showEffectBrowser: show }),
 

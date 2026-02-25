@@ -11,6 +11,7 @@
  * NO PROP DRILLING - Reads from Zustand store
  */
 
+import { useState } from 'react';
 import { useDAWStore } from '@/stores/dawStore';
 import { cn } from '@/lib/utils';
 import { Play, Square, Music } from 'lucide-react';
@@ -44,16 +45,23 @@ const CLIP_COLORS = [
 
 export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProps) {
     // ========================================================================
+    // LOCAL STATE: Double-click detection
+    // ========================================================================
+    const [lastClickTime, setLastClickTime] = useState(0);
+
+    // ========================================================================
     // STATE: Read from Zustand store
     // ========================================================================
     const tracks = useDAWStore(state => state.tracks);
     const clips = useDAWStore(state => state.clips);
     const playingClips = useDAWStore(state => state.playingClips);
+    const selectedClipSlot = useDAWStore(state => state.selectedClipSlot);
 
     // ========================================================================
     // ACTIONS: Get from Zustand store
     // ========================================================================
     const triggerClip = useDAWStore(state => state.triggerClip);
+    const setSelectedClipSlot = useDAWStore(state => state.setSelectedClipSlot);
 
     // ========================================================================
     // DERIVED STATE
@@ -64,6 +72,7 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     // Find clip in this slot
     const clip = clips.find(c => c.track_id === track.id && c.slot_index === slotIndex);
     const isPlaying = playingClips.some(pc => pc.track_id === track.id && pc.slot_index === slotIndex);
+    const isSelected = selectedClipSlot?.trackIndex === trackIndex && selectedClipSlot?.slotIndex === slotIndex;
 
     // Get unique color for this slot position
     const slotColor = CLIP_COLORS[(trackIndex * 3 + slotIndex) % CLIP_COLORS.length];
@@ -72,8 +81,19 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     // HANDLERS
     // ========================================================================
     const handleClick = () => {
-        // For now, trigger even if no clip (for UI testing)
-        triggerClip(track.id, slotIndex);
+        const now = Date.now();
+        const timeSinceLastClick = now - lastClickTime;
+
+        // Double-click detection (within 300ms)
+        if (timeSinceLastClick < 300) {
+            // Double-click: Trigger/stop clip
+            triggerClip(track.id, slotIndex);
+            setLastClickTime(0); // Reset to prevent triple-click issues
+        } else {
+            // Single-click: Select slot
+            setSelectedClipSlot({ trackIndex, slotIndex });
+            setLastClickTime(now);
+        }
     };
 
     // ========================================================================
@@ -94,10 +114,14 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                             backgroundColor: isPlaying
                                 ? slotColor
                                 : '#1a1a1a',
-                            boxShadow: isPlaying
-                                ? `0 0 20px ${slotColor}, inset 0 0 10px ${slotColor}40`
-                                : 'inset 0 2px 4px rgba(0,0,0,0.5)',
-                            border: `1px solid ${isPlaying ? slotColor : '#2a2a2a'}`,
+                            boxShadow: isSelected
+                                ? `0 0 0 2px hsl(var(--primary)), 0 0 20px hsl(var(--primary))40`
+                                : isPlaying
+                                    ? `0 0 20px ${slotColor}, inset 0 0 10px ${slotColor}40`
+                                    : 'inset 0 2px 4px rgba(0,0,0,0.5)',
+                            border: isSelected
+                                ? `2px solid hsl(var(--primary))`
+                                : `1px solid ${isPlaying ? slotColor : '#2a2a2a'}`,
                         }}
                     >
                         {/* Dim indicator when empty */}
@@ -140,10 +164,14 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                     )}
                     style={{
                         backgroundColor: slotColor,
-                        boxShadow: isPlaying
-                            ? `0 0 20px ${slotColor}, inset 0 0 10px ${slotColor}40`
-                            : `0 0 8px ${slotColor}60, inset 0 2px 4px rgba(0,0,0,0.3)`,
-                        border: `1px solid ${slotColor}`,
+                        boxShadow: isSelected
+                            ? `0 0 0 2px hsl(var(--primary)), 0 0 20px hsl(var(--primary))40, inset 0 0 10px ${slotColor}40`
+                            : isPlaying
+                                ? `0 0 20px ${slotColor}, inset 0 0 10px ${slotColor}40`
+                                : `0 0 8px ${slotColor}60, inset 0 2px 4px rgba(0,0,0,0.3)`,
+                        border: isSelected
+                            ? `2px solid hsl(var(--primary))`
+                            : `1px solid ${slotColor}`,
                         opacity: isPlaying ? 1 : 0.7
                     }}
                 >

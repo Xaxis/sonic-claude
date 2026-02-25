@@ -896,6 +896,9 @@ class PlaybackEngineService:
         Respects composition.launch_quantization setting:
         - 'none': Launch immediately
         - '1/4', '1/2', '1', '2', '4': Wait for next beat/bar boundary
+
+        IMPORTANT: Only one clip per track can play at a time (exclusive playback).
+        Launching a new clip on a track will stop any other clips on that track.
         """
         composition = self.composition_state_service.get_composition(composition_id)
         if not composition:
@@ -908,7 +911,26 @@ class PlaybackEngineService:
             logger.error(f"❌ Clip {clip_id} not found")
             return
 
-        # If clip is already playing or triggered, cancel and restart
+        # EXCLUSIVE PLAYBACK: Stop all other clips on the same track
+        # (Only one clip per column/track can play at a time)
+        clips_to_stop = []
+        for active_clip_id in list(self.active_synths.keys()):
+            active_clip = next((c for c in composition.clips if c.id == active_clip_id), None)
+            if active_clip and active_clip.track_id == clip.track_id and active_clip_id != clip_id:
+                clips_to_stop.append(active_clip_id)
+
+        # Also check triggered clips (waiting for quantization)
+        for triggered_clip_id in list(self.triggered_clips.keys()):
+            triggered_clip = next((c for c in composition.clips if c.id == triggered_clip_id), None)
+            if triggered_clip and triggered_clip.track_id == clip.track_id and triggered_clip_id != clip_id:
+                clips_to_stop.append(triggered_clip_id)
+
+        # Stop all clips on this track
+        for clip_id_to_stop in clips_to_stop:
+            logger.info(f"🛑 Stopping clip {clip_id_to_stop} (exclusive playback - same track)")
+            await self.stop_clip(clip_id_to_stop)
+
+        # If this specific clip is already playing or triggered, cancel and restart
         if clip_id in self.active_synths:
             await self.stop_clip(clip_id)
         if clip_id in self.triggered_clips:
