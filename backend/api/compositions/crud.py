@@ -204,7 +204,7 @@ async def get_composition(
             raise ResourceNotFoundError(f"Composition {composition_id} not found")
 
         # Restore the composition to backend services
-        success = composition_service.restore_composition_to_services(
+        success = await composition_service.restore_composition_to_services(
             composition=composition,
             composition_state_service=composition_state_service,
             mixer_service=mixer_service,
@@ -215,7 +215,9 @@ async def get_composition(
         if not success:
             raise ServiceError(f"Failed to restore composition {composition_id} to services")
 
+        # Verify current_composition_id was set
         logger.info(f"✅ Loaded and activated composition: {composition.name} (ID: {composition_id})")
+        logger.info(f"🔍 Current composition ID in state service: {composition_state_service.current_composition_id}")
 
         return composition
     except ResourceNotFoundError:

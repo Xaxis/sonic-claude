@@ -60,6 +60,9 @@ async def play(
 ):
     """Start playback of the current composition"""
     try:
+        logger.info(f"🔍 Play requested - current_composition_id: {composition_state_service.current_composition_id}")
+        logger.info(f"🔍 Available compositions: {list(composition_state_service.compositions.keys())}")
+
         if not composition_state_service.current_composition_id:
             raise ServiceError("No composition loaded")
 
