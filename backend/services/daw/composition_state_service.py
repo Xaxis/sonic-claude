@@ -272,12 +272,29 @@ class CompositionStateService:
         return None
 
     def delete_track(self, track_id: str) -> bool:
-        """Delete track from its composition"""
+        """Delete track from its composition and clean up clip launcher references"""
         for composition in self.compositions.values():
             for i, track in enumerate(composition.tracks):
                 if track.id == track_id:
+                    # Get clip IDs that will be deleted
+                    deleted_clip_ids = [c.id for c in composition.clips if c.track_id == track_id]
+
                     # Delete all clips on this track
                     composition.clips = [c for c in composition.clips if c.track_id != track_id]
+
+                    # CRITICAL: Clean up clip launcher slot references for deleted clips
+                    if composition.clip_slots and deleted_clip_ids:
+                        for track_slots in composition.clip_slots:
+                            for slot_index, assigned_clip_id in enumerate(track_slots):
+                                if assigned_clip_id in deleted_clip_ids:
+                                    track_slots[slot_index] = None
+                                    logger.info(f"🧹 Cleaned up clip launcher slot reference to deleted clip {assigned_clip_id}")
+
+                    # CRITICAL: Remove the track's column from clip_slots
+                    if composition.clip_slots and i < len(composition.clip_slots):
+                        composition.clip_slots.pop(i)
+                        logger.info(f"🧹 Removed clip launcher column for deleted track {track_id}")
+
                     # Delete the track
                     composition.tracks.pop(i)
                     composition.updated_at = datetime.now()
@@ -446,7 +463,7 @@ class CompositionStateService:
         return None
 
     def delete_clip(self, composition_id: str, clip_id: str) -> bool:
-        """Delete a clip"""
+        """Delete a clip and clean up clip launcher references"""
         composition = self.compositions.get(composition_id)
         if not composition:
             return False
@@ -454,6 +471,15 @@ class CompositionStateService:
         for i, clip in enumerate(composition.clips):
             if clip.id == clip_id:
                 composition.clips.pop(i)
+
+                # CRITICAL: Clean up clip launcher slot references
+                if composition.clip_slots:
+                    for track_slots in composition.clip_slots:
+                        for slot_index, assigned_clip_id in enumerate(track_slots):
+                            if assigned_clip_id == clip_id:
+                                track_slots[slot_index] = None
+                                logger.info(f"🧹 Cleaned up clip launcher slot reference to deleted clip {clip_id}")
+
                 composition.updated_at = datetime.now()
                 logger.info(f"🗑️ Deleted clip {clip_id}")
                 return True
