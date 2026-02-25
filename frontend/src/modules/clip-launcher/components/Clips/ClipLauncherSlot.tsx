@@ -86,13 +86,9 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     const isSelected = selectedClipSlot?.trackIndex === trackIndex && selectedClipSlot?.slotIndex === slotIndex;
 
     // INTELLIGENT COLOR SYSTEM:
-    // Blend theme colors with hardware-inspired vibrant palette
-    // Each track gets a vibrant color from the professional palette
-    const hardwareColor = HARDWARE_COLORS[trackIndex % HARDWARE_COLORS.length];
-
-    // Use track.color if it's vibrant enough, otherwise use hardware palette
-    const isTrackColorVibrant = track.color && !track.color.includes('10%') && !track.color.includes('20%');
-    const padColor = isTrackColorVibrant ? track.color : hardwareColor;
+    // Each track column gets a unique vibrant color from the hardware palette
+    // This ensures visual differentiation between columns (like Akai Force)
+    const padColor = HARDWARE_COLORS[trackIndex % HARDWARE_COLORS.length];
 
     // ========================================================================
     // HANDLERS
