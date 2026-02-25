@@ -19,6 +19,26 @@ import { cn } from '@/lib/utils';
 import { Square, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 
+// PROFESSIONAL HARDWARE COLOR PALETTE (same as PAD VIEW)
+const HARDWARE_COLORS = [
+    'hsl(187 100% 50%)',  // Cyan
+    'hsl(330 100% 60%)',  // Magenta
+    'hsl(45 100% 55%)',   // Yellow
+    'hsl(0 100% 60%)',    // Red
+    'hsl(120 100% 45%)',  // Green
+    'hsl(210 100% 55%)',  // Blue
+    'hsl(30 100% 55%)',   // Orange
+    'hsl(280 100% 65%)',  // Purple
+    'hsl(160 100% 50%)',  // Teal
+    'hsl(350 100% 65%)',  // Pink
+    'hsl(270 100% 60%)',  // Violet
+    'hsl(50 100% 60%)',   // Gold
+    'hsl(10 100% 60%)',   // Coral
+    'hsl(140 100% 50%)',  // Lime
+    'hsl(200 100% 50%)',  // Sky Blue
+    'hsl(300 100% 60%)',  // Fuchsia
+];
+
 export function ClipLauncherGrid() {
     // ========================================================================
     // STATE: Read from Zustand store
@@ -141,11 +161,17 @@ export function ClipLauncherGrid() {
                     style={{ padding: '12px' }}
                 >
                     {/* Track Header - Ableton Live Style with M/S/Arm buttons */}
-                    <div className="flex flex-col gap-2 border-b border-border/30 pb-2.5">
-                        {/* Track Name */}
+                    <div className="flex flex-col gap-2 border-b pb-2.5" style={{
+                        borderColor: isEmpty(trackIndex) ? 'hsl(var(--border))' : `${HARDWARE_COLORS[trackIndex % HARDWARE_COLORS.length]}60`
+                    }}>
+                        {/* Track Name with Hardware Color */}
                         <div
                             className="truncate text-center text-xs font-bold uppercase tracking-wider drop-shadow-sm"
-                            style={{ color: isEmpty(trackIndex) ? 'hsl(var(--muted-foreground))' : track.color }}
+                            style={{
+                                color: isEmpty(trackIndex)
+                                    ? 'hsl(var(--muted-foreground))'
+                                    : HARDWARE_COLORS[trackIndex % HARDWARE_COLORS.length]
+                            }}
                             title={track.name}
                         >
                             {track.name}
@@ -224,7 +250,10 @@ export function ClipLauncherGrid() {
                         {isEmpty(trackIndex) ? (
                             <div className="h-full w-full rounded-md border border-dashed border-border/20 bg-muted/5" />
                         ) : (
-                            <ClipLauncherTrackStop trackId={track.id} trackColor={track.color} />
+                            <ClipLauncherTrackStop
+                                trackId={track.id}
+                                trackColor={HARDWARE_COLORS[trackIndex % HARDWARE_COLORS.length]}
+                            />
                         )}
                     </div>
                 </div>
