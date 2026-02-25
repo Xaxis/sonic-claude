@@ -62,7 +62,7 @@ export function ClipLauncherScene({ sceneIndex }: ClipLauncherSceneProps) {
     };
 
     // ========================================================================
-    // RENDER: PERFORMANCE INSTRUMENT
+    // RENDER: HARDWARE RGB PAD STYLE
     // ========================================================================
     return (
         <ContextMenu>
@@ -70,58 +70,34 @@ export function ClipLauncherScene({ sceneIndex }: ClipLauncherSceneProps) {
                 <button
                     onClick={handleClick}
                     className={cn(
-                        "relative h-full w-full rounded-lg border-2 transition-all cursor-pointer overflow-hidden",
-                        "flex flex-col items-center justify-center group",
-                        "hover:scale-[1.02] active:scale-98",
-                        isPlaying && "scale-[1.02]"
+                        "relative h-full w-full rounded transition-all cursor-pointer",
+                        "flex items-center justify-center",
+                        "hover:brightness-125 active:scale-95"
                     )}
                     style={{
-                        borderColor: isPlaying
-                            ? sceneColor
-                            : `color-mix(in srgb, ${sceneColor} 60%, transparent)`,
-                        backgroundColor: `color-mix(in srgb, ${sceneColor} 30%, var(--color-background))`,
+                        backgroundColor: isPlaying ? sceneColor : '#1a1a1a',
                         boxShadow: isPlaying
-                            ? `0 0 24px ${sceneColor}70, inset 0 0 20px ${sceneColor}25`
-                            : `0 0 8px ${sceneColor}30`,
+                            ? `0 0 20px ${sceneColor}, inset 0 0 10px ${sceneColor}40`
+                            : 'inset 0 2px 4px rgba(0,0,0,0.5)',
+                        border: `1px solid ${isPlaying ? sceneColor : '#2a2a2a'}`,
                     }}
                 >
-                    {/* Background glow when playing */}
-                    {isPlaying && (
-                        <div
-                            className="absolute inset-0 opacity-40 animate-pulse"
-                            style={{
-                                background: `radial-gradient(circle at center, ${sceneColor}80 0%, transparent 70%)`,
-                            }}
-                        />
-                    )}
-
-                    {/* Content */}
-                    <div className="relative flex flex-col items-center justify-center gap-2">
-                        {/* Play/Stop icon */}
-                        {isPlaying ? (
-                            <Square
-                                size={20}
-                                className="text-white/95 fill-white/20"
-                            />
-                        ) : (
-                            <Play
-                                size={20}
-                                className="text-white/80 fill-white/10"
-                            />
+                    {/* Play icon */}
+                    <Play
+                        size={16}
+                        className={cn(
+                            "transition-all",
+                            isPlaying ? "text-white fill-white/30" : "text-zinc-600"
                         )}
+                    />
 
-                        {/* Scene number */}
-                        <div className="text-xs font-bold text-white/95 uppercase tracking-wider">
-                            {sceneIndex + 1}
-                        </div>
-                    </div>
-
-                    {/* Playing ring */}
+                    {/* Pulse when playing */}
                     {isPlaying && (
                         <div
-                            className="absolute inset-0 rounded-lg border-2 animate-pulse pointer-events-none"
+                            className="absolute inset-0 rounded animate-pulse"
                             style={{
-                                borderColor: `${sceneColor}90`,
+                                background: `radial-gradient(circle at center, ${sceneColor} 0%, transparent 70%)`,
+                                opacity: 0.5
                             }}
                         />
                     )}

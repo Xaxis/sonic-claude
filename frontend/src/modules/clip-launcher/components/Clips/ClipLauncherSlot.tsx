@@ -77,7 +77,7 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     };
 
     // ========================================================================
-    // RENDER: Empty slot (still clickable for testing)
+    // RENDER: Empty slot - HARDWARE RGB PAD STYLE
     // ========================================================================
     if (!clip) {
         return (
@@ -86,58 +86,32 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                     <button
                         onClick={handleClick}
                         className={cn(
-                            "relative h-full w-full rounded-lg border-2 border-dashed transition-all cursor-pointer",
-                            "flex flex-col items-center justify-center gap-2 group",
-                            "hover:scale-[1.02] active:scale-98",
-                            isPlaying && "border-solid scale-[1.02]"
+                            "relative h-full w-full rounded transition-all cursor-pointer",
+                            "flex items-center justify-center",
+                            "hover:brightness-125 active:scale-95"
                         )}
                         style={{
-                            borderColor: isPlaying
-                                ? slotColor
-                                : `color-mix(in srgb, ${slotColor} 30%, transparent)`,
                             backgroundColor: isPlaying
-                                ? `color-mix(in srgb, ${slotColor} 35%, var(--color-background))`
-                                : `color-mix(in srgb, ${slotColor} 8%, transparent)`,
+                                ? slotColor
+                                : '#1a1a1a',
                             boxShadow: isPlaying
-                                ? `0 0 24px ${slotColor}60, inset 0 0 20px ${slotColor}20`
-                                : 'none',
+                                ? `0 0 20px ${slotColor}, inset 0 0 10px ${slotColor}40`
+                                : 'inset 0 2px 4px rgba(0,0,0,0.5)',
+                            border: `1px solid ${isPlaying ? slotColor : '#2a2a2a'}`,
                         }}
                     >
-                        {/* Background glow when playing */}
-                        {isPlaying && (
-                            <div
-                                className="absolute inset-0 rounded-lg opacity-40 animate-pulse"
-                                style={{
-                                    background: `radial-gradient(circle at center, ${slotColor}60 0%, transparent 70%)`,
-                                }}
-                            />
+                        {/* Dim indicator when empty */}
+                        {!isPlaying && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
                         )}
 
-                        {/* Icon */}
-                        <Music
-                            size={20}
-                            className={cn(
-                                "relative transition-all",
-                                isPlaying ? "text-white" : "text-muted-foreground/40"
-                            )}
-                        />
-
-                        {/* Label */}
-                        <div
-                            className={cn(
-                                "relative text-[9px] font-bold uppercase tracking-wider transition-all",
-                                isPlaying ? "text-white" : "text-muted-foreground/40"
-                            )}
-                        >
-                            {isPlaying ? 'Playing' : 'Empty'}
-                        </div>
-
-                        {/* Playing ring */}
+                        {/* Pulse when playing */}
                         {isPlaying && (
                             <div
-                                className="absolute inset-0 rounded-lg border-2 animate-pulse"
+                                className="absolute inset-0 rounded animate-pulse"
                                 style={{
-                                    borderColor: `${slotColor}80`,
+                                    background: `radial-gradient(circle at center, ${slotColor} 0%, transparent 70%)`,
+                                    opacity: 0.5
                                 }}
                             />
                         )}
@@ -152,7 +126,7 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     }
 
     // ========================================================================
-    // RENDER: Filled slot (PERFORMANCE INSTRUMENT)
+    // RENDER: Filled slot - HARDWARE RGB PAD STYLE
     // ========================================================================
     return (
         <ContextMenu>
@@ -160,87 +134,47 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                 <button
                     onClick={handleClick}
                     className={cn(
-                        "relative h-full w-full rounded-lg border-2 transition-all cursor-pointer overflow-hidden",
-                        "flex flex-col group",
-                        "hover:scale-[1.02] active:scale-98",
-                        isPlaying && "scale-[1.02]"
+                        "relative h-full w-full rounded transition-all cursor-pointer overflow-hidden",
+                        "flex flex-col p-1.5",
+                        "hover:brightness-125 active:scale-95"
                     )}
                     style={{
-                        borderColor: isPlaying
-                            ? slotColor
-                            : `color-mix(in srgb, ${slotColor} 60%, transparent)`,
-                        backgroundColor: `color-mix(in srgb, ${slotColor} 30%, var(--color-background))`,
+                        backgroundColor: slotColor,
                         boxShadow: isPlaying
-                            ? `0 0 24px ${slotColor}70, inset 0 0 20px ${slotColor}25`
-                            : `0 0 8px ${slotColor}30`,
+                            ? `0 0 20px ${slotColor}, inset 0 0 10px ${slotColor}40`
+                            : `0 0 8px ${slotColor}60, inset 0 2px 4px rgba(0,0,0,0.3)`,
+                        border: `1px solid ${slotColor}`,
+                        opacity: isPlaying ? 1 : 0.7
                     }}
                 >
-                    {/* Background glow when playing */}
+                    {/* Pulse when playing */}
                     {isPlaying && (
                         <div
-                            className="absolute inset-0 opacity-40 animate-pulse"
+                            className="absolute inset-0 rounded animate-pulse"
                             style={{
-                                background: `radial-gradient(circle at center, ${slotColor}80 0%, transparent 70%)`,
+                                background: `radial-gradient(circle at center, ${slotColor} 0%, transparent 70%)`,
+                                opacity: 0.5
                             }}
                         />
                     )}
 
                     {/* Content */}
-                    <div className="relative h-full flex flex-col p-3 gap-2">
-                        {/* Header */}
-                        <div className="flex items-center justify-between">
-                            <div className="text-xs font-bold text-white/95 truncate">
-                                {clip.name}
-                            </div>
-                            {isPlaying ? (
-                                <Square
-                                    size={14}
-                                    className="text-white/95 flex-shrink-0 fill-white/20"
-                                />
-                            ) : (
-                                <Play
-                                    size={14}
-                                    className="text-white/80 flex-shrink-0 fill-white/10"
-                                />
-                            )}
+                    <div className="relative h-full flex flex-col justify-between">
+                        {/* Clip name */}
+                        <div className="text-[8px] font-bold text-white/90 truncate leading-tight drop-shadow">
+                            {clip.name}
                         </div>
 
-                        {/* Clip info */}
-                        <div className="flex-1 flex flex-col justify-center gap-1">
-                            <div className="text-[9px] text-white/60 uppercase tracking-wider font-medium">
+                        {/* Bottom: Type + Playing indicator */}
+                        <div className="flex items-center justify-between">
+                            <div className="text-[7px] text-white/70 uppercase font-bold">
                                 {clip.type}
                             </div>
-                            {clip.duration && (
-                                <div className="text-[9px] text-white/50 font-mono">
-                                    {clip.duration.toFixed(2)}s
-                                </div>
+                            {isPlaying && (
+                                <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                             )}
                         </div>
-
-                        {/* Loop progress bar (only when playing) */}
-                        {isPlaying && (
-                            <div className="relative h-1.5 rounded-full overflow-hidden bg-black/40">
-                                <div
-                                    className="absolute inset-y-0 left-0 rounded-full transition-all duration-100"
-                                    style={{
-                                        width: '50%', // TODO: Calculate from actual loop progress
-                                        backgroundColor: slotColor,
-                                        boxShadow: `0 0 8px ${slotColor}`,
-                                    }}
-                                />
-                            </div>
-                        )}
                     </div>
-
-                    {/* Playing ring */}
-                    {isPlaying && (
-                        <div
-                            className="absolute inset-0 rounded-lg border-2 animate-pulse pointer-events-none"
-                            style={{
-                                borderColor: `${slotColor}90`,
-                            }}
-                        />
-                    )}
                 </button>
             </ContextMenuTrigger>
             <ContextMenuContent>
