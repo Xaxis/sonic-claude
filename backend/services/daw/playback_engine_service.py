@@ -58,11 +58,16 @@ class PlaybackEngineService:
         # Buffer manager for sample playback
         self.buffer_manager = BufferManager(engine_manager) if engine_manager else None
 
-        # Playback state
+        # Timeline playback state
         self.is_playing = False
         self.is_paused = False
         self.playhead_position = 0.0  # beats
         self.tempo = 120.0  # BPM
+
+        # Clip launcher playback state (INDEPENDENT from timeline)
+        self.clip_launcher_active = False  # True if ANY clips are playing
+        self.clip_launcher_task: Optional[asyncio.Task] = None  # Background loop for clip launcher
+        self.clip_launcher_start_time = 0.0  # When clip launcher started (for timing)
 
         # Metronome state
         self.metronome_enabled = False
@@ -850,6 +855,75 @@ class PlaybackEngineService:
     # CLIP LAUNCHER (PERFORMANCE MODE)
     # ========================================================================
 
+    async def _clip_launcher_playback_loop(self, composition_id: str) -> None:
+        """
+        Independent playback loop for clip launcher
+
+        This runs separately from timeline playback and manages:
+        - Timing for quantized clip launches
+        - WebSocket updates for playing clips
+        - Tempo/clock for clip launcher
+
+        Runs continuously as long as ANY clips are playing
+        """
+        try:
+            logger.info("🎬 Starting clip launcher playback loop")
+            self.clip_launcher_start_time = time.time()
+            loop_count = 0
+
+            while self.clip_launcher_active:
+                loop_start = time.time()
+                loop_count += 1
+
+                # Get composition
+                composition = self.composition_state_service.get_composition(composition_id)
+                if not composition:
+                    logger.error(f"❌ Composition {composition_id} not found")
+                    break
+
+                # Use composition tempo
+                self.tempo = composition.tempo
+
+                # Send WebSocket updates (every 60Hz = ~16ms)
+                if self.websocket_manager and loop_count % 1 == 0:
+                    transport_data = {
+                        "type": "transport",
+                        "is_playing": self.is_playing,  # Timeline playback
+                        "is_paused": self.is_paused,
+                        "position_beats": self.playhead_position,
+                        "position_seconds": self.playhead_position * (60.0 / self.tempo),
+                        "tempo": self.tempo,
+                        "time_signature_num": 4,
+                        "time_signature_den": 4,
+                        "loop_enabled": composition.loop_enabled,
+                        "loop_start": composition.loop_start,
+                        "loop_end": composition.loop_end,
+                        "metronome_enabled": self.metronome_enabled,
+                        "active_notes": [],
+                        # Clip launcher state (CRITICAL for UI updates)
+                        "playing_clips": list(self.active_synths.keys()),
+                        "triggered_clips": list(self.triggered_clips.keys()),
+                    }
+                    await self.websocket_manager.broadcast_transport(transport_data)
+
+                # Check if we should stop the loop (no more active clips)
+                if not self.active_synths and not self.triggered_clips:
+                    logger.info("🛑 No more active clips - stopping clip launcher loop")
+                    self.clip_launcher_active = False
+                    break
+
+                # Sleep to maintain ~60Hz update rate
+                loop_duration = time.time() - loop_start
+                sleep_time = max(0.0, (1.0 / 60.0) - loop_duration)
+                await asyncio.sleep(sleep_time)
+
+        except asyncio.CancelledError:
+            logger.info("🛑 Clip launcher playback loop cancelled")
+            raise
+        except Exception as e:
+            logger.error(f"❌ Error in clip launcher playback loop: {e}", exc_info=True)
+            self.clip_launcher_active = False
+
     def _calculate_next_quantization_boundary(
         self,
         current_position: float,
@@ -938,45 +1012,20 @@ class PlaybackEngineService:
             del self.triggered_clips[clip_id]
 
         # Get quantization setting
-        quantization = composition.launch_quantization or '1'
+        quantization = composition.launch_quantization or 'none'
 
-        # Check if we should quantize
-        if quantization == 'none' or not self.is_playing:
-            # Launch immediately (no quantization or playback not running)
-            logger.info(f"🎬 Launching clip '{clip.name}' immediately (quantization: {quantization})")
-            await self._launch_clip_immediately(composition_id, clip_id)
-        else:
-            # Calculate next quantization boundary
-            next_boundary = self._calculate_next_quantization_boundary(
-                self.playhead_position,
-                quantization,
-                self.tempo
+        # CLIP LAUNCHER ALWAYS LAUNCHES IMMEDIATELY (for now)
+        # TODO: Implement quantization with clip launcher clock
+        logger.info(f"🎬 Launching clip '{clip.name}' immediately (clip launcher mode)")
+        await self._launch_clip_immediately(composition_id, clip_id)
+
+        # Start clip launcher playback loop if not already running
+        if not self.clip_launcher_active:
+            logger.info("🚀 Starting clip launcher playback loop")
+            self.clip_launcher_active = True
+            self.clip_launcher_task = asyncio.create_task(
+                self._clip_launcher_playback_loop(composition_id)
             )
-
-            # Calculate delay in seconds
-            delay_beats = next_boundary - self.playhead_position
-            delay_seconds = delay_beats * (60.0 / self.tempo)
-
-            logger.info(f"🎬 Triggering clip '{clip.name}' (quantization: {quantization})")
-            logger.info(f"   Current position: {self.playhead_position:.2f} beats")
-            logger.info(f"   Next boundary: {next_boundary:.2f} beats")
-            logger.info(f"   Delay: {delay_beats:.2f} beats ({delay_seconds:.2f}s)")
-
-            # Schedule launch at boundary
-            async def scheduled_launch():
-                try:
-                    await asyncio.sleep(delay_seconds)
-                    # Check if clip is still triggered (not cancelled)
-                    if clip_id in self.triggered_clips:
-                        del self.triggered_clips[clip_id]
-                        await self._launch_clip_immediately(composition_id, clip_id)
-                except asyncio.CancelledError:
-                    logger.info(f"⏹️  Cancelled triggered clip '{clip.name}'")
-                    raise
-
-            # Track triggered clip
-            task = asyncio.create_task(scheduled_launch())
-            self.triggered_clips[clip_id] = task
 
     async def _launch_clip_immediately(self, composition_id: str, clip_id: str) -> None:
         """
@@ -1069,24 +1118,33 @@ class PlaybackEngineService:
 
             # Create a task that loops the MIDI pattern
             async def midi_loop_task():
+                loop_count = 0
                 while clip.id in self.active_synths:
+                    loop_count += 1
+                    logger.info(f"🔁 MIDI clip loop iteration {loop_count} for clip {clip.id}")
+
                     # Trigger all notes in the clip
-                    for note in clip.midi_events:
+                    for i, note in enumerate(clip.midi_events):
                         if clip.id not in self.active_synths:
+                            logger.info(f"🛑 Clip {clip.id} stopped during loop")
                             break
 
-                        # Calculate note timing relative to clip start
-                        note_time_beats = note.time - clip.start_time
+                        # Calculate note timing relative to clip start (FIX: use note.start_time)
+                        note_time_beats = note.start_time - clip.start_time
                         note_delay = (note_time_beats / tempo) * 60.0
 
+                        logger.info(f"   Note {i+1}/{len(clip.midi_events)}: delay={note_delay:.2f}s")
+
                         # Schedule note
-                        await asyncio.sleep(note_delay)
+                        if note_delay > 0:
+                            await asyncio.sleep(note_delay)
 
                         if clip.id in self.active_synths:
                             # Trigger note
                             await self._trigger_midi_note(note, bus, tempo)
 
                     # Wait for clip to finish, then loop
+                    logger.info(f"🔁 Waiting {clip_duration_seconds:.2f}s before next loop")
                     await asyncio.sleep(clip_duration_seconds)
 
             # Start the loop task
@@ -1107,14 +1165,16 @@ class PlaybackEngineService:
             # Allocate node ID
             node_id = self.engine_manager.allocate_node_id()
 
-            # Convert MIDI note to frequency
-            freq = 440.0 * (2.0 ** ((note.pitch - 69) / 12.0))
+            # Convert MIDI note to frequency (FIX: use note.note, not note.pitch)
+            freq = 440.0 * (2.0 ** ((note.note - 69) / 12.0))
 
             # Calculate duration in seconds
             duration_seconds = (note.duration / tempo) * 60.0
 
             # Get synth name (default to sine wave)
             synth_name = "sine"  # TODO: Get from track instrument
+
+            logger.info(f"🎵 Triggering MIDI note: note={note.note}, freq={freq:.2f}Hz, amp={note.velocity / 127.0:.2f}, dur={duration_seconds:.2f}s, bus={bus}")
 
             # Trigger note
             self.engine_manager.send_message(
@@ -1131,10 +1191,11 @@ class PlaybackEngineService:
 
             # Schedule note release
             await asyncio.sleep(duration_seconds)
+            logger.info(f"🔇 Releasing MIDI note: node={node_id}")
             self.engine_manager.send_message("/n_set", node_id, "gate", 0)
 
         except Exception as e:
-            logger.error(f"❌ Failed to trigger MIDI note: {e}")
+            logger.error(f"❌ Failed to trigger MIDI note: {e}", exc_info=True)
 
     async def stop_clip(self, clip_id: str) -> None:
         """Stop a playing or triggered clip"""

@@ -90,6 +90,11 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     const isPlaying = assignedClipId ? playingClipIds.includes(assignedClipId) : false;
     const isSelected = selectedClipSlots.get(trackIndex) === slotIndex;
 
+    // DEBUG: Log playing state
+    if (isPlaying) {
+        console.log(`🟢 Slot [${trackIndex}][${slotIndex}] is PLAYING:`, { assignedClipId, playingClipIds });
+    }
+
     // INTELLIGENT COLOR SYSTEM:
     // Each track column gets a unique vibrant color from the hardware palette
     // This ensures visual differentiation between columns (like Akai Force)

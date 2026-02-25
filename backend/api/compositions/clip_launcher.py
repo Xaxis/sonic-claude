@@ -323,26 +323,36 @@ async def launch_clip(
     The clip will loop until stopped.
     """
     try:
+        logger.info(f"🎯 LAUNCH CLIP REQUEST: composition_id={composition_id}, clip_id={clip_id}")
+
         # Get composition
         composition = composition_state_service.get_composition(composition_id)
         if not composition:
+            logger.error(f"❌ Composition {composition_id} not found")
             raise ResourceNotFoundError(f"Composition {composition_id} not found")
+
+        logger.info(f"✅ Found composition: {composition.name}")
 
         # Find clip
         clip = next((c for c in composition.clips if c.id == clip_id), None)
         if not clip:
+            logger.error(f"❌ Clip {clip_id} not found in composition")
             raise ResourceNotFoundError(f"Clip {clip_id} not found")
 
-        # Trigger clip playback (respects composition.launch_quantization)
-        # - If quantization is 'none' or playback not running: launches immediately
-        # - Otherwise: schedules launch at next beat/bar boundary
+        logger.info(f"✅ Found clip: {clip.name} (type: {clip.type}, track_id: {clip.track_id})")
+
+        if clip.type == "midi":
+            logger.info(f"   MIDI events: {len(clip.midi_events) if clip.midi_events else 0}")
+
+        # Trigger clip playback
+        logger.info(f"🚀 Calling playback_engine_service.launch_clip()")
         await playback_engine_service.launch_clip(composition_id, clip_id)
 
         logger.info(f"✅ Launched clip '{clip.name}' (ID: {clip_id})")
         return {"status": "launched", "clip_id": clip_id}
 
     except Exception as e:
-        logger.error(f"❌ Failed to launch clip: {e}")
+        logger.error(f"❌ Failed to launch clip: {e}", exc_info=True)
         raise ServiceError(f"Failed to launch clip: {str(e)}")
 
 
