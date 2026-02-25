@@ -25,24 +25,24 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 
-// Same hardware color palette as PAD VIEW for consistency
+// THEME-MATCHED COLOR PALETTE (same as PAD VIEW)
 const HARDWARE_COLORS = [
-    'hsl(187 100% 50%)',  // Cyan
-    'hsl(330 100% 60%)',  // Magenta
-    'hsl(45 100% 55%)',   // Yellow
-    'hsl(0 100% 60%)',    // Red
-    'hsl(120 100% 45%)',  // Green
-    'hsl(210 100% 55%)',  // Blue
-    'hsl(30 100% 55%)',   // Orange
-    'hsl(280 100% 65%)',  // Purple
-    'hsl(160 100% 50%)',  // Teal
-    'hsl(350 100% 65%)',  // Pink
-    'hsl(270 100% 60%)',  // Violet
-    'hsl(50 100% 60%)',   // Gold
-    'hsl(10 100% 60%)',   // Coral
-    'hsl(140 100% 50%)',  // Lime
-    'hsl(200 100% 50%)',  // Sky Blue
-    'hsl(300 100% 60%)',  // Fuchsia
+    'hsl(187 85% 55%)',   // Cyan (primary)
+    'hsl(280 85% 65%)',   // Magenta (secondary)
+    'hsl(45 95% 60%)',    // Yellow (accent)
+    'hsl(0 85% 60%)',     // Red
+    'hsl(120 85% 55%)',   // Green
+    'hsl(210 85% 60%)',   // Blue
+    'hsl(30 90% 60%)',    // Orange
+    'hsl(270 85% 65%)',   // Purple
+    'hsl(160 85% 55%)',   // Teal
+    'hsl(330 85% 65%)',   // Pink
+    'hsl(60 90% 60%)',    // Lime
+    'hsl(180 85% 60%)',   // Aqua
+    'hsl(300 85% 65%)',   // Fuchsia
+    'hsl(15 90% 60%)',    // Coral
+    'hsl(240 85% 65%)',   // Indigo
+    'hsl(90 85% 55%)',    // Chartreuse
 ];
 
 interface ClipLauncherSlotAssignmentProps {
@@ -106,12 +106,14 @@ export function ClipLauncherSlotAssignment({ trackIndex, slotIndex }: ClipLaunch
             onClick={handleSelect}
             className={cn(
                 "relative h-full w-full rounded transition-all cursor-pointer",
-                "flex flex-col items-center justify-center gap-2 p-3",
-                isSelected && "ring-2 ring-primary"
+                "flex flex-col items-center justify-center gap-2 p-3"
             )}
             style={{
                 backgroundColor: assignedClip ? `${trackColor}25` : '#1a1a1a',
-                border: `2px solid ${assignedClip ? trackColor : '#2a2a2a'}`,
+                border: isSelected
+                    ? `2px solid ${trackColor}`
+                    : `2px solid ${assignedClip ? trackColor : '#2a2a2a'}`,
+                boxShadow: isSelected ? `0 0 12px ${trackColor}` : 'none',
             }}
         >
             {/* Assigned Clip Display */}

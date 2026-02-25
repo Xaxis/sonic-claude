@@ -29,26 +29,26 @@ interface ClipLauncherSlotProps {
     slotIndex: number;
 }
 
-// PROFESSIONAL CLIP LAUNCHER COLOR PALETTE
-// Inspired by Akai Force, Ableton Push, and Ableton Live
-// High saturation, vibrant RGB colors for maximum stage visibility
+// THEME-MATCHED COLOR PALETTE
+// Uses the same color scheme as the visualizer module for consistency
+// High saturation colors that fit the dark theme aesthetic
 const HARDWARE_COLORS = [
-    'hsl(187 100% 50%)',  // Cyan (Akai signature)
-    'hsl(330 100% 60%)',  // Magenta
-    'hsl(45 100% 55%)',   // Yellow
-    'hsl(0 100% 60%)',    // Red
-    'hsl(120 100% 45%)',  // Green
-    'hsl(210 100% 55%)',  // Blue
-    'hsl(30 100% 55%)',   // Orange
-    'hsl(280 100% 65%)',  // Purple
-    'hsl(160 100% 50%)',  // Teal
-    'hsl(350 100% 65%)',  // Pink
-    'hsl(270 100% 60%)',  // Violet
-    'hsl(50 100% 60%)',   // Gold
-    'hsl(10 100% 60%)',   // Coral
-    'hsl(140 100% 50%)',  // Lime
-    'hsl(200 100% 50%)',  // Sky Blue
-    'hsl(300 100% 60%)',  // Fuchsia
+    'hsl(187 85% 55%)',   // Cyan (primary)
+    'hsl(280 85% 65%)',   // Magenta (secondary)
+    'hsl(45 95% 60%)',    // Yellow (accent)
+    'hsl(0 85% 60%)',     // Red
+    'hsl(120 85% 55%)',   // Green
+    'hsl(210 85% 60%)',   // Blue
+    'hsl(30 90% 60%)',    // Orange
+    'hsl(270 85% 65%)',   // Purple
+    'hsl(160 85% 55%)',   // Teal
+    'hsl(330 85% 65%)',   // Pink
+    'hsl(60 90% 60%)',    // Lime
+    'hsl(180 85% 60%)',   // Aqua
+    'hsl(300 85% 65%)',   // Fuchsia
+    'hsl(15 90% 60%)',    // Coral
+    'hsl(240 85% 65%)',   // Indigo
+    'hsl(90 85% 55%)',    // Chartreuse
 ];
 
 export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProps) {
@@ -167,30 +167,28 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                 <button
                     onClick={handleClick}
                     className={cn(
-                        "relative h-full w-full rounded transition-all cursor-pointer overflow-hidden",
+                        "relative h-full w-full rounded-md transition-all cursor-pointer overflow-hidden",
                         "flex flex-col p-1.5",
-                        "hover:brightness-125 active:scale-95"
+                        "hover:brightness-110 active:scale-[0.98]"
                     )}
                     style={{
-                        backgroundColor: padColor,
+                        backgroundColor: isPlaying ? padColor : `${padColor}30`,
                         boxShadow: isSelected
-                            ? `0 0 0 2px hsl(var(--primary)), 0 0 20px hsl(var(--primary))40, inset 0 0 10px ${padColor}40`
+                            ? `0 0 0 2px ${padColor}, 0 0 12px ${padColor}`
                             : isPlaying
-                                ? `0 0 20px ${padColor}, inset 0 0 10px ${padColor}40`
-                                : `0 0 8px ${padColor}60, inset 0 2px 4px rgba(0,0,0,0.3)`,
+                                ? `0 0 16px ${padColor}, 0 4px 12px ${padColor}80, inset 0 0 20px ${padColor}60`
+                                : `0 2px 4px rgba(0,0,0,0.4)`,
                         border: isSelected
-                            ? `2px solid hsl(var(--primary))`
-                            : `1px solid ${padColor}`,
-                        opacity: isPlaying ? 1 : 0.5  // Dimmed when not playing
+                            ? `2px solid ${padColor}`
+                            : `1px solid ${padColor}60`,
                     }}
                 >
-                    {/* Pulse when playing */}
+                    {/* Subtle pulse when playing */}
                     {isPlaying && (
                         <div
-                            className="absolute inset-0 rounded animate-pulse"
+                            className="absolute inset-0 rounded-md animate-pulse"
                             style={{
-                                background: `radial-gradient(circle at center, ${padColor} 0%, transparent 70%)`,
-                                opacity: 0.5
+                                background: `radial-gradient(circle at center, rgba(255,255,255,0.3) 0%, transparent 60%)`,
                             }}
                         />
                     )}
