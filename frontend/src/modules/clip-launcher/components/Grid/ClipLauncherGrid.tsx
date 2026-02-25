@@ -1,22 +1,11 @@
 /**
  * ClipLauncherGrid - Professional clip launcher grid layout
  *
- * BEST PRACTICE: CSS Grid with sticky headers (like SequencerGridLayout)
- * - Single scroll container
- * - Sticky track headers at top
- * - Perfect alignment between headers and columns
- * - Consistent spacing throughout
- *
- * Architecture:
- * ┌──────────┬──────────┬──────────┬──────────┐
- * │ Scenes   │ Track 1  │ Track 2  │ Track 3  │ ← sticky headers
- * ├──────────┼──────────┼──────────┼──────────┤
- * │ Scene 1  │ Slot 1,1 │ Slot 2,1 │ Slot 3,1 │
- * │ Scene 2  │ Slot 1,2 │ Slot 2,2 │ Slot 3,2 │
- * │ Scene 3  │ Slot 1,3 │ Slot 2,3 │ Slot 3,3 │
- * ├──────────┼──────────┼──────────┼──────────┤
- * │          │ Stop 1   │ Stop 2   │ Stop 3   │
- * └──────────┴──────────┴──────────┴──────────┘
+ * FOLLOWS EXACT MIXER PATTERN:
+ * - Horizontal flex layout with gap-4
+ * - Fixed width columns (like MixerChannelStrip w-56)
+ * - Proper card styling with borders, gradients, shadows
+ * - Scene column on left, track columns, scrollable
  */
 
 import React from 'react';
@@ -33,119 +22,69 @@ export function ClipLauncherGrid() {
     const numSlots = useDAWStore(state => state.numClipSlots);
 
     // ========================================================================
-    // LAYOUT CONSTANTS - Professional sizing
-    // ========================================================================
-    const SCENE_COLUMN_WIDTH = 80;
-    const TRACK_COLUMN_WIDTH = 160;
-    const HEADER_HEIGHT = 56;
-    const SLOT_HEIGHT = 64;
-    const STOP_BUTTON_HEIGHT = 40;
-    const GAP = 8;
-
-    // ========================================================================
-    // GRID LAYOUT - CSS Grid with sticky headers
+    // RENDER: EXACT MIXER PATTERN - Horizontal flex layout
     // ========================================================================
     return (
-        <div className="h-full overflow-auto p-4 bg-gradient-to-b from-background/50 to-background">
-            <div
-                style={{
-                    display: 'grid',
-                    gridTemplateColumns: `${SCENE_COLUMN_WIDTH}px repeat(${tracks.length}, ${TRACK_COLUMN_WIDTH}px)`,
-                    gap: `${GAP}px`,
-                    minHeight: '100%',
-                }}
-            >
-                {/* ============================================================ */}
-                {/* HEADER ROW - Sticky at top */}
-                {/* ============================================================ */}
-                
-                {/* Scene column header */}
-                <div
-                    className="flex items-center justify-center rounded-md border border-border/50 bg-background"
-                    style={{
-                        position: 'sticky',
-                        top: 0,
-                        height: `${HEADER_HEIGHT}px`,
-                        zIndex: 40,
-                    }}
-                >
+        <div className="flex h-full gap-4 overflow-x-auto overflow-y-hidden bg-gradient-to-b from-background/50 to-background p-5">
+            {/* Scene Column - Fixed on left */}
+            <div className="flex w-20 flex-shrink-0 flex-col gap-3">
+                {/* Scene Header */}
+                <div className="flex h-12 items-center justify-center rounded-lg border border-border/70 bg-gradient-to-b from-card to-card/60 px-3 shadow-lg">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                         Scenes
                     </span>
                 </div>
 
-                {/* Track headers */}
-                {tracks.map((track) => (
-                    <div
-                        key={track.id}
-                        className="rounded-md border p-2 flex flex-col justify-between shadow-sm transition-all hover:border-border"
-                        style={{
-                            position: 'sticky',
-                            top: 0,
-                            height: `${HEADER_HEIGHT}px`,
-                            backgroundColor: `color-mix(in srgb, ${track.color} 15%, var(--color-background))`,
-                            borderColor: `color-mix(in srgb, ${track.color} 50%, transparent)`,
-                            zIndex: 20,
-                        }}
-                    >
-                        {/* Track name */}
+                {/* Scene Triggers */}
+                {Array.from({ length: numSlots }).map((_, slotIndex) => (
+                    <div key={slotIndex} className="h-16">
+                        <ClipLauncherScene sceneIndex={slotIndex} />
+                    </div>
+                ))}
+            </div>
+
+            {/* Track Columns - Scrollable */}
+            {tracks.map((track, trackIndex) => (
+                <div key={track.id} className="flex w-56 flex-shrink-0 flex-col gap-3">
+                    {/* Track Header */}
+                    <div className="flex h-12 flex-col gap-1.5 rounded-lg border border-border/70 bg-gradient-to-b from-card to-card/60 p-2 shadow-lg">
+                        {/* Track Name */}
                         <div
-                            className="text-[11px] font-bold uppercase tracking-wide truncate text-center"
+                            className="truncate text-center text-xs font-bold uppercase tracking-wider drop-shadow-sm"
                             style={{ color: track.color }}
                             title={track.name}
                         >
                             {track.name}
                         </div>
 
-                        {/* Track type badge */}
+                        {/* Track Type Badge */}
                         <div className="flex justify-center">
                             <span
-                                className="rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider"
+                                className="rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider shadow-sm"
                                 style={{
-                                    backgroundColor: `color-mix(in srgb, ${track.color} 30%, transparent)`,
+                                    backgroundColor: `${track.color}20`,
                                     color: track.color,
-                                    border: `1px solid color-mix(in srgb, ${track.color} 60%, transparent)`,
+                                    border: `1px solid ${track.color}40`
                                 }}
                             >
                                 {track.type}
                             </span>
                         </div>
                     </div>
-                ))}
 
-                {/* ============================================================ */}
-                {/* SLOT ROWS - One row per scene */}
-                {/* ============================================================ */}
-                {Array.from({ length: numSlots }).map((_, slotIndex) => (
-                    <React.Fragment key={slotIndex}>
-                        {/* Scene trigger */}
-                        <div style={{ height: `${SLOT_HEIGHT}px` }}>
-                            <ClipLauncherScene sceneIndex={slotIndex} />
+                    {/* Clip Slots */}
+                    {Array.from({ length: numSlots }).map((_, slotIndex) => (
+                        <div key={slotIndex} className="h-16">
+                            <ClipLauncherSlot trackIndex={trackIndex} slotIndex={slotIndex} />
                         </div>
+                    ))}
 
-                        {/* Clip slots for each track */}
-                        {tracks.map((track, trackIndex) => (
-                            <div key={track.id} style={{ height: `${SLOT_HEIGHT}px` }}>
-                                <ClipLauncherSlot trackIndex={trackIndex} slotIndex={slotIndex} />
-                            </div>
-                        ))}
-                    </React.Fragment>
-                ))}
-
-                {/* ============================================================ */}
-                {/* STOP BUTTON ROW */}
-                {/* ============================================================ */}
-                
-                {/* Empty cell for scene column */}
-                <div style={{ height: `${STOP_BUTTON_HEIGHT}px` }} />
-
-                {/* Track stop buttons */}
-                {tracks.map((track) => (
-                    <div key={track.id} style={{ height: `${STOP_BUTTON_HEIGHT}px` }}>
+                    {/* Track Stop Button */}
+                    <div className="h-10">
                         <ClipLauncherTrackStop trackId={track.id} trackColor={track.color} />
                     </div>
-                ))}
-            </div>
+                </div>
+            ))}
         </div>
     );
 }

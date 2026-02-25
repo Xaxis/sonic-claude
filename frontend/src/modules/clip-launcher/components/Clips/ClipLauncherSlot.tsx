@@ -77,23 +77,71 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     };
 
     // ========================================================================
-    // RENDER: Empty slot
+    // RENDER: Empty slot (still clickable for testing)
     // ========================================================================
     if (!clip) {
         return (
             <ContextMenu>
                 <ContextMenuTrigger asChild>
-                    <div
-                        className="relative h-full w-full rounded-md border-2 border-dashed transition-all cursor-pointer flex items-center justify-center group hover:scale-[1.01]"
+                    <button
+                        onClick={handleClick}
+                        className={cn(
+                            "relative h-full w-full rounded-lg border-2 border-dashed transition-all cursor-pointer",
+                            "flex flex-col items-center justify-center gap-2 group",
+                            "hover:scale-[1.02] active:scale-98",
+                            isPlaying && "border-solid scale-[1.02]"
+                        )}
                         style={{
-                            borderColor: `color-mix(in srgb, ${track.color} 40%, transparent)`,
-                            backgroundColor: `color-mix(in srgb, ${track.color} 8%, transparent)`,
+                            borderColor: isPlaying
+                                ? slotColor
+                                : `color-mix(in srgb, ${slotColor} 30%, transparent)`,
+                            backgroundColor: isPlaying
+                                ? `color-mix(in srgb, ${slotColor} 35%, var(--color-background))`
+                                : `color-mix(in srgb, ${slotColor} 8%, transparent)`,
+                            boxShadow: isPlaying
+                                ? `0 0 24px ${slotColor}60, inset 0 0 20px ${slotColor}20`
+                                : 'none',
                         }}
                     >
-                        <div className="text-[10px] font-bold text-muted-foreground/30 uppercase tracking-wider">
-                            Empty
+                        {/* Background glow when playing */}
+                        {isPlaying && (
+                            <div
+                                className="absolute inset-0 rounded-lg opacity-40 animate-pulse"
+                                style={{
+                                    background: `radial-gradient(circle at center, ${slotColor}60 0%, transparent 70%)`,
+                                }}
+                            />
+                        )}
+
+                        {/* Icon */}
+                        <Music
+                            size={20}
+                            className={cn(
+                                "relative transition-all",
+                                isPlaying ? "text-white" : "text-muted-foreground/40"
+                            )}
+                        />
+
+                        {/* Label */}
+                        <div
+                            className={cn(
+                                "relative text-[9px] font-bold uppercase tracking-wider transition-all",
+                                isPlaying ? "text-white" : "text-muted-foreground/40"
+                            )}
+                        >
+                            {isPlaying ? 'Playing' : 'Empty'}
                         </div>
-                    </div>
+
+                        {/* Playing ring */}
+                        {isPlaying && (
+                            <div
+                                className="absolute inset-0 rounded-lg border-2 animate-pulse"
+                                style={{
+                                    borderColor: `${slotColor}80`,
+                                }}
+                            />
+                        )}
+                    </button>
                 </ContextMenuTrigger>
                 <ContextMenuContent>
                     <ContextMenuItem>Add Audio Clip</ContextMenuItem>
@@ -104,7 +152,7 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     }
 
     // ========================================================================
-    // RENDER: Filled slot
+    // RENDER: Filled slot (PERFORMANCE INSTRUMENT)
     // ========================================================================
     return (
         <ContextMenu>
@@ -112,54 +160,90 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                 <button
                     onClick={handleClick}
                     className={cn(
-                        "relative h-full w-full rounded-md cursor-pointer transition-all overflow-hidden group",
-                        "shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-95",
-                        isPlaying && "ring-2 ring-primary/60 scale-[1.01]",
+                        "relative h-full w-full rounded-lg border-2 transition-all cursor-pointer overflow-hidden",
+                        "flex flex-col group",
+                        "hover:scale-[1.02] active:scale-98",
+                        isPlaying && "scale-[1.02]"
                     )}
                     style={{
-                        backgroundColor: `color-mix(in srgb, ${track.color} 25%, var(--color-background))`,
-                        border: `1px solid color-mix(in srgb, ${track.color} 60%, transparent)`,
+                        borderColor: isPlaying
+                            ? slotColor
+                            : `color-mix(in srgb, ${slotColor} 60%, transparent)`,
+                        backgroundColor: `color-mix(in srgb, ${slotColor} 30%, var(--color-background))`,
+                        boxShadow: isPlaying
+                            ? `0 0 24px ${slotColor}70, inset 0 0 20px ${slotColor}25`
+                            : `0 0 8px ${slotColor}30`,
                     }}
                 >
-                    {/* Background glow */}
-                    <div
-                        className="absolute inset-0 opacity-30"
-                        style={{
-                            background: `radial-gradient(circle at center, ${track.color}40 0%, transparent 70%)`,
-                        }}
-                    />
+                    {/* Background glow when playing */}
+                    {isPlaying && (
+                        <div
+                            className="absolute inset-0 opacity-40 animate-pulse"
+                            style={{
+                                background: `radial-gradient(circle at center, ${slotColor}80 0%, transparent 70%)`,
+                            }}
+                        />
+                    )}
 
                     {/* Content */}
-                    <div className="relative h-full flex flex-col justify-between p-2">
-                        {/* Top: Clip name */}
-                        <div
-                            className="text-[10px] font-bold uppercase tracking-wide truncate"
-                            style={{ color: track.color }}
-                            title={clip.name}
-                        >
-                            {clip.name}
+                    <div className="relative h-full flex flex-col p-3 gap-2">
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                            <div className="text-xs font-bold text-white/95 truncate">
+                                {clip.name}
+                            </div>
+                            {isPlaying ? (
+                                <Square
+                                    size={14}
+                                    className="text-white/95 flex-shrink-0 fill-white/20"
+                                />
+                            ) : (
+                                <Play
+                                    size={14}
+                                    className="text-white/80 flex-shrink-0 fill-white/10"
+                                />
+                            )}
                         </div>
 
-                        {/* Bottom: Play state indicator */}
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1">
-                                {isPlaying ? (
-                                    <Square size={10} fill="currentColor" className="text-primary animate-pulse" />
-                                ) : (
-                                    <Play size={10} fill="currentColor" className="text-muted-foreground" />
-                                )}
-                                <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-wider">
-                                    {isPlaying ? 'Playing' : 'Ready'}
-                                </span>
+                        {/* Clip info */}
+                        <div className="flex-1 flex flex-col justify-center gap-1">
+                            <div className="text-[9px] text-white/60 uppercase tracking-wider font-medium">
+                                {clip.type}
                             </div>
+                            {clip.duration && (
+                                <div className="text-[9px] text-white/50 font-mono">
+                                    {clip.duration.toFixed(2)}s
+                                </div>
+                            )}
                         </div>
+
+                        {/* Loop progress bar (only when playing) */}
+                        {isPlaying && (
+                            <div className="relative h-1.5 rounded-full overflow-hidden bg-black/40">
+                                <div
+                                    className="absolute inset-y-0 left-0 rounded-full transition-all duration-100"
+                                    style={{
+                                        width: '50%', // TODO: Calculate from actual loop progress
+                                        backgroundColor: slotColor,
+                                        boxShadow: `0 0 8px ${slotColor}`,
+                                    }}
+                                />
+                            </div>
+                        )}
                     </div>
+
+                    {/* Playing ring */}
+                    {isPlaying && (
+                        <div
+                            className="absolute inset-0 rounded-lg border-2 animate-pulse pointer-events-none"
+                            style={{
+                                borderColor: `${slotColor}90`,
+                            }}
+                        />
+                    )}
                 </button>
             </ContextMenuTrigger>
             <ContextMenuContent>
-                <ContextMenuItem onClick={handleClick}>
-                    {isPlaying ? 'Stop Clip' : 'Play Clip'}
-                </ContextMenuItem>
                 <ContextMenuItem>Edit Clip</ContextMenuItem>
                 <ContextMenuItem>Duplicate Clip</ContextMenuItem>
                 <ContextMenuItem className="text-destructive">Delete Clip</ContextMenuItem>

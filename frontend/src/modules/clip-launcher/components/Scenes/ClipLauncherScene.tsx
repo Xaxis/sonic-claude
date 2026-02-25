@@ -1,14 +1,18 @@
 /**
  * ClipLauncherScene - Scene trigger button
  *
+ * PERFORMANCE INSTRUMENT VISION:
+ * - Large, tactile scene triggers for live performance
+ * - Clear visual feedback when scene is playing
+ * - Vibrant colors that are VISIBLE
+ * - Triggers entire row of clips at once
+ *
  * NO PROP DRILLING - Reads from Zustand store
- * Uses theme colors (primary, secondary, accent) for vibrant scene colors
- * Professional styling matching Ableton Live
  */
 
 import { useDAWStore } from '@/stores/dawStore';
 import { cn } from '@/lib/utils';
-import { Play } from 'lucide-react';
+import { Play, Square } from 'lucide-react';
 import {
     ContextMenu,
     ContextMenuContent,
@@ -20,7 +24,7 @@ interface ClipLauncherSceneProps {
     sceneIndex: number;
 }
 
-// Scene colors using theme colors
+// Vibrant scene colors (cycling through theme colors)
 const SCENE_COLORS = [
     'hsl(187 85% 55%)',  // primary (cyan)
     'hsl(280 85% 65%)',  // secondary (purple)
@@ -54,15 +58,11 @@ export function ClipLauncherScene({ sceneIndex }: ClipLauncherSceneProps) {
     // HANDLERS
     // ========================================================================
     const handleClick = () => {
-        if (isPlaying) {
-            stopScene(sceneIndex);
-        } else {
-            triggerScene(sceneIndex);
-        }
+        triggerScene(sceneIndex);
     };
 
     // ========================================================================
-    // RENDER
+    // RENDER: PERFORMANCE INSTRUMENT
     // ========================================================================
     return (
         <ContextMenu>
@@ -70,59 +70,64 @@ export function ClipLauncherScene({ sceneIndex }: ClipLauncherSceneProps) {
                 <button
                     onClick={handleClick}
                     className={cn(
-                        "relative h-full w-full rounded-md cursor-pointer transition-all overflow-hidden group",
-                        "shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-95",
-                        isPlaying && "ring-2 ring-white/60 scale-[1.01]",
+                        "relative h-full w-full rounded-lg border-2 transition-all cursor-pointer overflow-hidden",
+                        "flex flex-col items-center justify-center group",
+                        "hover:scale-[1.02] active:scale-98",
+                        isPlaying && "scale-[1.02]"
                     )}
                     style={{
-                        backgroundColor: `color-mix(in srgb, ${sceneColor} 25%, var(--color-background))`,
-                        border: `1px solid color-mix(in srgb, ${sceneColor} 60%, transparent)`,
+                        borderColor: isPlaying
+                            ? sceneColor
+                            : `color-mix(in srgb, ${sceneColor} 60%, transparent)`,
+                        backgroundColor: `color-mix(in srgb, ${sceneColor} 30%, var(--color-background))`,
+                        boxShadow: isPlaying
+                            ? `0 0 24px ${sceneColor}70, inset 0 0 20px ${sceneColor}25`
+                            : `0 0 8px ${sceneColor}30`,
                     }}
                 >
-                    {/* Background glow */}
-                    <div
-                        className="absolute inset-0 opacity-30"
-                        style={{
-                            background: `radial-gradient(circle at center, ${sceneColor}40 0%, transparent 70%)`,
-                        }}
-                    />
+                    {/* Background glow when playing */}
+                    {isPlaying && (
+                        <div
+                            className="absolute inset-0 opacity-40 animate-pulse"
+                            style={{
+                                background: `radial-gradient(circle at center, ${sceneColor}80 0%, transparent 70%)`,
+                            }}
+                        />
+                    )}
 
                     {/* Content */}
-                    <div className="relative h-full flex flex-col items-center justify-center gap-1">
-                        {/* Play icon */}
-                        <Play
-                            size={16}
-                            fill="currentColor"
-                            className={cn(
-                                "transition-all",
-                                isPlaying ? "text-white animate-pulse" : "text-muted-foreground"
-                            )}
-                        />
+                    <div className="relative flex flex-col items-center justify-center gap-2">
+                        {/* Play/Stop icon */}
+                        {isPlaying ? (
+                            <Square
+                                size={20}
+                                className="text-white/95 fill-white/20"
+                            />
+                        ) : (
+                            <Play
+                                size={20}
+                                className="text-white/80 fill-white/10"
+                            />
+                        )}
 
                         {/* Scene number */}
-                        <div
-                            className="text-[10px] font-bold uppercase tracking-wider"
-                            style={{ color: sceneColor }}
-                        >
-                            Scene {sceneIndex + 1}
+                        <div className="text-xs font-bold text-white/95 uppercase tracking-wider">
+                            {sceneIndex + 1}
                         </div>
                     </div>
 
-                    {/* Playing indicator */}
+                    {/* Playing ring */}
                     {isPlaying && (
                         <div
-                            className="absolute inset-0 border-2 border-white/40 rounded-md animate-pulse"
+                            className="absolute inset-0 rounded-lg border-2 animate-pulse pointer-events-none"
                             style={{
-                                boxShadow: `0 0 20px ${sceneColor}80`,
+                                borderColor: `${sceneColor}90`,
                             }}
                         />
                     )}
                 </button>
             </ContextMenuTrigger>
             <ContextMenuContent>
-                <ContextMenuItem onClick={handleClick}>
-                    {isPlaying ? 'Stop Scene' : 'Trigger Scene'}
-                </ContextMenuItem>
                 <ContextMenuItem>Rename Scene</ContextMenuItem>
                 <ContextMenuItem>Insert Scene Above</ContextMenuItem>
                 <ContextMenuItem>Insert Scene Below</ContextMenuItem>
