@@ -2311,6 +2311,14 @@ export const useDAWStore = create<DAWStore>()(
                         metadata: { actions: response.actions_executed },
                     };
                     get().addAnalysisEvent(analysisEvent);
+
+                    // CRITICAL: Reload composition after assistant mutations
+                    // Backend is source of truth - must reload to see changes
+                    const { activeComposition } = get();
+                    if (activeComposition) {
+                        await get().loadComposition(activeComposition.id);
+                        await get().refreshUndoRedoStatus();
+                    }
                 }
             } catch (error) {
                 console.error("Failed to send message:", error);
