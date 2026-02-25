@@ -324,6 +324,38 @@ class CompositionStateService:
     # CLIP MANAGEMENT
     # ========================================================================
 
+    def _generate_unique_clip_name(self, composition: Composition, clip_type: str) -> str:
+        """
+        Generate a unique clip name with sequential numbering.
+
+        Pattern: "MIDI Clip 1", "MIDI Clip 2", "Audio Clip 1", etc.
+
+        Args:
+            composition: The composition to check for existing clips
+            clip_type: "midi" or "audio"
+
+        Returns:
+            Unique clip name with sequential number
+        """
+        # Count existing clips of this type
+        type_prefix = f"{clip_type.upper()} Clip"
+        existing_numbers = []
+
+        for clip in composition.clips:
+            # Check if clip name matches pattern "MIDI Clip N" or "AUDIO Clip N"
+            if clip.name.startswith(type_prefix):
+                # Extract number from name
+                suffix = clip.name[len(type_prefix):].strip()
+                if suffix.isdigit():
+                    existing_numbers.append(int(suffix))
+
+        # Find next available number
+        next_number = 1
+        while next_number in existing_numbers:
+            next_number += 1
+
+        return f"{type_prefix} {next_number}"
+
     def add_clip(self, composition_id: str, request: AddClipRequest) -> Optional[Clip]:
         """Add a clip to a composition"""
         composition = self.compositions.get(composition_id)
@@ -331,10 +363,15 @@ class CompositionStateService:
             logger.error(f"❌ Composition {composition_id} not found")
             return None
 
+        # Generate unique clip name if not provided
+        clip_name = request.name
+        if not clip_name:
+            clip_name = self._generate_unique_clip_name(composition, request.clip_type)
+
         clip_id = str(uuid.uuid4())
         clip = Clip(
             id=clip_id,
-            name=request.name or f"{request.clip_type.upper()} Clip",
+            name=clip_name,
             type=request.clip_type,
             track_id=request.track_id,
             start_time=request.start_time,
@@ -350,7 +387,7 @@ class CompositionStateService:
         composition.clips.append(clip)
         composition.updated_at = datetime.now()
 
-        logger.info(f"✅ Added {request.clip_type} clip to composition {composition_id}")
+        logger.info(f"✅ Added {request.clip_type} clip '{clip_name}' to composition {composition_id}")
         return clip
 
     def get_clips(self, composition_id: str) -> Optional[List[Clip]]:

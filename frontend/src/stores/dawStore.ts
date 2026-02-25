@@ -300,10 +300,12 @@ interface DAWStore {
     // CLIP LAUNCHER ACTIONS (Performance Mode)
     // ========================================================================
     setClipLaunchState: (clipId: string, state: ClipLaunchState) => void;
+    setClipLaunchStatesFromWebSocket: (playingClips: string[], triggeredClips: string[]) => void;
     launchClip: (clipId: string) => Promise<void>;
     launchScene: (sceneId: string) => Promise<void>;
     stopClip: (clipId: string) => Promise<void>;
     stopAllClips: () => Promise<void>;
+    stopTrackClips: (trackId: string) => Promise<void>;
     assignClipToSlot: (trackIndex: number, slotIndex: number, clipId: string | null) => Promise<void>;
     createScene: (name: string, color?: string, tempo?: number) => Promise<void>;
     updateScene: (sceneId: string, name?: string, color?: string, tempo?: number) => Promise<void>;
@@ -1012,6 +1014,31 @@ export const useDAWStore = create<DAWStore>()(
             }));
         },
 
+        setClipLaunchStatesFromWebSocket: (playingClips, triggeredClips) => {
+            // Build new clip launch states from WebSocket data (60Hz real-time updates)
+            const newStates: Record<string, ClipLaunchState> = {};
+
+            // Add playing clips
+            playingClips.forEach(clipId => {
+                newStates[clipId] = {
+                    clipId,
+                    state: 'playing',
+                    progress: 0, // Progress is calculated in UI based on clip duration
+                };
+            });
+
+            // Add triggered clips (waiting for quantization)
+            triggeredClips.forEach(clipId => {
+                newStates[clipId] = {
+                    clipId,
+                    state: 'triggered',
+                    progress: 0,
+                };
+            });
+
+            set({ clipLaunchStates: newStates });
+        },
+
         launchClip: async (clipId) => {
             try {
                 const { activeComposition } = get();
@@ -1076,6 +1103,32 @@ export const useDAWStore = create<DAWStore>()(
             } catch (error) {
                 console.error("Failed to stop all clips:", error);
                 toast.error("Failed to stop all clips");
+            }
+        },
+
+        stopTrackClips: async (trackId) => {
+            try {
+                const { activeComposition } = get();
+                if (!activeComposition) return;
+
+                await api.compositions.stopTrackClips(activeComposition.id, trackId);
+
+                // Remove clip launch states for clips on this track
+                set((state) => {
+                    const newStates = { ...state.clipLaunchStates };
+                    const trackClipIds = activeComposition.clips
+                        .filter(clip => clip.track_id === trackId)
+                        .map(clip => clip.id);
+
+                    trackClipIds.forEach(clipId => {
+                        delete newStates[clipId];
+                    });
+
+                    return { clipLaunchStates: newStates };
+                });
+            } catch (error) {
+                console.error("Failed to stop track clips:", error);
+                toast.error("Failed to stop track clips");
             }
         },
 

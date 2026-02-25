@@ -333,11 +333,9 @@ async def launch_clip(
         if not clip:
             raise ResourceNotFoundError(f"Clip {clip_id} not found")
 
-        # TODO: Implement quantized launch timing
-        # For now, launch immediately
-        # In future: schedule launch based on composition.launch_quantization
-
-        # Trigger clip playback
+        # Trigger clip playback (respects composition.launch_quantization)
+        # - If quantization is 'none' or playback not running: launches immediately
+        # - Otherwise: schedules launch at next beat/bar boundary
         await playback_engine_service.launch_clip(composition_id, clip_id)
 
         logger.info(f"✅ Launched clip '{clip.name}' (ID: {clip_id})")
@@ -433,4 +431,44 @@ async def stop_all_clips(
     except Exception as e:
         logger.error(f"❌ Failed to stop all clips: {e}")
         raise ServiceError(f"Failed to stop all clips: {str(e)}")
+
+
+@router.post("/{composition_id}/clip-launcher/tracks/{track_id}/stop-all")
+async def stop_track_clips(
+    composition_id: str,
+    track_id: str,
+    composition_state_service: CompositionStateService = Depends(get_composition_state_service),
+    playback_engine_service: PlaybackEngineService = Depends(get_playback_engine_service)
+):
+    """
+    Stop all clips on a specific track
+
+    Stops all playing and triggered clips that belong to the specified track.
+    """
+    try:
+        # Get composition
+        composition = composition_state_service.get_composition(composition_id)
+        if not composition:
+            raise ResourceNotFoundError(f"Composition {composition_id} not found")
+
+        # Find all clips on this track
+        track_clip_ids = [clip.id for clip in composition.clips if clip.track_id == track_id]
+
+        # Stop each clip
+        stopped_count = 0
+        for clip_id in track_clip_ids:
+            if clip_id in playback_engine_service.active_synths or clip_id in playback_engine_service.triggered_clips:
+                await playback_engine_service.stop_clip(clip_id)
+                stopped_count += 1
+
+        logger.info(f"✅ Stopped {stopped_count} clips on track {track_id}")
+        return {
+            "status": "stopped",
+            "track_id": track_id,
+            "clips_stopped": stopped_count
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Failed to stop track clips: {e}")
+        raise ServiceError(f"Failed to stop track clips: {str(e)}")
 

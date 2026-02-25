@@ -88,8 +88,8 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         defaultLayout: { x: 0, y: 0, w: 6, h: 10 },
     },
     {
-        id: "loop-visualizer",
-        title: "LOOP",
+        id: "visualizer",
+        title: "VISUALIZER",
         component: createElement(VisualizerPanel),
         closeable: false,
         getSubtitle: () => "Active • 120 BPM • 4/4 • Position: 8.2 beats",
@@ -144,7 +144,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         component: createElement(ClipLauncherPanel),
         closeable: false,
         getSubtitle: () => "Performance Mode • 0 scenes",
-        defaultLayout: { x: 0, y: 0, w: 12, h: 20 },
+        defaultLayout: { x: 0, y: 0, w: 12, h: 22 },
     },
 
 ];
@@ -169,7 +169,7 @@ export const DEFAULT_TABS = [
         name: "INTERACT",
         panelIds: [
             "input",
-            "loop-visualizer",
+            "visualizer",
             "ai"
         ],
     },
@@ -178,7 +178,6 @@ export const DEFAULT_TABS = [
         name: "PERFORM",
         panelIds: [
             "clip-launcher",
-            "loop-visualizer",
         ],
     },
 ];

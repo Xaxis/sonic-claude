@@ -513,5 +513,13 @@ export class CompositionsProvider extends BaseAPIClient {
     async stopAllClips(compositionId: string): Promise<any> {
         return this.post(`/api/compositions/${compositionId}/clip-launcher/clips/stop-all`, {});
     }
+
+    /**
+     * Stop all clips on a specific track
+     * POST /api/compositions/{composition_id}/clip-launcher/tracks/{track_id}/stop-all
+     */
+    async stopTrackClips(compositionId: string, trackId: string): Promise<any> {
+        return this.post(`/api/compositions/${compositionId}/clip-launcher/tracks/${trackId}/stop-all`, {});
+    }
 }
 

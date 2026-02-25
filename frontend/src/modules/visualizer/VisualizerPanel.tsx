@@ -188,7 +188,7 @@ export function VisualizerPanel() {
             </SubPanel>
 
             <SubPanel
-                title="LOOP FEEDBACK"
+                title="FEEDBACK"
                 collapsible
                 headerActions={
                     <Activity className="h-3 w-3 text-primary" />

@@ -3,8 +3,11 @@
  *
  * Professional clip launcher for live performance.
  * Displays clips in a grid for triggering scenes and individual clips.
- * 
+ *
  * FOLLOWS EXACT MIXER/SEQUENCER PANEL PATTERN
+ *
+ * NOTE: Clip launch states (playing/triggered) are synced via WebSocket in WebSocketProvider.
+ * No HTTP polling needed - WebSocket provides 60Hz real-time updates.
  */
 
 import { SubPanel } from "@/components/ui/sub-panel.tsx";

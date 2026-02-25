@@ -19,6 +19,7 @@ import type { SequencerClip } from "../../types.ts";
 import { WaveformDisplay } from "../../../../components/ui/waveform-display.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { useWaveformData } from "../../hooks/useWaveformData.ts";
+import { ClipNameEditor } from "./ClipNameEditor.tsx";
 import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
 
 interface SequencerClipProps {
@@ -77,6 +78,11 @@ export function SequencerClip({
 
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null);
+
+    // Handle clip rename
+    const handleRename = (clipId: string, newName: string) => {
+        updateClip(clipId, { name: newName });
+    };
     const [dragStartX, setDragStartX] = useState(0);
     const [dragStartTime, setDragStartTime] = useState(0);
     const [dragStartDuration, setDragStartDuration] = useState(0);
@@ -288,12 +294,16 @@ export function SequencerClip({
             {isTrackExpanded ? (
                 /* EXPANDED MODE: Label at bottom in dedicated bar */
                 <div className="absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-sm border-t border-white/10 px-2 py-1 z-10 pointer-events-none">
-                    <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-medium text-white truncate flex-1">
-                            {clip.name}
-                        </span>
+                    <div className="flex items-center justify-between gap-2 pointer-events-auto">
+                        <ClipNameEditor
+                            clipId={clip.id}
+                            clipName={clip.name}
+                            onSave={handleRename}
+                            isExpanded={true}
+                            className="flex-1"
+                        />
                         {clip.type === "midi" && clip.midi_events && (
-                            <span className="text-[10px] text-white/60 flex-shrink-0">
+                            <span className="text-[10px] text-white/60 flex-shrink-0 pointer-events-none">
                                 {clip.midi_events.length} notes
                             </span>
                         )}
@@ -301,8 +311,13 @@ export function SequencerClip({
                 </div>
             ) : (
                 /* MINIMIZED MODE: Label at top (original) */
-                <div className="relative z-10 px-2 py-1 text-xs font-medium text-white truncate pointer-events-none">
-                    {clip.name}
+                <div className="relative z-10 px-2 py-1 pointer-events-none">
+                    <ClipNameEditor
+                        clipId={clip.id}
+                        clipName={clip.name}
+                        onSave={handleRename}
+                        isExpanded={false}
+                    />
                 </div>
             )}
 

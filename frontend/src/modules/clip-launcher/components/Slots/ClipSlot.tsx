@@ -12,6 +12,7 @@
  * NO PROP DRILLING - Reads from Zustand store
  */
 
+import { useState } from 'react';
 import { useDAWStore } from '@/stores/dawStore';
 import { cn } from '@/lib/utils';
 import {
@@ -22,7 +23,8 @@ import {
     ContextMenuLabel,
     ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { Music, AudioWaveform, X } from 'lucide-react';
+import { Music, AudioWaveform, X, Circle } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface ClipSlotProps {
     trackIndex: number;
@@ -36,6 +38,12 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
     const launchClip = useDAWStore((state) => state.launchClip);
     const stopClip = useDAWStore((state) => state.stopClip);
     const assignClipToSlot = useDAWStore((state) => state.assignClipToSlot);
+    const openPianoRoll = useDAWStore((state) => state.openPianoRoll);
+    const openSampleEditor = useDAWStore((state) => state.openSampleEditor);
+
+    // Local state for recording and double-click detection
+    const [isRecording, setIsRecording] = useState(false);
+    const [lastClickTime, setLastClickTime] = useState(0);
 
     // Get clip ID from slot
     const clipId = composition?.clip_slots?.[trackIndex]?.[slotIndex] ?? null;
@@ -58,19 +66,33 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
     const progress = launchState?.progress ?? 0;
 
     const handleClick = () => {
-        console.log('ClipSlot clicked:', { clipId, clip, isPlaying, isTriggered });
-
-        if (!clipId) {
-            console.log('No clip ID - slot is empty');
+        if (!clipId || !clip) {
             return;
         }
 
-        if (isPlaying || isTriggered) {
-            console.log('Stopping clip:', clipId);
-            stopClip(clipId);
+        const now = Date.now();
+        const timeSinceLastClick = now - lastClickTime;
+
+        // Double-click detection (within 300ms)
+        if (timeSinceLastClick < 300) {
+            // Double-click: open editor
+            if (clip.type === 'midi') {
+                openPianoRoll(clipId);
+                toast.info(`Opening Piano Roll for "${clip.name}"`);
+            } else if (clip.type === 'audio') {
+                openSampleEditor(clipId);
+                toast.info(`Opening Sample Editor for "${clip.name}"`);
+            }
+            // Reset click time to prevent triple-click issues
+            setLastClickTime(0);
         } else {
-            console.log('Launching clip:', clipId);
-            launchClip(clipId);
+            // Single-click: launch/stop clip
+            if (isPlaying || isTriggered) {
+                stopClip(clipId);
+            } else {
+                launchClip(clipId);
+            }
+            setLastClickTime(now);
         }
     };
 
@@ -82,12 +104,51 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
         assignClipToSlot(trackIndex, slotIndex, null);
     };
 
-    // Empty slot with context menu
+    const handleStartRecording = () => {
+        // TODO: Implement recording functionality
+        // For now, just show a toast
+        setIsRecording(true);
+        toast.info("Recording functionality coming soon!");
+
+        // Simulate recording for 4 beats (at 120 BPM = 2 seconds)
+        setTimeout(() => {
+            setIsRecording(false);
+            toast.success("Recording complete! (simulated)");
+        }, 2000);
+    };
+
+    // Empty slot with context menu and record button
     if (isEmpty) {
         return (
             <ContextMenu>
                 <ContextMenuTrigger asChild>
-                    <div className="h-24 rounded-lg border-2 border-dashed border-border/20 bg-background/20 hover:border-border/40 hover:bg-background/30 transition-all cursor-pointer" />
+                    <div className="relative h-32 rounded-md border border-border/30 bg-black/40 hover:border-border/60 hover:bg-black/50 transition-all cursor-pointer flex items-center justify-center group">
+                        {/* Plus icon for assigning clips */}
+                        <div className="text-4xl opacity-20 group-hover:opacity-40 transition-opacity">+</div>
+
+                        {/* Record button - BOTTOM RIGHT CORNER */}
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleStartRecording();
+                            }}
+                            className={cn(
+                                "absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                                "opacity-0 group-hover:opacity-100",
+                                isRecording
+                                    ? "bg-red-500 shadow-lg shadow-red-500/50 animate-pulse"
+                                    : "bg-red-500/80 hover:bg-red-500 hover:shadow-lg hover:shadow-red-500/50"
+                            )}
+                            title="Record into this slot"
+                        >
+                            <Circle
+                                size={14}
+                                fill={isRecording ? "white" : "currentColor"}
+                                className="text-white"
+                            />
+                        </button>
+                    </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent className="w-56">
                     <ContextMenuLabel>Assign Clip</ContextMenuLabel>
@@ -123,18 +184,15 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
     // Track color with fallback
     const trackColor = track?.color || 'hsl(187 85% 55%)';
 
-    // Filled slot with context menu
+    // Filled slot with context menu - PROFESSIONAL VIBRANT DESIGN
     return (
         <ContextMenu>
             <ContextMenuTrigger asChild>
                 <button
                     className={cn(
-                        "relative h-24 w-full rounded-lg border-2 cursor-pointer transition-all overflow-hidden",
-                        "bg-gradient-to-b from-card to-card/60 shadow-lg",
-                        isPlaying && "border-primary shadow-primary/50",
-                        isTriggered && "border-accent shadow-accent/50 animate-pulse",
-                        isStopping && "border-destructive shadow-destructive/50",
-                        !isPlaying && !isTriggered && !isStopping && "border-border/70 hover:border-border"
+                        "relative h-32 w-full rounded-md cursor-pointer transition-all overflow-hidden group",
+                        "shadow-lg hover:shadow-xl",
+                        isPlaying && "animate-pulse",
                     )}
                     onClick={(e) => {
                         e.preventDefault();
@@ -145,50 +203,73 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
                         console.log('MOUSE DOWN on clip slot');
                     }}
                     style={{
-                        borderColor: isPlaying || isTriggered || isStopping ? undefined : `${trackColor}60`,
+                        // VIBRANT SATURATED BACKGROUND - Like Ableton/APC hardware
+                        backgroundColor: isPlaying
+                            ? trackColor
+                            : isTriggered
+                            ? '#facc15' // Bright yellow for triggered
+                            : isStopping
+                            ? '#ef4444' // Bright red for stopping
+                            : `${trackColor}dd`, // Slightly transparent when idle
+                        boxShadow: isPlaying
+                            ? `0 0 20px ${trackColor}, 0 4px 12px rgba(0,0,0,0.4)`
+                            : isTriggered
+                            ? '0 0 20px #facc15, 0 4px 12px rgba(0,0,0,0.4)'
+                            : isStopping
+                            ? '0 0 20px #ef4444, 0 4px 12px rgba(0,0,0,0.4)'
+                            : `0 2px 8px rgba(0,0,0,0.3)`,
                     }}
                 >
-            {/* Background gradient with track color */}
+            {/* Dark overlay for contrast */}
             <div
-                className="absolute inset-0 opacity-10 pointer-events-none"
-                style={{
-                    background: `linear-gradient(135deg, ${trackColor}40 0%, transparent 100%)`
-                }}
+                className={cn(
+                    "absolute inset-0 pointer-events-none transition-opacity",
+                    isPlaying ? "bg-black/20" : "bg-black/30 group-hover:bg-black/20"
+                )}
             />
 
-            {/* Clip content */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-3 gap-1.5 pointer-events-none">
-                <span
-                    className="text-sm font-bold uppercase tracking-wider truncate w-full text-center drop-shadow-sm"
-                    style={{ color: trackColor }}
-                >
+            {/* Clip content - HIGH CONTRAST */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-3 gap-2 pointer-events-none">
+                {/* Clip type icon */}
+                <div className="text-white/90">
+                    {clip.type === 'midi' ? (
+                        <Music size={20} className="drop-shadow-lg" />
+                    ) : (
+                        <AudioWaveform size={20} className="drop-shadow-lg" />
+                    )}
+                </div>
+
+                {/* Clip name - BOLD AND READABLE */}
+                <span className="text-sm font-black uppercase tracking-wide truncate w-full text-center text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
                     {clip.name}
                 </span>
-                <span className="text-[10px] text-muted-foreground font-mono">
-                    {clip.start_time.toFixed(1)} - {(clip.start_time + clip.duration).toFixed(1)}
+
+                {/* Clip duration */}
+                <span className="text-[10px] font-mono text-white/80 drop-shadow-lg">
+                    {clip.duration.toFixed(1)}s
                 </span>
             </div>
 
-            {/* Progress bar */}
+            {/* Progress bar - BRIGHT AND VISIBLE */}
             {(isPlaying || isTriggered) && (
-                <div className="absolute bottom-0 left-0 right-0 h-2 bg-black/40 pointer-events-none">
+                <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/60 pointer-events-none">
                     <div
-                        className="h-full bg-gradient-to-r from-primary to-accent transition-all shadow-[0_0_8px_rgba(6,182,212,0.6)]"
+                        className="h-full bg-white transition-all shadow-[0_0_8px_rgba(255,255,255,0.8)]"
                         style={{ width: `${progress * 100}%` }}
                     />
                 </div>
             )}
 
-            {/* Launch state indicator */}
+            {/* Launch state indicator - TOP RIGHT CORNER */}
             <div className="absolute top-2 right-2 pointer-events-none">
                 {isPlaying && (
-                    <div className="w-3 h-3 rounded-full bg-primary shadow-[0_0_10px_rgba(6,182,212,0.8)] animate-pulse" />
+                    <div className="w-4 h-4 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)] animate-pulse" />
                 )}
                 {isTriggered && (
-                    <div className="w-3 h-3 rounded-full bg-accent shadow-[0_0_10px_rgba(250,204,21,0.8)] animate-pulse" />
+                    <div className="w-4 h-4 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)] animate-pulse" />
                 )}
                 {isStopping && (
-                    <div className="w-3 h-3 rounded-full bg-destructive shadow-[0_0_10px_rgba(239,68,68,0.8)] animate-pulse" />
+                    <div className="w-4 h-4 rounded-full bg-white/50 shadow-[0_0_12px_rgba(255,255,255,0.5)]" />
                 )}
             </div>
                 </button>

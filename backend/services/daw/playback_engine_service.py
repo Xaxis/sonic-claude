@@ -79,6 +79,9 @@ class PlaybackEngineService:
         # Track all MIDI note tasks so we can cancel them on pause/stop
         self.midi_note_tasks: Set[asyncio.Task] = set()
 
+        # Track triggered clips (waiting for quantization)
+        self.triggered_clips: Dict[str, asyncio.Task] = {}  # clip_id -> launch_task
+
         logger.info("✅ PlaybackEngineService initialized")
 
     # ========================================================================
@@ -235,6 +238,9 @@ class PlaybackEngineService:
                         "loop_end": composition.loop_end,
                         "metronome_enabled": self.metronome_enabled,
                         "active_notes": active_notes_list,
+                        # Clip launcher state (for real-time UI updates)
+                        "playing_clips": list(self.active_synths.keys()),
+                        "triggered_clips": list(self.triggered_clips.keys()),
                     }
                     if loop_count == 1:
                         logger.info(f"📡 Broadcasting first transport update: {transport_data}")
@@ -684,6 +690,8 @@ class PlaybackEngineService:
                     "loop_end": composition.loop_end,
                     "metronome_enabled": self.metronome_enabled,
                     "active_notes": [],
+                    "playing_clips": list(self.active_synths.keys()),
+                    "triggered_clips": list(self.triggered_clips.keys()),
                 }
                 await self.websocket_manager.broadcast_transport(transport_data)
 
@@ -755,6 +763,8 @@ class PlaybackEngineService:
                         "loop_end": composition.loop_end,
                         "metronome_enabled": self.metronome_enabled,
                         "active_notes": [],
+                        "playing_clips": list(self.active_synths.keys()),
+                        "triggered_clips": list(self.triggered_clips.keys()),
                     }
                     await self.websocket_manager.broadcast_transport(transport_data)
 
@@ -840,12 +850,52 @@ class PlaybackEngineService:
     # CLIP LAUNCHER (PERFORMANCE MODE)
     # ========================================================================
 
+    def _calculate_next_quantization_boundary(
+        self,
+        current_position: float,
+        quantization: str,
+        tempo: float
+    ) -> float:
+        """
+        Calculate the next quantization boundary in beats
+
+        Args:
+            current_position: Current playhead position in beats
+            quantization: Quantization setting ('none', '1/4', '1/2', '1', '2', '4')
+            tempo: Current tempo in BPM
+
+        Returns:
+            Next quantization boundary in beats
+        """
+        if quantization == 'none':
+            return current_position  # Launch immediately
+
+        # Parse quantization value to beats
+        quantization_beats = {
+            '1/4': 0.25,  # Quarter note
+            '1/2': 0.5,   # Half note
+            '1': 1.0,     # 1 bar (4 beats in 4/4 time)
+            '2': 2.0,     # 2 bars
+            '4': 4.0,     # 4 bars
+        }.get(quantization, 1.0)  # Default to 1 bar
+
+        # Calculate next boundary
+        # Example: position=6.3, quantization=1.0 → next_boundary=7.0
+        # Example: position=6.3, quantization=0.25 → next_boundary=6.5
+        next_boundary = ((current_position // quantization_beats) + 1) * quantization_beats
+
+        return next_boundary
+
     async def launch_clip(self, composition_id: str, clip_id: str) -> None:
         """
-        Launch a clip in performance mode
+        Launch a clip in performance mode with quantization
 
         The clip will loop continuously until stopped.
         This is different from timeline playback - clips play independently.
+
+        Respects composition.launch_quantization setting:
+        - 'none': Launch immediately
+        - '1/4', '1/2', '1', '2', '4': Wait for next beat/bar boundary
         """
         composition = self.composition_state_service.get_composition(composition_id)
         if not composition:
@@ -858,11 +908,72 @@ class PlaybackEngineService:
             logger.error(f"❌ Clip {clip_id} not found")
             return
 
-        # If clip is already playing, restart it
+        # If clip is already playing or triggered, cancel and restart
         if clip_id in self.active_synths:
             await self.stop_clip(clip_id)
+        if clip_id in self.triggered_clips:
+            self.triggered_clips[clip_id].cancel()
+            del self.triggered_clips[clip_id]
 
-        logger.info(f"🎬 Launching clip '{clip.name}' (ID: {clip_id}, type: {clip.type})")
+        # Get quantization setting
+        quantization = composition.launch_quantization or '1'
+
+        # Check if we should quantize
+        if quantization == 'none' or not self.is_playing:
+            # Launch immediately (no quantization or playback not running)
+            logger.info(f"🎬 Launching clip '{clip.name}' immediately (quantization: {quantization})")
+            await self._launch_clip_immediately(composition_id, clip_id)
+        else:
+            # Calculate next quantization boundary
+            next_boundary = self._calculate_next_quantization_boundary(
+                self.playhead_position,
+                quantization,
+                self.tempo
+            )
+
+            # Calculate delay in seconds
+            delay_beats = next_boundary - self.playhead_position
+            delay_seconds = delay_beats * (60.0 / self.tempo)
+
+            logger.info(f"🎬 Triggering clip '{clip.name}' (quantization: {quantization})")
+            logger.info(f"   Current position: {self.playhead_position:.2f} beats")
+            logger.info(f"   Next boundary: {next_boundary:.2f} beats")
+            logger.info(f"   Delay: {delay_beats:.2f} beats ({delay_seconds:.2f}s)")
+
+            # Schedule launch at boundary
+            async def scheduled_launch():
+                try:
+                    await asyncio.sleep(delay_seconds)
+                    # Check if clip is still triggered (not cancelled)
+                    if clip_id in self.triggered_clips:
+                        del self.triggered_clips[clip_id]
+                        await self._launch_clip_immediately(composition_id, clip_id)
+                except asyncio.CancelledError:
+                    logger.info(f"⏹️  Cancelled triggered clip '{clip.name}'")
+                    raise
+
+            # Track triggered clip
+            task = asyncio.create_task(scheduled_launch())
+            self.triggered_clips[clip_id] = task
+
+    async def _launch_clip_immediately(self, composition_id: str, clip_id: str) -> None:
+        """
+        Launch a clip immediately without quantization
+
+        Internal method called by launch_clip() after quantization delay
+        """
+        composition = self.composition_state_service.get_composition(composition_id)
+        if not composition:
+            logger.error(f"❌ Composition {composition_id} not found")
+            return
+
+        # Find clip
+        clip = next((c for c in composition.clips if c.id == clip_id), None)
+        if not clip:
+            logger.error(f"❌ Clip {clip_id} not found")
+            return
+
+        logger.info(f"🎵 Launching clip '{clip.name}' NOW (ID: {clip_id}, type: {clip.type})")
 
         # Get track for bus routing
         track = next((t for t in composition.tracks if t.id == clip.track_id), None)
@@ -1000,9 +1111,17 @@ class PlaybackEngineService:
             logger.error(f"❌ Failed to trigger MIDI note: {e}")
 
     async def stop_clip(self, clip_id: str) -> None:
-        """Stop a playing clip"""
+        """Stop a playing or triggered clip"""
+        # Cancel triggered clip if waiting for quantization
+        if clip_id in self.triggered_clips:
+            self.triggered_clips[clip_id].cancel()
+            del self.triggered_clips[clip_id]
+            logger.info(f"⏹️  Cancelled triggered clip {clip_id}")
+            return
+
+        # Stop playing clip
         if clip_id not in self.active_synths:
-            logger.warning(f"⚠️  Clip {clip_id} is not playing")
+            logger.warning(f"⚠️  Clip {clip_id} is not playing or triggered")
             return
 
         node_id = self.active_synths[clip_id]
@@ -1017,9 +1136,15 @@ class PlaybackEngineService:
         logger.info(f"⏹️  Stopped clip {clip_id}")
 
     async def stop_all_clips(self) -> None:
-        """Stop all playing clips"""
-        clip_ids = list(self.active_synths.keys())
+        """Stop all playing and triggered clips"""
+        # Cancel all triggered clips
+        triggered_count = len(self.triggered_clips)
+        for task in self.triggered_clips.values():
+            task.cancel()
+        self.triggered_clips.clear()
 
+        # Stop all playing clips
+        clip_ids = list(self.active_synths.keys())
         for clip_id in clip_ids:
             await self.stop_clip(clip_id)
 
@@ -1028,5 +1153,6 @@ class PlaybackEngineService:
             task.cancel()
         self.midi_note_tasks.clear()
 
-        logger.info(f"⏹️  Stopped all clips ({len(clip_ids)} clips)")
+        total_stopped = len(clip_ids) + triggered_count
+        logger.info(f"⏹️  Stopped all clips ({len(clip_ids)} playing, {triggered_count} triggered)")
 

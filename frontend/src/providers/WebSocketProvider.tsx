@@ -28,9 +28,10 @@ export function WebSocketProvider() {
     const setMeters = useDAWStore((state) => state.setMeters);
     const setSpectrum = useDAWStore((state) => state.setSpectrum);
     const setWaveform = useDAWStore((state) => state.setWaveform);
+    const setClipLaunchStatesFromWebSocket = useDAWStore((state) => state.setClipLaunchStatesFromWebSocket);
     // const setAnalytics = useDAWStore((state) => state.setAnalytics); // TODO: Implement backend endpoint
-    
-    // Sync transport data
+
+    // Sync transport data + clip launcher states
     useEffect(() => {
         if (transport) {
             // Debug: Log active notes when transport updates (only when notes are active)
@@ -38,8 +39,16 @@ export function WebSocketProvider() {
                 console.log('📡 WebSocket transport update - active_notes:', transport.active_notes);
             }
             setTransport(transport);
+
+            // Sync clip launcher states from transport WebSocket (60Hz real-time updates)
+            if (transport.playing_clips || transport.triggered_clips) {
+                setClipLaunchStatesFromWebSocket(
+                    transport.playing_clips || [],
+                    transport.triggered_clips || []
+                );
+            }
         }
-    }, [transport, setTransport]);
+    }, [transport, setTransport, setClipLaunchStatesFromWebSocket]);
     
     // Sync meter data
     useEffect(() => {

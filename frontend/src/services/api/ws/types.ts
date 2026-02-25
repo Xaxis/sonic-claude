@@ -38,6 +38,8 @@ export interface TransportMessage extends BaseWebSocketMessage {
     loop_end?: number;
     metronome_enabled?: boolean;
     active_notes?: ActiveNote[];
+    playing_clips?: string[];  // Clip IDs currently playing
+    triggered_clips?: string[];  // Clip IDs waiting for quantization
 }
 
 /**
