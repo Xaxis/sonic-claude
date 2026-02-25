@@ -15,7 +15,7 @@
  */
 
 import { useState, useRef, useEffect } from "react";
-import { Pencil, Check, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ClipNameEditorProps {
@@ -24,17 +24,32 @@ interface ClipNameEditorProps {
     onSave: (clipId: string, newName: string) => void;
     className?: string;
     isExpanded?: boolean;  // Different layout for expanded vs minimized tracks (reserved for future use)
+    externalEditMode?: boolean;  // External control of edit mode
+    onEditModeChange?: (isEditing: boolean) => void;  // Callback when edit mode changes
 }
 
 export function ClipNameEditor({
     clipId,
     clipName,
     onSave,
-    className
+    className,
+    externalEditMode,
+    onEditModeChange
 }: ClipNameEditorProps) {
-    const [isEditing, setIsEditing] = useState(false);
+    const [internalEditMode, setInternalEditMode] = useState(false);
     const [editValue, setEditValue] = useState(clipName);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    // Use external edit mode if provided, otherwise use internal
+    const isEditing = externalEditMode !== undefined ? externalEditMode : internalEditMode;
+
+    const setIsEditing = (value: boolean) => {
+        if (externalEditMode !== undefined && onEditModeChange) {
+            onEditModeChange(value);
+        } else {
+            setInternalEditMode(value);
+        }
+    };
 
     // Auto-focus input when entering edit mode
     useEffect(() => {
@@ -116,28 +131,14 @@ export function ClipNameEditor({
     }
 
     return (
-        <div 
-            className={cn("flex items-center gap-1 group pointer-events-auto", className)}
+        <div
+            className={cn("flex items-center gap-1.5 pointer-events-auto", className)}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
         >
             <span className="text-xs font-medium text-white truncate flex-1">
                 {clipName}
             </span>
-            <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    setIsEditing(true);
-                }}
-                className={cn(
-                    "flex-shrink-0 h-4 w-4 flex items-center justify-center rounded",
-                    "opacity-0 group-hover:opacity-100 transition-opacity",
-                    "bg-background/60 hover:bg-background/80"
-                )}
-                title="Rename clip"
-            >
-                <Pencil size={10} className="text-white/80" />
-            </button>
         </div>
     );
 }

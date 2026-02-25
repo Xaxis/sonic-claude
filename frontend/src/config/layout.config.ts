@@ -183,14 +183,6 @@ export const DEFAULT_TABS = [
 ];
 
 /**
- * Storage Keys
- */
-export const STORAGE_KEYS = {
-    LAYOUT: "sonic-claude-layout-v2",
-    WINDOW_STATE: "sonic-claude-window-state",
-} as const;
-
-/**
  * BroadcastChannel Keys
  */
 export const BROADCAST_KEYS = {

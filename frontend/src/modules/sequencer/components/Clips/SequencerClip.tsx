@@ -11,8 +11,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Copy, Trash2, Volume2, Scissors } from "lucide-react";
-import { Button } from "@/components/ui/button.tsx";
+import { Copy, Trash2, Volume2, Scissors, Pencil } from "lucide-react";
 import { Slider } from "@/components/ui/slider.tsx";
 import { cn } from "@/lib/utils.ts";
 import type { SequencerClip } from "../../types.ts";
@@ -78,10 +77,12 @@ export function SequencerClip({
 
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null);
+    const [isEditingName, setIsEditingName] = useState(false);
 
     // Handle clip rename
     const handleRename = (clipId: string, newName: string) => {
         updateClip(clipId, { name: newName });
+        setIsEditingName(false);
     };
     const [dragStartX, setDragStartX] = useState(0);
     const [dragStartTime, setDragStartTime] = useState(0);
@@ -293,14 +294,19 @@ export function SequencerClip({
             {/* Clip Info - Different layout for expanded vs minimized tracks */}
             {isTrackExpanded ? (
                 /* EXPANDED MODE: Label at bottom in dedicated bar */
-                <div className="absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-sm border-t border-white/10 px-2 py-1 z-10 pointer-events-none">
-                    <div className="flex items-center justify-between gap-2 pointer-events-auto">
+                <div className={cn(
+                    "absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-sm border-t border-white/10 px-2 py-1",
+                    isEditingName ? "z-40" : "z-10"
+                )}>
+                    <div className="flex items-center justify-between gap-2">
                         <ClipNameEditor
                             clipId={clip.id}
                             clipName={clip.name}
                             onSave={handleRename}
                             isExpanded={true}
                             className="flex-1"
+                            externalEditMode={isEditingName}
+                            onEditModeChange={setIsEditingName}
                         />
                         {clip.type === "midi" && clip.midi_events && (
                             <span className="text-[10px] text-white/60 flex-shrink-0 pointer-events-none">
@@ -311,43 +317,65 @@ export function SequencerClip({
                 </div>
             ) : (
                 /* MINIMIZED MODE: Label at top (original) */
-                <div className="relative z-10 px-2 py-1 pointer-events-none">
+                <div className={cn(
+                    "relative px-2 py-1",
+                    isEditingName ? "z-40" : "z-10"
+                )}>
                     <ClipNameEditor
                         clipId={clip.id}
                         clipName={clip.name}
                         onSave={handleRename}
                         isExpanded={false}
+                        externalEditMode={isEditingName}
+                        onEditModeChange={setIsEditingName}
                     />
                 </div>
             )}
 
-            {/* Actions (show on hover/select) */}
-            {isSelected && (
-                <div className="absolute top-1 right-1 flex gap-1 z-20">
-                    <Button
+            {/* Actions (show on hover/select, hide when editing name) */}
+            {isSelected && !isEditingName && (
+                <div className="absolute top-1 right-1 flex gap-1 z-30">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsEditingName(true);
+                        }}
+                        onMouseDown={(e) => {
+                            e.stopPropagation();
+                        }}
+                        className="h-5 w-5 flex items-center justify-center rounded bg-black/60 hover:bg-black/80 transition-colors cursor-pointer"
+                        title="Rename clip"
+                    >
+                        <Pencil size={10} className="text-white" />
+                    </button>
+                    <button
                         onClick={async (e) => {
                             e.stopPropagation();
                             if (activeComposition) {
                                 await duplicateClip(activeComposition.id, clip.id);
                             }
                         }}
-                        size="sm"
-                        variant="ghost"
-                        className="h-5 w-5 p-0 bg-background/80 hover:bg-background"
+                        onMouseDown={(e) => {
+                            e.stopPropagation();
+                        }}
+                        className="h-5 w-5 flex items-center justify-center rounded bg-black/60 hover:bg-black/80 transition-colors cursor-pointer"
+                        title="Copy clip"
                     >
                         <Copy size={10} className="text-white" />
-                    </Button>
-                    <Button
+                    </button>
+                    <button
                         onClick={async (e) => {
                             e.stopPropagation();
                             await deleteClip(clip.id);
                         }}
-                        size="sm"
-                        variant="ghost"
-                        className="h-5 w-5 p-0 bg-background/80 hover:bg-background"
+                        onMouseDown={(e) => {
+                            e.stopPropagation();
+                        }}
+                        className="h-5 w-5 flex items-center justify-center rounded bg-black/60 hover:bg-black/80 transition-colors cursor-pointer"
+                        title="Delete clip"
                     >
                         <Trash2 size={10} className="text-white" />
-                    </Button>
+                    </button>
                 </div>
             )}
 
