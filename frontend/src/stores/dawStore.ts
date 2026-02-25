@@ -222,6 +222,11 @@ interface DAWStore {
     selectedEffectId: string | null;
     showEffectBrowser: boolean;
 
+    // Clip Launcher UI (Performance Mode)
+    numClipSlots: number;  // Number of clip slots per track (scenes)
+    playingClips: Array<{ track_id: string; slot_index: number }>;  // Currently playing clips
+    playingScenes: number[];  // Currently playing scene indices
+
     // Assistant State
     chatHistory: ChatMessage[];
     analysisEvents: AnalysisEvent[];
@@ -311,6 +316,13 @@ interface DAWStore {
     updateScene: (sceneId: string, name?: string, color?: string, tempo?: number) => Promise<void>;
     deleteScene: (sceneId: string) => Promise<void>;
     setLaunchQuantization: (quantization: 'none' | '1/4' | '1/2' | '1' | '2' | '4') => Promise<void>;
+
+    // UI-only actions (for mock development)
+    triggerClip: (trackId: string, slotIndex: number) => void;
+    triggerScene: (sceneIndex: number) => void;
+    stopTrack: (trackId: string) => void;
+    stopScene: (sceneIndex: number) => void;
+    setNumClipSlots: (num: number) => void;
 
     // ========================================================================
     // MIXER ACTIONS
@@ -514,6 +526,11 @@ export const useDAWStore = create<DAWStore>()(
                 selectedChannelId: null,
                 selectedEffectId: null,
                 showEffectBrowser: false,
+
+                // Clip Launcher UI State (PERSISTED)
+                numClipSlots: 8,  // Default 8 scenes
+                playingClips: [],
+                playingScenes: [],
 
                 // Assistant State
                 chatHistory: [],
@@ -2484,6 +2501,82 @@ export const useDAWStore = create<DAWStore>()(
                 toast.error('Failed to redo action');
             }
         },
+
+        // ====================================================================
+        // CLIP LAUNCHER UI ACTIONS (Mock for UI development)
+        // ====================================================================
+
+        triggerClip: (trackId, slotIndex) => {
+            const { playingClips } = get();
+
+            // Check if already playing
+            const isPlaying = playingClips.some(
+                pc => pc.track_id === trackId && pc.slot_index === slotIndex
+            );
+
+            if (isPlaying) {
+                // Stop clip
+                set({
+                    playingClips: playingClips.filter(
+                        pc => !(pc.track_id === trackId && pc.slot_index === slotIndex)
+                    )
+                });
+            } else {
+                // Start clip (stop other clips on same track first)
+                set({
+                    playingClips: [
+                        ...playingClips.filter(pc => pc.track_id !== trackId),
+                        { track_id: trackId, slot_index: slotIndex }
+                    ]
+                });
+            }
+        },
+
+        triggerScene: (sceneIndex) => {
+            const { playingScenes, tracks } = get();
+
+            // Check if scene is playing
+            const isPlaying = playingScenes.includes(sceneIndex);
+
+            if (isPlaying) {
+                // Stop scene
+                set({
+                    playingScenes: playingScenes.filter(s => s !== sceneIndex),
+                    playingClips: get().playingClips.filter(pc => pc.slot_index !== sceneIndex)
+                });
+            } else {
+                // Start scene (trigger all clips in this row)
+                const newPlayingClips = tracks.map(track => ({
+                    track_id: track.id,
+                    slot_index: sceneIndex
+                }));
+
+                set({
+                    playingScenes: [...playingScenes, sceneIndex],
+                    playingClips: [
+                        ...get().playingClips.filter(pc => pc.slot_index !== sceneIndex),
+                        ...newPlayingClips
+                    ]
+                });
+            }
+        },
+
+        stopTrack: (trackId) => {
+            set({
+                playingClips: get().playingClips.filter(pc => pc.track_id !== trackId)
+            });
+        },
+
+        stopScene: (sceneIndex) => {
+            set({
+                playingScenes: get().playingScenes.filter(s => s !== sceneIndex),
+                playingClips: get().playingClips.filter(pc => pc.slot_index !== sceneIndex)
+            });
+        },
+
+        setNumClipSlots: (num) => {
+            set({ numClipSlots: num });
+        },
             }),
             {
                 name: 'sonic-claude-daw',
@@ -2499,6 +2592,7 @@ export const useDAWStore = create<DAWStore>()(
                     meterMode: state.meterMode,
                     activeAssistantTab: state.activeAssistantTab,
                     activeInputsTab: state.activeInputsTab,
+                    numClipSlots: state.numClipSlots,
 
                     // Active Composition ID (for auto-load on startup)
                     _persistedCompositionId: state.activeComposition?.id || null,

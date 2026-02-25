@@ -13,7 +13,7 @@
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { useDAWStore } from "@/stores/dawStore";
 import { ClipLauncherToolbar } from "./components/Toolbars/ClipLauncherToolbar";
-import { ClipLauncherGrid } from "./components/Layouts/ClipLauncherGrid";
+import { ClipLauncherGrid } from "./components/Grid/ClipLauncherGrid";
 
 export function ClipLauncherPanel() {
     // Get state from Zustand store
