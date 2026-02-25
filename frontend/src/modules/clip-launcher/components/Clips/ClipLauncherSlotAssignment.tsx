@@ -99,125 +99,95 @@ export function ClipLauncherSlotAssignment({ trackIndex, slotIndex }: ClipLaunch
     };
 
     // ========================================================================
-    // RENDER: Professional assignment interface with track color coding
+    // RENDER: Clean, minimal assignment interface (Akai Force style)
     // ========================================================================
     return (
         <div
             onClick={handleSelect}
             className={cn(
-                "relative h-full w-full rounded transition-all cursor-pointer overflow-hidden",
-                "flex flex-col",
-                isSelected
-                    ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
-                    : "hover:brightness-110"
+                "relative h-full w-full rounded transition-all cursor-pointer",
+                "flex flex-col items-center justify-center gap-2 p-3",
+                isSelected && "ring-2 ring-primary"
             )}
             style={{
-                backgroundColor: assignedClip ? `${trackColor}20` : '#1a1a1a',
-                border: assignedClip
-                    ? `2px solid ${trackColor}60`
-                    : '2px solid #2a2a2a',
+                backgroundColor: assignedClip ? `${trackColor}25` : '#1a1a1a',
+                border: `2px solid ${assignedClip ? trackColor : '#2a2a2a'}`,
             }}
         >
-            {/* Track Color Header Bar */}
-            <div
-                className="h-1 w-full"
-                style={{ backgroundColor: trackColor }}
-            />
-
-            {/* Content */}
-            <div className="flex flex-col p-2 gap-2 flex-1">
-                {/* Slot Label + Clear Button */}
-                <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Slot {slotIndex + 1}
-                    </span>
-                    {assignedClip && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-4 w-4 p-0 hover:bg-destructive/20 hover:text-destructive"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleClearSlot();
-                            }}
-                            title="Clear slot"
-                        >
-                            <X size={10} />
-                        </Button>
-                    )}
-                </div>
-
-                {/* Clip Selector Dropdown */}
-                <Select
-                    value={assignedClipId || ""}
-                    onValueChange={handleAssignClip}
-                >
-                    <SelectTrigger
-                        className="h-9 text-xs font-medium border-2"
-                        style={{
-                            borderColor: assignedClip ? `${trackColor}80` : 'hsl(var(--border))',
-                            backgroundColor: assignedClip ? `${trackColor}10` : 'hsl(var(--background))',
-                        }}
-                    >
-                        <SelectValue placeholder={
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                                <Plus size={12} />
-                                <span>Assign clip...</span>
-                            </div>
-                        } />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {trackClips.length === 0 ? (
-                            <div className="px-3 py-2 text-xs text-muted-foreground">
-                                No clips on this track
-                            </div>
-                        ) : (
-                            trackClips.map(clip => (
-                                <SelectItem key={clip.id} value={clip.id}>
-                                    <div className="flex items-center gap-2">
-                                        {clip.type === 'midi' ? (
-                                            <Music size={14} className="text-primary" />
-                                        ) : (
-                                            <AudioWaveform size={14} className="text-secondary" />
-                                        )}
-                                        <span className="text-xs font-medium">{clip.name}</span>
-                                        <span className="text-[10px] text-muted-foreground ml-auto">
-                                            {clip.duration.toFixed(1)}b
-                                        </span>
-                                    </div>
-                                </SelectItem>
-                            ))
-                        )}
-                    </SelectContent>
-                </Select>
-
-                {/* Assigned Clip Preview */}
-                {assignedClip ? (
+            {/* Assigned Clip Display */}
+            {assignedClip ? (
+                <>
+                    {/* Clip Icon */}
                     <div
-                        className="flex flex-col gap-1.5 p-2 rounded-md border-2 flex-1 min-h-0"
-                        style={{
-                            backgroundColor: `${trackColor}15`,
-                            borderColor: `${trackColor}60`,
-                        }}
+                        className="w-8 h-8 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: `${trackColor}40` }}
                     >
-                        <div className="flex items-center gap-2">
-                            {assignedClip.type === 'midi' ? (
-                                <Music size={12} className="text-primary flex-shrink-0" />
-                            ) : (
-                                <AudioWaveform size={12} className="text-secondary flex-shrink-0" />
-                            )}
-                            <span className="text-[11px] font-bold truncate">{assignedClip.name}</span>
-                        </div>
-                        <div className="text-[9px] text-muted-foreground">
-                            {assignedClip.duration.toFixed(2)} beats
-                        </div>
+                        {assignedClip.type === 'midi' ? (
+                            <Music size={16} style={{ color: trackColor }} />
+                        ) : (
+                            <AudioWaveform size={16} style={{ color: trackColor }} />
+                        )}
                     </div>
-                ) : (
-                    <div className="flex items-center justify-center flex-1 min-h-0 p-2 rounded-md border-2 border-dashed border-border/30">
-                        <span className="text-[10px] text-muted-foreground">Empty slot</span>
+
+                    {/* Clip Name */}
+                    <div className="text-[10px] font-bold text-center truncate w-full" style={{ color: trackColor }}>
+                        {assignedClip.name}
                     </div>
-                )}
-            </div>
+
+                    {/* Clear Button */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleClearSlot();
+                        }}
+                        className="absolute top-1 right-1 w-4 h-4 rounded-full bg-black/50 hover:bg-destructive/80 flex items-center justify-center transition-colors"
+                        title="Clear"
+                    >
+                        <X size={8} className="text-white" />
+                    </button>
+                </>
+            ) : (
+                <>
+                    {/* Empty State - Dropdown Selector */}
+                    <div className="flex flex-col items-center gap-2 w-full">
+                        <Plus size={24} className="text-muted-foreground/50" />
+                        <Select
+                            value={assignedClipId || ""}
+                            onValueChange={handleAssignClip}
+                        >
+                            <SelectTrigger
+                                className="h-8 w-full text-xs border bg-background/50"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <SelectValue placeholder="Assign clip..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {trackClips.length === 0 ? (
+                                    <div className="px-3 py-2 text-xs text-muted-foreground">
+                                        No clips on this track
+                                    </div>
+                                ) : (
+                                    trackClips.map(clip => (
+                                        <SelectItem key={clip.id} value={clip.id}>
+                                            <div className="flex items-center gap-2">
+                                                {clip.type === 'midi' ? (
+                                                    <Music size={14} className="text-primary" />
+                                                ) : (
+                                                    <AudioWaveform size={14} className="text-secondary" />
+                                                )}
+                                                <span className="text-xs font-medium">{clip.name}</span>
+                                                <span className="text-[10px] text-muted-foreground ml-auto">
+                                                    {clip.duration.toFixed(1)}b
+                                                </span>
+                                            </div>
+                                        </SelectItem>
+                                    ))
+                                )}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </>
+            )}
         </div>
     );
 }
