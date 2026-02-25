@@ -57,7 +57,7 @@ export function SceneTrigger({ sceneIndex }: SceneTriggerProps) {
 
     if (!scene) {
         return (
-            <div className="h-32 w-full rounded-md border border-border/30 bg-black/40" />
+            <div className="h-24 w-full rounded-md border border-border/30 bg-black/20" />
         );
     }
 
@@ -108,14 +108,14 @@ export function SceneTrigger({ sceneIndex }: SceneTriggerProps) {
         }
     };
 
-    // PROFESSIONAL VIBRANT SCENE BUTTON - Like Ableton/APC hardware
+    // COMPACT SCENE TRIGGER - Like Ableton Live
     return (
         <ContextMenu>
             <ContextMenuTrigger asChild>
                 <button
                     className={cn(
-                        "relative h-32 w-full rounded-md cursor-pointer transition-all overflow-hidden group",
-                        "shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
+                        "relative h-24 w-full rounded-md cursor-pointer transition-all overflow-hidden group",
+                        "shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-95"
                     )}
                     onClick={(e) => {
                         e.preventDefault();
@@ -128,17 +128,16 @@ export function SceneTrigger({ sceneIndex }: SceneTriggerProps) {
                         handleStartEdit();
                     }}
                     style={{
-                        // Professional muted background
-                        backgroundColor: `${scene.color}99`,
-                        border: `1px solid ${scene.color}`,
-                        boxShadow: `0 2px 6px rgba(0,0,0,0.2)`,
+                        // Muted background with border
+                        backgroundColor: `${scene.color}40`,
+                        border: `2px solid ${scene.color}80`,
                     }}
                 >
                     {/* Dark overlay for contrast */}
-                    <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 pointer-events-none transition-opacity" />
+                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 pointer-events-none transition-opacity" />
 
-                    {/* Scene content - HIGH CONTRAST */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-3 gap-2">
+                    {/* Scene content - COMPACT */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-2 gap-1">
                         {isEditing ? (
                             /* INLINE EDITING MODE */
                             <div className="w-full pointer-events-auto" onClick={(e) => e.stopPropagation()}>
@@ -154,25 +153,17 @@ export function SceneTrigger({ sceneIndex }: SceneTriggerProps) {
                                 />
                             </div>
                         ) : (
-                            /* NORMAL DISPLAY MODE */
                             <>
-                                {/* Play icon - LARGE AND PROMINENT */}
+                                {/* Play icon - SMALLER */}
                                 <Play
-                                    className="w-8 h-8 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] pointer-events-none"
+                                    className="w-6 h-6 text-white drop-shadow-lg pointer-events-none"
                                     fill="white"
                                 />
 
-                                {/* Scene name - BOLD AND READABLE */}
-                                <span className="text-xs font-black uppercase tracking-wide truncate w-full text-center text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] pointer-events-none">
+                                {/* Scene name - COMPACT */}
+                                <span className="text-[11px] font-bold truncate w-full text-center text-white drop-shadow-lg pointer-events-none">
                                     {scene.name}
                                 </span>
-
-                                {/* Tempo override */}
-                                {scene.tempo && (
-                                    <span className="text-[10px] font-mono text-white/80 drop-shadow-lg pointer-events-none">
-                                        {scene.tempo} BPM
-                                    </span>
-                                )}
                             </>
                         )}
                     </div>

@@ -296,7 +296,7 @@ export function SequencerClip({
                 /* EXPANDED MODE: Label at bottom in dedicated bar */
                 <div className={cn(
                     "absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-sm border-t border-white/10 px-2 py-1",
-                    isEditingName ? "z-40" : "z-10"
+                    isEditingName ? "z-40 pointer-events-auto" : "z-10 pointer-events-none"
                 )}>
                     <div className="flex items-center justify-between gap-2">
                         <ClipNameEditor
@@ -319,7 +319,7 @@ export function SequencerClip({
                 /* MINIMIZED MODE: Label at top (original) */
                 <div className={cn(
                     "relative px-2 py-1",
-                    isEditingName ? "z-40" : "z-10"
+                    isEditingName ? "z-40 pointer-events-auto" : "z-10 pointer-events-none"
                 )}>
                     <ClipNameEditor
                         clipId={clip.id}

@@ -123,10 +123,10 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
             <ContextMenu>
                 <ContextMenuTrigger asChild>
                     <div
-                        className="relative h-32 rounded-md border border-border/30 bg-black/40 hover:border-border/60 hover:bg-black/50 transition-all cursor-pointer flex items-center justify-center group"
+                        className="relative h-24 rounded-md border-2 border-dashed border-border/40 bg-black/20 hover:border-border/70 hover:bg-black/30 transition-all cursor-pointer flex items-center justify-center group"
                     >
                         {/* Plus icon for assigning clips */}
-                        <div className="text-4xl opacity-20 group-hover:opacity-40 transition-opacity">+</div>
+                        <div className="text-3xl opacity-30 group-hover:opacity-50 transition-opacity text-muted-foreground">+</div>
 
                         {/* Record button - BOTTOM RIGHT CORNER */}
                         <button
@@ -136,7 +136,7 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
                                 handleStartRecording();
                             }}
                             className={cn(
-                                "absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                                "absolute bottom-1.5 right-1.5 w-7 h-7 rounded-full flex items-center justify-center transition-all",
                                 "opacity-0 group-hover:opacity-100",
                                 isRecording
                                     ? "bg-red-500 shadow-lg shadow-red-500/50 animate-pulse"
@@ -145,7 +145,7 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
                             title="Record into this slot"
                         >
                             <Circle
-                                size={14}
+                                size={12}
                                 fill={isRecording ? "white" : "currentColor"}
                                 className="text-white"
                             />
@@ -192,9 +192,9 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
             <ContextMenuTrigger asChild>
                 <button
                     className={cn(
-                        "relative h-32 w-full rounded-md cursor-pointer transition-all overflow-hidden group",
-                        "shadow-lg hover:shadow-xl",
-                        isPlaying && "animate-pulse",
+                        "relative h-24 w-full rounded-md cursor-pointer transition-all overflow-hidden group",
+                        "shadow-md hover:shadow-lg",
+                        isPlaying && "ring-2 ring-white/50",
                     )}
                     onClick={(e) => {
                         e.preventDefault();

@@ -41,28 +41,28 @@ export function ClipLauncherGrid() {
     // PROFESSIONAL CLIP LAUNCHER GRID - Like Ableton Live Session View
     return (
         <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-background to-background/95">
-            {/* STICKY HEADER ROW */}
-            <div className="flex gap-2 px-6 pt-6 pb-3 flex-shrink-0 border-b border-border/30 bg-background/95 backdrop-blur-sm">
+            {/* STICKY HEADER ROW - ALWAYS VISIBLE */}
+            <div className="flex gap-2 px-6 pt-4 pb-4 flex-shrink-0 border-b-2 border-border/50 bg-background shadow-lg z-10">
                 {/* Scene column header */}
-                <div className="w-28 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-black uppercase tracking-widest text-foreground/80">
+                <div className="w-20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         Scenes
                     </span>
                 </div>
 
-                {/* Track headers - VIBRANT */}
+                {/* Track headers - PROFESSIONAL */}
                 {tracks.map((track) => (
                     <div
                         key={track.id}
-                        className="w-48 flex flex-col gap-1.5 border-b pb-3 rounded-t-md px-3 pt-2 flex-shrink-0"
+                        className="w-56 flex flex-col gap-2 border rounded-lg px-3 py-2.5 flex-shrink-0 shadow-sm"
                         style={{
-                            backgroundColor: `${track.color}15`,
-                            borderColor: `${track.color}40`,
+                            backgroundColor: `${track.color}10`,
+                            borderColor: `${track.color}30`,
                         }}
                     >
-                        {/* Track name - BOLD */}
+                        {/* Track name - LARGE AND BOLD */}
                         <div
-                            className="text-base font-black uppercase tracking-wide truncate text-center drop-shadow-sm"
+                            className="text-sm font-bold truncate text-center"
                             style={{ color: track.color }}
                             title={track.name}
                         >
@@ -85,12 +85,13 @@ export function ClipLauncherGrid() {
                                 />
                             </div>
 
-                            {/* Track type badge - VIBRANT */}
+                            {/* Track type badge */}
                             <span
-                                className="rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider shadow-md"
+                                className="rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
                                 style={{
-                                    backgroundColor: `${track.color}dd`,
-                                    color: 'white',
+                                    backgroundColor: `${track.color}20`,
+                                    color: track.color,
+                                    border: `1px solid ${track.color}40`,
                                 }}
                             >
                                 {track.type}
@@ -100,30 +101,20 @@ export function ClipLauncherGrid() {
                 ))}
             </div>
 
-            {/* SCROLLABLE GRID CONTENT - ROW-BASED WITH ALTERNATING COLORS */}
+            {/* SCROLLABLE GRID CONTENT */}
             <div className="flex-1 overflow-x-auto overflow-y-auto">
-                <div className="flex flex-col px-6 pt-4 pb-6 min-w-min">
+                <div className="flex flex-col gap-2 px-6 pt-4 pb-6 min-w-min">
                     {/* Rows (scenes) */}
                     {Array.from({ length: numSlots }).map((_, slotIndex) => (
-                        <div
-                            key={slotIndex}
-                            className="flex gap-2 mb-2"
-                            style={{
-                                backgroundColor: slotIndex % 2 === 0
-                                    ? 'rgba(255, 255, 255, 0.02)'
-                                    : 'rgba(0, 0, 0, 0.15)',
-                                borderRadius: '6px',
-                                padding: '4px',
-                            }}
-                        >
+                        <div key={slotIndex} className="flex gap-2">
                             {/* Scene trigger */}
-                            <div className="w-28 flex-shrink-0">
+                            <div className="w-20 flex-shrink-0">
                                 <SceneTrigger sceneIndex={slotIndex} />
                             </div>
 
                             {/* Clip slots for this row */}
                             {tracks.map((track, trackIndex) => (
-                                <div key={track.id} className="w-48 flex-shrink-0">
+                                <div key={track.id} className="w-56 flex-shrink-0">
                                     <ClipSlot trackIndex={trackIndex} slotIndex={slotIndex} />
                                 </div>
                             ))}
@@ -133,11 +124,11 @@ export function ClipLauncherGrid() {
                     {/* Track footer row - STOP BUTTONS */}
                     <div className="flex gap-2 mt-4">
                         {/* Empty space for scene column */}
-                        <div className="w-28 flex-shrink-0" />
+                        <div className="w-20 flex-shrink-0" />
 
                         {/* Stop buttons for each track */}
                         {tracks.map((track) => (
-                            <div key={track.id} className="w-48 flex-shrink-0">
+                            <div key={track.id} className="w-56 flex-shrink-0">
                                 <TrackStopButton trackId={track.id} trackColor={track.color} />
                             </div>
                         ))}
