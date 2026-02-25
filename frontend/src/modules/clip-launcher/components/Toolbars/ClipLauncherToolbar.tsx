@@ -14,7 +14,8 @@ import { useCallback, useState } from 'react';
 import { useDAWStore } from '@/stores/dawStore';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { Play, Pause, SkipBack, Square, Plus, Circle, Grid3x3 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Play, Pause, SkipBack, Square, Plus, Minus, Circle, Grid3x3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -48,6 +49,7 @@ export function ClipLauncherToolbar() {
     const resume = useDAWStore(state => state.resume);
     const stop = useDAWStore(state => state.stop);
     const setNumClipSlots = useDAWStore(state => state.setNumClipSlots);
+    const updateComposition = useDAWStore(state => state.updateComposition);
 
     // ========================================================================
     // DERIVED STATE
@@ -109,6 +111,15 @@ export function ClipLauncherToolbar() {
         toast.success(`Added scene ${numClipSlots + 1}`);
     }, [numClipSlots, setNumClipSlots]);
 
+    const handleRemoveScene = useCallback(() => {
+        if (numClipSlots <= 1) {
+            toast.error('Cannot remove the last scene');
+            return;
+        }
+        setNumClipSlots(numClipSlots - 1);
+        toast.success(`Removed scene ${numClipSlots}`);
+    }, [numClipSlots, setNumClipSlots]);
+
     const handleSessionRecord = useCallback(() => {
         if (isSessionRecording) {
             setIsSessionRecording(false);
@@ -123,6 +134,15 @@ export function ClipLauncherToolbar() {
         setQuantization(value);
         toast.success(`Launch quantization: ${value}`);
     }, []);
+
+    const handleTempoChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!activeComposition) return;
+        const newTempo = parseFloat(e.target.value);
+        if (isNaN(newTempo) || newTempo < 20 || newTempo > 300) return;
+
+        await updateComposition(activeComposition.id, { tempo: newTempo });
+        toast.success(`Tempo: ${newTempo} BPM`);
+    }, [activeComposition, updateComposition]);
 
     return (
         <div className="flex items-center justify-between">
@@ -167,13 +187,22 @@ export function ClipLauncherToolbar() {
                         </span>
                     </div>
                     <div className="w-px h-6 bg-border/50" />
-                    <div className="flex flex-col">
+                    <div className="flex flex-col gap-0.5">
                         <span className="text-[8px] font-bold uppercase tracking-wider text-muted-foreground">
                             Tempo
                         </span>
-                        <span className="text-xs font-mono font-bold text-foreground">
-                            {tempo} BPM
-                        </span>
+                        <div className="flex items-center gap-1">
+                            <Input
+                                type="number"
+                                min="20"
+                                max="300"
+                                step="1"
+                                value={tempo}
+                                onChange={handleTempoChange}
+                                className="h-5 w-14 px-1 text-xs font-mono font-bold text-center bg-background/50 border-border/50"
+                            />
+                            <span className="text-[10px] font-bold text-muted-foreground">BPM</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -236,18 +265,30 @@ export function ClipLauncherToolbar() {
                     </span>
                 </Button>
 
-                {/* Add Scene */}
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1.5"
-                    onClick={handleAddScene}
-                >
-                    <Plus size={14} />
-                    <span className="text-[10px] font-bold uppercase tracking-wider">
-                        Add Scene
-                    </span>
-                </Button>
+                {/* Add/Remove Scene */}
+                <div className="flex items-center gap-1">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5"
+                        onClick={handleAddScene}
+                    >
+                        <Plus size={14} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">
+                            Add Scene
+                        </span>
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2"
+                        onClick={handleRemoveScene}
+                        disabled={numClipSlots <= 1}
+                        title="Remove last scene"
+                    >
+                        <Minus size={14} />
+                    </Button>
+                </div>
 
                 {/* Scene Count */}
                 <div className="flex items-center gap-2 px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">

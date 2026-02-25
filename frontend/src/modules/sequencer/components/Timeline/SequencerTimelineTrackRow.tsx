@@ -40,6 +40,7 @@ export function SequencerTimelineTrackRow({
     // ACTIONS: Get from Zustand store
     // ========================================================================
     const addClip = useDAWStore(state => state.addClip);
+    const setSelectedClipId = useDAWStore(state => state.setSelectedClipId);
 
     // ========================================================================
     // SHARED TIMELINE CALCULATIONS: Use the same hook as timeline for consistency!
@@ -69,7 +70,7 @@ export function SequencerTimelineTrackRow({
     const handleTrackClick = async (e: React.MouseEvent<HTMLDivElement>) => {
         if (!activeComposition) return;
 
-        // Only add clip if we clicked on the track background (not on a clip)
+        // Only process if we clicked on the track background (not on a clip)
         if (!mouseDownPosRef.current || mouseDownPosRef.current.target !== e.currentTarget) {
             return;
         }
@@ -82,6 +83,9 @@ export function SequencerTimelineTrackRow({
         }
 
         mouseDownPosRef.current = null;
+
+        // Deselect any selected clip when clicking on empty timeline
+        setSelectedClipId(null);
 
         const rect = e.currentTarget.getBoundingClientRect();
         const clickX = e.clientX - rect.left;

@@ -208,14 +208,20 @@ export function SequencerClip({
         };
     }, [isDragging, isResizing, dragStartX, dragStartTime, dragStartDuration, pixelsPerBeat, zoom, snapEnabled, gridSize, clip.id, displayStartTime, displayDuration, dragState, updateClip]);
 
-    const handleClick = () => {
+    const handleClick = (e: React.MouseEvent) => {
+        // Don't trigger click if we just finished dragging/resizing
+        if (isDragging || isResizing) {
+            return;
+        }
+
+        e.stopPropagation(); // Prevent timeline background click
+
         const now = Date.now();
         const timeSinceLastClick = now - lastClickTime;
 
         // Double-click detection (within 300ms)
         if (timeSinceLastClick < 300) {
-            // Double-click: clear selection first, then open editor
-            setSelectedClipId(null);
+            // Double-click: open editor
             if (clip.type === "midi") {
                 openPianoRoll(clip.id);
             }

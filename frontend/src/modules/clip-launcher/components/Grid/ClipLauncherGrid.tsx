@@ -52,7 +52,7 @@ export function ClipLauncherGrid() {
     return (
         <div className="flex h-full gap-4 overflow-x-auto overflow-y-hidden bg-gradient-to-b from-background/50 to-background p-5">
             {/* Scene Column - Like master channel in mixer */}
-            <div className="flex w-24 flex-shrink-0 flex-col gap-3 rounded-lg border border-border/70 bg-gradient-to-b from-card to-card/60 p-3 shadow-lg">
+            <div className="flex w-24 flex-shrink-0 flex-col gap-3 rounded-lg border border-border/70 bg-gradient-to-b from-card to-card/60 p-3 shadow-lg overflow-hidden">
                 {/* Scene Header - Controls for all scenes */}
                 <div className="flex flex-col gap-2 border-b border-border/30 pb-2.5">
                     {/* Label */}
@@ -108,10 +108,10 @@ export function ClipLauncherGrid() {
                     </div>
                 </div>
 
-                {/* Scene Triggers */}
-                <div className="flex flex-col gap-2">
+                {/* Scene Triggers - Scrollable */}
+                <div className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
                     {Array.from({ length: numSlots }).map((_, slotIndex) => (
-                        <div key={slotIndex} className="h-20">
+                        <div key={slotIndex} className="h-20 flex-shrink-0">
                             <ClipLauncherScene sceneIndex={slotIndex} />
                         </div>
                     ))}
@@ -194,10 +194,10 @@ export function ClipLauncherGrid() {
                         )}
                     </div>
 
-                    {/* Clip Slots */}
-                    <div className="flex flex-col gap-2">
+                    {/* Clip Slots - Scrollable */}
+                    <div className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
                         {Array.from({ length: numSlots }).map((_, slotIndex) => (
-                            <div key={slotIndex} className="h-20">
+                            <div key={slotIndex} className="h-20 flex-shrink-0">
                                 {isEmpty(trackIndex) ? (
                                     <div className="h-full w-full rounded-md border border-dashed border-border/20 bg-muted/5" />
                                 ) : (
