@@ -1,12 +1,14 @@
 /**
- * ClipLauncherSlot - Individual clip slot component
+ * ClipLauncherSlot - Individual clip slot component (PAD VIEW)
  *
  * PERFORMANCE INSTRUMENT VISION:
- * - Large, tactile slots easy to click during live performance
- * - Clear state visualization (empty/armed/playing/stopping)
- * - Vibrant colors that are VISIBLE
- * - Loop progress indicator
- * - Each clip has its own unique color
+ * - Large, tactile pads easy to click during live performance
+ * - INTELLIGENT COLOR SYSTEM:
+ *   - Empty slot = Dark/dim (no clip assigned)
+ *   - Assigned slot (not playing) = Track color (50% opacity)
+ *   - Playing slot = Track color (full brightness, pulsing)
+ * - Double-click to trigger/stop clip
+ * - Single-click to select
  *
  * NO PROP DRILLING - Reads from Zustand store
  */
@@ -27,22 +29,6 @@ interface ClipLauncherSlotProps {
     slotIndex: number;
 }
 
-// Vibrant clip colors (each slot gets unique color based on position)
-const CLIP_COLORS = [
-    'hsl(187 85% 55%)',  // cyan
-    'hsl(280 85% 65%)',  // purple
-    'hsl(45 95% 60%)',   // yellow
-    'hsl(0 85% 60%)',    // red
-    'hsl(120 85% 55%)',  // green
-    'hsl(30 95% 60%)',   // orange
-    'hsl(200 85% 60%)',  // blue
-    'hsl(330 85% 65%)',  // pink
-    'hsl(160 85% 55%)',  // teal
-    'hsl(270 85% 60%)',  // violet
-    'hsl(50 95% 65%)',   // gold
-    'hsl(10 85% 60%)',   // coral
-];
-
 export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProps) {
     // ========================================================================
     // LOCAL STATE: Double-click detection
@@ -54,6 +40,7 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     // ========================================================================
     const tracks = useDAWStore(state => state.tracks);
     const clips = useDAWStore(state => state.clips);
+    const clipSlots = useDAWStore(state => state.clipSlots);
     const playingClips = useDAWStore(state => state.playingClips);
     const selectedClipSlot = useDAWStore(state => state.selectedClipSlot);
 
@@ -69,13 +56,15 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     const track = tracks[trackIndex];
     if (!track) return null;
 
-    // Find clip in this slot
-    const clip = clips.find(c => c.track_id === track.id && c.slot_index === slotIndex);
+    // Get assigned clip ID from grid
+    const assignedClipId = clipSlots[trackIndex]?.[slotIndex] || null;
+    const clip = assignedClipId ? clips.find(c => c.id === assignedClipId) : null;
+
     const isPlaying = playingClips.some(pc => pc.track_id === track.id && pc.slot_index === slotIndex);
     const isSelected = selectedClipSlot?.trackIndex === trackIndex && selectedClipSlot?.slotIndex === slotIndex;
 
-    // Get unique color for this slot position
-    const slotColor = CLIP_COLORS[(trackIndex * 3 + slotIndex) % CLIP_COLORS.length];
+    // Use track color for intelligent visual organization
+    const trackColor = track.color || 'hsl(220 10% 50%)';
 
     // ========================================================================
     // HANDLERS
@@ -97,7 +86,7 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     };
 
     // ========================================================================
-    // RENDER: Empty slot - HARDWARE RGB PAD STYLE
+    // RENDER: Empty slot - DARK/DIM (no clip assigned)
     // ========================================================================
     if (!clip) {
         return (
@@ -111,17 +100,13 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                             "hover:brightness-125 active:scale-95"
                         )}
                         style={{
-                            backgroundColor: isPlaying
-                                ? slotColor
-                                : '#1a1a1a',
+                            backgroundColor: '#1a1a1a',
                             boxShadow: isSelected
                                 ? `0 0 0 2px hsl(var(--primary)), 0 0 20px hsl(var(--primary))40`
-                                : isPlaying
-                                    ? `0 0 20px ${slotColor}, inset 0 0 10px ${slotColor}40`
-                                    : 'inset 0 2px 4px rgba(0,0,0,0.5)',
+                                : 'inset 0 2px 4px rgba(0,0,0,0.5)',
                             border: isSelected
                                 ? `2px solid hsl(var(--primary))`
-                                : `1px solid ${isPlaying ? slotColor : '#2a2a2a'}`,
+                                : '1px solid #2a2a2a',
                         }}
                     >
                         {/* Dim indicator when empty */}
@@ -150,7 +135,7 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     }
 
     // ========================================================================
-    // RENDER: Filled slot - HARDWARE RGB PAD STYLE
+    // RENDER: Filled slot - TRACK COLOR (intelligent visual organization)
     // ========================================================================
     return (
         <ContextMenu>
@@ -163,16 +148,16 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                         "hover:brightness-125 active:scale-95"
                     )}
                     style={{
-                        backgroundColor: slotColor,
+                        backgroundColor: trackColor,
                         boxShadow: isSelected
-                            ? `0 0 0 2px hsl(var(--primary)), 0 0 20px hsl(var(--primary))40, inset 0 0 10px ${slotColor}40`
+                            ? `0 0 0 2px hsl(var(--primary)), 0 0 20px hsl(var(--primary))40, inset 0 0 10px ${trackColor}40`
                             : isPlaying
-                                ? `0 0 20px ${slotColor}, inset 0 0 10px ${slotColor}40`
-                                : `0 0 8px ${slotColor}60, inset 0 2px 4px rgba(0,0,0,0.3)`,
+                                ? `0 0 20px ${trackColor}, inset 0 0 10px ${trackColor}40`
+                                : `0 0 8px ${trackColor}60, inset 0 2px 4px rgba(0,0,0,0.3)`,
                         border: isSelected
                             ? `2px solid hsl(var(--primary))`
-                            : `1px solid ${slotColor}`,
-                        opacity: isPlaying ? 1 : 0.7
+                            : `1px solid ${trackColor}`,
+                        opacity: isPlaying ? 1 : 0.5  // Dimmed when not playing
                     }}
                 >
                     {/* Pulse when playing */}
@@ -180,7 +165,7 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                         <div
                             className="absolute inset-0 rounded animate-pulse"
                             style={{
-                                background: `radial-gradient(circle at center, ${slotColor} 0%, transparent 70%)`,
+                                background: `radial-gradient(circle at center, ${trackColor} 0%, transparent 70%)`,
                                 opacity: 0.5
                             }}
                         />

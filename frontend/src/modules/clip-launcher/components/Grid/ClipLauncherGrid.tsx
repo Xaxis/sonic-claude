@@ -9,9 +9,10 @@
  * - Empty placeholders for missing tracks
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useDAWStore } from '@/stores/dawStore';
 import { ClipLauncherSlot } from '../Clips/ClipLauncherSlot';
+import { ClipLauncherSlotAssignment } from '../Clips/ClipLauncherSlotAssignment';
 import { ClipLauncherScene } from '../Scenes/ClipLauncherScene';
 import { ClipLauncherTrackStop } from '../Clips/ClipLauncherTrackStop';
 import { cn } from '@/lib/utils';
@@ -23,8 +24,17 @@ export function ClipLauncherGrid() {
     // STATE: Read from Zustand store
     // ========================================================================
     const tracks = useDAWStore(state => state.tracks);
+    const clipLauncherMode = useDAWStore(state => state.clipLauncherMode);
     const numSlots = useDAWStore(state => state.numClipSlots);
     const playingScenes = useDAWStore(state => state.playingScenes);
+    const loadClipSlots = useDAWStore(state => state.loadClipSlots);
+
+    // ========================================================================
+    // EFFECTS: Load clip slots on mount
+    // ========================================================================
+    useEffect(() => {
+        loadClipSlots();
+    }, [loadClipSlots]);
 
     // ========================================================================
     // LAYOUT CONSTANTS - Match mixer pattern
@@ -194,14 +204,16 @@ export function ClipLauncherGrid() {
                         )}
                     </div>
 
-                    {/* Clip Slots - No individual scrolling */}
+                    {/* Clip Slots - MODE-DEPENDENT RENDERING */}
                     <div className="flex flex-col gap-2">
                         {Array.from({ length: numSlots }).map((_, slotIndex) => (
                             <div key={slotIndex} className="h-20 flex-shrink-0">
                                 {isEmpty(trackIndex) ? (
                                     <div className="h-full w-full rounded-md border border-dashed border-border/20 bg-muted/5" />
-                                ) : (
+                                ) : clipLauncherMode === "pad" ? (
                                     <ClipLauncherSlot trackIndex={trackIndex} slotIndex={slotIndex} />
+                                ) : (
+                                    <ClipLauncherSlotAssignment trackIndex={trackIndex} slotIndex={slotIndex} />
                                 )}
                             </div>
                         ))}

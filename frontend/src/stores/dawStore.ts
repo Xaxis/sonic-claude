@@ -226,9 +226,11 @@ interface DAWStore {
     showEffectBrowser: boolean;
 
     // Clip Launcher UI (Performance Mode)
+    clipLauncherMode: "pad" | "assignment";  // View mode: PAD VIEW or ASSIGNMENT VIEW
     numClipSlots: number;  // Number of clip slots per track (scenes)
     playingClips: Array<{ track_id: string; slot_index: number }>;  // Currently playing clips
     playingScenes: number[];  // Currently playing scene indices
+    clipSlots: string[][];  // 2D grid of clip IDs [trackIndex][slotIndex]
 
     // Assistant State
     chatHistory: ChatMessage[];
@@ -409,7 +411,10 @@ interface DAWStore {
     setSelectedChannelId: (id: string | null) => void;
 
     // Clip Launcher UI actions
+    setClipLauncherMode: (mode: "pad" | "assignment") => void;
     setSelectedClipSlot: (slot: { trackIndex: number; slotIndex: number } | null) => void;
+    assignClipToSlot: (trackIndex: number, slotIndex: number, clipId: string | null) => Promise<void>;
+    loadClipSlots: () => Promise<void>;
     setSelectedEffectId: (id: string | null) => void;
     setShowEffectBrowser: (show: boolean) => void;
 
@@ -534,10 +539,12 @@ export const useDAWStore = create<DAWStore>()(
                 showEffectBrowser: false,
 
                 // Clip Launcher UI State (PERSISTED)
+                clipLauncherMode: "pad",  // Default to PAD VIEW
                 numClipSlots: 8,  // Default 8 scenes
                 selectedClipSlot: null,
                 playingClips: [],
                 playingScenes: [],
+                clipSlots: [],  // Loaded from backend
 
                 // Assistant State
                 chatHistory: [],
@@ -2163,7 +2170,42 @@ export const useDAWStore = create<DAWStore>()(
         setShowMeters: (show) => set({ showMeters: show }),
         setMeterMode: (mode) => set({ meterMode: mode }),
         setSelectedChannelId: (id) => set({ selectedChannelId: id }),
+
+        // Clip Launcher UI actions
+        setClipLauncherMode: (mode) => set({ clipLauncherMode: mode }),
         setSelectedClipSlot: (slot) => set({ selectedClipSlot: slot }),
+
+        assignClipToSlot: async (trackIndex, slotIndex, clipId) => {
+            const { activeComposition } = get();
+            if (!activeComposition) return;
+
+            try {
+                await api.compositions.assignClipToSlot({
+                    composition_id: activeComposition.id,
+                    track_index: trackIndex,
+                    slot_index: slotIndex,
+                    clip_id: clipId
+                });
+
+                // Reload clip slots from backend
+                await get().loadClipSlots();
+            } catch (error) {
+                console.error('Failed to assign clip to slot:', error);
+            }
+        },
+
+        loadClipSlots: async () => {
+            const { activeComposition } = get();
+            if (!activeComposition) return;
+
+            try {
+                const response = await api.compositions.getClipSlots(activeComposition.id);
+                set({ clipSlots: response.clip_slots || [] });
+            } catch (error) {
+                console.error('Failed to load clip slots:', error);
+            }
+        },
+
         setSelectedEffectId: (id) => set({ selectedEffectId: id }),
         setShowEffectBrowser: (show) => set({ showEffectBrowser: show }),
 
@@ -2694,6 +2736,7 @@ export const useDAWStore = create<DAWStore>()(
                     meterMode: state.meterMode,
                     activeAssistantTab: state.activeAssistantTab,
                     activeInputsTab: state.activeInputsTab,
+                    clipLauncherMode: state.clipLauncherMode,
                     numClipSlots: state.numClipSlots,
 
                     // Active Composition ID (for auto-load on startup)

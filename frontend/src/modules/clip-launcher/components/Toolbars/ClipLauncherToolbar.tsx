@@ -15,7 +15,7 @@ import { useDAWStore } from '@/stores/dawStore';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Input } from '@/components/ui/input';
-import { Play, Pause, SkipBack, Square, Plus, Minus, Circle, Grid3x3 } from 'lucide-react';
+import { Play, Pause, SkipBack, Square, Plus, Minus, Circle, Grid3x3, Gamepad2, ListTree } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -31,6 +31,7 @@ export function ClipLauncherToolbar() {
     // ========================================================================
     const activeComposition = useDAWStore(state => state.activeComposition);
     const transport = useDAWStore(state => state.transport);
+    const clipLauncherMode = useDAWStore(state => state.clipLauncherMode);
     const numClipSlots = useDAWStore(state => state.numClipSlots);
     const playingClips = useDAWStore(state => state.playingClips);
     const playingScenes = useDAWStore(state => state.playingScenes);
@@ -48,6 +49,7 @@ export function ClipLauncherToolbar() {
     const pause = useDAWStore(state => state.pause);
     const resume = useDAWStore(state => state.resume);
     const stop = useDAWStore(state => state.stop);
+    const setClipLauncherMode = useDAWStore(state => state.setClipLauncherMode);
     const setNumClipSlots = useDAWStore(state => state.setNumClipSlots);
     const updateComposition = useDAWStore(state => state.updateComposition);
 
@@ -209,6 +211,32 @@ export function ClipLauncherToolbar() {
 
             {/* Right: Clip Launcher Controls */}
             <div className="flex items-center gap-2">
+                {/* MODE TOGGLE: PAD VIEW ↔ ASSIGNMENT VIEW */}
+                <div className="flex items-center gap-0.5 p-0.5 rounded-md bg-muted/30 border border-border/30">
+                    <Button
+                        variant={clipLauncherMode === "pad" ? "default" : "ghost"}
+                        size="sm"
+                        className="h-7 gap-1.5 px-2"
+                        onClick={() => setClipLauncherMode("pad")}
+                    >
+                        <Gamepad2 size={14} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">
+                            Pad View
+                        </span>
+                    </Button>
+                    <Button
+                        variant={clipLauncherMode === "assignment" ? "default" : "ghost"}
+                        size="sm"
+                        className="h-7 gap-1.5 px-2"
+                        onClick={() => setClipLauncherMode("assignment")}
+                    >
+                        <ListTree size={14} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">
+                            Assignment
+                        </span>
+                    </Button>
+                </div>
+
                 {/* Launch Quantization */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
