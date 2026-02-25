@@ -230,6 +230,8 @@ interface DAWStore {
     numClipSlots: number;  // Number of clip slots per track (scenes)
     // NOTE: playingClips comes from WebSocket (transport.playing_clips), not stored here
     clipSlots: string[][];  // 2D grid of clip IDs [trackIndex][slotIndex]
+    scenes: any[];  // Scene definitions
+    launchQuantization: string;  // Launch quantization setting
 
     // Assistant State
     chatHistory: ChatMessage[];
@@ -542,6 +544,8 @@ export const useDAWStore = create<DAWStore>()(
                 numClipSlots: 8,  // Default 8 scenes
                 selectedClipSlots: new Map(), // trackIndex -> slotIndex (one per column)
                 clipSlots: [],  // Loaded from backend
+                scenes: [],  // Loaded from backend
+                launchQuantization: '1',  // Default 1 bar quantization
 
                 // Assistant State
                 chatHistory: [],
@@ -1881,6 +1885,11 @@ export const useDAWStore = create<DAWStore>()(
                 // Load samples state
                 const sampleAssignments = snapshot.sample_assignments || {};
 
+                // Load clip launcher state
+                const clipSlots = snapshot.clip_slots || [];
+                const scenes = snapshot.scenes || [];
+                const launchQuantization = snapshot.launch_quantization || '1';
+
                 set({
                     activeComposition: snapshot,
                     tracks,
@@ -1889,6 +1898,9 @@ export const useDAWStore = create<DAWStore>()(
                     master,
                     effectChains,
                     sampleAssignments,
+                    clipSlots,
+                    scenes,
+                    launchQuantization,
                     hasUnsavedChanges: false,
                     // Sync loop state from composition to UI state
                     isLooping: snapshot.loop_enabled ?? false,
@@ -1906,6 +1918,9 @@ export const useDAWStore = create<DAWStore>()(
                 windowManager.broadcastState('master', master);
                 windowManager.broadcastState('effectChains', effectChains);
                 windowManager.broadcastState('sampleAssignments', sampleAssignments);
+                windowManager.broadcastState('clipSlots', clipSlots);
+                windowManager.broadcastState('scenes', scenes);
+                windowManager.broadcastState('launchQuantization', launchQuantization);
 
                 toast.success(`Loaded composition: ${snapshot.name}`);
 
@@ -2561,20 +2576,26 @@ export const useDAWStore = create<DAWStore>()(
             }
 
             try {
-                // TODO: Check if already playing from WebSocket state
-                // For now, just toggle - backend will handle it
+                // Check if clip is currently playing from WebSocket state
+                const transport = get().transport;
+                const playingClips = transport?.playing_clips || [];
+                const isPlaying = playingClips.includes(clipId);
 
-                // Try to stop first (backend will ignore if not playing)
-                try {
+                console.log('🎯 Triggering clip:', { clipId, trackId, slotIndex, isPlaying });
+
+                if (isPlaying) {
+                    // Clip is playing - stop it
+                    console.log('⏹️ Stopping clip:', clipId);
                     await api.compositions.stopClip(activeComposition.id, clipId);
-                } catch {
-                    // If stop fails, clip wasn't playing - launch it
+                } else {
+                    // Clip is not playing - launch it
+                    console.log('▶️ Launching clip:', clipId);
                     await api.compositions.launchClip(activeComposition.id, clipId);
                 }
 
                 // WebSocket will update visual state automatically
             } catch (error) {
-                console.error('Failed to trigger clip:', error);
+                console.error('❌ Failed to trigger clip:', error);
                 toast.error('Failed to trigger clip');
             }
         },

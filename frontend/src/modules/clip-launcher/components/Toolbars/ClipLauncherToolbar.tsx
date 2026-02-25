@@ -79,20 +79,19 @@ export function ClipLauncherToolbar() {
     // ========================================================================
     // HANDLERS
     // ========================================================================
+    // In clip launcher mode, transport controls clips, NOT the composition timeline
     const handlePlayPause = useCallback(async () => {
-        if (!activeComposition) return;
-        if (isPlaying) {
-            await pause();
-        } else if (isPaused) {
-            await resume();
-        } else {
-            await play();
-        }
-    }, [isPlaying, isPaused, activeComposition, play, pause, resume]);
+        // Clip launcher doesn't have a global "play" - clips are triggered individually
+        // This button is disabled in clip launcher mode
+        toast.info('Trigger clips individually by clicking pads');
+    }, []);
 
     const handleStop = useCallback(async () => {
-        await stop();
-    }, [stop]);
+        // Stop all playing clips
+        const stopAllClips = useDAWStore.getState().stopAllClips;
+        await stopAllClips();
+        toast.success('Stopped all clips');
+    }, []);
 
     const handleStopAllClips = useCallback(async () => {
         if (!activeComposition) return;
@@ -168,22 +167,24 @@ export function ClipLauncherToolbar() {
         <div className="flex items-center justify-between">
             {/* Left: Transport Controls */}
             <div className="flex items-center gap-4">
-                {/* Transport Buttons */}
+                {/* Transport Buttons - Clip Launcher Mode */}
                 <div className="flex items-center gap-1">
                     <IconButton
-                        icon={SkipBack}
-                        tooltip="Stop and rewind"
+                        icon={Square}
+                        tooltip="Stop all clips"
                         onClick={handleStop}
-                        variant="ghost"
+                        variant={hasPlayingClips ? "destructive" : "ghost"}
                         size="icon-sm"
+                        className={cn(hasPlayingClips && "bg-destructive")}
                     />
                     <IconButton
-                        icon={isPlaying ? Pause : Play}
-                        tooltip={isPlaying ? "Pause" : (isPaused ? "Resume" : "Play")}
+                        icon={Play}
+                        tooltip="Trigger clips individually by clicking pads"
                         onClick={handlePlayPause}
-                        variant={isPlaying || isPaused ? "default" : "ghost"}
+                        variant="ghost"
                         size="icon-sm"
-                        className={cn((isPlaying || isPaused) && "bg-primary")}
+                        disabled={true}
+                        className="opacity-30 cursor-not-allowed"
                     />
                     <Button
                         onClick={handleSessionRecord}

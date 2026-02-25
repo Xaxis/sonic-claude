@@ -13,7 +13,7 @@
  * NO PROP DRILLING - Reads from Zustand store
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useDAWStore } from '@/stores/dawStore';
 import { useTransportWebSocket } from '@/hooks/useTransportWebsocket';
 import { cn } from '@/lib/utils';
@@ -54,9 +54,9 @@ const HARDWARE_COLORS = [
 
 export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProps) {
     // ========================================================================
-    // LOCAL STATE: Double-click detection
+    // LOCAL STATE: Double-click detection (use ref to persist across renders)
     // ========================================================================
-    const [lastClickTime, setLastClickTime] = useState(0);
+    const lastClickTimeRef = useRef(0);
 
     // ========================================================================
     // STATE: Read from Zustand store
@@ -100,17 +100,25 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     // ========================================================================
     const handleClick = () => {
         const now = Date.now();
-        const timeSinceLastClick = now - lastClickTime;
+        const timeSinceLastClick = now - lastClickTimeRef.current;
+
+        console.log('🖱️ Pad clicked:', { trackIndex, slotIndex, assignedClipId, timeSinceLastClick });
 
         // Double-click detection (within 300ms)
-        if (timeSinceLastClick < 300) {
+        if (timeSinceLastClick < 300 && timeSinceLastClick > 0) {
             // Double-click: Trigger/stop clip
-            triggerClip(track.id, slotIndex);
-            setLastClickTime(0); // Reset to prevent triple-click issues
+            console.log('🎯 Double-click detected - triggering clip');
+            if (assignedClipId) {
+                triggerClip(track.id, slotIndex);
+            } else {
+                console.warn('⚠️ No clip assigned to this slot');
+            }
+            lastClickTimeRef.current = 0; // Reset to prevent triple-click issues
         } else {
             // Single-click: Select slot (one per column)
+            console.log('👆 Single-click - selecting slot');
             setSelectedClipSlot(trackIndex, slotIndex);
-            setLastClickTime(now);
+            lastClickTimeRef.current = now;
         }
     };
 
