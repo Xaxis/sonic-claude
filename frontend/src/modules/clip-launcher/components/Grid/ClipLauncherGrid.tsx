@@ -15,6 +15,8 @@ import { ClipLauncherSlot } from '../Clips/ClipLauncherSlot';
 import { ClipLauncherScene } from '../Scenes/ClipLauncherScene';
 import { ClipLauncherTrackStop } from '../Clips/ClipLauncherTrackStop';
 import { cn } from '@/lib/utils';
+import { Square, ChevronDown } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function ClipLauncherGrid() {
     // ========================================================================
@@ -22,6 +24,7 @@ export function ClipLauncherGrid() {
     // ========================================================================
     const tracks = useDAWStore(state => state.tracks);
     const numSlots = useDAWStore(state => state.numClipSlots);
+    const playingScenes = useDAWStore(state => state.playingScenes);
 
     // ========================================================================
     // LAYOUT CONSTANTS - Match mixer pattern
@@ -50,11 +53,59 @@ export function ClipLauncherGrid() {
         <div className="flex h-full gap-4 overflow-x-auto overflow-y-hidden bg-gradient-to-b from-background/50 to-background p-5">
             {/* Scene Column - Like master channel in mixer */}
             <div className="flex w-24 flex-shrink-0 flex-col gap-3 rounded-lg border border-border/70 bg-gradient-to-b from-card to-card/60 p-3 shadow-lg">
-                {/* Scene Header - SAME HEIGHT AS TRACK HEADERS */}
-                <div className="flex h-14 items-center justify-center border-b border-border/30 pb-2.5">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                {/* Scene Header - Controls for all scenes */}
+                <div className="flex flex-col gap-2 border-b border-border/30 pb-2.5">
+                    {/* Label */}
+                    <div className="text-center text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         Scenes
-                    </span>
+                    </div>
+
+                    {/* Scene Controls */}
+                    <div className="flex items-center justify-center gap-1">
+                        {/* Stop All Scenes */}
+                        <button
+                            onClick={() => {
+                                const stopScene = useDAWStore.getState().stopScene;
+                                const playingScenes = useDAWStore.getState().playingScenes;
+                                playingScenes.forEach(sceneIndex => stopScene(sceneIndex));
+                                toast.success('Stopped all scenes');
+                            }}
+                            className={cn(
+                                "w-6 h-6 rounded flex items-center justify-center transition-all",
+                                playingScenes.length > 0
+                                    ? "bg-destructive/20 text-destructive hover:bg-destructive/30"
+                                    : "bg-muted/30 text-muted-foreground/50 cursor-not-allowed"
+                            )}
+                            disabled={playingScenes.length === 0}
+                            title="Stop all scenes"
+                        >
+                            <Square size={12} />
+                        </button>
+
+                        {/* Trigger Next Scene */}
+                        <button
+                            onClick={() => {
+                                const triggerScene = useDAWStore.getState().triggerScene;
+                                const playingScenes = useDAWStore.getState().playingScenes;
+                                const nextScene = playingScenes.length > 0
+                                    ? Math.max(...playingScenes) + 1
+                                    : 0;
+                                if (nextScene < numSlots) {
+                                    triggerScene(nextScene);
+                                    toast.success(`Triggered scene ${nextScene + 1}`);
+                                }
+                            }}
+                            className="w-6 h-6 rounded flex items-center justify-center bg-muted/30 text-muted-foreground hover:bg-primary/20 hover:text-primary transition-all"
+                            title="Trigger next scene"
+                        >
+                            <ChevronDown size={12} />
+                        </button>
+
+                        {/* Scene Count Badge */}
+                        <div className="w-6 h-6 rounded flex items-center justify-center bg-primary/20 text-primary text-[9px] font-bold">
+                            {numSlots}
+                        </div>
+                    </div>
                 </div>
 
                 {/* Scene Triggers */}
