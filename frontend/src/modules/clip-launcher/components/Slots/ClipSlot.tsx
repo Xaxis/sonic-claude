@@ -12,7 +12,7 @@
  * NO PROP DRILLING - Reads from Zustand store
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useDAWStore } from '@/stores/dawStore';
 import { cn } from '@/lib/utils';
 import {
@@ -117,21 +117,13 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
         }, 2000);
     };
 
-    // Empty slot - SINGLE CLICK to show menu (better UX)
+    // Empty slot - RIGHT CLICK to show menu
     if (isEmpty) {
-        const [menuOpen, setMenuOpen] = React.useState(false);
-
         return (
-            <ContextMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <ContextMenu>
                 <ContextMenuTrigger asChild>
                     <div
                         className="relative h-32 rounded-md border border-border/30 bg-black/40 hover:border-border/60 hover:bg-black/50 transition-all cursor-pointer flex items-center justify-center group"
-                        onClick={(e) => {
-                            // Single click opens menu
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setMenuOpen(true);
-                        }}
                     >
                         {/* Plus icon for assigning clips */}
                         <div className="text-4xl opacity-20 group-hover:opacity-40 transition-opacity">+</div>
@@ -171,10 +163,7 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
                         availableClips.map((clip) => (
                             <ContextMenuItem
                                 key={clip.id}
-                                onClick={() => {
-                                    handleAssignClip(clip.id);
-                                    setMenuOpen(false);
-                                }}
+                                onClick={() => handleAssignClip(clip.id)}
                                 className="gap-2"
                             >
                                 {clip.type === 'midi' ? (
