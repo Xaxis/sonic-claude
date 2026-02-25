@@ -49,9 +49,9 @@ export function ClipLauncherGrid() {
     const isEmpty = (trackIndex: number) => trackIndex >= tracks.length;
 
     return (
-        <div className="h-full overflow-auto bg-gradient-to-b from-background via-background to-muted/20">
+        <div className="flex h-full gap-4 overflow-x-auto overflow-y-hidden bg-gradient-to-b from-background/50 to-background p-5">
             {/* Hardware Surface - Blended with theme */}
-            <div className="inline-block m-6 rounded-2xl bg-gradient-to-br from-card/80 via-card/60 to-card/40 p-6 shadow-2xl border-2 border-border/50 backdrop-blur-sm">
+            <div className="inline-flex flex-col rounded-xl bg-gradient-to-br from-card/60 via-card/40 to-card/30 p-5 shadow-xl border border-border/40 backdrop-blur-sm">
 
                 {/* Track Names Row */}
                 <div className="flex mb-4" style={{ gap: `${GAP}px` }}>
