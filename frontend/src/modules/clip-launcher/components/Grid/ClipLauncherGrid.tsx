@@ -79,8 +79,8 @@ export function ClipLauncherGrid() {
                     )}
                     style={{ padding: '12px' }}
                 >
-                    {/* Track Header - Same as MixerChannelStrip - FIXED HEIGHT */}
-                    <div className="flex h-14 flex-col gap-1.5 border-b border-border/30 pb-2.5">
+                    {/* Track Header - Ableton Live Style with M/S/Arm buttons */}
+                    <div className="flex flex-col gap-2 border-b border-border/30 pb-2.5">
                         {/* Track Name */}
                         <div
                             className="truncate text-center text-xs font-bold uppercase tracking-wider drop-shadow-sm"
@@ -90,23 +90,57 @@ export function ClipLauncherGrid() {
                             {track.name}
                         </div>
 
-                        {/* Track Type Badge - Always render to maintain height */}
-                        <div className="flex justify-center">
-                            {!isEmpty(trackIndex) ? (
-                                <span
-                                    className="rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider shadow-sm"
-                                    style={{
-                                        backgroundColor: `${track.color}20`,
-                                        color: track.color,
-                                        border: `1px solid ${track.color}40`
-                                    }}
+                        {/* M / S / Arm Buttons - Ableton Live Style */}
+                        {!isEmpty(trackIndex) ? (
+                            <div className="flex items-center justify-center gap-1">
+                                {/* Mute Button */}
+                                <button
+                                    onClick={() => useDAWStore.getState().muteTrack(track.id)}
+                                    className={cn(
+                                        "w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold transition-all",
+                                        track.muted
+                                            ? "bg-accent text-accent-foreground shadow-md"
+                                            : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                                    )}
+                                    title="Mute track"
                                 >
-                                    {track.type}
-                                </span>
-                            ) : (
-                                <span className="h-[18px]" /> // Spacer to maintain height
-                            )}
-                        </div>
+                                    M
+                                </button>
+
+                                {/* Solo Button */}
+                                <button
+                                    onClick={() => useDAWStore.getState().soloTrack(track.id)}
+                                    className={cn(
+                                        "w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold transition-all",
+                                        track.soloed
+                                            ? "bg-primary text-primary-foreground shadow-md"
+                                            : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                                    )}
+                                    title="Solo track"
+                                >
+                                    S
+                                </button>
+
+                                {/* Arm Button */}
+                                <button
+                                    onClick={() => useDAWStore.getState().armTrack(track.id)}
+                                    className={cn(
+                                        "w-6 h-6 rounded-full flex items-center justify-center transition-all",
+                                        track.armed
+                                            ? "bg-destructive shadow-md shadow-destructive/50"
+                                            : "bg-muted/30 hover:bg-muted/50"
+                                    )}
+                                    title="Arm track for recording"
+                                >
+                                    <div className={cn(
+                                        "w-2 h-2 rounded-full",
+                                        track.armed ? "bg-white" : "bg-muted-foreground/50"
+                                    )} />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="h-6" /> // Spacer to maintain height
+                        )}
                     </div>
 
                     {/* Clip Slots */}
