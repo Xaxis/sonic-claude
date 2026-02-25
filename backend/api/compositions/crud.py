@@ -215,7 +215,9 @@ async def get_composition(
         if not success:
             raise ServiceError(f"Failed to restore composition {composition_id} to services")
 
+        # DEBUG: Verify current_composition_id is set
         logger.info(f"✅ Loaded and activated composition: {composition.name} (ID: {composition_id})")
+        logger.info(f"🔍 DEBUG: current_composition_id = {composition_state_service.current_composition_id}")
 
         return composition
     except ResourceNotFoundError:

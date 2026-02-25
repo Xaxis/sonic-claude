@@ -474,13 +474,15 @@ class CompositionService:
             logger.error(f"❌ Failed to auto-persist composition {composition_id}: {e}")
             return False
 
-    def restore_composition_to_services(
+    async def restore_composition_to_services(
         self,
         composition: Composition,
         composition_state_service: 'CompositionStateService',
         mixer_service: 'MixerService',
         effects_service: 'TrackEffectsService',
-        set_as_current: bool = True
+        set_as_current: bool = True,
+        mixer_channel_service: 'MixerChannelSynthManager' = None,
+        audio_bus_manager: 'AudioBusManager' = None
     ) -> bool:
         """
         Restore a composition to the services
@@ -493,6 +495,8 @@ class CompositionService:
             mixer_service: MixerService instance
             effects_service: TrackEffectsService instance
             set_as_current: Whether to set this composition as the current composition (default: True)
+            mixer_channel_service: MixerChannelSynthManager instance (optional, for recreating mixer channels)
+            audio_bus_manager: AudioBusManager instance (optional, for recreating mixer channels)
 
         Returns:
             True if successful, False otherwise
@@ -518,6 +522,28 @@ class CompositionService:
                     track = next((t for t in composition.tracks if t.id == track_id), None)
                     if track and hasattr(track, 'sample_path'):
                         track.sample_path = sample_path
+
+                # CRITICAL FIX: Recreate mixer channels for all tracks
+                # This ensures that mixer channel synths exist in SuperCollider
+                # after reloading a composition (e.g., after assistant actions)
+                if mixer_channel_service and audio_bus_manager:
+                    for track in composition.tracks:
+                        # Check if mixer channel already exists
+                        if track.id not in mixer_channel_service.mixer_channels:
+                            # Get or allocate bus
+                            track_bus = audio_bus_manager.get_track_bus(track.id)
+                            if track_bus is None:
+                                track_bus = audio_bus_manager.allocate_track_bus(track.id)
+
+                            # Create mixer channel synth in SuperCollider
+                            await mixer_channel_service.create_mixer_channel(
+                                track_id=track.id,
+                                volume=track.volume,
+                                pan=track.pan,
+                                mute=track.is_muted,
+                                solo=track.is_solo
+                            )
+                            logger.info(f"🎚️ Recreated mixer channel for track {track.id} on bus {track_bus}")
 
             logger.info(f"✅ Restored composition: {composition.name} (set_as_current={set_as_current})")
             return True
