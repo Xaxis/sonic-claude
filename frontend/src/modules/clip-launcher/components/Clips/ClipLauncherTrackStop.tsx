@@ -7,6 +7,7 @@
  */
 
 import { useDAWStore } from '@/stores/dawStore';
+import { useTransportWebSocket } from '@/hooks/useTransportWebsocket';
 import { cn } from '@/lib/utils';
 import { Square } from 'lucide-react';
 
@@ -17,9 +18,15 @@ interface ClipLauncherTrackStopProps {
 
 export function ClipLauncherTrackStop({ trackId, trackColor }: ClipLauncherTrackStopProps) {
     // ========================================================================
-    // STATE: Read from Zustand store
+    // STATE: Read from WebSocket
     // ========================================================================
-    const playingClips = useDAWStore(state => state.playingClips);
+    const { transport } = useTransportWebSocket();
+    const playingClipIds = transport.playing_clips || [];
+
+    // Get clips and clipSlots to check if any playing clips belong to this track
+    const clips = useDAWStore(state => state.clips);
+    const clipSlots = useDAWStore(state => state.clipSlots);
+    const tracks = useDAWStore(state => state.tracks);
 
     // ========================================================================
     // ACTIONS: Get from Zustand store
@@ -29,7 +36,15 @@ export function ClipLauncherTrackStop({ trackId, trackColor }: ClipLauncherTrack
     // ========================================================================
     // DERIVED STATE
     // ========================================================================
-    const hasActiveClips = playingClips.some(pc => pc.track_id === trackId);
+    // Find track index
+    const trackIndex = tracks.findIndex(t => t.id === trackId);
+
+    // Check if any playing clips are in this track's column
+    const hasActiveClips = playingClipIds.some(clipId => {
+        // Check if this clip is in any slot of this track
+        if (trackIndex === -1 || !clipSlots[trackIndex]) return false;
+        return clipSlots[trackIndex].includes(clipId);
+    });
 
     // ========================================================================
     // HANDLERS

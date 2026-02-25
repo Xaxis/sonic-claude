@@ -9,8 +9,9 @@
  * - Empty placeholders for missing tracks
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useDAWStore } from '@/stores/dawStore';
+import { useTransportWebSocket } from '@/hooks/useTransportWebsocket';
 import { ClipLauncherSlot } from '../Clips/ClipLauncherSlot';
 import { ClipLauncherSlotAssignment } from '../Clips/ClipLauncherSlotAssignment';
 import { ClipLauncherScene } from '../Scenes/ClipLauncherScene';
@@ -41,13 +42,32 @@ const HARDWARE_COLORS = [
 
 export function ClipLauncherGrid() {
     // ========================================================================
-    // STATE: Read from Zustand store
+    // STATE: Read from Zustand store and WebSocket
     // ========================================================================
     const tracks = useDAWStore(state => state.tracks);
     const clipLauncherMode = useDAWStore(state => state.clipLauncherMode);
     const numSlots = useDAWStore(state => state.numClipSlots);
-    const playingScenes = useDAWStore(state => state.playingScenes);
+    const clipSlots = useDAWStore(state => state.clipSlots);
     const loadClipSlots = useDAWStore(state => state.loadClipSlots);
+
+    // Read playing clips from WebSocket
+    const { transport } = useTransportWebSocket();
+    const playingClipIds = transport.playing_clips || [];
+
+    // Calculate which scenes are playing (any clip in that row is playing)
+    const playingScenes = useMemo(() => {
+        const scenes: number[] = [];
+        for (let sceneIndex = 0; sceneIndex < numSlots; sceneIndex++) {
+            const isScenePlaying = clipSlots.some((trackSlots) => {
+                const clipId = trackSlots?.[sceneIndex];
+                return clipId && playingClipIds.includes(clipId);
+            });
+            if (isScenePlaying) {
+                scenes.push(sceneIndex);
+            }
+        }
+        return scenes;
+    }, [clipSlots, playingClipIds, numSlots]);
 
     // ========================================================================
     // EFFECTS: Load clip slots on mount
@@ -96,7 +116,7 @@ export function ClipLauncherGrid() {
                         <button
                             onClick={() => {
                                 const stopScene = useDAWStore.getState().stopScene;
-                                const playingScenes = useDAWStore.getState().playingScenes;
+                                // Stop all currently playing scenes
                                 playingScenes.forEach(sceneIndex => stopScene(sceneIndex));
                                 toast.success('Stopped all scenes');
                             }}
@@ -116,7 +136,7 @@ export function ClipLauncherGrid() {
                         <button
                             onClick={() => {
                                 const triggerScene = useDAWStore.getState().triggerScene;
-                                const playingScenes = useDAWStore.getState().playingScenes;
+                                // Calculate next scene from current playing scenes
                                 const nextScene = playingScenes.length > 0
                                     ? Math.max(...playingScenes) + 1
                                     : 0;

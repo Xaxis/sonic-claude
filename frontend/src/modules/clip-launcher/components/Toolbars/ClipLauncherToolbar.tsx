@@ -12,6 +12,7 @@
 
 import { useCallback, useState } from 'react';
 import { useDAWStore } from '@/stores/dawStore';
+import { useTransportWebSocket } from '@/hooks/useTransportWebsocket';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Input } from '@/components/ui/input';
@@ -27,14 +28,16 @@ import {
 
 export function ClipLauncherToolbar() {
     // ========================================================================
-    // STATE: Read from Zustand store
+    // STATE: Read from Zustand store and WebSocket
     // ========================================================================
     const activeComposition = useDAWStore(state => state.activeComposition);
     const transport = useDAWStore(state => state.transport);
     const clipLauncherMode = useDAWStore(state => state.clipLauncherMode);
     const numClipSlots = useDAWStore(state => state.numClipSlots);
-    const playingClips = useDAWStore(state => state.playingClips);
-    const playingScenes = useDAWStore(state => state.playingScenes);
+
+    // Read playing clips from WebSocket (runtime state)
+    const { transport: wsTransport } = useTransportWebSocket();
+    const playingClipIds = wsTransport.playing_clips || [];
 
     // ========================================================================
     // LOCAL STATE: Launch quantization
@@ -61,7 +64,7 @@ export function ClipLauncherToolbar() {
     const isPaused = transport?.is_paused ?? false;
     const currentTime = transport?.current_time ?? 0;
     const tempo = activeComposition?.tempo ?? 120;
-    const hasPlayingClips = playingClips.length > 0;
+    const hasPlayingClips = playingClipIds.length > 0;
 
     // Format time as bars:beats:sixteenths
     const formatTime = (seconds: number) => {

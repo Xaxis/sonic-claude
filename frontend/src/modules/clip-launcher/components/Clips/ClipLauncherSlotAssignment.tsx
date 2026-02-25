@@ -91,11 +91,24 @@ export function ClipLauncherSlotAssignment({ trackIndex, slotIndex }: ClipLaunch
     };
 
     const handleAssignClip = async (clipId: string) => {
-        await assignClipToSlot(trackIndex, slotIndex, clipId);
+        try {
+            console.log('🎯 Assigning clip:', { trackIndex, slotIndex, clipId });
+            await assignClipToSlot(trackIndex, slotIndex, clipId);
+            console.log('✅ Clip assigned successfully');
+        } catch (error) {
+            console.error('❌ Failed to assign clip:', error);
+        }
     };
 
-    const handleClearSlot = async () => {
-        await assignClipToSlot(trackIndex, slotIndex, null);
+    const handleClearSlot = async (e: React.MouseEvent) => {
+        try {
+            e.stopPropagation();
+            console.log('🗑️ Clearing slot:', { trackIndex, slotIndex });
+            await assignClipToSlot(trackIndex, slotIndex, null);
+            console.log('✅ Slot cleared successfully');
+        } catch (error) {
+            console.error('❌ Failed to clear slot:', error);
+        }
     };
 
     // ========================================================================
@@ -138,10 +151,7 @@ export function ClipLauncherSlotAssignment({ trackIndex, slotIndex }: ClipLaunch
 
                     {/* Clear Button */}
                     <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleClearSlot();
-                        }}
+                        onClick={handleClearSlot}
                         className="absolute top-1 right-1 w-4 h-4 rounded-full bg-black/50 hover:bg-destructive/80 flex items-center justify-center transition-colors"
                         title="Clear"
                     >
@@ -154,7 +164,7 @@ export function ClipLauncherSlotAssignment({ trackIndex, slotIndex }: ClipLaunch
                     <div className="flex flex-col items-center gap-2 w-full">
                         <Plus size={24} className="text-muted-foreground/50" />
                         <Select
-                            value={assignedClipId || ""}
+                            value={assignedClipId || undefined}
                             onValueChange={handleAssignClip}
                         >
                             <SelectTrigger
@@ -163,7 +173,11 @@ export function ClipLauncherSlotAssignment({ trackIndex, slotIndex }: ClipLaunch
                             >
                                 <SelectValue placeholder="Assign clip..." />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent
+                                className="z-[9999]"
+                                position="popper"
+                                sideOffset={5}
+                            >
                                 {trackClips.length === 0 ? (
                                     <div className="px-3 py-2 text-xs text-muted-foreground">
                                         No clips on this track

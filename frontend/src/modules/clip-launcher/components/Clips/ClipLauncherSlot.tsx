@@ -15,6 +15,7 @@
 
 import { useState } from 'react';
 import { useDAWStore } from '@/stores/dawStore';
+import { useTransportWebSocket } from '@/hooks/useTransportWebsocket';
 import { cn } from '@/lib/utils';
 import { Play, Square, Music } from 'lucide-react';
 import {
@@ -63,8 +64,11 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     const tracks = useDAWStore(state => state.tracks);
     const clips = useDAWStore(state => state.clips);
     const clipSlots = useDAWStore(state => state.clipSlots);
-    const playingClips = useDAWStore(state => state.playingClips);
     const selectedClipSlots = useDAWStore(state => state.selectedClipSlots);
+
+    // Read playing clips from WebSocket (runtime state)
+    const { transport } = useTransportWebSocket();
+    const playingClipIds = transport.playing_clips || [];
 
     // ========================================================================
     // ACTIONS: Get from Zustand store
@@ -82,7 +86,8 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     const assignedClipId = clipSlots[trackIndex]?.[slotIndex] || null;
     const clip = assignedClipId ? clips.find(c => c.id === assignedClipId) : null;
 
-    const isPlaying = playingClips.some(pc => pc.track_id === track.id && pc.slot_index === slotIndex);
+    // Check if this clip is playing (by clip ID from WebSocket)
+    const isPlaying = assignedClipId ? playingClipIds.includes(assignedClipId) : false;
     const isSelected = selectedClipSlots.get(trackIndex) === slotIndex;
 
     // INTELLIGENT COLOR SYSTEM:

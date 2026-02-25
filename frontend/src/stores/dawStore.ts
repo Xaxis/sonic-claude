@@ -228,8 +228,7 @@ interface DAWStore {
     // Clip Launcher UI (Performance Mode)
     clipLauncherMode: "pad" | "assignment";  // View mode: PAD VIEW or ASSIGNMENT VIEW
     numClipSlots: number;  // Number of clip slots per track (scenes)
-    playingClips: Array<{ track_id: string; slot_index: number }>;  // Currently playing clips
-    playingScenes: number[];  // Currently playing scene indices
+    // NOTE: playingClips comes from WebSocket (transport.playing_clips), not stored here
     clipSlots: string[][];  // 2D grid of clip IDs [trackIndex][slotIndex]
 
     // Assistant State
@@ -542,8 +541,6 @@ export const useDAWStore = create<DAWStore>()(
                 clipLauncherMode: "pad",  // Default to PAD VIEW
                 numClipSlots: 8,  // Default 8 scenes
                 selectedClipSlots: new Map(), // trackIndex -> slotIndex (one per column)
-                playingClips: [],
-                playingScenes: [],
                 clipSlots: [],  // Loaded from backend
 
                 // Assistant State
@@ -2181,24 +2178,7 @@ export const useDAWStore = create<DAWStore>()(
             });
         },
 
-        assignClipToSlot: async (trackIndex, slotIndex, clipId) => {
-            const { activeComposition } = get();
-            if (!activeComposition) return;
 
-            try {
-                await api.compositions.assignClipToSlot({
-                    composition_id: activeComposition.id,
-                    track_index: trackIndex,
-                    slot_index: slotIndex,
-                    clip_id: clipId
-                });
-
-                // Reload clip slots from backend
-                await get().loadClipSlots();
-            } catch (error) {
-                console.error('Failed to assign clip to slot:', error);
-            }
-        },
 
         loadClipSlots: async () => {
             const { activeComposition } = get();
@@ -2581,34 +2561,18 @@ export const useDAWStore = create<DAWStore>()(
             }
 
             try {
-                // Check if already playing
-                const { playingClips } = get();
-                const isPlaying = playingClips.some(
-                    pc => pc.track_id === trackId && pc.slot_index === slotIndex
-                );
+                // TODO: Check if already playing from WebSocket state
+                // For now, just toggle - backend will handle it
 
-                if (isPlaying) {
-                    // Stop clip via backend
-                    await compositionsProvider.stopClip(activeComposition.id, clipId);
-
-                    // Update local state
-                    set({
-                        playingClips: playingClips.filter(
-                            pc => !(pc.track_id === trackId && pc.slot_index === slotIndex)
-                        )
-                    });
-                } else {
-                    // Launch clip via backend
-                    await compositionsProvider.launchClip(activeComposition.id, clipId);
-
-                    // Update local state (stop other clips on same track first)
-                    set({
-                        playingClips: [
-                            ...playingClips.filter(pc => pc.track_id !== trackId),
-                            { track_id: trackId, slot_index: slotIndex }
-                        ]
-                    });
+                // Try to stop first (backend will ignore if not playing)
+                try {
+                    await api.compositions.stopClip(activeComposition.id, clipId);
+                } catch {
+                    // If stop fails, clip wasn't playing - launch it
+                    await api.compositions.launchClip(activeComposition.id, clipId);
                 }
+
+                // WebSocket will update visual state automatically
             } catch (error) {
                 console.error('Failed to trigger clip:', error);
                 toast.error('Failed to trigger clip');
@@ -2616,65 +2580,25 @@ export const useDAWStore = create<DAWStore>()(
         },
 
         triggerScene: async (sceneIndex) => {
-            const { activeComposition, tracks, clipSlots } = get();
+            const { activeComposition, clipSlots } = get();
             if (!activeComposition || !clipSlots) return;
 
             try {
-                const { playingScenes } = get();
-                const isPlaying = playingScenes.includes(sceneIndex);
-
-                if (isPlaying) {
-                    // Stop scene - stop all clips in this row
-                    // Collect clip IDs from clip_slots grid at this scene index
-                    const clipIdsToStop: string[] = [];
-                    for (let trackIndex = 0; trackIndex < clipSlots.length; trackIndex++) {
-                        const clipId = clipSlots[trackIndex]?.[sceneIndex];
-                        if (clipId) {
-                            clipIdsToStop.push(clipId);
-                        }
+                // Launch all clips in this row
+                const clipIdsToLaunch: string[] = [];
+                for (let trackIndex = 0; trackIndex < clipSlots.length; trackIndex++) {
+                    const clipId = clipSlots[trackIndex]?.[sceneIndex];
+                    if (clipId) {
+                        clipIdsToLaunch.push(clipId);
                     }
-
-                    // Stop each clip via backend
-                    for (const clipId of clipIdsToStop) {
-                        await compositionsProvider.stopClip(activeComposition.id, clipId);
-                    }
-
-                    // Update local state
-                    set({
-                        playingScenes: playingScenes.filter(s => s !== sceneIndex),
-                        playingClips: get().playingClips.filter(pc => pc.slot_index !== sceneIndex)
-                    });
-                } else {
-                    // Launch scene - trigger all clips in this row
-                    const clipIdsToLaunch: string[] = [];
-                    for (let trackIndex = 0; trackIndex < clipSlots.length; trackIndex++) {
-                        const clipId = clipSlots[trackIndex]?.[sceneIndex];
-                        if (clipId) {
-                            clipIdsToLaunch.push(clipId);
-                        }
-                    }
-
-                    // Launch each clip via backend
-                    for (const clipId of clipIdsToLaunch) {
-                        await compositionsProvider.launchClip(activeComposition.id, clipId);
-                    }
-
-                    // Update local state - mark all clips in this scene as playing
-                    const newPlayingClips = tracks
-                        .map((track, trackIndex) => {
-                            const clipId = clipSlots?.[trackIndex]?.[sceneIndex];
-                            return clipId ? { track_id: track.id, slot_index: sceneIndex } : null;
-                        })
-                        .filter((pc): pc is { track_id: string; slot_index: number } => pc !== null);
-
-                    set({
-                        playingScenes: [...playingScenes, sceneIndex],
-                        playingClips: [
-                            ...get().playingClips.filter(pc => pc.slot_index !== sceneIndex),
-                            ...newPlayingClips
-                        ]
-                    });
                 }
+
+                // Launch each clip via backend
+                for (const clipId of clipIdsToLaunch) {
+                    await api.compositions.launchClip(activeComposition.id, clipId);
+                }
+
+                // WebSocket will update visual state automatically
             } catch (error) {
                 console.error('Failed to trigger scene:', error);
                 toast.error('Failed to trigger scene');
@@ -2687,12 +2611,9 @@ export const useDAWStore = create<DAWStore>()(
 
             try {
                 // Stop all clips on this track via backend
-                await compositionsProvider.stopTrackClips(activeComposition.id, trackId);
+                await api.compositions.stopTrackClips(activeComposition.id, trackId);
 
-                // Update local state
-                set({
-                    playingClips: get().playingClips.filter(pc => pc.track_id !== trackId)
-                });
+                // WebSocket will update visual state automatically
             } catch (error) {
                 console.error('Failed to stop track:', error);
             }
@@ -2716,14 +2637,10 @@ export const useDAWStore = create<DAWStore>()(
 
                 // Stop each clip via backend
                 for (const clipId of clipIdsToStop) {
-                    await compositionsProvider.stopClip(activeComposition.id, clipId);
+                    await api.compositions.stopClip(activeComposition.id, clipId);
                 }
 
-                // Update local state
-                set({
-                    playingScenes: get().playingScenes.filter(s => s !== sceneIndex),
-                    playingClips: get().playingClips.filter(pc => pc.slot_index !== sceneIndex)
-                });
+                // WebSocket will update visual state automatically
             } catch (error) {
                 console.error('Failed to stop scene:', error);
             }

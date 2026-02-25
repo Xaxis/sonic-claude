@@ -11,6 +11,7 @@
  */
 
 import { useDAWStore } from '@/stores/dawStore';
+import { useTransportWebSocket } from '@/hooks/useTransportWebsocket';
 import { cn } from '@/lib/utils';
 import { Play, Square } from 'lucide-react';
 import {
@@ -38,9 +39,11 @@ const SCENE_COLORS = [
 
 export function ClipLauncherScene({ sceneIndex }: ClipLauncherSceneProps) {
     // ========================================================================
-    // STATE: Read from Zustand store
+    // STATE: Read from WebSocket and Zustand
     // ========================================================================
-    const playingScenes = useDAWStore(state => state.playingScenes);
+    const { transport } = useTransportWebSocket();
+    const playingClipIds = transport.playing_clips || [];
+    const clipSlots = useDAWStore(state => state.clipSlots);
 
     // ========================================================================
     // ACTIONS: Get from Zustand store
@@ -51,7 +54,12 @@ export function ClipLauncherScene({ sceneIndex }: ClipLauncherSceneProps) {
     // ========================================================================
     // DERIVED STATE
     // ========================================================================
-    const isPlaying = playingScenes.includes(sceneIndex);
+    // A scene is "playing" if ANY clip in that row is playing
+    const isPlaying = clipSlots.some((trackSlots, trackIndex) => {
+        const clipId = trackSlots?.[sceneIndex];
+        return clipId && playingClipIds.includes(clipId);
+    });
+
     const sceneColor = SCENE_COLORS[sceneIndex % SCENE_COLORS.length];
 
     // ========================================================================
