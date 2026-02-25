@@ -695,65 +695,120 @@ SynthDef(\synthBass2, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
 // STRINGS (GM 41-48)
 // ============================================================================
 
-// 41. Violin - Bowed string instrument
-SynthDef(\violin, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8, vibrato=5|
-    var env, sig, bow, vibr;
+// 41. Violin - Bowed string instrument (Physical modeling with waveguide)
+SynthDef(\violin, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8, vibrato=5, bowPressure=0.7|
+    var env, sig, bow, vibr, exciter, resonator, formants;
     env = EnvGen.kr(Env.asr(0.1, 1, 0.2), gate, doneAction: 2);
-    // Vibrato
+
+    // Vibrato (natural violin vibrato)
     vibr = SinOsc.kr(vibrato).range(0.995, 1.005);
-    // Bowed string (filtered sawtooth)
-    sig = Mix([
-        Saw.ar(freq * vibr) * 0.5,
-        Saw.ar(freq * 2 * vibr) * 0.25,
-        Saw.ar(freq * 3 * vibr) * 0.15,
-        Saw.ar(freq * 4 * vibr) * 0.1
-    ]);
-    sig = RLPF.ar(sig, freq * 4, 0.3);
-    sig = sig * env * amp * velocity;
+
+    // Bow exciter: Filtered noise with pressure control
+    bow = LFNoise1.ar(3000) * bowPressure * velocity;
+    bow = HPF.ar(bow, 200);
+
+    // Waveguide resonator (Karplus-Strong-like delay line)
+    exciter = bow + (Impulse.ar(0) * 0.3);  // Initial attack
+    resonator = CombL.ar(exciter, 0.1, (freq * vibr).reciprocal, 8);
+
+    // Add harmonic richness with multiple delay lines (body resonance)
+    resonator = resonator + (CombL.ar(exciter, 0.1, (freq * 2 * vibr).reciprocal, 4) * 0.3);
+    resonator = resonator + (CombL.ar(exciter, 0.1, (freq * 3 * vibr).reciprocal, 2) * 0.15);
+
+    // Violin formants (body resonances around 300Hz, 900Hz, 2500Hz)
+    formants = BPF.ar(resonator, 300, 0.5, 0.3) +
+               BPF.ar(resonator, 900, 0.4, 0.4) +
+               BPF.ar(resonator, 2500, 0.3, 0.3);
+
+    sig = (resonator * 0.6 + formants * 0.4) * env * amp;
+    sig = LPF.ar(sig, 8000);  // Natural high-frequency rolloff
     Out.ar(out, [sig, sig]);
 }).add;
 
-// 42. Viola - Deeper than violin
-SynthDef(\viola, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8, vibrato=4.5|
-    var env, sig, vibr;
+// 42. Viola - Deeper than violin (Physical modeling, warmer formants)
+SynthDef(\viola, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8, vibrato=4.5, bowPressure=0.75|
+    var env, sig, bow, vibr, exciter, resonator, formants;
     env = EnvGen.kr(Env.asr(0.12, 1, 0.25), gate, doneAction: 2);
+
+    // Slower, wider vibrato for viola
     vibr = SinOsc.kr(vibrato).range(0.996, 1.004);
-    sig = Mix([
-        Saw.ar(freq * vibr) * 0.6,
-        Saw.ar(freq * 2 * vibr) * 0.25,
-        Saw.ar(freq * 3 * vibr) * 0.15
-    ]);
-    sig = RLPF.ar(sig, freq * 3.5, 0.35);
-    sig = sig * env * amp * velocity;
+
+    // Bow exciter with more weight
+    bow = LFNoise1.ar(2500) * bowPressure * velocity;
+    bow = HPF.ar(bow, 150);
+
+    // Waveguide resonator
+    exciter = bow + (Impulse.ar(0) * 0.35);
+    resonator = CombL.ar(exciter, 0.1, (freq * vibr).reciprocal, 9);
+    resonator = resonator + (CombL.ar(exciter, 0.1, (freq * 2 * vibr).reciprocal, 5) * 0.35);
+    resonator = resonator + (CombL.ar(exciter, 0.1, (freq * 3 * vibr).reciprocal, 2.5) * 0.2);
+
+    // Viola formants (lower than violin: 250Hz, 750Hz, 2200Hz)
+    formants = BPF.ar(resonator, 250, 0.6, 0.35) +
+               BPF.ar(resonator, 750, 0.5, 0.4) +
+               BPF.ar(resonator, 2200, 0.4, 0.25);
+
+    sig = (resonator * 0.65 + formants * 0.35) * env * amp;
+    sig = LPF.ar(sig, 7000);
     Out.ar(out, [sig, sig]);
 }).add;
 
-// 43. Cello - Rich, warm low strings
-SynthDef(\cello, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8, vibrato=4|
-    var env, sig, vibr;
+// 43. Cello - Rich, warm low strings (Physical modeling, deep resonance)
+SynthDef(\cello, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8, vibrato=4, bowPressure=0.8|
+    var env, sig, bow, vibr, exciter, resonator, formants, bodyResonance;
     env = EnvGen.kr(Env.asr(0.15, 1, 0.3), gate, doneAction: 2);
+
+    // Slower, narrower vibrato for cello
     vibr = SinOsc.kr(vibrato).range(0.997, 1.003);
-    sig = Mix([
-        Saw.ar(freq * vibr) * 0.7,
-        Saw.ar(freq * 2 * vibr) * 0.2,
-        Saw.ar(freq * 3 * vibr) * 0.1
-    ]);
-    sig = RLPF.ar(sig, freq * 3, 0.4);
-    sig = sig * env * amp * velocity;
+
+    // Heavier bow exciter for cello
+    bow = LFNoise1.ar(2000) * bowPressure * velocity;
+    bow = HPF.ar(bow, 100);
+
+    // Waveguide resonator with longer decay
+    exciter = bow + (Impulse.ar(0) * 0.4);
+    resonator = CombL.ar(exciter, 0.1, (freq * vibr).reciprocal, 10);
+    resonator = resonator + (CombL.ar(exciter, 0.1, (freq * 2 * vibr).reciprocal, 6) * 0.4);
+    resonator = resonator + (CombL.ar(exciter, 0.1, (freq * 3 * vibr).reciprocal, 3) * 0.25);
+
+    // Cello formants (deep: 200Hz, 600Hz, 2000Hz)
+    formants = BPF.ar(resonator, 200, 0.7, 0.4) +
+               BPF.ar(resonator, 600, 0.6, 0.35) +
+               BPF.ar(resonator, 2000, 0.5, 0.25);
+
+    // Large body resonance
+    bodyResonance = Resonz.ar(resonator, freq * 0.5, 0.05) * 0.3;
+
+    sig = (resonator * 0.5 + formants * 0.35 + bodyResonance * 0.15) * env * amp;
+    sig = LPF.ar(sig, 6000);
     Out.ar(out, [sig, sig]);
 }).add;
 
-// 44. Contrabass - Deep double bass
-SynthDef(\contrabass, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
-    var env, sig;
+// 44. Contrabass - Deep double bass (Physical modeling, massive body)
+SynthDef(\contrabass, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8, bowPressure=0.85|
+    var env, sig, bow, exciter, resonator, formants, bodyResonance;
     env = EnvGen.kr(Env.asr(0.2, 1, 0.4), gate, doneAction: 2);
-    sig = Mix([
-        Saw.ar(freq) * 0.8,
-        Saw.ar(freq * 2) * 0.15,
-        Saw.ar(freq * 3) * 0.05
-    ]);
-    sig = RLPF.ar(sig, freq * 2.5, 0.5);
-    sig = sig * env * amp * velocity;
+
+    // Very heavy bow exciter
+    bow = LFNoise1.ar(1500) * bowPressure * velocity;
+    bow = HPF.ar(bow, 60);
+
+    // Waveguide resonator with very long decay
+    exciter = bow + (Impulse.ar(0) * 0.5);
+    resonator = CombL.ar(exciter, 0.1, freq.reciprocal, 12);
+    resonator = resonator + (CombL.ar(exciter, 0.1, (freq * 2).reciprocal, 7) * 0.45);
+    resonator = resonator + (CombL.ar(exciter, 0.1, (freq * 3).reciprocal, 3.5) * 0.3);
+
+    // Contrabass formants (very deep: 150Hz, 450Hz, 1500Hz)
+    formants = BPF.ar(resonator, 150, 0.8, 0.45) +
+               BPF.ar(resonator, 450, 0.7, 0.35) +
+               BPF.ar(resonator, 1500, 0.6, 0.2);
+
+    // Massive body resonance
+    bodyResonance = Resonz.ar(resonator, freq * 0.5, 0.03) * 0.4;
+
+    sig = (resonator * 0.45 + formants * 0.35 + bodyResonance * 0.2) * env * amp;
+    sig = LPF.ar(sig, 5000);
     Out.ar(out, [sig, sig]);
 }).add;
 
@@ -861,36 +916,64 @@ SynthDef(\stringEnsemble2, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
     Out.ar(out, [sig, sig]);
 }).add;
 
-// 51. Synth Strings 1 - Analog string synth
+// 51. Synth Strings 1 - Analog string synth (Supersaw with chorus)
 SynthDef(\synthStrings1, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
-    var env, sig;
+    var env, sig, chorus, left, right;
     env = EnvGen.kr(Env.asr(0.2, 1, 0.4), gate, doneAction: 2);
+
+    // Supersaw: 7 detuned sawtooths for thick ensemble sound
     sig = Mix([
-        Saw.ar(freq * 0.998) * 0.25,
-        Saw.ar(freq) * 0.25,
-        Saw.ar(freq * 1.002) * 0.25,
-        Pulse.ar(freq * 0.999, 0.5) * 0.15,
-        Pulse.ar(freq * 1.001, 0.5) * 0.15
+        Saw.ar(freq * 0.996) * 0.14,
+        Saw.ar(freq * 0.998) * 0.15,
+        Saw.ar(freq * 0.999) * 0.16,
+        Saw.ar(freq) * 0.18,
+        Saw.ar(freq * 1.001) * 0.16,
+        Saw.ar(freq * 1.002) * 0.15,
+        Saw.ar(freq * 1.004) * 0.14
     ]);
-    sig = LPF.ar(sig, freq * 3);
-    sig = sig * env * amp * velocity;
-    Out.ar(out, [sig, sig]);
+
+    // Add pulse waves for body
+    sig = sig + Mix([
+        Pulse.ar(freq * 0.999, 0.5) * 0.1,
+        Pulse.ar(freq * 1.001, 0.5) * 0.1
+    ]);
+
+    // Gentle low-pass filtering
+    sig = LPF.ar(sig, freq * 4);
+
+    // Stereo chorus effect for width
+    left = DelayC.ar(sig, 0.05, LFNoise1.kr(0.5).range(0.01, 0.02));
+    right = DelayC.ar(sig, 0.05, LFNoise1.kr(0.6).range(0.01, 0.02));
+
+    sig = [left, right] * env * amp * velocity * 0.7;
+    Out.ar(out, sig);
 }).add;
 
-// 52. Synth Strings 2 - Brighter synth strings
+// 52. Synth Strings 2 - Brighter synth strings (Supersaw with more harmonics)
 SynthDef(\synthStrings2, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
-    var env, sig;
+    var env, sig, chorus, left, right;
     env = EnvGen.kr(Env.asr(0.15, 1, 0.3), gate, doneAction: 2);
+
+    // Wider detuning for brighter, more aggressive sound
     sig = Mix([
-        Saw.ar(freq * 0.997) * 0.2,
-        Saw.ar(freq * 0.999) * 0.2,
-        Saw.ar(freq) * 0.2,
-        Saw.ar(freq * 1.001) * 0.2,
-        Saw.ar(freq * 1.003) * 0.2
+        Saw.ar(freq * 0.995) * 0.14,
+        Saw.ar(freq * 0.997) * 0.15,
+        Saw.ar(freq * 0.999) * 0.16,
+        Saw.ar(freq) * 0.18,
+        Saw.ar(freq * 1.001) * 0.16,
+        Saw.ar(freq * 1.003) * 0.15,
+        Saw.ar(freq * 1.005) * 0.14
     ]);
-    sig = RLPF.ar(sig, freq * 5, 0.3);
-    sig = sig * env * amp * velocity;
-    Out.ar(out, [sig, sig]);
+
+    // Brighter filtering with resonance
+    sig = RLPF.ar(sig, freq * 6, 0.3);
+
+    // Stereo chorus with faster modulation
+    left = DelayC.ar(sig, 0.05, LFNoise1.kr(0.7).range(0.008, 0.018));
+    right = DelayC.ar(sig, 0.05, LFNoise1.kr(0.8).range(0.008, 0.018));
+
+    sig = [left, right] * env * amp * velocity * 0.7;
+    Out.ar(out, sig);
 }).add;
 
 // 53. Choir Aahs - Vocal choir (ah vowel)
@@ -968,50 +1051,79 @@ SynthDef(\orchestraHit, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
 // BRASS (GM 57-64)
 // ============================================================================
 
-// 57. Trumpet - Bright brass
+// 57. Trumpet - Bright brass (FM synthesis with 1:1 carrier/modulator ratio)
 SynthDef(\trumpet, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
-    var env, sig, vibrato;
+    var env, modEnv, sig, vibrato, modulator, carrier, modIndex;
     env = EnvGen.kr(Env.asr(0.05, 1, 0.1), gate, doneAction: 2);
+
+    // Modulation envelope (brightness control)
+    modEnv = EnvGen.kr(Env.asr(0.02, 0.8, 0.15));
+
+    // Vibrato
     vibrato = SinOsc.kr(5).range(0.998, 1.002);
-    // Bright brass harmonics
-    sig = Mix([
-        Saw.ar(freq * vibrato) * 0.5,
-        Saw.ar(freq * 2 * vibrato) * 0.3,
-        Saw.ar(freq * 3 * vibrato) * 0.15,
-        Saw.ar(freq * 4 * vibrato) * 0.08
-    ]);
-    sig = RLPF.ar(sig, freq * 5, 0.3);
-    sig = sig * env * amp * velocity;
+
+    // FM synthesis: 1:1 ratio for harmonic brass spectrum
+    // Modulation index controls brightness (higher = brighter)
+    modIndex = (2 + (velocity * 3)) * modEnv;  // Dynamic brightness
+    modulator = SinOsc.ar(freq * vibrato) * (freq * modIndex);
+    carrier = SinOsc.ar(freq * vibrato + modulator);
+
+    // Add slight second partial for more complexity
+    carrier = carrier + (SinOsc.ar(freq * 2 * vibrato) * 0.15);
+
+    // Brass formant filtering (emphasize 1000-1500Hz)
+    sig = BPF.ar(carrier, 1200, 0.8, 2) + (carrier * 0.5);
+    sig = LPF.ar(sig, 8000);
+
+    sig = sig * env * amp * velocity * 0.7;
     Out.ar(out, [sig, sig]);
 }).add;
 
-// 58. Trombone - Deeper brass
+// 58. Trombone - Deeper brass (FM synthesis, warmer than trumpet)
 SynthDef(\trombone, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
-    var env, sig;
+    var env, modEnv, sig, modulator, carrier, modIndex;
     env = EnvGen.kr(Env.asr(0.08, 1, 0.15), gate, doneAction: 2);
-    sig = Mix([
-        Saw.ar(freq) * 0.6,
-        Saw.ar(freq * 2) * 0.25,
-        Saw.ar(freq * 3) * 0.12,
-        Saw.ar(freq * 4) * 0.06
-    ]);
-    sig = RLPF.ar(sig, freq * 4, 0.35);
-    sig = sig * env * amp * velocity;
+
+    // Slower modulation envelope for warmer attack
+    modEnv = EnvGen.kr(Env.asr(0.05, 0.75, 0.2));
+
+    // FM synthesis: 1:1 ratio, lower modulation index for warmth
+    modIndex = (1.5 + (velocity * 2.5)) * modEnv;
+    modulator = SinOsc.ar(freq) * (freq * modIndex);
+    carrier = SinOsc.ar(freq + modulator);
+
+    // Add fundamental and second partial
+    carrier = carrier + (SinOsc.ar(freq * 2) * 0.2);
+
+    // Trombone formant (emphasize 600-900Hz)
+    sig = BPF.ar(carrier, 750, 0.9, 2.5) + (carrier * 0.5);
+    sig = LPF.ar(sig, 7000);
+
+    sig = sig * env * amp * velocity * 0.75;
     Out.ar(out, [sig, sig]);
 }).add;
 
-// 59. Tuba - Deep bass brass
+// 59. Tuba - Deep bass brass (FM synthesis, very low modulation index)
 SynthDef(\tuba, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
-    var env, sig;
+    var env, modEnv, sig, modulator, carrier, modIndex;
     env = EnvGen.kr(Env.asr(0.1, 1, 0.2), gate, doneAction: 2);
-    sig = Mix([
-        Saw.ar(freq) * 0.7,
-        Saw.ar(freq * 2) * 0.2,
-        Saw.ar(freq * 3) * 0.08,
-        Saw.ar(freq * 4) * 0.04
-    ]);
-    sig = RLPF.ar(sig, freq * 3, 0.4);
-    sig = sig * env * amp * velocity;
+
+    // Gentle modulation envelope
+    modEnv = EnvGen.kr(Env.asr(0.08, 0.7, 0.25));
+
+    // FM synthesis: 1:1 ratio, low modulation index for deep, mellow tone
+    modIndex = (1 + (velocity * 2)) * modEnv;
+    modulator = SinOsc.ar(freq) * (freq * modIndex);
+    carrier = SinOsc.ar(freq + modulator);
+
+    // Strong fundamental, weak harmonics
+    carrier = carrier + (SinOsc.ar(freq * 2) * 0.15);
+
+    // Tuba formant (emphasize 400-600Hz)
+    sig = BPF.ar(carrier, 500, 1.0, 3) + (carrier * 0.6);
+    sig = LPF.ar(sig, 5000);
+
+    sig = sig * env * amp * velocity * 0.8;
     Out.ar(out, [sig, sig]);
 }).add;
 
@@ -1031,19 +1143,28 @@ SynthDef(\mutedTrumpet, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
     Out.ar(out, [sig, sig]);
 }).add;
 
-// 61. French Horn - Warm, mellow brass
+// 61. French Horn - Warm, mellow brass (FM synthesis, smooth and round)
 SynthDef(\frenchHorn, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
-    var env, sig;
+    var env, modEnv, sig, modulator, carrier, modIndex;
     env = EnvGen.kr(Env.asr(0.1, 1, 0.2), gate, doneAction: 2);
-    sig = Mix([
-        Saw.ar(freq) * 0.5,
-        Saw.ar(freq * 2) * 0.3,
-        Saw.ar(freq * 3) * 0.15,
-        Saw.ar(freq * 4) * 0.08,
-        Saw.ar(freq * 5) * 0.04
-    ]);
-    sig = LPF.ar(sig, freq * 3.5);
-    sig = sig * env * amp * velocity;
+
+    // Smooth modulation envelope
+    modEnv = EnvGen.kr(Env.asr(0.08, 0.65, 0.3));
+
+    // FM synthesis: 1:1 ratio, moderate modulation for warmth
+    modIndex = (1.2 + (velocity * 2.2)) * modEnv;
+    modulator = SinOsc.ar(freq) * (freq * modIndex);
+    carrier = SinOsc.ar(freq + modulator);
+
+    // Add harmonics for richness
+    carrier = carrier + (SinOsc.ar(freq * 2) * 0.25);
+    carrier = carrier + (SinOsc.ar(freq * 3) * 0.1);
+
+    // French horn formant (emphasize 700-1000Hz)
+    sig = BPF.ar(carrier, 850, 0.85, 2.2) + (carrier * 0.55);
+    sig = LPF.ar(sig, 6000);
+
+    sig = sig * env * amp * velocity * 0.7;
     Out.ar(out, [sig, sig]);
 }).add;
 
@@ -1065,35 +1186,60 @@ SynthDef(\brassSection, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
     Out.ar(out, [sig, sig]);
 }).add;
 
-// 63. Synth Brass 1 - Analog brass synth
+// 63. Synth Brass 1 - Analog brass synth (Detuned sawtooths + aggressive filter sweep)
 SynthDef(\synthBrass1, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
-    var env, filterEnv, sig;
+    var env, filterEnv, sig, cutoff;
     env = EnvGen.kr(Env.asr(0.05, 1, 0.1), gate, doneAction: 2);
+
+    // Aggressive filter envelope for classic synth brass
     filterEnv = EnvGen.kr(Env.asr(0.05, 0.8, 0.2));
+
+    // Multiple detuned sawtooths for thickness
     sig = Mix([
-        Saw.ar(freq) * 0.5,
-        Saw.ar(freq * 0.999) * 0.25,
-        Saw.ar(freq * 1.001) * 0.25
+        Saw.ar(freq * 0.997) * 0.2,
+        Saw.ar(freq * 0.999) * 0.2,
+        Saw.ar(freq) * 0.2,
+        Saw.ar(freq * 1.001) * 0.2,
+        Saw.ar(freq * 1.003) * 0.2
     ]);
-    sig = RLPF.ar(sig, (freq * 4 * filterEnv) + (freq * 2), 0.25);
+
+    // Dynamic filter sweep (classic synth brass technique)
+    cutoff = (freq * 8 * filterEnv * velocity) + (freq * 1.5);
+    sig = RLPF.ar(sig, cutoff.clip(100, 12000), 0.25);
+
+    // Soft saturation for analog warmth
     sig = (sig * 1.2).tanh;
+
     sig = sig * env * amp * velocity;
     Out.ar(out, [sig, sig]);
 }).add;
 
-// 64. Synth Brass 2 - Brighter synth brass
+// 64. Synth Brass 2 - Brighter synth brass (Saw + PWM + sharper filter)
 SynthDef(\synthBrass2, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
-    var env, filterEnv, sig;
+    var env, filterEnv, sig, cutoff, pwm;
     env = EnvGen.kr(Env.asr(0.03, 1, 0.08), gate, doneAction: 2);
+
+    // Faster, brighter filter envelope
     filterEnv = EnvGen.kr(Env.asr(0.03, 0.9, 0.15));
+
+    // PWM (pulse width modulation) for movement
+    pwm = SinOsc.kr(0.3).range(0.2, 0.8);
+
+    // Mix of detuned saws and PWM pulse
     sig = Mix([
-        Saw.ar(freq * 0.998) * 0.25,
-        Saw.ar(freq) * 0.3,
-        Saw.ar(freq * 1.002) * 0.25,
-        Pulse.ar(freq, 0.3) * 0.2
+        Saw.ar(freq * 0.998) * 0.22,
+        Saw.ar(freq) * 0.25,
+        Saw.ar(freq * 1.002) * 0.22,
+        Pulse.ar(freq, pwm) * 0.31
     ]);
-    sig = RLPF.ar(sig, (freq * 5 * filterEnv) + (freq * 2.5), 0.2);
+
+    // Sharper filter sweep for brightness
+    cutoff = (freq * 10 * filterEnv * velocity) + (freq * 2);
+    sig = RLPF.ar(sig, cutoff.clip(100, 15000), 0.2);
+
+    // Harder saturation for edge
     sig = (sig * 1.3).tanh;
+
     sig = sig * env * amp * velocity;
     Out.ar(out, [sig, sig]);
 }).add;
@@ -1366,12 +1512,20 @@ SynthDef(\lead1Square, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
     Out.ar(out, [sig, sig]);
 }).add;
 
-// 82. Lead 2 (Sawtooth) - Sawtooth lead
+// 82. Lead 2 (Sawtooth) - Sawtooth lead (Detuned supersaw for thickness)
 SynthDef(\lead2Sawtooth, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
     var env, filterEnv, sig;
     env = EnvGen.kr(Env.adsr(0.01, 0.3, 0.6, 0.2), gate, doneAction: 2);
     filterEnv = EnvGen.kr(Env.adsr(0.01, 0.5, 0.3, 0.3));
-    sig = Saw.ar(freq);
+
+    // Detuned sawtooths for fat lead sound
+    sig = Mix([
+        Saw.ar(freq * 0.998) * 0.25,
+        Saw.ar(freq) * 0.3,
+        Saw.ar(freq * 1.002) * 0.25,
+        Saw.ar(freq * 2) * 0.1  // Octave for brightness
+    ]);
+
     sig = RLPF.ar(sig, (freq * 5 * filterEnv) + (freq * 2), 0.25);
     sig = sig * env * amp * velocity;
     Out.ar(out, [sig, sig]);
@@ -1433,27 +1587,46 @@ SynthDef(\lead6Voice, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
     Out.ar(out, [sig, sig]);
 }).add;
 
-// 87. Lead 7 (Fifths) - Lead with fifth harmony
+// 87. Lead 7 (Fifths) - Lead with fifth harmony (Detuned for richness)
 SynthDef(\lead7Fifths, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
     var env, filterEnv, sig;
     env = EnvGen.kr(Env.adsr(0.01, 0.3, 0.6, 0.2), gate, doneAction: 2);
     filterEnv = EnvGen.kr(Env.adsr(0.01, 0.4, 0.3, 0.3));
+
+    // Detuned root and fifth for thick harmony
     sig = Mix([
-        Saw.ar(freq) * 0.5,
-        Saw.ar(freq * 1.5) * 0.5  // Perfect fifth
+        Saw.ar(freq * 0.999) * 0.22,
+        Saw.ar(freq) * 0.25,
+        Saw.ar(freq * 1.001) * 0.22,
+        Saw.ar(freq * 1.5 * 0.999) * 0.15,  // Perfect fifth (detuned)
+        Saw.ar(freq * 1.5) * 0.16           // Perfect fifth
     ]);
+
     sig = RLPF.ar(sig, (freq * 4 * filterEnv) + (freq * 2), 0.3);
     sig = sig * env * amp * velocity;
     Out.ar(out, [sig, sig]);
 }).add;
 
-// 88. Lead 8 (Bass + Lead) - Fat bass and lead
+// 88. Lead 8 (Bass + Lead) - Fat bass and lead (Detuned layers)
 SynthDef(\lead8BassLead, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
     var env, filterEnv, sig, bass, lead;
     env = EnvGen.kr(Env.adsr(0.01, 0.3, 0.6, 0.2), gate, doneAction: 2);
     filterEnv = EnvGen.kr(Env.adsr(0.01, 0.4, 0.3, 0.3));
-    bass = Saw.ar(freq * 0.5) * 0.4;
-    lead = Saw.ar(freq) * 0.6;
+
+    // Fat detuned bass layer
+    bass = Mix([
+        Saw.ar(freq * 0.5 * 0.999) * 0.2,
+        Saw.ar(freq * 0.5) * 0.22,
+        Saw.ar(freq * 0.5 * 1.001) * 0.2
+    ]);
+
+    // Detuned lead layer
+    lead = Mix([
+        Saw.ar(freq * 0.998) * 0.18,
+        Saw.ar(freq) * 0.2,
+        Saw.ar(freq * 1.002) * 0.18
+    ]);
+
     sig = bass + lead;
     sig = RLPF.ar(sig, (freq * 4 * filterEnv) + (freq * 2), 0.3);
     sig = sig * env * amp * velocity;
@@ -1464,36 +1637,62 @@ SynthDef(\lead8BassLead, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
 // SYNTH PAD (GM 89-96)
 // ============================================================================
 
-// 89. Pad 1 (New Age) - Warm, ethereal pad
+// 89. Pad 1 (New Age) - Warm, ethereal pad (Additive synthesis + chorus)
 SynthDef(\pad1NewAge, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
-    var env, sig;
+    var env, sig, left, right;
     env = EnvGen.kr(Env.asr(0.5, 1, 1.0), gate, doneAction: 2);
+
+    // Additive synthesis: multiple sine waves for smooth, ethereal sound
     sig = Mix([
-        Saw.ar(freq * 0.997) * 0.15,
-        Saw.ar(freq * 0.999) * 0.15,
-        Saw.ar(freq) * 0.2,
-        Saw.ar(freq * 1.001) * 0.15,
-        Saw.ar(freq * 1.003) * 0.15,
-        SinOsc.ar(freq * 2) * 0.1
+        SinOsc.ar(freq * 0.997) * 0.12,
+        SinOsc.ar(freq * 0.999) * 0.13,
+        SinOsc.ar(freq) * 0.15,
+        SinOsc.ar(freq * 1.001) * 0.13,
+        SinOsc.ar(freq * 1.003) * 0.12,
+        SinOsc.ar(freq * 2) * 0.1,
+        SinOsc.ar(freq * 3) * 0.08,
+        SinOsc.ar(freq * 4) * 0.05,
+        SinOsc.ar(freq * 5) * 0.03
     ]);
-    sig = LPF.ar(sig, freq * 3);
-    sig = sig * env * amp * velocity;
-    Out.ar(out, [sig, sig]);
+
+    // Gentle filtering
+    sig = LPF.ar(sig, freq * 4);
+
+    // Wide stereo chorus for ethereal quality
+    left = DelayC.ar(sig, 0.1, LFNoise1.kr(0.3).range(0.02, 0.04));
+    right = DelayC.ar(sig, 0.1, LFNoise1.kr(0.35).range(0.02, 0.04));
+
+    sig = [left, right] * env * amp * velocity * 0.8;
+    Out.ar(out, sig);
 }).add;
 
-// 90. Pad 2 (Warm) - Soft, warm pad
+// 90. Pad 2 (Warm) - Soft, warm pad (Detuned pulses + slow LFO)
 SynthDef(\pad2Warm, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
-    var env, sig;
+    var env, sig, pwm, left, right;
     env = EnvGen.kr(Env.asr(0.4, 1, 0.8), gate, doneAction: 2);
+
+    // Slow PWM for warmth and movement
+    pwm = SinOsc.kr(0.2).range(0.3, 0.7);
+
+    // Multiple detuned pulse waves
     sig = Mix([
-        Pulse.ar(freq * 0.998, 0.5) * 0.2,
-        Pulse.ar(freq, 0.5) * 0.25,
-        Pulse.ar(freq * 1.002, 0.5) * 0.2,
-        SinOsc.ar(freq) * 0.2
+        Pulse.ar(freq * 0.997, pwm) * 0.18,
+        Pulse.ar(freq * 0.999, pwm + 0.1) * 0.19,
+        Pulse.ar(freq, pwm) * 0.2,
+        Pulse.ar(freq * 1.001, pwm - 0.1) * 0.19,
+        Pulse.ar(freq * 1.003, pwm) * 0.18,
+        SinOsc.ar(freq) * 0.15
     ]);
-    sig = LPF.ar(sig, freq * 2.5);
-    sig = sig * env * amp * velocity;
-    Out.ar(out, [sig, sig]);
+
+    // Warm low-pass filtering
+    sig = LPF.ar(sig, freq * 3);
+
+    // Subtle stereo widening
+    left = DelayC.ar(sig, 0.05, LFNoise1.kr(0.4).range(0.015, 0.025));
+    right = DelayC.ar(sig, 0.05, LFNoise1.kr(0.45).range(0.015, 0.025));
+
+    sig = [left, right] * env * amp * velocity * 0.75;
+    Out.ar(out, sig);
 }).add;
 
 // 91. Pad 3 (Polysynth) - Bright poly pad

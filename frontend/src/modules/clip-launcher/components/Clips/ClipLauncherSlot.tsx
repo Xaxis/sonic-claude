@@ -159,19 +159,36 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                     )}
 
                     {/* Content */}
-                    <div className="relative h-full flex flex-col justify-between">
-                        {/* Clip name */}
-                        <div className="text-[8px] font-bold text-white/90 truncate leading-tight drop-shadow">
-                            {clip.name}
-                        </div>
-
-                        {/* Bottom: Type + Playing indicator */}
-                        <div className="flex items-center justify-between">
-                            <div className="text-[7px] text-white/70 uppercase font-bold">
-                                {clip.type}
+                    <div className="relative h-full flex flex-col justify-between gap-1">
+                        {/* Top: Clip name + Playing indicator */}
+                        <div className="flex items-start justify-between gap-1">
+                            <div className="text-[8px] font-bold text-white/90 truncate leading-tight drop-shadow flex-1">
+                                {clip.name}
                             </div>
                             {isPlaying && (
-                                <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                                <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse flex-shrink-0 mt-0.5" />
+                            )}
+                        </div>
+
+                        {/* Middle: Loop progress bar (when playing) */}
+                        {isPlaying && (
+                            <div className="relative h-1 rounded-full overflow-hidden bg-black/40">
+                                <div
+                                    className="absolute inset-y-0 left-0 rounded-full transition-all duration-100"
+                                    style={{
+                                        width: '50%', // TODO: Calculate from actual loop progress
+                                        backgroundColor: 'white',
+                                        boxShadow: '0 0 4px white',
+                                    }}
+                                />
+                            </div>
+                        )}
+
+                        {/* Bottom: Type + Duration */}
+                        <div className="flex items-center justify-between text-[7px] text-white/70">
+                            <span className="uppercase font-bold">{clip.type}</span>
+                            {clip.duration && (
+                                <span className="font-mono">{clip.duration.toFixed(1)}s</span>
                             )}
                         </div>
                     </div>
