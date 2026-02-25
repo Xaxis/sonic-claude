@@ -52,6 +52,7 @@ export function ClipLauncherToolbar() {
     const setClipLauncherMode = useDAWStore(state => state.setClipLauncherMode);
     const setNumClipSlots = useDAWStore(state => state.setNumClipSlots);
     const updateComposition = useDAWStore(state => state.updateComposition);
+    const setLaunchQuantization = useDAWStore(state => state.setLaunchQuantization);
 
     // ========================================================================
     // DERIVED STATE
@@ -90,23 +91,18 @@ export function ClipLauncherToolbar() {
         await stop();
     }, [stop]);
 
-    const handleStopAllClips = useCallback(() => {
-        // Stop all playing clips and scenes
-        const stopTrack = useDAWStore.getState().stopTrack;
-        const stopScene = useDAWStore.getState().stopScene;
+    const handleStopAllClips = useCallback(async () => {
+        if (!activeComposition) return;
 
-        // Stop all playing clips
-        playingClips.forEach(({ track_id }) => {
-            stopTrack(track_id);
-        });
-
-        // Stop all playing scenes
-        playingScenes.forEach((sceneIndex) => {
-            stopScene(sceneIndex);
-        });
-
-        toast.success('Stopped all clips');
-    }, [playingClips, playingScenes]);
+        try {
+            const stopAllClips = useDAWStore.getState().stopAllClips;
+            await stopAllClips();
+            toast.success('Stopped all clips');
+        } catch (error) {
+            console.error('Failed to stop all clips:', error);
+            toast.error('Failed to stop all clips');
+        }
+    }, [activeComposition]);
 
     const handleAddScene = useCallback(() => {
         setNumClipSlots(numClipSlots + 1);
@@ -132,10 +128,29 @@ export function ClipLauncherToolbar() {
         }
     }, [isSessionRecording]);
 
-    const handleQuantizationChange = useCallback((value: string) => {
+    const handleQuantizationChange = useCallback(async (value: string) => {
+        // Map display value to backend value
+        const quantizationMap: Record<string, 'none' | '1/4' | '1/2' | '1' | '2' | '4'> = {
+            'None': 'none',
+            '1/16': '1/4',  // Backend doesn't support 1/16, use 1/4
+            '1/8': '1/4',   // Backend doesn't support 1/8, use 1/4
+            '1/4': '1/4',
+            '1/2': '1/2',
+            '1 Bar': '1',
+            '2 Bars': '2',
+            '4 Bars': '4',
+        };
+
+        const backendValue = quantizationMap[value];
+        if (!backendValue) {
+            console.warn(`Unknown quantization value: ${value}`);
+            return;
+        }
+
         setQuantization(value);
+        await setLaunchQuantization(backendValue);
         toast.success(`Launch quantization: ${value}`);
-    }, []);
+    }, [setLaunchQuantization]);
 
     const handleTempoChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!activeComposition) return;

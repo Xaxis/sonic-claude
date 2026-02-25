@@ -143,7 +143,7 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                             <div
                                 className="absolute inset-0 rounded animate-pulse"
                                 style={{
-                                    background: `radial-gradient(circle at center, ${slotColor} 0%, transparent 70%)`,
+                                    background: `radial-gradient(circle at center, ${padColor} 0%, transparent 70%)`,
                                     opacity: 0.5
                                 }}
                             />

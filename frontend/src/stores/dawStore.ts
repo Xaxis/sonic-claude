@@ -2611,18 +2611,13 @@ export const useDAWStore = create<DAWStore>()(
                 }
             } catch (error) {
                 console.error('Failed to trigger clip:', error);
+                toast.error('Failed to trigger clip');
             }
         },
 
         triggerScene: async (sceneIndex) => {
-            const { activeComposition, scenes, tracks, clipSlots } = get();
-            if (!activeComposition || !scenes || sceneIndex >= scenes.length) return;
-
-            const scene = scenes[sceneIndex];
-            if (!scene) {
-                console.warn(`No scene found at index ${sceneIndex}`);
-                return;
-            }
+            const { activeComposition, tracks, clipSlots } = get();
+            if (!activeComposition || !clipSlots) return;
 
             try {
                 const { playingScenes } = get();
@@ -2632,12 +2627,10 @@ export const useDAWStore = create<DAWStore>()(
                     // Stop scene - stop all clips in this row
                     // Collect clip IDs from clip_slots grid at this scene index
                     const clipIdsToStop: string[] = [];
-                    if (clipSlots) {
-                        for (let trackIndex = 0; trackIndex < clipSlots.length; trackIndex++) {
-                            const clipId = clipSlots[trackIndex]?.[sceneIndex];
-                            if (clipId) {
-                                clipIdsToStop.push(clipId);
-                            }
+                    for (let trackIndex = 0; trackIndex < clipSlots.length; trackIndex++) {
+                        const clipId = clipSlots[trackIndex]?.[sceneIndex];
+                        if (clipId) {
+                            clipIdsToStop.push(clipId);
                         }
                     }
 
@@ -2652,8 +2645,19 @@ export const useDAWStore = create<DAWStore>()(
                         playingClips: get().playingClips.filter(pc => pc.slot_index !== sceneIndex)
                     });
                 } else {
-                    // Launch scene via backend
-                    await compositionsProvider.launchScene(activeComposition.id, scene.id);
+                    // Launch scene - trigger all clips in this row
+                    const clipIdsToLaunch: string[] = [];
+                    for (let trackIndex = 0; trackIndex < clipSlots.length; trackIndex++) {
+                        const clipId = clipSlots[trackIndex]?.[sceneIndex];
+                        if (clipId) {
+                            clipIdsToLaunch.push(clipId);
+                        }
+                    }
+
+                    // Launch each clip via backend
+                    for (const clipId of clipIdsToLaunch) {
+                        await compositionsProvider.launchClip(activeComposition.id, clipId);
+                    }
 
                     // Update local state - mark all clips in this scene as playing
                     const newPlayingClips = tracks
@@ -2673,6 +2677,7 @@ export const useDAWStore = create<DAWStore>()(
                 }
             } catch (error) {
                 console.error('Failed to trigger scene:', error);
+                toast.error('Failed to trigger scene');
             }
         },
 
