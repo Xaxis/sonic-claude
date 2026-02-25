@@ -16,6 +16,10 @@ import { Meter } from "@/components/ui/meter.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { MixerButton } from "./MixerButton.tsx";
 import { volumeToDb, dbToVolume, formatDb } from "@/lib/audio-utils";
+import { useInlineAI } from "@/hooks/useInlineAI";
+import { useEntityHighlight } from "@/hooks/useEntityHighlight";
+import { InlineAIPromptPopover } from "@/components/ai/InlineAIPromptPopover";
+import { cn } from "@/lib/utils";
 
 interface MixerChannelStripProps {
     trackId: string;
@@ -42,6 +46,16 @@ export function MixerChannelStrip({ trackId }: MixerChannelStripProps) {
     // ========================================================================
     const track = tracks.find(t => t.id === trackId);
 
+    // ========================================================================
+    // INLINE AI: Universal pattern for AI editing
+    // ========================================================================
+    const { handlers: aiHandlers, showPrompt: showAIPrompt, position: aiPosition, closePrompt: closeAIPrompt } = useInlineAI({
+        entityType: "mixer_channel",
+        entityId: trackId,
+    });
+
+    const { highlightClass } = useEntityHighlight(trackId);
+
     // Validation: track must exist
     if (!track) {
         return null;
@@ -55,17 +69,19 @@ export function MixerChannelStrip({ trackId }: MixerChannelStripProps) {
     const peakRight = trackMeter?.peakRight ?? -60;
 
     return (
-        <div className="flex w-56 flex-shrink-0 flex-col gap-3 rounded-lg border border-border/70 bg-gradient-to-b from-card to-card/60 p-3 shadow-lg hover:border-border transition-all">
-            {/* Track Header */}
-            <div className="flex flex-col gap-1.5 border-b border-border/30 pb-2.5">
-                {/* Track Name */}
-                <div
-                    className="truncate text-center text-xs font-bold uppercase tracking-wider drop-shadow-sm"
-                    style={{ color: track.color }}
-                    title={track.name}
-                >
-                    {track.name}
-                </div>
+        <>
+            <div className={cn("flex w-56 flex-shrink-0 flex-col gap-3 rounded-lg border border-border/70 bg-gradient-to-b from-card to-card/60 p-3 shadow-lg hover:border-border transition-all", highlightClass)}>
+                {/* Track Header */}
+                <div className="flex flex-col gap-1.5 border-b border-border/30 pb-2.5">
+                    {/* Track Name - Right-click or long-press for AI */}
+                    <div
+                        className="truncate text-center text-xs font-bold uppercase tracking-wider drop-shadow-sm cursor-pointer"
+                        style={{ color: track.color }}
+                        title={`${track.name} • Right-click or long-press for AI`}
+                        {...aiHandlers}
+                    >
+                        {track.name}
+                    </div>
 
                 {/* Track Type Badge */}
                 <div className="flex justify-center">
@@ -141,6 +157,17 @@ export function MixerChannelStrip({ trackId }: MixerChannelStripProps) {
                 />
             </div>
         </div>
+
+        {/* INLINE AI PROMPT - Universal pattern */}
+        {showAIPrompt && aiPosition && (
+            <InlineAIPromptPopover
+                entityType="mixer_channel"
+                entityId={trackId}
+                position={aiPosition}
+                onClose={closeAIPrompt}
+            />
+        )}
+        </>
     );
 }
 

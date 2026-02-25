@@ -13,7 +13,7 @@
  * into a menu when space is constrained.
  */
 
-import { MoreVertical, Pencil, Copy, Trash2, Volume2, Scissors } from "lucide-react";
+import { MoreVertical, Pencil, Copy, Trash2, Volume2, Scissors, Sparkles } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -23,22 +23,28 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { InlineAIPrompt } from "@/components/ai/InlineAIPrompt";
+import { useDAWStore } from "@/stores/dawStore";
 
 interface SequencerClipActionsMenuProps {
+    // Clip ID
+    clipId: string;
+
     // Actions
     onEdit: () => void;
     onCopy: () => void;
     onDelete: () => void;
     onVolumeChange: (value: number) => void;
     onAudioOffsetChange?: (value: number) => void;
-    
+
     // Current values
     volume: number; // 0-2 (0-200%)
     audioOffset?: number; // seconds
-    
+
     // Clip type
     clipType: "audio" | "midi";
-    
+
     // Styling
     className?: string;
 }

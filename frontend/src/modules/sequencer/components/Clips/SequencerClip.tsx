@@ -19,6 +19,9 @@ import { useWaveformData } from "../../hooks/useWaveformData.ts";
 import { SequencerClipNameEditor } from "./SequencerClipNameEditor.tsx";
 import { SequencerClipActionsMenu } from "./SequencerClipActionsMenu.tsx";
 import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
+import { useInlineAI } from "@/hooks/useInlineAI";
+import { useEntityHighlight } from "@/hooks/useEntityHighlight";
+import { InlineAIPromptPopover } from "@/components/ai/InlineAIPromptPopover";
 
 interface SequencerClipProps {
     clip: SequencerClip;  // Iteration data - acceptable to pass
@@ -77,6 +80,17 @@ export function SequencerClip({
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null);
     const [isEditingName, setIsEditingName] = useState(false);
+
+    // ========================================================================
+    // INLINE AI: Universal pattern for AI editing
+    // ========================================================================
+    const { handlers: aiHandlers, showPrompt: showAIPrompt, position: aiPosition, closePrompt: closeAIPrompt } = useInlineAI({
+        entityType: "clip",
+        entityId: clip.id,
+        disabled: isDragging || isResizing !== null || isEditingName,
+    });
+
+    const { highlightClass } = useEntityHighlight(clip.id);
 
     // Handle clip rename
     const handleRename = (clipId: string, newName: string) => {
@@ -253,7 +267,8 @@ export function SequencerClip({
                             ? "border-white shadow-lg"
                             : "border-white/40",
                     isDragging && "opacity-70",
-                    isResizing && "opacity-70"
+                    isResizing && "opacity-70",
+                    highlightClass
                 )}
                 style={{
                     left: `${left}px`,
@@ -265,6 +280,7 @@ export function SequencerClip({
                 }}
             onClick={handleClick}
             onMouseDown={(e) => handleMouseDown(e, "move")}
+            {...aiHandlers}
         >
             {/* Left resize handle */}
             <div
@@ -363,6 +379,16 @@ export function SequencerClip({
 
             {/* Volume and audio offset controls are now in the dropdown menu only */}
             </div>
+
+            {/* INLINE AI PROMPT - Universal pattern */}
+            {showAIPrompt && aiPosition && (
+                <InlineAIPromptPopover
+                    entityType="clip"
+                    entityId={clip.id}
+                    position={aiPosition}
+                    onClose={closeAIPrompt}
+                />
+            )}
         </>
     );
 }

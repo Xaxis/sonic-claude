@@ -247,6 +247,10 @@ interface DAWStore {
     isSendingMessage: boolean;
     isLoadingAssistantState: boolean;
 
+    // Inline AI State (for context-aware editing)
+    inlineAIHighlights: Map<string, number>;  // entity_id -> timestamp (for animation)
+    activeInlineAIPrompt: { entityType: string; entityId: string } | null;
+
     // Inputs UI State
     activeInputsTab: "audio" | "midi" | "library";
 
@@ -441,6 +445,18 @@ interface DAWStore {
     sendMessage: (message: string) => Promise<void>;
     refreshAssistantState: () => Promise<void>;
 
+    // Inline AI Actions
+    sendContextualMessage: (params: {
+        message: string;
+        entity_type: string;
+        entity_id: string;
+        composition_id: string;
+    }) => Promise<void>;
+    highlightEntity: (entityId: string) => void;
+    clearEntityHighlight: (entityId: string) => void;
+    clearAllHighlights: () => void;
+    setActiveInlineAIPrompt: (entityType: string | null, entityId: string | null) => void;
+
     // Inputs UI Actions
     setActiveInputsTab: (tab: "audio" | "midi" | "library") => void;
 
@@ -565,6 +581,10 @@ export const useDAWStore = create<DAWStore>()(
                 activeAssistantTab: "chat",
                 isSendingMessage: false,
                 isLoadingAssistantState: false,
+
+                // Inline AI State
+                inlineAIHighlights: new Map(),
+                activeInlineAIPrompt: null,
 
                 // Inputs UI State (PERSISTED)
                 activeInputsTab: "audio",
@@ -2462,6 +2482,77 @@ export const useDAWStore = create<DAWStore>()(
             } finally {
                 set({ isLoadingAssistantState: false });
             }
+        },
+
+        // ====================================================================
+        // INLINE AI ACTIONS
+        // ====================================================================
+
+        sendContextualMessage: async (params) => {
+            try {
+                const { message, entity_type, entity_id, composition_id } = params;
+
+                // Send contextual message to backend
+                const response = await api.assistant.contextualChat({
+                    message,
+                    entity_type,
+                    entity_id,
+                    composition_id,
+                });
+
+                // Highlight affected entities
+                if (response.affected_entities) {
+                    response.affected_entities.forEach((entity: any) => {
+                        get().highlightEntity(entity.id);
+                    });
+                }
+
+                // Reload composition to see changes
+                const { activeComposition } = get();
+                if (activeComposition) {
+                    await get().loadComposition(activeComposition.id);
+                    await get().refreshUndoRedoStatus();
+                }
+
+                toast.success("AI modifications applied");
+            } catch (error) {
+                console.error("Failed to send contextual message:", error);
+                toast.error("Failed to process AI request");
+                throw error;
+            }
+        },
+
+        highlightEntity: (entityId) => {
+            set((state) => {
+                const newHighlights = new Map(state.inlineAIHighlights);
+                newHighlights.set(entityId, Date.now());
+                return { inlineAIHighlights: newHighlights };
+            });
+
+            // Auto-clear highlight after 3 seconds
+            setTimeout(() => {
+                get().clearEntityHighlight(entityId);
+            }, 3000);
+        },
+
+        clearEntityHighlight: (entityId) => {
+            set((state) => {
+                const newHighlights = new Map(state.inlineAIHighlights);
+                newHighlights.delete(entityId);
+                return { inlineAIHighlights: newHighlights };
+            });
+        },
+
+        clearAllHighlights: () => {
+            set({ inlineAIHighlights: new Map() });
+        },
+
+        setActiveInlineAIPrompt: (entityType, entityId) => {
+            set({
+                activeInlineAIPrompt: entityType && entityId
+                    ? { entityType, entityId }
+                    : null
+            });
         },
 
         // ====================================================================

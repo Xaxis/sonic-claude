@@ -283,6 +283,165 @@ Call ALL the tools needed to complete ALL steps. Don't stop after one tool call.
             "plan": plan_text  # Include the plan separately for frontend
         }
 
+    async def send_contextual_message(
+        self,
+        message: str,
+        entity_type: str,
+        entity_id: str,
+        composition_id: str,
+        additional_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Send contextual message scoped to a specific entity
+
+        This is used for inline AI editing where the user right-clicks on an entity
+        and asks the AI to modify it with natural language.
+
+        Args:
+            message: User's natural language request
+            entity_type: Type of entity (track, clip, effect, mixer_channel, composition)
+            entity_id: ID of the specific entity
+            composition_id: ID of the composition
+            additional_context: Optional additional context
+
+        Returns:
+            Dict with 'response', 'actions_executed', and 'affected_entities'
+        """
+        from backend.services.ai.context_builder_service import ContextBuilderService
+
+        # Build focused context for the entity
+        context_builder = ContextBuilderService(
+            composition_state_service=self.action_service.composition_state,
+            mixer_service=self.action_service.mixer,
+            effects_service=self.action_service.effects
+        )
+
+        # Get entity-specific context
+        if entity_type == "track":
+            entity_context = context_builder.build_track_context(composition_id, entity_id)
+        elif entity_type == "clip":
+            entity_context = context_builder.build_clip_context(composition_id, entity_id)
+        elif entity_type == "effect":
+            entity_context = context_builder.build_effect_context(composition_id, entity_id)
+        elif entity_type == "mixer_channel":
+            entity_context = context_builder.build_mixer_channel_context(composition_id, entity_id)
+        elif entity_type == "composition":
+            entity_context = context_builder.build_composition_context(composition_id)
+        else:
+            raise ValueError(f"Unknown entity type: {entity_type}")
+
+        # Build contextual prompt
+        contextual_prompt = self._build_contextual_prompt(
+            message=message,
+            entity_type=entity_type,
+            entity_context=entity_context,
+            additional_context=additional_context
+        )
+
+        # Execute with AI (similar to send_message but with focused context)
+        logger.info(f"🎯 Contextual AI request for {entity_type} {entity_id}: '{message}'")
+
+        # Planning stage
+        planning_response = self.client.messages.create(
+            model=self.model,
+            max_tokens=2048,
+            system=contextual_prompt,
+            messages=[{
+                "role": "user",
+                "content": message
+            }]
+        )
+
+        plan_text = planning_response.content[0].text if planning_response.content else ""
+        logger.info(f"📋 Contextual Plan:\n{plan_text}")
+
+        # Execution stage
+        execution_prompt = self._build_execution_prompt()
+        messages = [
+            {"role": "user", "content": message},
+            {"role": "assistant", "content": plan_text},
+            {"role": "user", "content": "Execute the plan using the available tools."}
+        ]
+
+        actions_executed = []
+        affected_entities = []
+        max_turns = 10
+        turn = 0
+
+        while turn < max_turns:
+            turn += 1
+
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                system=execution_prompt,
+                messages=messages,
+                tools=self._get_tool_definitions()
+            )
+
+            tool_calls_made = False
+
+            for block in response.content:
+                if block.type == "tool_use":
+                    tool_calls_made = True
+
+                    action = DAWAction(
+                        action=block.name,
+                        parameters=block.input
+                    )
+
+                    result = await self.action_service.execute_action(action)
+                    actions_executed.append(result)
+
+                    # Track affected entities for highlighting
+                    if result.success and result.data:
+                        affected_entity = self._extract_affected_entity(action, result)
+                        if affected_entity:
+                            affected_entities.append(affected_entity)
+
+                    messages.append({
+                        "role": "assistant",
+                        "content": response.content
+                    })
+                    messages.append({
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": f"Success: {result.success}\nMessage: {result.message}"
+                        }]
+                    })
+
+            if not tool_calls_made:
+                break
+
+        # Build response message
+        full_response = f"✅ Modified {entity_type} '{entity_id}'\n\n{plan_text}"
+
+        return {
+            "response": full_response,
+            "actions_executed": actions_executed,
+            "affected_entities": affected_entities,
+            "musical_context": str(entity_context)
+        }
+
+    def _extract_affected_entity(self, action: DAWAction, result: ActionResult) -> Optional[Dict[str, str]]:
+        """Extract affected entity from action result for highlighting"""
+        if not result.data:
+            return None
+
+        # Map action types to entity types
+        if action.action == "create_track":
+            return {"type": "track", "id": result.data.get("track_id")}
+        elif action.action in ["create_midi_clip", "modify_clip"]:
+            return {"type": "clip", "id": result.data.get("clip_id")}
+        elif action.action == "add_effect":
+            return {"type": "effect", "id": result.data.get("effect_id")}
+        elif action.action == "set_track_parameter":
+            return {"type": "track", "id": action.parameters.get("track_id")}
+
+        return None
+
     async def _save_ai_iteration(self, user_message: str, assistant_response: str, actions_executed: List[ActionResult]) -> None:
         """Save composition as AI iteration after actions are executed"""
         try:
@@ -446,6 +605,122 @@ CRITICAL RULES
 🚨 **THINK COMPLETE WORKFLOWS** - don't plan half-finished actions
 
 Remember: You're PLANNING, not executing. Be thorough and specific."""
+
+    def _build_contextual_prompt(
+        self,
+        message: str,
+        entity_type: str,
+        entity_context: Dict[str, Any],
+        additional_context: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Build contextual prompt for entity-specific AI editing"""
+        import json
+
+        instruments_list = self._build_instruments_list()
+        effects_list = self._build_effects_list()
+
+        entity_context_str = json.dumps(entity_context, indent=2)
+
+        entity_guidance = {
+            "track": """
+You are modifying a TRACK. You can:
+- Adjust track parameters (volume, pan, mute, solo)
+- Add/modify/remove clips on this track
+- Add/modify/remove effects on this track
+- Change the track's instrument (for MIDI tracks)
+
+Focus on this specific track while considering the overall composition context.""",
+            "clip": """
+You are modifying a CLIP. You can:
+- Modify MIDI notes (for MIDI clips)
+- Adjust clip timing (start_time, duration)
+- Adjust clip gain/volume
+- Transpose notes, add variation, change rhythm
+
+Focus on this specific clip while considering the track and composition context.""",
+            "effect": """
+You are modifying an EFFECT. You can:
+- Adjust effect parameters
+- Bypass/enable the effect
+- Consider the effect's position in the signal chain
+
+Focus on this specific effect while considering the track context.""",
+            "mixer_channel": """
+You are modifying a MIXER CHANNEL. You can:
+- Adjust fader level (volume)
+- Adjust pan position
+- Toggle mute/solo
+- Adjust input gain
+
+Focus on this specific channel while considering the overall mix.""",
+            "composition": """
+You are modifying the COMPOSITION. You can:
+- Adjust global tempo
+- Add/remove tracks
+- Modify arrangement
+- Adjust overall mix balance
+
+Consider the entire composition holistically."""
+        }
+
+        return f"""You are a music production AI in CONTEXTUAL EDITING mode.
+
+The user has right-clicked on a {entity_type.upper()} and asked you to modify it.
+
+═══════════════════════════════════════════════════════════════════════════════
+ENTITY CONTEXT
+═══════════════════════════════════════════════════════════════════════════════
+{entity_context_str}
+
+═══════════════════════════════════════════════════════════════════════════════
+EDITING SCOPE
+═══════════════════════════════════════════════════════════════════════════════
+{entity_guidance.get(entity_type, "")}
+
+═══════════════════════════════════════════════════════════════════════════════
+AVAILABLE INSTRUMENTS
+═══════════════════════════════════════════════════════════════════════════════
+{instruments_list}
+
+═══════════════════════════════════════════════════════════════════════════════
+AVAILABLE EFFECTS
+═══════════════════════════════════════════════════════════════════════════════
+{effects_list}
+
+═══════════════════════════════════════════════════════════════════════════════
+YOUR TASK
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Understand the user's request in the context of this specific {entity_type}
+2. Analyze the current state of the {entity_type}
+3. Generate a focused plan to modify this {entity_type}
+4. Be specific with parameter values and musical content
+
+Generate a plan in this format:
+
+**ANALYSIS:**
+[Brief analysis of the request and current {entity_type} state]
+
+**PLAN:**
+Step 1: [Action] - [Specific details]
+  - Parameter 1: [value]
+  - Parameter 2: [value]
+
+[Continue for all steps...]
+
+**MUSICAL REASONING:**
+[Explain why this plan achieves the user's goal for this {entity_type}]
+
+═══════════════════════════════════════════════════════════════════════════════
+CRITICAL RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+🚨 **STAY FOCUSED** - Modify only this {entity_type} unless the request explicitly asks for more
+🚨 **BE SPECIFIC** - Use exact parameter values, not vague terms
+🚨 **CONSIDER CONTEXT** - Understand how this {entity_type} fits in the bigger picture
+🚨 **PRESERVE INTENT** - Don't drastically change things unless asked
+
+Remember: You're planning focused edits to this specific {entity_type}."""
 
     def _build_execution_prompt(self) -> str:
         """Build STAGE 2 execution prompt"""

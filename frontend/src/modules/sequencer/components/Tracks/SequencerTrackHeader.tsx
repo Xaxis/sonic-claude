@@ -25,6 +25,9 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { useDAWStore } from "@/stores/dawStore";
+import { useInlineAI } from "@/hooks/useInlineAI";
+import { useEntityHighlight } from "@/hooks/useEntityHighlight";
+import { InlineAIPromptPopover } from "@/components/ai/InlineAIPromptPopover";
 
 interface SequencerTrackHeaderProps {
     trackId: string;
@@ -62,6 +65,17 @@ export function SequencerTrackHeader({
     // ========================================================================
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState(track?.name || "");
+
+    // ========================================================================
+    // INLINE AI: Universal pattern for AI editing
+    // ========================================================================
+    const { handlers: aiHandlers, showPrompt: showAIPrompt, position: aiPosition, closePrompt: closeAIPrompt } = useInlineAI({
+        entityType: "track",
+        entityId: trackId,
+        disabled: isEditing, // Disable AI when editing name
+    });
+
+    const { highlightClass } = useEntityHighlight(trackId);
 
     // Guard: If track not found, render nothing
     if (!track) {
@@ -162,11 +176,12 @@ export function SequencerTrackHeader({
                         {track.type}
                     </Badge>
 
-                    {/* Track Name - Always visible, click to expand */}
+                    {/* Track Name - Always visible, click to expand, right-click/long-press for AI */}
                     <div
-                        className="flex-1 min-w-0 cursor-pointer"
+                        className={cn("flex-1 min-w-0 cursor-pointer transition-all", highlightClass)}
                         onClick={() => onToggleExpand?.(track.id)}
-                        title="Click to expand track controls"
+                        title="Click to expand • Right-click or long-press for AI"
+                        {...aiHandlers}
                     >
                         {isEditing ? (
                             <input
@@ -331,6 +346,16 @@ export function SequencerTrackHeader({
                         </div>
                     </div>
                 </>
+            )}
+
+            {/* INLINE AI PROMPT - Universal pattern */}
+            {showAIPrompt && aiPosition && (
+                <InlineAIPromptPopover
+                    entityType="track"
+                    entityId={trackId}
+                    position={aiPosition}
+                    onClose={closeAIPrompt}
+                />
             )}
         </div>
     );

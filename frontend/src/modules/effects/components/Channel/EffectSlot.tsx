@@ -18,6 +18,9 @@ import { ChevronDown, Trash2, GripVertical } from "lucide-react";
 import { useDAWStore } from '@/stores/dawStore';
 import { EffectParameterControl } from "./EffectParameterControl";
 import { cn } from "@/lib/utils";
+import { useInlineAI } from "@/hooks/useInlineAI";
+import { useEntityHighlight } from "@/hooks/useEntityHighlight";
+import { InlineAIPromptPopover } from "@/components/ai/InlineAIPromptPopover";
 
 interface EffectSlotProps {
     effectId: string; // ✅ Identifier - acceptable
@@ -58,6 +61,17 @@ export function EffectSlot({
     // LOCAL STATE
     // ========================================================================
     const [isExpanded, setIsExpanded] = useState(false);
+
+    // ========================================================================
+    // INLINE AI: Universal pattern for AI editing
+    // ========================================================================
+    const { handlers: aiHandlers, showPrompt: showAIPrompt, position: aiPosition, closePrompt: closeAIPrompt } = useInlineAI({
+        entityType: "effect",
+        entityId: effectId,
+        disabled: isDragging,
+    });
+
+    const { highlightClass } = useEntityHighlight(effectId);
 
     // ========================================================================
     // DERIVED STATE: Find effect instance
@@ -119,21 +133,24 @@ export function EffectSlot({
     };
 
     return (
-        <div
-            draggable={true}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onDragEnd={handleDragEnd}
-            className={cn(
-                "rounded-lg border transition-all duration-200",
-                effect.is_bypassed
-                    ? "border-border/30 bg-background/5 opacity-50"
-                    : "border-border/50 bg-gradient-to-b from-background/80 to-background/40 hover:border-primary/50",
-                isDragging && "opacity-40 scale-95",
-                isDragOver && "border-primary ring-2 ring-primary/50"
-            )}
+        <>
+            <div
+                draggable={true}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onDragEnd={handleDragEnd}
+                className={cn(
+                    "rounded-lg border transition-all duration-200",
+                    effect.is_bypassed
+                        ? "border-border/30 bg-background/5 opacity-50"
+                        : "border-border/50 bg-gradient-to-b from-background/80 to-background/40 hover:border-primary/50",
+                    isDragging && "opacity-40 scale-95",
+                    isDragOver && "border-primary ring-2 ring-primary/50",
+                    highlightClass
+                )}
+                {...aiHandlers}
         >
             {/* Effect Header - Spacious and clean */}
             <div className="p-3.5 space-y-3">
@@ -233,6 +250,17 @@ export function EffectSlot({
                 </div>
             )}
         </div>
+
+        {/* INLINE AI PROMPT - Universal pattern */}
+        {showAIPrompt && aiPosition && (
+            <InlineAIPromptPopover
+                entityType="effect"
+                entityId={effectId}
+                position={aiPosition}
+                onClose={closeAIPrompt}
+            />
+        )}
+        </>
     );
 }
 

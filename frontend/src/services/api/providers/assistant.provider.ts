@@ -27,6 +27,21 @@ export interface ChatResponse {
     musical_context?: string | null;
 }
 
+export interface ContextualChatRequest {
+    message: string;
+    entity_type: string;
+    entity_id: string;
+    composition_id: string;
+    additional_context?: Record<string, any>;
+}
+
+export interface ContextualChatResponse {
+    response: string;
+    actions_executed?: any[];
+    affected_entities?: Array<{ type: string; id: string }>;
+    musical_context?: string | null;
+}
+
 export interface GetStateRequest {
     detail?: {
         include_clips?: boolean;
@@ -74,6 +89,10 @@ export class AssistantProvider extends BaseAPIClient {
     // === CHAT ===
     async chat(request: ChatRequest): Promise<ChatResponse> {
         return this.post("/api/assistant/chat", request);
+    }
+
+    async contextualChat(request: ContextualChatRequest): Promise<ContextualChatResponse> {
+        return this.post("/api/assistant/contextual-chat", request);
     }
 
     // === STATE ===
