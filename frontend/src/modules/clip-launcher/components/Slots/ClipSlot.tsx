@@ -12,7 +12,7 @@
  * NO PROP DRILLING - Reads from Zustand store
  */
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useDAWStore } from '@/stores/dawStore';
 import { cn } from '@/lib/utils';
 import {
@@ -117,12 +117,22 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
         }, 2000);
     };
 
-    // Empty slot with context menu and record button
+    // Empty slot - SINGLE CLICK to show menu (better UX)
     if (isEmpty) {
+        const [menuOpen, setMenuOpen] = React.useState(false);
+
         return (
-            <ContextMenu>
+            <ContextMenu open={menuOpen} onOpenChange={setMenuOpen}>
                 <ContextMenuTrigger asChild>
-                    <div className="relative h-32 rounded-md border border-border/30 bg-black/40 hover:border-border/60 hover:bg-black/50 transition-all cursor-pointer flex items-center justify-center group">
+                    <div
+                        className="relative h-32 rounded-md border border-border/30 bg-black/40 hover:border-border/60 hover:bg-black/50 transition-all cursor-pointer flex items-center justify-center group"
+                        onClick={(e) => {
+                            // Single click opens menu
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setMenuOpen(true);
+                        }}
+                    >
                         {/* Plus icon for assigning clips */}
                         <div className="text-4xl opacity-20 group-hover:opacity-40 transition-opacity">+</div>
 
@@ -161,7 +171,10 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
                         availableClips.map((clip) => (
                             <ContextMenuItem
                                 key={clip.id}
-                                onClick={() => handleAssignClip(clip.id)}
+                                onClick={() => {
+                                    handleAssignClip(clip.id);
+                                    setMenuOpen(false);
+                                }}
                                 className="gap-2"
                             >
                                 {clip.type === 'midi' ? (
@@ -203,21 +216,21 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
                         console.log('MOUSE DOWN on clip slot');
                     }}
                     style={{
-                        // VIBRANT SATURATED BACKGROUND - Like Ableton/APC hardware
+                        // BRIGHT SATURATED COLORS - Like Ableton Live Session View
                         backgroundColor: isPlaying
-                            ? trackColor
+                            ? trackColor // Full saturation when playing
                             : isTriggered
-                            ? '#facc15' // Bright yellow for triggered
+                            ? '#fbbf24' // Bright yellow for triggered
                             : isStopping
                             ? '#ef4444' // Bright red for stopping
-                            : `${trackColor}dd`, // Slightly transparent when idle
+                            : trackColor, // Full color when idle
                         boxShadow: isPlaying
-                            ? `0 0 20px ${trackColor}, 0 4px 12px rgba(0,0,0,0.4)`
+                            ? `0 0 20px ${trackColor}, 0 4px 12px rgba(0,0,0,0.5)`
                             : isTriggered
-                            ? '0 0 20px #facc15, 0 4px 12px rgba(0,0,0,0.4)'
+                            ? '0 0 20px #fbbf24, 0 4px 12px rgba(0,0,0,0.5)'
                             : isStopping
-                            ? '0 0 20px #ef4444, 0 4px 12px rgba(0,0,0,0.4)'
-                            : `0 2px 8px rgba(0,0,0,0.3)`,
+                            ? '0 0 20px #ef4444, 0 4px 12px rgba(0,0,0,0.5)'
+                            : '0 2px 8px rgba(0,0,0,0.4)',
                     }}
                 >
             {/* Dark overlay for contrast */}
@@ -274,8 +287,32 @@ export function ClipSlot({ trackIndex, slotIndex }: ClipSlotProps) {
             </div>
                 </button>
             </ContextMenuTrigger>
-            <ContextMenuContent className="w-48">
-                <ContextMenuLabel>{clip.name}</ContextMenuLabel>
+            <ContextMenuContent className="w-56">
+                <ContextMenuLabel>Reassign Clip</ContextMenuLabel>
+                <ContextMenuSeparator />
+                {availableClips.length === 0 ? (
+                    <ContextMenuItem disabled>
+                        <span className="text-muted-foreground text-xs">No clips on this track</span>
+                    </ContextMenuItem>
+                ) : (
+                    availableClips.map((availableClip) => (
+                        <ContextMenuItem
+                            key={availableClip.id}
+                            onClick={() => handleAssignClip(availableClip.id)}
+                            className="gap-2"
+                        >
+                            {availableClip.type === 'midi' ? (
+                                <Music size={14} className="text-primary" />
+                            ) : (
+                                <AudioWaveform size={14} className="text-accent" />
+                            )}
+                            <span className="truncate">{availableClip.name}</span>
+                            <span className="ml-auto text-[10px] text-muted-foreground font-mono">
+                                {availableClip.duration.toFixed(1)}s
+                            </span>
+                        </ContextMenuItem>
+                    ))
+                )}
                 <ContextMenuSeparator />
                 <ContextMenuItem onClick={handleClearSlot} className="gap-2 text-destructive">
                     <X size={14} />

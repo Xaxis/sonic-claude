@@ -28,16 +28,16 @@ interface SceneTriggerProps {
     sceneIndex: number;
 }
 
-// Predefined color palette for scenes
+// Professional muted color palette for scenes
 const SCENE_COLORS = [
-    '#f39c12', // Orange (default)
-    '#e74c3c', // Red
-    '#9b59b6', // Purple
-    '#3498db', // Blue
-    '#1abc9c', // Teal
-    '#2ecc71', // Green
-    '#f1c40f', // Yellow
-    '#e67e22', // Dark Orange
+    '#d97706', // Amber (default)
+    '#dc2626', // Red
+    '#7c3aed', // Violet
+    '#2563eb', // Blue
+    '#0891b2', // Cyan
+    '#059669', // Emerald
+    '#ca8a04', // Yellow
+    '#ea580c', // Orange
 ];
 
 export function SceneTrigger({ sceneIndex }: SceneTriggerProps) {
@@ -128,9 +128,10 @@ export function SceneTrigger({ sceneIndex }: SceneTriggerProps) {
                         handleStartEdit();
                     }}
                     style={{
-                        // VIBRANT SATURATED BACKGROUND
-                        backgroundColor: `${scene.color}dd`,
-                        boxShadow: `0 2px 8px rgba(0,0,0,0.3), 0 0 0 1px ${scene.color}`,
+                        // Professional muted background
+                        backgroundColor: `${scene.color}99`,
+                        border: `1px solid ${scene.color}`,
+                        boxShadow: `0 2px 6px rgba(0,0,0,0.2)`,
                     }}
                 >
                     {/* Dark overlay for contrast */}

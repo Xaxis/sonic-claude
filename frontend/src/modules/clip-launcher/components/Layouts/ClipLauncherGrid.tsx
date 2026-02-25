@@ -100,32 +100,48 @@ export function ClipLauncherGrid() {
                 ))}
             </div>
 
-            {/* SCROLLABLE GRID CONTENT */}
+            {/* SCROLLABLE GRID CONTENT - ROW-BASED WITH ALTERNATING COLORS */}
             <div className="flex-1 overflow-x-auto overflow-y-auto">
-                <div className="flex gap-2 px-6 pb-6 min-w-min">
-                    {/* Scene column */}
-                    <div className="flex flex-col gap-2 w-28 flex-shrink-0">
-                        {Array.from({ length: numSlots }).map((_, slotIndex) => (
-                            <SceneTrigger key={slotIndex} sceneIndex={slotIndex} />
-                        ))}
-                    </div>
-
-                    {/* Track columns */}
-                    {tracks.map((track, trackIndex) => (
-                        <div key={track.id} className="flex flex-col gap-2 w-48 flex-shrink-0">
-                            {/* Clip slots */}
-                            <div className="flex flex-col gap-2">
-                                {Array.from({ length: numSlots }).map((_, slotIndex) => (
-                                    <ClipSlot key={slotIndex} trackIndex={trackIndex} slotIndex={slotIndex} />
-                                ))}
+                <div className="flex flex-col px-6 pt-4 pb-6 min-w-min">
+                    {/* Rows (scenes) */}
+                    {Array.from({ length: numSlots }).map((_, slotIndex) => (
+                        <div
+                            key={slotIndex}
+                            className="flex gap-2 mb-2"
+                            style={{
+                                backgroundColor: slotIndex % 2 === 0
+                                    ? 'rgba(255, 255, 255, 0.02)'
+                                    : 'rgba(0, 0, 0, 0.15)',
+                                borderRadius: '6px',
+                                padding: '4px',
+                            }}
+                        >
+                            {/* Scene trigger */}
+                            <div className="w-28 flex-shrink-0">
+                                <SceneTrigger sceneIndex={slotIndex} />
                             </div>
 
-                            {/* Track footer - STOP BUTTON */}
-                            <div className="mt-2">
-                                <TrackStopButton trackId={track.id} trackColor={track.color} />
-                            </div>
+                            {/* Clip slots for this row */}
+                            {tracks.map((track, trackIndex) => (
+                                <div key={track.id} className="w-48 flex-shrink-0">
+                                    <ClipSlot trackIndex={trackIndex} slotIndex={slotIndex} />
+                                </div>
+                            ))}
                         </div>
                     ))}
+
+                    {/* Track footer row - STOP BUTTONS */}
+                    <div className="flex gap-2 mt-4">
+                        {/* Empty space for scene column */}
+                        <div className="w-28 flex-shrink-0" />
+
+                        {/* Stop buttons for each track */}
+                        {tracks.map((track) => (
+                            <div key={track.id} className="w-48 flex-shrink-0">
+                                <TrackStopButton trackId={track.id} trackColor={track.color} />
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>

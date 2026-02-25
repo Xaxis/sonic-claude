@@ -982,7 +982,11 @@ class PlaybackEngineService:
             return
 
         # Get track bus from mixer
-        track_bus = self.mixer_service.get_track_bus(track.id) if self.mixer_service else 0
+        track_bus = 0  # Default to master bus
+        if self.audio_bus_manager:
+            bus = self.audio_bus_manager.get_track_bus(track.id)
+            if bus is not None:
+                track_bus = bus
 
         if clip.type == "audio":
             # Launch audio clip
