@@ -108,8 +108,8 @@ export function ClipLauncherGrid() {
                     </div>
                 </div>
 
-                {/* Scene Triggers - Scrollable */}
-                <div className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                {/* Scene Triggers - No individual scrolling */}
+                <div className="flex flex-col gap-2">
                     {Array.from({ length: numSlots }).map((_, slotIndex) => (
                         <div key={slotIndex} className="h-20 flex-shrink-0">
                             <ClipLauncherScene sceneIndex={slotIndex} />
@@ -194,8 +194,8 @@ export function ClipLauncherGrid() {
                         )}
                     </div>
 
-                    {/* Clip Slots - Scrollable */}
-                    <div className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                    {/* Clip Slots - No individual scrolling */}
+                    <div className="flex flex-col gap-2">
                         {Array.from({ length: numSlots }).map((_, slotIndex) => (
                             <div key={slotIndex} className="h-20 flex-shrink-0">
                                 {isEmpty(trackIndex) ? (

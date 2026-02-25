@@ -2233,8 +2233,922 @@ SynthDef(\gunshot, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
     Out.ar(out, [sig, sig]);
 }).add;
 
+// ============================================================================
+// EXTENDED INSTRUMENTS - PHASE 4
+// ============================================================================
+
+// ============================================================================
+// VINTAGE SYNTHESIZERS (15 instruments)
+// ============================================================================
+
+// 129. Moog Lead - Classic Moog ladder filter lead
+SynthDef(\moogLead, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig;
+    env = EnvGen.kr(Env.adsr(0.01, 0.3, 0.7, 0.5), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.01, 0.5, 0.3, 0.3), gate);
+    sig = Saw.ar(freq);
+    sig = MoogFF.ar(sig, (freq * 4 * filterEnv * velocity).clip(20, 18000), 3.5);
+    sig = sig * env * amp * velocity * 0.3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 130. Moog Bass - Thick Moog bass
+SynthDef(\moogBass, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig;
+    env = EnvGen.kr(Env.adsr(0.001, 0.2, 0.8, 0.3), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.001, 0.3, 0.2, 0.2), gate);
+    sig = Mix([Saw.ar(freq), Pulse.ar(freq, 0.5)]) * 0.5;
+    sig = MoogFF.ar(sig, (freq * 3 * filterEnv * velocity).clip(20, 8000), 3.8);
+    sig = sig * env * amp * velocity * 0.4;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 131. ARP Odyssey - ARP Odyssey character
+SynthDef(\arpOdyssey, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig, osc1, osc2;
+    env = EnvGen.kr(Env.adsr(0.01, 0.4, 0.6, 0.4), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.01, 0.6, 0.4, 0.3), gate);
+    osc1 = Saw.ar(freq);
+    osc2 = Pulse.ar(freq * 1.01, 0.5);
+    sig = Mix([osc1, osc2]) * 0.5;
+    sig = RLPF.ar(sig, (freq * 5 * filterEnv * velocity).clip(20, 18000), 0.3);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 132. ARP 2600 - Semi-modular ARP sound
+SynthDef(\arp2600, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig, osc1, osc2, osc3;
+    env = EnvGen.kr(Env.adsr(0.02, 0.5, 0.6, 0.5), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.02, 0.7, 0.3, 0.4), gate);
+    osc1 = Saw.ar(freq);
+    osc2 = Pulse.ar(freq * 0.995, 0.6);
+    osc3 = Saw.ar(freq * 2.01);
+    sig = Mix([osc1 * 0.4, osc2 * 0.4, osc3 * 0.2]);
+    sig = RLPF.ar(sig, (freq * 4 * filterEnv * velocity).clip(20, 18000), 0.35);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 133. Roland Jupiter-8 - Lush Jupiter sound
+SynthDef(\rolandJupiter8, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig;
+    env = EnvGen.kr(Env.adsr(0.05, 0.6, 0.7, 0.8), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.05, 0.8, 0.5, 0.6), gate);
+    // Dual oscillators with slight detune
+    sig = Mix([
+        Saw.ar(freq * 0.998),
+        Saw.ar(freq * 1.002),
+        Pulse.ar(freq * 0.999, 0.5),
+        Pulse.ar(freq * 1.001, 0.5)
+    ]) * 0.25;
+    sig = RLPF.ar(sig, (freq * 6 * filterEnv * velocity).clip(20, 18000), 0.4);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 134. Roland Juno-106 - Chorus-heavy Juno sound
+SynthDef(\rolandJuno106, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig, chorus;
+    env = EnvGen.kr(Env.adsr(0.02, 0.4, 0.7, 0.6), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.02, 0.5, 0.4, 0.4), gate);
+    sig = Pulse.ar(freq, LFTri.kr(0.5).range(0.3, 0.7));
+    sig = RLPF.ar(sig, (freq * 5 * filterEnv * velocity).clip(20, 18000), 0.5);
+    // Juno chorus effect
+    chorus = Mix([
+        DelayC.ar(sig, 0.05, LFNoise1.kr(0.5).range(0.01, 0.02)),
+        DelayC.ar(sig, 0.05, LFNoise1.kr(0.7).range(0.015, 0.025))
+    ]) * 0.3;
+    sig = (sig * 0.7) + chorus;
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 135. Yamaha DX7 - FM electric piano
+SynthDef(\yamahaDX7, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, modEnv, modulator, carrier, sig;
+    env = EnvGen.kr(Env.perc(0.001, 2.0 * velocity, 1, -4), gate, doneAction: 2);
+    modEnv = EnvGen.kr(Env.perc(0.001, 0.3 * velocity, 1, -6), gate);
+    // Classic DX7 FM algorithm
+    modulator = SinOsc.ar(freq * 14) * (freq * 5 * modEnv * velocity);
+    carrier = SinOsc.ar(freq + modulator);
+    sig = carrier * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 136. Korg M1 Piano - Digital M1 piano
+SynthDef(\korgM1Piano, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig;
+    env = EnvGen.kr(Env.perc(0.001, 2.5 * velocity, 1, -3), gate, doneAction: 2);
+    // M1-style digital piano (simplified)
+    sig = Mix([
+        SinOsc.ar(freq) * 0.4,
+        SinOsc.ar(freq * 2.01) * 0.25,
+        SinOsc.ar(freq * 3.02) * 0.15,
+        SinOsc.ar(freq * 4.03) * 0.1,
+        Pulse.ar(freq * 0.5, 0.3) * 0.1
+    ]);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 137. Prophet-5 - Sequential Circuits Prophet-5
+SynthDef(\prophet5, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig;
+    env = EnvGen.kr(Env.adsr(0.01, 0.5, 0.7, 0.6), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.01, 0.6, 0.4, 0.5), gate);
+    // Prophet-5 dual oscillators
+    sig = Mix([
+        Saw.ar(freq * 0.997),
+        Saw.ar(freq * 1.003),
+        Pulse.ar(freq * 0.998, 0.5),
+        Pulse.ar(freq * 1.002, 0.5)
+    ]) * 0.25;
+    sig = RLPF.ar(sig, (freq * 5 * filterEnv * velocity).clip(20, 18000), 0.4);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 138. Oberheim OB-Xa - Oberheim OB-Xa sound
+SynthDef(\oberheimOBXa, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig;
+    env = EnvGen.kr(Env.adsr(0.02, 0.6, 0.7, 0.7), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.02, 0.7, 0.5, 0.6), gate);
+    // Oberheim thick sound with detuned oscillators
+    sig = Mix([
+        Saw.ar(freq * 0.996),
+        Saw.ar(freq * 1.004),
+        Pulse.ar(freq * 0.997, 0.4),
+        Pulse.ar(freq * 1.003, 0.6)
+    ]) * 0.25;
+    sig = RLPF.ar(sig, (freq * 6 * filterEnv * velocity).clip(20, 18000), 0.35);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 139. Minimoog - Classic Minimoog bass/lead
+SynthDef(\minimoog, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig;
+    env = EnvGen.kr(Env.adsr(0.005, 0.3, 0.8, 0.4), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.005, 0.4, 0.3, 0.3), gate);
+    // Three oscillators like Minimoog
+    sig = Mix([
+        Saw.ar(freq) * 0.4,
+        Pulse.ar(freq, 0.5) * 0.3,
+        Saw.ar(freq * 0.5) * 0.3
+    ]);
+    sig = MoogFF.ar(sig, (freq * 4 * filterEnv * velocity).clip(20, 18000), 3.5);
+    sig = sig * env * amp * velocity * 0.3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 140. TB-303 Bass - Roland TB-303 acid bass
+SynthDef(\tb303Bass, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig;
+    env = EnvGen.kr(Env.adsr(0.001, 0.2, 0.0, 0.1), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.001, 0.3, 0.0, 0.1), gate);
+    sig = Saw.ar(freq);
+    sig = RLPF.ar(sig, (freq * 8 * filterEnv * velocity).clip(20, 18000), 0.1);
+    sig = (sig * 10).tanh; // Distortion
+    sig = sig * env * amp * velocity * 0.3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 141. TR-808 Synth - TR-808 synth tones
+SynthDef(\tr808Synth, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig;
+    env = EnvGen.kr(Env.perc(0.001, 0.3, 1, -4), gate, doneAction: 2);
+    sig = Pulse.ar(freq, 0.5);
+    sig = RLPF.ar(sig, freq * 4, 0.3);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 142. PPG Wavetable - PPG Wave wavetable synth
+SynthDef(\ppgWavetable, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, wavePos;
+    env = EnvGen.kr(Env.adsr(0.05, 0.5, 0.7, 0.8), gate, doneAction: 2);
+    wavePos = LFTri.kr(0.3).range(0, 7);
+    // Simulate wavetable scanning
+    sig = Mix([
+        Saw.ar(freq) * (1 - (wavePos / 7)),
+        Pulse.ar(freq, 0.5) * ((wavePos / 7).clip(0, 1))
+    ]);
+    sig = RLPF.ar(sig, freq * 6, 0.4);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 143. Sequential Circuits - Sequential Circuits character
+SynthDef(\sequentialCircuits, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig;
+    env = EnvGen.kr(Env.adsr(0.01, 0.5, 0.7, 0.6), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.01, 0.6, 0.4, 0.5), gate);
+    sig = Mix([
+        Saw.ar(freq * 0.998),
+        Saw.ar(freq * 1.002),
+        Pulse.ar(freq, 0.5)
+    ]) * 0.33;
+    sig = RLPF.ar(sig, (freq * 5 * filterEnv * velocity).clip(20, 18000), 0.4);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// ============================================================================
+// WORLD/ETHNIC - ASIAN (12 instruments)
+// ============================================================================
+
+// 144. Erhu - Chinese two-string fiddle
+SynthDef(\erhu, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, bow, string;
+    env = EnvGen.kr(Env.adsr(0.1, 0.3, 0.8, 0.3), gate, doneAction: 2);
+    // Bow exciter
+    bow = LPF.ar(WhiteNoise.ar(0.3), freq * 8) * LFNoise1.kr(10).range(0.8, 1.0);
+    // String resonance with Chinese erhu formants
+    string = CombL.ar(bow, 0.1, 1/freq, 3.0);
+    sig = BPF.ar(string, freq * 2, 0.5) + BPF.ar(string, freq * 4, 0.3);
+    sig = sig * env * amp * velocity * 2;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 145. Pipa - Chinese lute
+SynthDef(\pipa, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 2.0 * velocity, 1, -4), gate, doneAction: 2);
+    // Sharp pluck with bright harmonics
+    pluck = Impulse.ar(0) + (WhiteNoise.ar(0.3) * EnvGen.kr(Env.perc(0.001, 0.01)));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 2.5);
+    sig = BPF.ar(sig, freq * 3, 0.4) + (sig * 0.5);
+    sig = sig * env * amp * velocity * 3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 146. Guzheng - Chinese zither
+SynthDef(\guzheng, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 3.0 * velocity, 1, -3), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (PinkNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.015)));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 4.0);
+    // Bright metallic overtones
+    sig = sig + BPF.ar(sig, freq * 5, 0.3);
+    sig = sig * env * amp * velocity * 2.5;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 147. Gamelan - Indonesian gamelan ensemble
+SynthDef(\gamelan, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, modulator, carrier;
+    env = EnvGen.kr(Env.perc(0.001, 4.0 * velocity, 1, -2), gate, doneAction: 2);
+    // FM synthesis for metallic gong-like sound
+    modulator = SinOsc.ar(freq * 2.1) * (freq * 3 * velocity);
+    carrier = SinOsc.ar(freq + modulator);
+    sig = carrier + (SinOsc.ar(freq * 3.01) * 0.3);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 148. Angklung - Indonesian bamboo instrument
+SynthDef(\angklung, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig;
+    env = EnvGen.kr(Env.perc(0.01, 1.5 * velocity, 1, -3), gate, doneAction: 2);
+    // Hollow bamboo resonance
+    sig = Mix([
+        SinOsc.ar(freq) * 0.5,
+        SinOsc.ar(freq * 2.01) * 0.3,
+        SinOsc.ar(freq * 4.02) * 0.2
+    ]);
+    sig = BPF.ar(sig, freq * 2, 0.8);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 149. Tabla - Indian hand drums (melodic version)
+SynthDef(\tablaMelodic, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, tone, slap;
+    env = EnvGen.kr(Env.perc(0.001, 0.4 * velocity, 1, -6), gate, doneAction: 2);
+    tone = SinOsc.ar(freq) * EnvGen.kr(Env.perc(0.001, 0.1));
+    slap = HPF.ar(WhiteNoise.ar(0.3), freq * 2) * EnvGen.kr(Env.perc(0.001, 0.05));
+    sig = tone + slap;
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 150. Bansuri - Indian bamboo flute
+SynthDef(\bansuri, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, breath, tone;
+    env = EnvGen.kr(Env.adsr(0.2, 0.3, 0.8, 0.4), gate, doneAction: 2);
+    // Breathy flute tone
+    breath = LPF.ar(PinkNoise.ar(0.15), freq * 3);
+    tone = SinOsc.ar(freq) * 0.6;
+    sig = tone + breath;
+    sig = BPF.ar(sig, freq * 2, 0.7) + (sig * 0.4);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 151. Sarangi - Indian bowed string instrument
+SynthDef(\sarangi, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, bow, string;
+    env = EnvGen.kr(Env.adsr(0.15, 0.3, 0.8, 0.4), gate, doneAction: 2);
+    bow = LPF.ar(WhiteNoise.ar(0.3), freq * 6) * LFNoise1.kr(8).range(0.7, 1.0);
+    string = CombL.ar(bow, 0.1, 1/freq, 4.0);
+    // Indian sarangi has sympathetic strings
+    sig = string + (CombL.ar(bow, 0.1, 1/(freq * 1.5), 3.0) * 0.3);
+    sig = sig * env * amp * velocity * 2;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 152. Tanpura - Indian drone instrument
+SynthDef(\tanpura, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.asr(0.5, 1, 2.0), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (PinkNoise.ar(0.1) * EnvGen.kr(Env.perc(0.01, 0.05)));
+    // Long sustaining drone with rich harmonics
+    sig = CombL.ar(pluck, 0.1, 1/freq, 8.0);
+    sig = sig + Mix([
+        CombL.ar(pluck, 0.1, 1/(freq * 2), 7.0) * 0.3,
+        CombL.ar(pluck, 0.1, 1/(freq * 3), 6.0) * 0.2,
+        CombL.ar(pluck, 0.1, 1/(freq * 4), 5.0) * 0.1
+    ]);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 153. Santur - Persian hammered dulcimer
+SynthDef(\santur, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, strike;
+    env = EnvGen.kr(Env.perc(0.001, 2.5 * velocity, 1, -3), gate, doneAction: 2);
+    strike = Impulse.ar(0) + (WhiteNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.01)));
+    sig = CombL.ar(strike, 0.1, 1/freq, 3.5);
+    // Metallic shimmer
+    sig = sig + BPF.ar(sig, freq * 6, 0.4);
+    sig = sig * env * amp * velocity * 2;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 154. Oud - Middle Eastern lute
+SynthDef(\oud, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 2.0 * velocity, 1, -4), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (BrownNoise.ar(0.3) * EnvGen.kr(Env.perc(0.001, 0.015)));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 2.5);
+    // Warm, woody tone
+    sig = LPF.ar(sig, freq * 6);
+    sig = sig * env * amp * velocity * 3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 155. Qanun - Middle Eastern zither
+SynthDef(\qanun, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 2.5 * velocity, 1, -3), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (PinkNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.012)));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 3.0);
+    // Bright, shimmering tone
+    sig = sig + BPF.ar(sig, freq * 4, 0.5);
+    sig = sig * env * amp * velocity * 2.5;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 156. Ney - Middle Eastern flute
+SynthDef(\ney, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, breath, tone;
+    env = EnvGen.kr(Env.adsr(0.15, 0.2, 0.8, 0.5), gate, doneAction: 2);
+    // Breathy, airy tone
+    breath = LPF.ar(WhiteNoise.ar(0.25), freq * 4);
+    tone = SinOsc.ar(freq) * 0.5;
+    sig = tone + breath;
+    sig = BPF.ar(sig, freq * 1.5, 0.6) + (sig * 0.3);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 157. Duduk - Armenian double-reed
+SynthDef(\duduk, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig;
+    env = EnvGen.kr(Env.adsr(0.2, 0.3, 0.9, 0.5), gate, doneAction: 2);
+    // Warm, mournful double-reed tone
+    sig = Mix([
+        Pulse.ar(freq, 0.3) * 0.5,
+        Pulse.ar(freq * 2.01, 0.4) * 0.3,
+        SinOsc.ar(freq) * 0.2
+    ]);
+    sig = LPF.ar(sig, freq * 4);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 158. Kora - West African harp-lute
+SynthDef(\kora, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 2.0 * velocity, 1, -4), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (PinkNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.01)));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 2.5);
+    // Bright, harp-like tone
+    sig = sig + BPF.ar(sig, freq * 3, 0.5);
+    sig = sig * env * amp * velocity * 3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 159. Djembe - West African drum (melodic version)
+SynthDef(\djembeMelodic, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, tone, slap;
+    env = EnvGen.kr(Env.perc(0.001, 0.5 * velocity, 1, -5), gate, doneAction: 2);
+    tone = SinOsc.ar(freq) * EnvGen.kr(Env.perc(0.001, 0.15));
+    slap = HPF.ar(WhiteNoise.ar(0.4), freq * 3) * EnvGen.kr(Env.perc(0.001, 0.03));
+    sig = tone + slap;
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 160. Balafon - West African xylophone
+SynthDef(\balafon, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, strike;
+    env = EnvGen.kr(Env.perc(0.001, 1.5 * velocity, 1, -4), gate, doneAction: 2);
+    strike = Impulse.ar(0) + (WhiteNoise.ar(0.3) * EnvGen.kr(Env.perc(0.001, 0.008)));
+    sig = CombL.ar(strike, 0.1, 1/freq, 1.5);
+    // Woody, resonant tone
+    sig = BPF.ar(sig, freq * 2, 0.6) + (sig * 0.4);
+    sig = sig * env * amp * velocity * 2;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 161. Mbira - African thumb piano
+SynthDef(\mbira, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 2.5 * velocity, 1, -3), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (WhiteNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.01)));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 3.0);
+    // Metallic, bell-like tone
+    sig = sig + BPF.ar(sig, freq * 5, 0.4);
+    sig = sig * env * amp * velocity * 2.5;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 162. Berimbau - Brazilian musical bow
+SynthDef(\berimbau, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 1.5 * velocity, 1, -4), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (WhiteNoise.ar(0.3) * EnvGen.kr(Env.perc(0.001, 0.01)));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 2.0);
+    // Twangy, percussive tone
+    sig = HPF.ar(sig, freq * 0.8);
+    sig = sig * env * amp * velocity * 3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 163. Charango - Andean small guitar
+SynthDef(\charango, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 1.5 * velocity, 1, -4), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (PinkNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.01)));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 1.8);
+    // Bright, jangly tone
+    sig = sig + BPF.ar(sig, freq * 4, 0.5);
+    sig = sig * env * amp * velocity * 3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 164. Hurdy-Gurdy - European drone instrument
+SynthDef(\hurdyGurdy, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, melody, drone;
+    env = EnvGen.kr(Env.asr(0.1, 1, 0.3), gate, doneAction: 2);
+    // Melody string (bowed)
+    melody = Saw.ar(freq) * 0.5;
+    // Drone strings
+    drone = Mix([
+        Saw.ar(freq * 0.5) * 0.3,
+        Saw.ar(freq * 0.75) * 0.2
+    ]);
+    sig = melody + drone;
+    sig = RLPF.ar(sig, freq * 4, 0.4);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 165. Balalaika - Russian triangular lute
+SynthDef(\balalaika, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 1.5 * velocity, 1, -4), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (PinkNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.01)));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 2.0);
+    // Bright, metallic tone
+    sig = sig + BPF.ar(sig, freq * 3, 0.5);
+    sig = sig * env * amp * velocity * 3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 166. Mandolin - Italian plucked string
+SynthDef(\mandolin, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 1.2 * velocity, 1, -5), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (WhiteNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.008)));
+    // Double course strings (pairs)
+    sig = Mix([
+        CombL.ar(pluck, 0.1, 1/freq, 1.5),
+        CombL.ar(pluck, 0.1, 1/(freq * 1.002), 1.5)
+    ]) * 0.5;
+    sig = sig + BPF.ar(sig, freq * 4, 0.5);
+    sig = sig * env * amp * velocity * 3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 167. Bouzouki - Greek long-necked lute
+SynthDef(\bouzouki, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 2.0 * velocity, 1, -4), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (PinkNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.01)));
+    // Double course strings
+    sig = Mix([
+        CombL.ar(pluck, 0.1, 1/freq, 2.5),
+        CombL.ar(pluck, 0.1, 1/(freq * 1.001), 2.5)
+    ]) * 0.5;
+    sig = sig + BPF.ar(sig, freq * 3, 0.5);
+    sig = sig * env * amp * velocity * 3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// ============================================================================
+// EXTENDED GUITARS & BASSES (8 instruments)
+// ============================================================================
+
+// 168. 12-String Guitar - Jangly 12-string
+SynthDef(\twelveStringGuitar, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 2.5 * velocity, 1, -3), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (PinkNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.01)));
+    // 12-string pairs (octaves + unison)
+    sig = Mix([
+        CombL.ar(pluck, 0.1, 1/freq, 2.5),
+        CombL.ar(pluck, 0.1, 1/(freq * 1.001), 2.5),
+        CombL.ar(pluck, 0.1, 1/(freq * 2), 2.0),
+        CombL.ar(pluck, 0.1, 1/(freq * 2.002), 2.0)
+    ]) * 0.25;
+    sig = sig * env * amp * velocity * 3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 169. Flamenco Guitar - Percussive flamenco
+SynthDef(\flamencoGuitar, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck, tap;
+    env = EnvGen.kr(Env.perc(0.001, 1.5 * velocity, 1, -5), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (WhiteNoise.ar(0.3) * EnvGen.kr(Env.perc(0.001, 0.008)));
+    tap = WhiteNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.005));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 1.8);
+    sig = (sig + tap) * env * amp * velocity * 3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 170. Resonator Guitar - Dobro/resonator
+SynthDef(\resonatorGuitar, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 3.0 * velocity, 1, -3), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (WhiteNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.01)));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 3.5);
+    // Metallic resonator cone
+    sig = sig + BPF.ar(sig, freq * 4, 0.4);
+    sig = sig * env * amp * velocity * 2.5;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 171. Slide Guitar - Slide/bottleneck guitar
+SynthDef(\slideGuitar, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck, slide;
+    env = EnvGen.kr(Env.asr(0.05, 1, 0.5), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (PinkNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.01)));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 3.0);
+    // Slide vibrato
+    slide = SinOsc.kr(5).range(0.995, 1.005);
+    sig = FreqShift.ar(sig, (freq * slide) - freq);
+    sig = sig * env * amp * velocity * 2.5;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 172. Upright Bass - Acoustic upright bass
+SynthDef(\uprightBass, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.005, 1.5 * velocity, 1, -4), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (BrownNoise.ar(0.3) * EnvGen.kr(Env.perc(0.005, 0.02)));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 2.0);
+    // Warm, woody tone
+    sig = LPF.ar(sig, freq * 4);
+    sig = sig * env * amp * velocity * 3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 173. 5-String Bass - Extended range bass
+SynthDef(\fiveStringBass, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.002, 1.2 * velocity, 1, -4), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (PinkNoise.ar(0.2) * EnvGen.kr(Env.perc(0.002, 0.015)));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 1.8);
+    sig = LPF.ar(sig, freq * 6);
+    sig = sig * env * amp * velocity * 3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 174. Cuatro - Venezuelan/Puerto Rican 4-string
+SynthDef(\cuatro, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 1.5 * velocity, 1, -4), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (PinkNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.01)));
+    sig = CombL.ar(pluck, 0.1, 1/freq, 2.0);
+    // Bright, jangly tone
+    sig = sig + BPF.ar(sig, freq * 3, 0.5);
+    sig = sig * env * amp * velocity * 3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 175. Tres - Cuban 3-course guitar
+SynthDef(\tres, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, pluck;
+    env = EnvGen.kr(Env.perc(0.001, 1.8 * velocity, 1, -4), gate, doneAction: 2);
+    pluck = Impulse.ar(0) + (PinkNoise.ar(0.2) * EnvGen.kr(Env.perc(0.001, 0.01)));
+    // Triple course strings
+    sig = Mix([
+        CombL.ar(pluck, 0.1, 1/freq, 2.0),
+        CombL.ar(pluck, 0.1, 1/(freq * 1.001), 2.0),
+        CombL.ar(pluck, 0.1, 1/(freq * 1.002), 2.0)
+    ]) * 0.33;
+    sig = sig * env * amp * velocity * 3;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// ============================================================================
+// EXTENDED SYNTH SOUNDS (12 instruments)
+// ============================================================================
+
+// 176. Supersaw Lead - Thick supersaw lead
+SynthDef(\supersawLead, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig;
+    env = EnvGen.kr(Env.adsr(0.01, 0.3, 0.7, 0.5), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.01, 0.5, 0.4, 0.4), gate);
+    // 7 detuned saws
+    sig = Mix([
+        Saw.ar(freq * 0.993),
+        Saw.ar(freq * 0.996),
+        Saw.ar(freq * 0.999),
+        Saw.ar(freq),
+        Saw.ar(freq * 1.001),
+        Saw.ar(freq * 1.004),
+        Saw.ar(freq * 1.007)
+    ]) * 0.14;
+    sig = RLPF.ar(sig, (freq * 6 * filterEnv * velocity).clip(20, 18000), 0.4);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 177. PWM Lead - Pulse width modulation lead
+SynthDef(\pwmLead, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig, pwm;
+    env = EnvGen.kr(Env.adsr(0.01, 0.3, 0.7, 0.5), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.01, 0.5, 0.4, 0.4), gate);
+    pwm = LFTri.kr(0.5).range(0.1, 0.9);
+    sig = Pulse.ar(freq, pwm);
+    sig = RLPF.ar(sig, (freq * 5 * filterEnv * velocity).clip(20, 18000), 0.4);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 178. Sync Lead - Hard sync lead
+SynthDef(\syncLead, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig, syncFreq;
+    env = EnvGen.kr(Env.adsr(0.01, 0.3, 0.7, 0.5), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.01, 0.5, 0.4, 0.4), gate);
+    syncFreq = freq * LFTri.kr(0.3).range(1, 3);
+    sig = SyncSaw.ar(freq, syncFreq);
+    sig = RLPF.ar(sig, (freq * 6 * filterEnv * velocity).clip(20, 18000), 0.3);
+    sig = sig * env * amp * velocity * 0.5;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 179. Wavetable Lead - Wavetable synthesis lead
+SynthDef(\wavetableLead, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, filterEnv, sig, wavePos;
+    env = EnvGen.kr(Env.adsr(0.02, 0.4, 0.7, 0.6), gate, doneAction: 2);
+    filterEnv = EnvGen.kr(Env.adsr(0.02, 0.6, 0.4, 0.5), gate);
+    wavePos = LFTri.kr(0.4).range(0, 1);
+    sig = (Saw.ar(freq) * (1 - wavePos)) + (Pulse.ar(freq, 0.5) * wavePos);
+    sig = RLPF.ar(sig, (freq * 6 * filterEnv * velocity).clip(20, 18000), 0.4);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 180. Ambient Pad - Lush ambient pad
+SynthDef(\ambientPad, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig;
+    env = EnvGen.kr(Env.asr(2.0, 1, 3.0), gate, doneAction: 2);
+    sig = Mix([
+        SinOsc.ar(freq * 0.997) * 0.2,
+        SinOsc.ar(freq) * 0.2,
+        SinOsc.ar(freq * 1.003) * 0.2,
+        SinOsc.ar(freq * 2.01) * 0.15,
+        SinOsc.ar(freq * 3.02) * 0.1,
+        SinOsc.ar(freq * 4.03) * 0.08,
+        SinOsc.ar(freq * 5.04) * 0.05
+    ]);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 181. Drone Pad - Deep drone pad
+SynthDef(\dronePad, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig;
+    env = EnvGen.kr(Env.asr(3.0, 1, 4.0), gate, doneAction: 2);
+    sig = Mix([
+        Saw.ar(freq * 0.995) * 0.25,
+        Saw.ar(freq) * 0.25,
+        Saw.ar(freq * 1.005) * 0.25,
+        Pulse.ar(freq * 0.5, 0.5) * 0.25
+    ]);
+    sig = LPF.ar(sig, freq * 3);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 182. Granular Pad - Granular synthesis pad
+SynthDef(\granularPad, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, grains;
+    env = EnvGen.kr(Env.asr(2.0, 1, 3.0), gate, doneAction: 2);
+    grains = Mix.fill(8, {
+        var grain = SinOsc.ar(freq * Rand(0.99, 1.01));
+        grain * EnvGen.kr(Env.perc(Rand(0.1, 0.3), Rand(0.5, 1.5)), Impulse.kr(Rand(2, 5)));
+    }) * 0.125;
+    sig = grains * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 183. Shimmer Pad - Shimmer reverb pad
+SynthDef(\shimmerPad, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, shimmer;
+    env = EnvGen.kr(Env.asr(1.5, 1, 2.5), gate, doneAction: 2);
+    sig = Mix([
+        SinOsc.ar(freq) * 0.3,
+        SinOsc.ar(freq * 2.01) * 0.25,
+        SinOsc.ar(freq * 3.02) * 0.2,
+        SinOsc.ar(freq * 4.03) * 0.15,
+        SinOsc.ar(freq * 5.04) * 0.1
+    ]);
+    // Shimmer effect (octave up)
+    shimmer = FreqShift.ar(sig, freq);
+    sig = (sig * 0.7) + (shimmer * 0.3);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 184. Analog Strings - Analog synth strings
+SynthDef(\analogStrings, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig;
+    env = EnvGen.kr(Env.asr(0.5, 1, 1.0), gate, doneAction: 2);
+    sig = Mix([
+        Saw.ar(freq * 0.996),
+        Saw.ar(freq * 0.998),
+        Saw.ar(freq),
+        Saw.ar(freq * 1.002),
+        Saw.ar(freq * 1.004)
+    ]) * 0.2;
+    sig = RLPF.ar(sig, freq * 4, 0.5);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 185. Digital Brass - Digital brass ensemble
+SynthDef(\digitalBrass, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, modEnv, modulator, carrier, sig;
+    env = EnvGen.kr(Env.adsr(0.05, 0.3, 0.8, 0.4), gate, doneAction: 2);
+    modEnv = EnvGen.kr(Env.adsr(0.05, 0.4, 0.6, 0.3), gate);
+    modulator = SinOsc.ar(freq) * (freq * 2 * modEnv * velocity);
+    carrier = SinOsc.ar(freq + modulator);
+    sig = Mix([carrier, carrier * 0.5]);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 186. Flugelhorn - Warm flugelhorn
+SynthDef(\flugelhorn, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, modEnv, modulator, carrier, sig;
+    env = EnvGen.kr(Env.adsr(0.08, 0.3, 0.8, 0.5), gate, doneAction: 2);
+    modEnv = EnvGen.kr(Env.adsr(0.08, 0.4, 0.6, 0.4), gate);
+    modulator = SinOsc.ar(freq) * (freq * 1.5 * modEnv * velocity);
+    carrier = SinOsc.ar(freq + modulator);
+    sig = LPF.ar(carrier, freq * 6);
+    sig = BPF.ar(sig, 1000, 1.5) + (sig * 0.5);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 187. Cornet - Bright cornet
+SynthDef(\cornet, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, modEnv, modulator, carrier, sig;
+    env = EnvGen.kr(Env.adsr(0.05, 0.3, 0.8, 0.4), gate, doneAction: 2);
+    modEnv = EnvGen.kr(Env.adsr(0.05, 0.4, 0.6, 0.3), gate);
+    modulator = SinOsc.ar(freq) * (freq * 2 * modEnv * velocity);
+    carrier = SinOsc.ar(freq + modulator);
+    sig = BPF.ar(carrier, 1300, 1.5) + (carrier * 0.5);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 188. Euphonium - Mellow euphonium
+SynthDef(\euphonium, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, modEnv, modulator, carrier, sig;
+    env = EnvGen.kr(Env.adsr(0.1, 0.4, 0.8, 0.6), gate, doneAction: 2);
+    modEnv = EnvGen.kr(Env.adsr(0.1, 0.5, 0.6, 0.5), gate);
+    modulator = SinOsc.ar(freq) * (freq * 1.2 * modEnv * velocity);
+    carrier = SinOsc.ar(freq + modulator);
+    sig = LPF.ar(carrier, freq * 5);
+    sig = BPF.ar(sig, 600, 1.5) + (sig * 0.5);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 189. Piccolo Trumpet - High bright trumpet
+SynthDef(\piccoloTrumpet, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, modEnv, modulator, carrier, sig;
+    env = EnvGen.kr(Env.adsr(0.03, 0.2, 0.8, 0.3), gate, doneAction: 2);
+    modEnv = EnvGen.kr(Env.adsr(0.03, 0.3, 0.6, 0.2), gate);
+    modulator = SinOsc.ar(freq) * (freq * 2.5 * modEnv * velocity);
+    carrier = SinOsc.ar(freq + modulator);
+    sig = BPF.ar(carrier, 1500, 1.5) + (carrier * 0.5);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 190. Chamber Strings - Intimate chamber strings
+SynthDef(\chamberStrings, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, bow, string;
+    env = EnvGen.kr(Env.adsr(0.15, 0.3, 0.8, 0.4), gate, doneAction: 2);
+    bow = LPF.ar(WhiteNoise.ar(0.2), freq * 6) * LFNoise1.kr(8).range(0.8, 1.0);
+    string = CombL.ar(bow, 0.1, 1/freq, 3.5);
+    sig = BPF.ar(string, freq * 2, 0.6) + BPF.ar(string, freq * 4, 0.4);
+    sig = sig * env * amp * velocity * 2;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 191. Gospel Choir - Gospel choir ensemble
+SynthDef(\gospelChoir, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig;
+    env = EnvGen.kr(Env.adsr(0.3, 0.4, 0.9, 0.6), gate, doneAction: 2);
+    // Multiple voices with formants
+    sig = Mix([
+        Pulse.ar(freq * 0.997, 0.3) * 0.2,
+        Pulse.ar(freq, 0.3) * 0.2,
+        Pulse.ar(freq * 1.003, 0.3) * 0.2,
+        Pulse.ar(freq * 2.01, 0.4) * 0.15,
+        Pulse.ar(freq * 3.02, 0.4) * 0.15,
+        Pulse.ar(freq * 4.03, 0.4) * 0.1
+    ]);
+    sig = BPF.ar(sig, 800, 1.5) + BPF.ar(sig, 1200, 1.2) + (sig * 0.3);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 192. Rain - Enhanced rain effect
+SynthDef(\rain, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, drops;
+    env = EnvGen.kr(Env.asr(0.5, 1, 1.0), gate, doneAction: 2);
+    drops = Mix.fill(16, {
+        var drop = SinOsc.ar(Rand(freq * 2, freq * 8));
+        drop * EnvGen.kr(Env.perc(0.001, Rand(0.05, 0.2)), Impulse.kr(Rand(5, 15)));
+    }) * 0.0625;
+    sig = drops + (LPF.ar(WhiteNoise.ar(0.1), freq * 4));
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 193. Thunder - Thunder rumble
+SynthDef(\thunder, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig;
+    env = EnvGen.kr(Env.perc(0.1, 3.0 * velocity, 1, -2), gate, doneAction: 2);
+    sig = LPF.ar(BrownNoise.ar(0.8), freq * 2);
+    sig = sig + SinOsc.ar(freq * 0.5, 0, 0.3);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 194. Wind - Wind effect
+SynthDef(\wind, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig;
+    env = EnvGen.kr(Env.asr(1.0, 1, 1.5), gate, doneAction: 2);
+    sig = BPF.ar(WhiteNoise.ar(0.5), freq * LFNoise1.kr(0.5).range(1, 3), 0.3);
+    sig = sig * LFNoise1.kr(2).range(0.5, 1.0);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// 195. Sci-Fi - Enhanced sci-fi effect
+SynthDef(\sciFi, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
+    var env, sig, sweep;
+    env = EnvGen.kr(Env.asr(0.3, 1, 0.5), gate, doneAction: 2);
+    sweep = LFTri.kr(0.3).range(freq * 0.5, freq * 4);
+    sig = SinOsc.ar(sweep) + (Pulse.ar(sweep * 1.5, 0.3) * 0.5);
+    sig = RLPF.ar(sig, sweep * 2, 0.3);
+    sig = sig * env * amp * velocity;
+    Out.ar(out, [sig, sig]);
+}).add;
+
 "".postln;
-"✅✅✅ ALL MELODIC INSTRUMENTS LOADED - PHASE 1+2+3 COMPLETE! ✅✅✅".postln;
+"✅✅✅ ALL MELODIC INSTRUMENTS LOADED - PHASES 1-4 COMPLETE! ✅✅✅".postln;
 "".postln;
 "═══════════════════════════════════════════════════════════════════════════".postln;
 "   PHASE 1 - Piano, Chromatic Percussion, Organ, Guitar (32 instruments)".postln;
@@ -2278,8 +3192,37 @@ SynthDef(\gunshot, { |out=0, freq=440, amp=0.5, gate=1, velocity=0.8|
 "                 telephoneRing, helicopter, applause, gunshot".postln;
 "".postln;
 "═══════════════════════════════════════════════════════════════════════════".postln;
-"   TOTAL MELODIC INSTRUMENTS: 128 (Full General MIDI Standard)".postln;
+"   PHASE 4 - EXTENDED LIBRARY (67 instruments)".postln;
 "═══════════════════════════════════════════════════════════════════════════".postln;
+"   VINTAGE SYNTHS (15): moogLead, moogBass, arpOdyssey, arp2600, rolandJupiter8,".postln;
+"                        rolandJuno106, yamahaDX7, korgM1Piano, prophet5, oberheimOBXa,".postln;
+"                        minimoog, tb303Bass, tr808Synth, ppgWavetable, sequentialCircuits".postln;
+"   ASIAN INSTRUMENTS (12): erhu, pipa, guzheng, gamelan, angklung, tablaMelodic,".postln;
+"                           bansuri, sarangi, tanpura, santur, oud, qanun".postln;
+"   MIDDLE EASTERN (2): ney, duduk".postln;
+"   AFRICAN (4): kora, djembeMelodic, balafon, mbira".postln;
+"   LATIN/CARIBBEAN (2): berimbau, charango".postln;
+"   EUROPEAN FOLK (4): hurdyGurdy, balalaika, mandolin, bouzouki".postln;
+"   EXTENDED GUITARS/BASS (8): twelveStringGuitar, flamencoGuitar, resonatorGuitar,".postln;
+"                              slideGuitar, uprightBass, fiveStringBass, cuatro, tres".postln;
+"   EXTENDED SYNTHS (12): supersawLead, pwmLead, syncLead, wavetableLead, ambientPad,".postln;
+"                         dronePad, granularPad, shimmerPad, analogStrings, digitalBrass,".postln;
+"                         flugelhorn, cornet".postln;
+"   ORCHESTRAL ADDITIONS (4): euphonium, piccoloTrumpet, chamberStrings, gospelChoir".postln;
+"   SOUND DESIGN (4): rain, thunder, wind, sciFi".postln;
+"".postln;
+"═══════════════════════════════════════════════════════════════════════════".postln;
+"   TOTAL MELODIC INSTRUMENTS: 195 (GM Standard + Extended Library)".postln;
+"═══════════════════════════════════════════════════════════════════════════".postln;
+"".postln;
+"🎹 SYNTHESIS TECHNIQUES USED:".postln;
+"   • Physical Modeling (Karplus-Strong, waveguide synthesis)".postln;
+"   • FM Synthesis (brass, bells, electric pianos)".postln;
+"   • Additive Synthesis (organs, pads)".postln;
+"   • Subtractive Synthesis (vintage synths, leads)".postln;
+"   • Wavetable Synthesis (modern synths)".postln;
+"   • Granular Synthesis (pads, textures)".postln;
+"   • Analog Modeling (Moog, ARP, Roland, Prophet)".postln;
 "".postln;
 )
 

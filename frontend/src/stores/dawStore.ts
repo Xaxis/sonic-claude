@@ -317,11 +317,11 @@ interface DAWStore {
     deleteScene: (sceneId: string) => Promise<void>;
     setLaunchQuantization: (quantization: 'none' | '1/4' | '1/2' | '1' | '2' | '4') => Promise<void>;
 
-    // UI-only actions (for mock development)
-    triggerClip: (trackId: string, slotIndex: number) => void;
-    triggerScene: (sceneIndex: number) => void;
-    stopTrack: (trackId: string) => void;
-    stopScene: (sceneIndex: number) => void;
+    // Clip launcher actions (call backend API)
+    triggerClip: (trackId: string, slotIndex: number) => Promise<void>;
+    triggerScene: (sceneIndex: number) => Promise<void>;
+    stopTrack: (trackId: string) => Promise<void>;
+    stopScene: (sceneIndex: number) => Promise<void>;
     setNumClipSlots: (num: number) => void;
 
     // ========================================================================
@@ -2503,75 +2503,169 @@ export const useDAWStore = create<DAWStore>()(
         },
 
         // ====================================================================
-        // CLIP LAUNCHER UI ACTIONS (Mock for UI development)
+        // CLIP LAUNCHER UI ACTIONS (Trigger clips/scenes via backend API)
         // ====================================================================
 
-        triggerClip: (trackId, slotIndex) => {
-            const { playingClips } = get();
+        triggerClip: async (trackId, slotIndex) => {
+            const { activeComposition, tracks, clipSlots } = get();
+            if (!activeComposition || !clipSlots) return;
 
-            // Check if already playing
-            const isPlaying = playingClips.some(
-                pc => pc.track_id === trackId && pc.slot_index === slotIndex
-            );
+            // Find track index
+            const trackIndex = tracks.findIndex(t => t.id === trackId);
+            if (trackIndex === -1) {
+                console.warn(`Track ${trackId} not found`);
+                return;
+            }
 
-            if (isPlaying) {
-                // Stop clip
-                set({
-                    playingClips: playingClips.filter(
-                        pc => !(pc.track_id === trackId && pc.slot_index === slotIndex)
-                    )
-                });
-            } else {
-                // Start clip (stop other clips on same track first)
-                set({
-                    playingClips: [
-                        ...playingClips.filter(pc => pc.track_id !== trackId),
-                        { track_id: trackId, slot_index: slotIndex }
-                    ]
-                });
+            // Get clip ID from clip_slots grid
+            const clipId = clipSlots[trackIndex]?.[slotIndex];
+            if (!clipId) {
+                console.warn(`No clip assigned to slot [${trackIndex}][${slotIndex}]`);
+                return;
+            }
+
+            try {
+                // Check if already playing
+                const { playingClips } = get();
+                const isPlaying = playingClips.some(
+                    pc => pc.track_id === trackId && pc.slot_index === slotIndex
+                );
+
+                if (isPlaying) {
+                    // Stop clip via backend
+                    await compositionsProvider.stopClip(activeComposition.id, clipId);
+
+                    // Update local state
+                    set({
+                        playingClips: playingClips.filter(
+                            pc => !(pc.track_id === trackId && pc.slot_index === slotIndex)
+                        )
+                    });
+                } else {
+                    // Launch clip via backend
+                    await compositionsProvider.launchClip(activeComposition.id, clipId);
+
+                    // Update local state (stop other clips on same track first)
+                    set({
+                        playingClips: [
+                            ...playingClips.filter(pc => pc.track_id !== trackId),
+                            { track_id: trackId, slot_index: slotIndex }
+                        ]
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to trigger clip:', error);
             }
         },
 
-        triggerScene: (sceneIndex) => {
-            const { playingScenes, tracks } = get();
+        triggerScene: async (sceneIndex) => {
+            const { activeComposition, scenes, tracks, clipSlots } = get();
+            if (!activeComposition || !scenes || sceneIndex >= scenes.length) return;
 
-            // Check if scene is playing
-            const isPlaying = playingScenes.includes(sceneIndex);
+            const scene = scenes[sceneIndex];
+            if (!scene) {
+                console.warn(`No scene found at index ${sceneIndex}`);
+                return;
+            }
 
-            if (isPlaying) {
-                // Stop scene
+            try {
+                const { playingScenes } = get();
+                const isPlaying = playingScenes.includes(sceneIndex);
+
+                if (isPlaying) {
+                    // Stop scene - stop all clips in this row
+                    // Collect clip IDs from clip_slots grid at this scene index
+                    const clipIdsToStop: string[] = [];
+                    if (clipSlots) {
+                        for (let trackIndex = 0; trackIndex < clipSlots.length; trackIndex++) {
+                            const clipId = clipSlots[trackIndex]?.[sceneIndex];
+                            if (clipId) {
+                                clipIdsToStop.push(clipId);
+                            }
+                        }
+                    }
+
+                    // Stop each clip via backend
+                    for (const clipId of clipIdsToStop) {
+                        await compositionsProvider.stopClip(activeComposition.id, clipId);
+                    }
+
+                    // Update local state
+                    set({
+                        playingScenes: playingScenes.filter(s => s !== sceneIndex),
+                        playingClips: get().playingClips.filter(pc => pc.slot_index !== sceneIndex)
+                    });
+                } else {
+                    // Launch scene via backend
+                    await compositionsProvider.launchScene(activeComposition.id, scene.id);
+
+                    // Update local state - mark all clips in this scene as playing
+                    const newPlayingClips = tracks
+                        .map((track, trackIndex) => {
+                            const clipId = clipSlots?.[trackIndex]?.[sceneIndex];
+                            return clipId ? { track_id: track.id, slot_index: sceneIndex } : null;
+                        })
+                        .filter((pc): pc is { track_id: string; slot_index: number } => pc !== null);
+
+                    set({
+                        playingScenes: [...playingScenes, sceneIndex],
+                        playingClips: [
+                            ...get().playingClips.filter(pc => pc.slot_index !== sceneIndex),
+                            ...newPlayingClips
+                        ]
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to trigger scene:', error);
+            }
+        },
+
+        stopTrack: async (trackId) => {
+            const { activeComposition } = get();
+            if (!activeComposition) return;
+
+            try {
+                // Stop all clips on this track via backend
+                await compositionsProvider.stopTrackClips(activeComposition.id, trackId);
+
+                // Update local state
                 set({
-                    playingScenes: playingScenes.filter(s => s !== sceneIndex),
+                    playingClips: get().playingClips.filter(pc => pc.track_id !== trackId)
+                });
+            } catch (error) {
+                console.error('Failed to stop track:', error);
+            }
+        },
+
+        stopScene: async (sceneIndex) => {
+            const { activeComposition, clipSlots } = get();
+            if (!activeComposition) return;
+
+            try {
+                // Collect clip IDs from clip_slots grid at this scene index
+                const clipIdsToStop: string[] = [];
+                if (clipSlots) {
+                    for (let trackIndex = 0; trackIndex < clipSlots.length; trackIndex++) {
+                        const clipId = clipSlots[trackIndex]?.[sceneIndex];
+                        if (clipId) {
+                            clipIdsToStop.push(clipId);
+                        }
+                    }
+                }
+
+                // Stop each clip via backend
+                for (const clipId of clipIdsToStop) {
+                    await compositionsProvider.stopClip(activeComposition.id, clipId);
+                }
+
+                // Update local state
+                set({
+                    playingScenes: get().playingScenes.filter(s => s !== sceneIndex),
                     playingClips: get().playingClips.filter(pc => pc.slot_index !== sceneIndex)
                 });
-            } else {
-                // Start scene (trigger all clips in this row)
-                const newPlayingClips = tracks.map(track => ({
-                    track_id: track.id,
-                    slot_index: sceneIndex
-                }));
-
-                set({
-                    playingScenes: [...playingScenes, sceneIndex],
-                    playingClips: [
-                        ...get().playingClips.filter(pc => pc.slot_index !== sceneIndex),
-                        ...newPlayingClips
-                    ]
-                });
+            } catch (error) {
+                console.error('Failed to stop scene:', error);
             }
-        },
-
-        stopTrack: (trackId) => {
-            set({
-                playingClips: get().playingClips.filter(pc => pc.track_id !== trackId)
-            });
-        },
-
-        stopScene: (sceneIndex) => {
-            set({
-                playingScenes: get().playingScenes.filter(s => s !== sceneIndex),
-                playingClips: get().playingClips.filter(pc => pc.slot_index !== sceneIndex)
-            });
         },
 
         setNumClipSlots: (num) => {
