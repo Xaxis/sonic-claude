@@ -19,27 +19,6 @@ export function ClipLauncherPanel() {
     // Get state from Zustand store
     const activeComposition = useDAWStore(state => state.activeComposition);
 
-    // Empty state when no composition loaded
-    if (!activeComposition) {
-        return (
-            <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
-                <div className="flex-1 min-h-0 flex flex-col">
-                    <SubPanel title="CLIP LAUNCHER" showHeader={false} contentOverflow="hidden">
-                        <div className="flex h-full items-center justify-center">
-                            <div className="text-center space-y-3">
-                                <div className="text-6xl opacity-20">🎛️</div>
-                                <p className="text-lg font-bold text-muted-foreground">No Composition Loaded</p>
-                                <p className="text-sm text-muted-foreground">
-                                    Create or load a composition to use the clip launcher
-                                </p>
-                            </div>
-                        </div>
-                    </SubPanel>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
             {/* Clip Launcher Content - Flexible, takes all space */}

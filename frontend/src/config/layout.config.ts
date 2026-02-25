@@ -144,7 +144,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         component: createElement(ClipLauncherPanel),
         closeable: false,
         getSubtitle: () => "Performance Mode • 0 scenes",
-        defaultLayout: { x: 0, y: 0, w: 12, h: 22 },
+        defaultLayout: { x: 0, y: 0, w: 12, h: 21 },
     },
 
 ];

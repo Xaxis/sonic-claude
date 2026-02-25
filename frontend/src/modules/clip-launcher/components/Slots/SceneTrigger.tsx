@@ -28,16 +28,16 @@ interface SceneTriggerProps {
     sceneIndex: number;
 }
 
-// Professional muted color palette for scenes
+// Professional vibrant color palette for scenes (matching our theme)
 const SCENE_COLORS = [
-    '#d97706', // Amber (default)
-    '#dc2626', // Red
-    '#7c3aed', // Violet
-    '#2563eb', // Blue
-    '#0891b2', // Cyan
-    '#059669', // Emerald
-    '#ca8a04', // Yellow
-    '#ea580c', // Orange
+    'hsl(187 85% 55%)', // Primary - Cyan
+    'hsl(280 85% 65%)', // Secondary - Magenta
+    'hsl(45 95% 60%)',  // Accent - Yellow
+    'hsl(0 85% 60%)',   // Destructive - Red
+    'hsl(220 85% 60%)', // Blue
+    'hsl(160 85% 55%)', // Emerald
+    'hsl(30 95% 60%)',  // Orange
+    'hsl(270 85% 65%)', // Purple
 ];
 
 export function SceneTrigger({ sceneIndex }: SceneTriggerProps) {
@@ -57,7 +57,7 @@ export function SceneTrigger({ sceneIndex }: SceneTriggerProps) {
 
     if (!scene) {
         return (
-            <div className="h-24 w-full rounded-md border border-border/30 bg-black/20" />
+            <div className="h-20 w-full rounded-lg border-2 border-dashed border-border/20 bg-background/30" />
         );
     }
 
@@ -108,14 +108,14 @@ export function SceneTrigger({ sceneIndex }: SceneTriggerProps) {
         }
     };
 
-    // COMPACT SCENE TRIGGER - Like Ableton Live
+    // PROFESSIONAL SCENE TRIGGER - Like Ableton Live
     return (
         <ContextMenu>
             <ContextMenuTrigger asChild>
                 <button
                     className={cn(
-                        "relative h-24 w-full rounded-md cursor-pointer transition-all overflow-hidden group",
-                        "shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-95"
+                        "relative h-20 w-full rounded-lg cursor-pointer transition-all overflow-hidden group",
+                        "shadow-lg hover:shadow-xl hover:scale-[1.03] active:scale-95"
                     )}
                     onClick={(e) => {
                         e.preventDefault();
@@ -128,16 +128,16 @@ export function SceneTrigger({ sceneIndex }: SceneTriggerProps) {
                         handleStartEdit();
                     }}
                     style={{
-                        // Muted background with border
-                        backgroundColor: `${scene.color}40`,
-                        border: `2px solid ${scene.color}80`,
+                        // Vibrant background with glow
+                        backgroundColor: scene.color,
+                        boxShadow: `0 0 24px ${scene.color}, 0 6px 16px rgba(0,0,0,0.6)`,
                     }}
                 >
                     {/* Dark overlay for contrast */}
-                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 pointer-events-none transition-opacity" />
+                    <div className="absolute inset-0 bg-black/25 group-hover:bg-black/15 pointer-events-none transition-opacity" />
 
                     {/* Scene content - COMPACT */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-2 gap-1">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-2 gap-1.5">
                         {isEditing ? (
                             /* INLINE EDITING MODE */
                             <div className="w-full pointer-events-auto" onClick={(e) => e.stopPropagation()}>
@@ -148,20 +148,20 @@ export function SceneTrigger({ sceneIndex }: SceneTriggerProps) {
                                     onKeyDown={handleKeyDown}
                                     onBlur={handleSaveEdit}
                                     autoFocus
-                                    className="w-full bg-background/90 text-white rounded px-2 py-1 text-xs font-bold text-center border border-primary/50 focus:outline-none focus:border-primary"
+                                    className="w-full bg-background/95 text-white rounded px-2 py-1 text-xs font-bold text-center border-2 border-primary/70 focus:outline-none focus:border-primary shadow-lg"
                                     placeholder="Scene name"
                                 />
                             </div>
                         ) : (
                             <>
-                                {/* Play icon - SMALLER */}
+                                {/* Play icon - PROMINENT */}
                                 <Play
-                                    className="w-6 h-6 text-white drop-shadow-lg pointer-events-none"
+                                    className="w-7 h-7 text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] pointer-events-none"
                                     fill="white"
                                 />
 
-                                {/* Scene name - COMPACT */}
-                                <span className="text-[11px] font-bold truncate w-full text-center text-white drop-shadow-lg pointer-events-none">
+                                {/* Scene name - BOLD */}
+                                <span className="text-[10px] font-black uppercase tracking-wider truncate w-full text-center text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] pointer-events-none">
                                     {scene.name}
                                 </span>
                             </>
@@ -172,21 +172,21 @@ export function SceneTrigger({ sceneIndex }: SceneTriggerProps) {
                     <div
                         className="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity"
                         style={{
-                            boxShadow: `inset 0 0 20px ${scene.color}`,
+                            boxShadow: `inset 0 0 30px ${scene.color}`,
                         }}
                     />
 
                     {/* Color picker overlay */}
                     {showColorPicker && (
                         <div
-                            className="absolute inset-0 bg-black/80 flex items-center justify-center p-2 pointer-events-auto z-20"
+                            className="absolute inset-0 bg-black/90 flex items-center justify-center p-2 pointer-events-auto z-20"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <div className="grid grid-cols-4 gap-2">
+                            <div className="grid grid-cols-4 gap-1.5">
                                 {SCENE_COLORS.map((color) => (
                                     <button
                                         key={color}
-                                        className="w-8 h-8 rounded-md border-2 border-white/20 hover:border-white transition-all hover:scale-110"
+                                        className="w-7 h-7 rounded-md border-2 border-white/30 hover:border-white transition-all hover:scale-110 shadow-lg"
                                         style={{ backgroundColor: color }}
                                         onClick={(e) => {
                                             e.stopPropagation();
