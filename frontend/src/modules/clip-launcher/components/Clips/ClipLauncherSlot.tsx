@@ -64,7 +64,7 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     const clips = useDAWStore(state => state.clips);
     const clipSlots = useDAWStore(state => state.clipSlots);
     const playingClips = useDAWStore(state => state.playingClips);
-    const selectedClipSlot = useDAWStore(state => state.selectedClipSlot);
+    const selectedClipSlots = useDAWStore(state => state.selectedClipSlots);
 
     // ========================================================================
     // ACTIONS: Get from Zustand store
@@ -83,7 +83,7 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
     const clip = assignedClipId ? clips.find(c => c.id === assignedClipId) : null;
 
     const isPlaying = playingClips.some(pc => pc.track_id === track.id && pc.slot_index === slotIndex);
-    const isSelected = selectedClipSlot?.trackIndex === trackIndex && selectedClipSlot?.slotIndex === slotIndex;
+    const isSelected = selectedClipSlots.get(trackIndex) === slotIndex;
 
     // INTELLIGENT COLOR SYSTEM:
     // Each track column gets a unique vibrant color from the hardware palette
@@ -103,8 +103,8 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
             triggerClip(track.id, slotIndex);
             setLastClickTime(0); // Reset to prevent triple-click issues
         } else {
-            // Single-click: Select slot
-            setSelectedClipSlot({ trackIndex, slotIndex });
+            // Single-click: Select slot (one per column)
+            setSelectedClipSlot(trackIndex, slotIndex);
             setLastClickTime(now);
         }
     };
@@ -172,15 +172,19 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                         "hover:brightness-110 active:scale-[0.98]"
                     )}
                     style={{
-                        backgroundColor: isPlaying ? padColor : `${padColor}30`,
+                        backgroundColor: isPlaying
+                            ? padColor
+                            : isSelected
+                                ? `color-mix(in srgb, ${padColor} 15%, transparent)`
+                                : '#1a1a1a',
                         boxShadow: isSelected
-                            ? `0 0 0 2px ${padColor}, 0 0 12px ${padColor}`
+                            ? `0 0 0 2px ${padColor}, 0 0 8px ${padColor}60`
                             : isPlaying
                                 ? `0 0 16px ${padColor}, 0 4px 12px ${padColor}80, inset 0 0 20px ${padColor}60`
                                 : `0 2px 4px rgba(0,0,0,0.4)`,
                         border: isSelected
                             ? `2px solid ${padColor}`
-                            : `1px solid ${padColor}60`,
+                            : `1px solid rgba(255,255,255,0.1)`,
                     }}
                 >
                     {/* Subtle pulse when playing */}

@@ -219,7 +219,7 @@ interface DAWStore {
     selectedChannelId: string | null;
 
     // Clip Launcher UI
-    selectedClipSlot: { trackIndex: number; slotIndex: number } | null;
+    selectedClipSlots: Map<number, number>; // trackIndex -> slotIndex (one selection per column)
 
     // Effects UI
     selectedEffectId: string | null;
@@ -412,7 +412,7 @@ interface DAWStore {
 
     // Clip Launcher UI actions
     setClipLauncherMode: (mode: "pad" | "assignment") => void;
-    setSelectedClipSlot: (slot: { trackIndex: number; slotIndex: number } | null) => void;
+    setSelectedClipSlot: (trackIndex: number, slotIndex: number) => void;
     assignClipToSlot: (trackIndex: number, slotIndex: number, clipId: string | null) => Promise<void>;
     loadClipSlots: () => Promise<void>;
     setSelectedEffectId: (id: string | null) => void;
@@ -541,7 +541,7 @@ export const useDAWStore = create<DAWStore>()(
                 // Clip Launcher UI State (PERSISTED)
                 clipLauncherMode: "pad",  // Default to PAD VIEW
                 numClipSlots: 8,  // Default 8 scenes
-                selectedClipSlot: null,
+                selectedClipSlots: new Map(), // trackIndex -> slotIndex (one per column)
                 playingClips: [],
                 playingScenes: [],
                 clipSlots: [],  // Loaded from backend
@@ -2173,7 +2173,13 @@ export const useDAWStore = create<DAWStore>()(
 
         // Clip Launcher UI actions
         setClipLauncherMode: (mode) => set({ clipLauncherMode: mode }),
-        setSelectedClipSlot: (slot) => set({ selectedClipSlot: slot }),
+        setSelectedClipSlot: (trackIndex, slotIndex) => {
+            set((state) => {
+                const newMap = new Map(state.selectedClipSlots);
+                newMap.set(trackIndex, slotIndex);
+                return { selectedClipSlots: newMap };
+            });
+        },
 
         assignClipToSlot: async (trackIndex, slotIndex, clipId) => {
             const { activeComposition } = get();

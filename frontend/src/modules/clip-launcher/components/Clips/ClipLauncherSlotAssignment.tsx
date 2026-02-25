@@ -57,7 +57,7 @@ export function ClipLauncherSlotAssignment({ trackIndex, slotIndex }: ClipLaunch
     const tracks = useDAWStore(state => state.tracks);
     const clips = useDAWStore(state => state.clips);
     const clipSlots = useDAWStore(state => state.clipSlots);
-    const selectedClipSlot = useDAWStore(state => state.selectedClipSlot);
+    const selectedClipSlots = useDAWStore(state => state.selectedClipSlots);
 
     // ========================================================================
     // ACTIONS: Get from Zustand store
@@ -78,7 +78,7 @@ export function ClipLauncherSlotAssignment({ trackIndex, slotIndex }: ClipLaunch
     // Filter clips for this track only
     const trackClips = clips.filter(c => c.track_id === track.id);
 
-    const isSelected = selectedClipSlot?.trackIndex === trackIndex && selectedClipSlot?.slotIndex === slotIndex;
+    const isSelected = selectedClipSlots.get(trackIndex) === slotIndex;
 
     // Get hardware color for this track column (same as PAD VIEW)
     const trackColor = HARDWARE_COLORS[trackIndex % HARDWARE_COLORS.length];
@@ -87,7 +87,7 @@ export function ClipLauncherSlotAssignment({ trackIndex, slotIndex }: ClipLaunch
     // HANDLERS
     // ========================================================================
     const handleSelect = () => {
-        setSelectedClipSlot({ trackIndex, slotIndex });
+        setSelectedClipSlot(trackIndex, slotIndex);
     };
 
     const handleAssignClip = async (clipId: string) => {
