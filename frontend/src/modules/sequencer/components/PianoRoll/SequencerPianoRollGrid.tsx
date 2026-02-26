@@ -71,8 +71,10 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     // ========================================================================
     // SYNC: Update local notes from clip when not interacting
     // ========================================================================
+    const isCommittingRef = useRef(false);
+
     useEffect(() => {
-        if (mode.type === 'IDLE') {
+        if (mode.type === 'IDLE' && !isCommittingRef.current) {
             setLocalNotes(clip.midi_events || []);
         }
     }, [clip.midi_events, mode.type]);
@@ -162,11 +164,6 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
         setLocalNotes(prev => [...prev, newNote]);
         previewNote(pitch);
     }, [gridSubdivision, snapEnabled]);
-
-    // Delete note at index
-    const deleteNote = useCallback((index: number) => {
-        setLocalNotes(prev => prev.filter((_, i) => i !== index));
-    }, []);
 
     // Handle grid click - add note or start painting
     const handleGridMouseDown = useCallback((e: React.MouseEvent) => {
@@ -350,15 +347,28 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
         const handleMouseUp = async () => {
             // Handle click-to-delete (if we didn't move)
             if (mode.type === 'DRAGGING_NOTE' && !mode.hasMoved) {
-                // Delete note and commit directly
+                // Update local state IMMEDIATELY for responsive UI
                 const updatedNotes = localNotes.filter((_, i) => i !== mode.noteIndex);
+                setLocalNotes(updatedNotes);
+
+                // Return to idle mode immediately
+                setMode({ type: 'IDLE' });
+
+                // Block sync from backend until commit completes
+                isCommittingRef.current = true;
                 await updateClip(clipId, { midi_events: updatedNotes });
+                isCommittingRef.current = false;
+                return;
             } else if (mode.type === 'RESIZING_NOTE' && !mode.hasMoved) {
                 // If we clicked resize handle but didn't move, do nothing
-            } else {
-                // We moved - commit changes to backend
-                await commitToBackend();
+                setMode({ type: 'IDLE' });
+                return;
             }
+
+            // We moved - commit changes to backend
+            isCommittingRef.current = true;
+            await commitToBackend();
+            isCommittingRef.current = false;
 
             // Return to idle mode
             setMode({ type: 'IDLE' });
