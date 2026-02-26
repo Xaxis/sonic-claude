@@ -22,7 +22,9 @@ from backend.models.daw_state import DAWStateSnapshot
 from backend.models.ai_actions import DAWAction, ActionResult
 from backend.services.ai.state_collector_service import DAWStateService
 from backend.services.ai.action_executor_service import DAWActionService
-from backend.services.analysis.sample_analyzer_service import SampleFileAnalyzer
+from backend.services.perception.sample_analysis import SampleAnalyzer
+from backend.services.perception.musical_perception import MusicalPerceptionAnalyzer
+from backend.services.perception.composition_perception import CompositionPerceptionAnalyzer
 from backend.models.instrument_types import get_valid_instruments_list, get_instruments_by_category
 from typing import TYPE_CHECKING
 
@@ -51,7 +53,9 @@ class AIAgentService:
         composition_service: Optional['CompositionService'] = None,
         api_key: Optional[str] = None,
         model: str = "claude-sonnet-4-5-20250929",
-        samples_dir: Optional[Path] = None
+        samples_dir: Optional[Path] = None,
+        musical_perception_analyzer: Optional[MusicalPerceptionAnalyzer] = None,
+        composition_perception_analyzer: Optional[CompositionPerceptionAnalyzer] = None
     ):
         self.state_service = state_service
         self.action_service = action_service
@@ -60,7 +64,11 @@ class AIAgentService:
         self.model = model
 
         # Sample analyzer for audio understanding
-        self.sample_analyzer = SampleFileAnalyzer(samples_dir=samples_dir)
+        self.sample_analyzer = SampleAnalyzer(samples_dir=samples_dir)
+
+        # Perception analyzers (Layer 2 & 3)
+        self.musical_perception = musical_perception_analyzer or MusicalPerceptionAnalyzer()
+        self.composition_perception = composition_perception_analyzer or CompositionPerceptionAnalyzer()
 
         # Track last state hash for efficient diffs (optional optimization)
         self.last_state_hash: Optional[str] = None
@@ -115,6 +123,20 @@ class AIAgentService:
                 plan_text += block.text
 
         logger.info(f"📋 Generated plan:\n{plan_text}")
+
+        # ====================================================================
+        # PLAN VALIDATION: Check for empty track creation
+        # ====================================================================
+        plan_lower = plan_text.lower()
+        if "create_track" in plan_lower:
+            # Check if plan mentions creating clips after tracks
+            has_create_track = "create_track" in plan_lower
+            has_create_clip = "create_midi_clip" in plan_lower or "create_clip" in plan_lower
+
+            if has_create_track and not has_create_clip:
+                logger.warning("🚨 PLAN VALIDATION FAILED: Plan creates tracks but doesn't mention adding clips!")
+                logger.warning("🚨 Injecting reminder to add clips to all tracks...")
+                plan_text += "\n\n🚨 CRITICAL REMINDER: You MUST add clips with notes to EVERY track you create. A track without clips is useless!"
 
         # ====================================================================
         # STAGE 2: EXECUTION (MULTI-TURN LOOP)
@@ -562,6 +584,14 @@ PLANNING GUIDELINES
    - For MIXER changes: Specify exact parameter adjustments
    - For EFFECTS: Specify which tracks and which effects
 
+   🚨 CRITICAL: If the user says "add EDM tracks" or "add some tracks", they OBVIOUSLY mean:
+   - Create the track
+   - Add a clip with actual musical notes to that track
+   - Optionally add effects
+
+   A track without clips is COMPLETELY USELESS. It's like creating a folder without files.
+   NEVER plan to create a track without IMMEDIATELY planning to add a clip with notes.
+
 4. **Be SPECIFIC with musical content**
    - Specify exact MIDI note patterns (not "add some notes")
    - Specify exact parameter values (not "adjust volume")
@@ -756,6 +786,11 @@ EXECUTION RULES
    - ALWAYS call create_midi_clip immediately after create_track
    - ALWAYS use the track_id returned from create_track
    - ALWAYS include actual note data in create_midi_clip
+
+   🚨 CRITICAL: If you call create_track, you MUST call create_midi_clip in the SAME response.
+   🚨 A track without a clip is COMPLETELY USELESS and will be flagged as an error.
+   🚨 When the user says "add EDM tracks", they mean: create track + add clip with notes + add effects.
+   🚨 NEVER create a track and stop. ALWAYS add a clip with musical notes immediately after.
 
 4. **MIDI note format**
    - Use compact format: {{n: MIDI_NOTE, s: START_BEAT, d: DURATION, v: VELOCITY}}
@@ -1062,6 +1097,11 @@ When modifying sequences:
         if state.audio:
             parts.append(f"Energy: {state.audio.energy:.0%} | Brightness: {state.audio.brightness:.0%} | Loudness: {state.audio.loudness_db:.1f}dB")
 
+        # === PERCEPTUAL ANALYSIS (NEW) ===
+        perception_summary = self._build_perception_context(state)
+        if perception_summary:
+            parts.append("\n" + perception_summary)
+
         # === TRACKS (with full details for modification) ===
         parts.append(f"\n=== TRACKS ({len(state.sequence.tracks)}) ===")
         for track in state.sequence.tracks:
@@ -1148,6 +1188,88 @@ When modifying sequences:
                 parts.append(f"{track.name}: {clip_timeline}")
 
         return "\n".join(parts)
+
+    def _build_perception_context(self, state: Optional[DAWStateSnapshot]) -> str:
+        """
+        Build perceptual analysis context using the 3-layer perception pipeline
+
+        This gives the AI "ears" to understand how the music sounds, not just what notes are playing.
+        """
+        if not state or not state.sequence:
+            return ""
+
+        try:
+            from backend.models.sequence import Clip
+
+            parts = []
+            parts.append("=== PERCEPTUAL ANALYSIS ===")
+
+            # Get composition from state service
+            composition_id = self.state_service.composition_state.current_composition_id
+            if not composition_id:
+                return ""
+
+            composition = self.state_service.composition_state.get_composition(composition_id)
+            if not composition:
+                return ""
+
+            # Layer 2: Analyze each track's perception
+            track_perceptions = []
+            for track in state.sequence.tracks:
+                # Get clips for this track
+                track_clips = [c for c in state.sequence.clips if c.track == track.id]
+
+                # Convert compact clips to full Clip objects
+                full_clips = []
+                for compact_clip in track_clips:
+                    full_clip = next((c for c in composition.clips if c.id == compact_clip.id), None)
+                    if full_clip:
+                        full_clips.append(full_clip)
+
+                # Get sample analysis if available
+                sample_analysis = None
+                if track.type == "sample" and full_clips:
+                    # Try to get sample analysis from first clip
+                    first_clip = full_clips[0]
+                    if hasattr(first_clip, 'audio_file_path') and first_clip.audio_file_path:
+                        sample_analysis = self.sample_analyzer.analyze_sample(first_clip.audio_file_path)
+
+                # Analyze track perception
+                track_perception = self.musical_perception.analyze_track(
+                    track_id=track.id,
+                    track_name=track.name,
+                    track_type=track.type,
+                    clips=full_clips,
+                    sample_analysis=sample_analysis,
+                    audio_features=None  # Could add real-time audio features here
+                )
+
+                track_perceptions.append(track_perception)
+                parts.append(f"  {track_perception.summary}")
+
+            # Layer 3: Analyze composition-level perception
+            if track_perceptions:
+                composition_perception = self.composition_perception.analyze_composition(
+                    composition_id=composition.id,
+                    composition_name=composition.name,
+                    track_perceptions=track_perceptions,
+                    tempo=state.tempo,
+                    time_signature=state.sequence.time_sig
+                )
+
+                parts.append(f"\n{composition_perception.summary}")
+
+                # Add actionable insights
+                if composition_perception.insights:
+                    parts.append("\nMix Insights:")
+                    for insight in composition_perception.insights:
+                        parts.append(f"  • {insight}")
+
+            return "\n".join(parts)
+
+        except Exception as e:
+            logger.error(f"Error building perception context: {e}", exc_info=True)
+            return ""
 
     def _note_to_name(self, midi_note: int) -> str:
         """Convert MIDI note number to name (e.g., 60 -> C4)"""

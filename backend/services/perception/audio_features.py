@@ -1,5 +1,5 @@
 """
-Audio Feature Extractor - Extract musical features from audio data
+Audio Features Analyzer - Extract musical features from audio data
 
 Performance optimizations:
 - Reuses existing FFT data (no duplicate computation)
@@ -17,7 +17,7 @@ from backend.models.daw_state import AudioFeatures, MusicalContext
 logger = logging.getLogger(__name__)
 
 
-class AudioFeatureExtractor:
+class AudioFeaturesAnalyzer:
     """
     Extracts musical features from real-time audio data
     Uses existing FFT/meter data from RealtimeAudioAnalyzer

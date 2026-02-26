@@ -1,5 +1,5 @@
 """
-Sample Analyzer Service - Extract audio features from sample files
+Sample Analyzer - Extract audio features from sample files
 
 Uses librosa for audio analysis to understand:
 - Spectral characteristics (brightness, frequency distribution)
@@ -36,7 +36,7 @@ from backend.models.sample_analysis import (
 logger = logging.getLogger(__name__)
 
 
-class SampleFileAnalyzer:
+class SampleAnalyzer:
     """
     Analyzes audio sample files to extract features for AI understanding
 

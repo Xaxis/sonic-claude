@@ -6,10 +6,16 @@ Design principles:
 - Hierarchical structure (AI can request detail levels)
 - Cacheable (detect changes, only send diffs)
 - Human-readable (LLM can understand structure)
+
+NOTE: AudioFeatures and MusicalContext have been moved to backend/models/perception.py
+      This file now imports them for backwards compatibility.
 """
 from typing import List, Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field
 from datetime import datetime
+
+# Import perception models (moved from this file to perception.py)
+from backend.models.perception import AudioFeatures, MusicalContext
 
 
 # ============================================================================
@@ -77,22 +83,10 @@ class CompactComposition(BaseModel):
 CompactSequence = CompactComposition
 
 
-class AudioFeatures(BaseModel):
-    """Real-time audio analysis features (derived from FFT/meters)"""
-    energy: float = Field(..., ge=0.0, le=1.0, description="RMS energy (0-1)")
-    brightness: float = Field(..., ge=0.0, le=1.0, description="Spectral centroid normalized (0-1)")
-    loudness_db: float = Field(..., description="Peak level in dB")
-    is_playing: bool = Field(..., description="Is audio currently playing")
-
-
-class MusicalContext(BaseModel):
-    """High-level musical analysis (computed from MIDI data)"""
-    key: Optional[str] = Field(None, description="Detected key (e.g., 'C major', 'A minor')")
-    scale: Optional[str] = Field(None, description="Scale type")
-    note_density: float = Field(default=0.0, ge=0.0, description="Notes per beat")
-    pitch_range: tuple[int, int] = Field(default=(60, 72), description="Min/max MIDI notes")
-    complexity: float = Field(default=0.0, ge=0.0, le=1.0, description="Rhythmic/harmonic complexity (0-1)")
-
+# ============================================================================
+# DAW STATE SNAPSHOT
+# ============================================================================
+# NOTE: AudioFeatures and MusicalContext are now imported from perception.py
 
 class DAWStateSnapshot(BaseModel):
     """

@@ -32,9 +32,11 @@ from backend.services.audio.input_service import AudioInputService
 from backend.services.audio.buffer_manager_service import BufferManager
 from backend.services.audio.bus_manager_service import AudioBusManager
 
-# Analysis services
-from backend.services.analysis.audio_features_service import AudioFeatureExtractor
-from backend.services.analysis.midi_analyzer_service import MIDIAnalyzer
+# Perception services (3-layer pipeline)
+from backend.services.perception.audio_features import AudioFeaturesAnalyzer
+from backend.services.perception.symbolic_analysis import SymbolicAnalyzer
+from backend.services.perception.musical_perception import MusicalPerceptionAnalyzer
+from backend.services.perception.composition_perception import CompositionPerceptionAnalyzer
 
 # DAW services
 from backend.services.daw.composition_state_service import CompositionStateService
@@ -74,8 +76,10 @@ _track_meter_service: Optional[TrackMetersService] = None
 _audio_bus_manager: Optional[AudioBusManager] = None
 _mixer_channel_service: Optional[MixerTrackChannelsService] = None
 _track_effects_service: Optional[TrackEffectsService] = None
-_audio_feature_extractor: Optional[AudioFeatureExtractor] = None
-_musical_context_analyzer: Optional[MIDIAnalyzer] = None
+_audio_features_analyzer: Optional[AudioFeaturesAnalyzer] = None
+_symbolic_analyzer: Optional[SymbolicAnalyzer] = None
+_musical_perception_analyzer: Optional[MusicalPerceptionAnalyzer] = None
+_composition_perception_analyzer: Optional[CompositionPerceptionAnalyzer] = None
 _daw_state_service: Optional[DAWStateService] = None
 _daw_action_service: Optional[DAWActionService] = None
 _composition_service: Optional[CompositionService] = None
@@ -101,8 +105,9 @@ async def initialize_services(settings: Settings) -> None:
     global _composition_state_service, _playback_engine_service
     global _ws_manager, _buffer_manager, _mixer_service
     global _track_meter_service, _audio_bus_manager, _mixer_channel_service, _track_effects_service
-    global _audio_feature_extractor, _musical_context_analyzer, _daw_state_service
-    global _daw_action_service, _composition_service, _ai_agent_service
+    global _audio_features_analyzer, _symbolic_analyzer
+    global _musical_perception_analyzer, _composition_perception_analyzer
+    global _daw_state_service, _daw_action_service, _composition_service, _ai_agent_service
 
     logger.info("🚀 Initializing services...")
 
@@ -170,21 +175,27 @@ async def initialize_services(settings: Settings) -> None:
     # Step 6: Initialize AI services
     logger.info("🤖 Initializing AI services...")
 
-    # Create AI analysis services
-    _audio_feature_extractor = AudioFeatureExtractor()
-    _musical_context_analyzer = MIDIAnalyzer()
+    # Create perception pipeline (3 layers)
+    logger.info("🎵 Initializing perception pipeline...")
+    # Layer 1: Raw analysis
+    _audio_features_analyzer = AudioFeaturesAnalyzer()
+    _symbolic_analyzer = SymbolicAnalyzer()
+    # Layer 2: Musical perception
+    _musical_perception_analyzer = MusicalPerceptionAnalyzer()
+    # Layer 3: Compositional intelligence
+    _composition_perception_analyzer = CompositionPerceptionAnalyzer()
 
     # Create sample analyzer (shared between DAW state and AI agent)
-    from backend.services.analysis.sample_analyzer_service import SampleFileAnalyzer
-    _sample_analyzer = SampleFileAnalyzer(samples_dir=settings.storage.samples_dir)
+    from backend.services.perception.sample_analysis import SampleAnalyzer
+    _sample_analyzer = SampleAnalyzer(samples_dir=settings.storage.samples_dir)
 
     # Create DAW state and action services
     _daw_state_service = DAWStateService(
         composition_state_service=_composition_state_service,
         mixer_service=_mixer_service,
         engine_manager=_engine_manager,
-        audio_feature_extractor=_audio_feature_extractor,
-        musical_context_analyzer=_musical_context_analyzer,
+        audio_feature_extractor=_audio_features_analyzer,
+        musical_context_analyzer=_symbolic_analyzer,
         sample_analyzer=_sample_analyzer
     )
 
@@ -208,7 +219,9 @@ async def initialize_services(settings: Settings) -> None:
         composition_service=_composition_service,
         api_key=api_key,
         model=settings.ai.model,
-        samples_dir=settings.storage.samples_dir
+        samples_dir=settings.storage.samples_dir,
+        musical_perception_analyzer=_musical_perception_analyzer,
+        composition_perception_analyzer=_composition_perception_analyzer
     )
 
     # Configure AI settings
@@ -219,7 +232,7 @@ async def initialize_services(settings: Settings) -> None:
     def _extract_and_update_features(spectrum_data):
         """Extract features from spectrum data and update DAW state"""
         try:
-            features = _audio_feature_extractor.extract_features(
+            features = _audio_features_analyzer.extract_features(
                 spectrum=spectrum_data.get("spectrum", []),
                 peak_db=spectrum_data.get("peak_db"),
                 rms_db=spectrum_data.get("rms_db"),
@@ -368,18 +381,32 @@ def get_track_effects_service() -> TrackEffectsService:
     return _track_effects_service
 
 
-def get_audio_feature_extractor() -> AudioFeatureExtractor:
-    """Get AudioFeatureExtractor instance"""
-    if _audio_feature_extractor is None:
-        raise RuntimeError("AudioFeatureExtractor not initialized")
-    return _audio_feature_extractor
+def get_audio_features_analyzer() -> AudioFeaturesAnalyzer:
+    """Get AudioFeaturesAnalyzer instance"""
+    if _audio_features_analyzer is None:
+        raise RuntimeError("AudioFeaturesAnalyzer not initialized")
+    return _audio_features_analyzer
 
 
-def get_musical_context_analyzer() -> MIDIAnalyzer:
-    """Get MIDIAnalyzer instance"""
-    if _musical_context_analyzer is None:
-        raise RuntimeError("MIDIAnalyzer not initialized")
-    return _musical_context_analyzer
+def get_symbolic_analyzer() -> SymbolicAnalyzer:
+    """Get SymbolicAnalyzer instance"""
+    if _symbolic_analyzer is None:
+        raise RuntimeError("SymbolicAnalyzer not initialized")
+    return _symbolic_analyzer
+
+
+def get_musical_perception_analyzer() -> MusicalPerceptionAnalyzer:
+    """Get MusicalPerceptionAnalyzer instance (Layer 2)"""
+    if _musical_perception_analyzer is None:
+        raise RuntimeError("MusicalPerceptionAnalyzer not initialized")
+    return _musical_perception_analyzer
+
+
+def get_composition_perception_analyzer() -> CompositionPerceptionAnalyzer:
+    """Get CompositionPerceptionAnalyzer instance (Layer 3)"""
+    if _composition_perception_analyzer is None:
+        raise RuntimeError("CompositionPerceptionAnalyzer not initialized")
+    return _composition_perception_analyzer
 
 
 def get_daw_state_service() -> DAWStateService:

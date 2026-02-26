@@ -1,5 +1,5 @@
 """
-Musical Context Analyzer - Extract musical information from MIDI data
+Symbolic Analyzer - Extract musical information from MIDI/symbolic data
 
 Performance optimizations:
 - Only analyzes when MIDI changes (event-driven)
@@ -17,9 +17,9 @@ from backend.models.daw_state import MusicalContext
 logger = logging.getLogger(__name__)
 
 
-class MIDIAnalyzer:
+class SymbolicAnalyzer:
     """
-    Analyzes MIDI sequences to extract musical context
+    Analyzes MIDI/symbolic sequences to extract musical context
     Key detection, scale detection, complexity metrics, etc.
     """
     
