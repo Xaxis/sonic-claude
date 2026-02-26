@@ -45,6 +45,8 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     // ========================================================================
     const [localNotes, setLocalNotes] = useState<MIDIEvent[]>([]);
     const [mode, setMode] = useState<InteractionMode>({ type: 'IDLE' });
+    const [dragPreview, setDragPreview] = useState<{ noteIndex: number; time: number; pitch: number } | null>(null);
+    const [resizePreview, setResizePreview] = useState<{ noteIndex: number; duration: number } | null>(null);
     const gridRef = useRef<HTMLDivElement>(null);
 
     // ========================================================================
@@ -267,25 +269,30 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
                 const note = localNotes[mode.noteIndex];
                 newTime = Math.max(0, Math.min(clipDuration - note.duration, newTime));
 
-                // Update note immediately
-                setLocalNotes(prev => {
-                    const updated = [...prev];
-                    const oldPitch = updated[mode.noteIndex].note;
+                // Update preview immediately (shows where it will snap)
+                setDragPreview({ noteIndex: mode.noteIndex, time: newTime, pitch: newPitch });
 
-                    updated[mode.noteIndex] = {
-                        ...updated[mode.noteIndex],
-                        start_time: newTime,
-                        note: newPitch,
-                        note_name: getNoteName(newPitch)
-                    };
+                // Only update actual note if position changed
+                if (note.start_time !== newTime || note.note !== newPitch) {
+                    setLocalNotes(prev => {
+                        const updated = [...prev];
+                        const oldPitch = updated[mode.noteIndex].note;
 
-                    // Preview if pitch changed
-                    if (newPitch !== oldPitch) {
-                        previewNote(newPitch, updated[mode.noteIndex].velocity);
-                    }
+                        updated[mode.noteIndex] = {
+                            ...updated[mode.noteIndex],
+                            start_time: newTime,
+                            note: newPitch,
+                            note_name: getNoteName(newPitch)
+                        };
 
-                    return updated;
-                });
+                        // Preview if pitch changed
+                        if (newPitch !== oldPitch) {
+                            previewNote(newPitch, updated[mode.noteIndex].velocity);
+                        }
+
+                        return updated;
+                    });
+                }
 
             } else if (mode.type === 'RESIZING_NOTE') {
                 const deltaX = e.clientX - mode.startX;
@@ -307,15 +314,20 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
                 const maxDuration = clipDuration - note.start_time;
                 newDuration = Math.min(newDuration, maxDuration);
 
-                // Update note immediately
-                setLocalNotes(prev => {
-                    const updated = [...prev];
-                    updated[mode.noteIndex] = {
-                        ...updated[mode.noteIndex],
-                        duration: newDuration
-                    };
-                    return updated;
-                });
+                // Update preview immediately (shows where it will snap)
+                setResizePreview({ noteIndex: mode.noteIndex, duration: newDuration });
+
+                // Only update actual note if duration changed
+                if (note.duration !== newDuration) {
+                    setLocalNotes(prev => {
+                        const updated = [...prev];
+                        updated[mode.noteIndex] = {
+                            ...updated[mode.noteIndex],
+                            duration: newDuration
+                        };
+                        return updated;
+                    });
+                }
 
             } else if (mode.type === 'PAINTING_NOTES') {
                 // Only allow painting within clip region
@@ -345,6 +357,10 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
         };
 
         const handleMouseUp = async () => {
+            // Clear previews
+            setDragPreview(null);
+            setResizePreview(null);
+
             // Handle click-to-delete (if we didn't move)
             if (mode.type === 'DRAGGING_NOTE' && !mode.hasMoved) {
                 // Update local state IMMEDIATELY for responsive UI
@@ -420,6 +436,10 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
 
                 {/* Notes */}
                 {localNotes.map((note, index) => {
+                    const hasDragPreview = dragPreview?.noteIndex === index;
+                    const hasResizePreview = resizePreview?.noteIndex === index;
+                    const isPreviewing = hasDragPreview || hasResizePreview;
+
                     const x = beatsToPixels(clipStartTime + note.start_time);
                     const y = pitchToPixels(note.note);
                     const width = beatsToPixels(note.duration);
@@ -431,30 +451,62 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
                     const velocityOpacity = 0.4 + (note.velocity / 127) * 0.6;
 
                     return (
-                        <div
-                            key={index}
-                            className="absolute rounded cursor-move select-none"
-                            style={{
-                                left: `${x}px`,
-                                top: `${y}px`,
-                                width: `${width}px`,
-                                height: `${noteHeight}px`,
-                                backgroundColor: `rgba(8, 145, 178, ${velocityOpacity})`,
-                                boxShadow: isPlaying ? '0 0 20px rgba(6, 182, 212, 0.8)' : undefined,
-                            }}
-                            onMouseDown={(e) => handleNoteMouseDown(e, index, false)}
-                        >
-                            {/* Velocity bar */}
+                        <div key={index}>
+                            {/* Original note (dimmed when previewing) */}
                             <div
-                                className="absolute bottom-0 left-0 right-0 bg-cyan-300/40"
-                                style={{ height: `${(note.velocity / 127) * 100}%` }}
-                            />
+                                className="absolute rounded cursor-move select-none"
+                                style={{
+                                    left: `${x}px`,
+                                    top: `${y}px`,
+                                    width: `${width}px`,
+                                    height: `${noteHeight}px`,
+                                    backgroundColor: `rgba(8, 145, 178, ${isPreviewing ? velocityOpacity * 0.3 : velocityOpacity})`,
+                                    boxShadow: isPlaying ? '0 0 20px rgba(6, 182, 212, 0.8)' : undefined,
+                                    opacity: isPreviewing ? 0.4 : 1,
+                                }}
+                                onMouseDown={(e) => handleNoteMouseDown(e, index, false)}
+                            >
+                                {/* Velocity bar */}
+                                <div
+                                    className="absolute bottom-0 left-0 right-0 bg-cyan-300/40"
+                                    style={{ height: `${(note.velocity / 127) * 100}%` }}
+                                />
 
-                            {/* Resize handle */}
-                            <div
-                                className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/20 z-10"
-                                onMouseDown={(e) => handleNoteMouseDown(e, index, true)}
-                            />
+                                {/* Resize handle */}
+                                <div
+                                    className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/20 z-10"
+                                    onMouseDown={(e) => handleNoteMouseDown(e, index, true)}
+                                />
+                            </div>
+
+                            {/* Ghost preview (shown when dragging/resizing) */}
+                            {hasDragPreview && (
+                                <div
+                                    className="absolute rounded pointer-events-none"
+                                    style={{
+                                        left: `${beatsToPixels(clipStartTime + dragPreview.time)}px`,
+                                        top: `${pitchToPixels(dragPreview.pitch)}px`,
+                                        width: `${width}px`,
+                                        height: `${noteHeight}px`,
+                                        backgroundColor: `rgba(6, 182, 212, 0.5)`,
+                                        border: '2px dashed rgba(6, 182, 212, 0.8)',
+                                    }}
+                                />
+                            )}
+
+                            {hasResizePreview && (
+                                <div
+                                    className="absolute rounded pointer-events-none"
+                                    style={{
+                                        left: `${x}px`,
+                                        top: `${y}px`,
+                                        width: `${beatsToPixels(resizePreview.duration)}px`,
+                                        height: `${noteHeight}px`,
+                                        backgroundColor: `rgba(6, 182, 212, 0.5)`,
+                                        border: '2px dashed rgba(6, 182, 212, 0.8)',
+                                    }}
+                                />
+                            )}
                         </div>
                     );
                 })}
