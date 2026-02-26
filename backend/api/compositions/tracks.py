@@ -3,6 +3,10 @@ Composition Tracks Routes - Track management within compositions
 
 All track operations are scoped to a specific composition.
 Tracks are nested resources under compositions.
+
+Validation:
+- Instrument names are validated against SYNTHDEF_REGISTRY
+- Invalid instruments will result in 422 Unprocessable Entity
 """
 import logging
 from typing import Optional
@@ -24,28 +28,47 @@ from backend.services.daw.composition_service import CompositionService
 from backend.services.daw.mixer_service import MixerService
 from backend.services.daw.effects_service import TrackEffectsService
 from backend.models.sequence import Track
+from backend.models.instrument_types import ValidInstrument
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
 class CreateTrackRequest(BaseModel):
-    """Request to create a track in a composition"""
+    """
+    Request to create a track in a composition
+
+    Validation:
+    - instrument must be a valid SynthDef name from SYNTHDEF_REGISTRY
+    - FastAPI will return 422 if instrument is invalid
+    """
     name: str
     type: Optional[str] = "sample"  # "midi", "audio", or "sample"
     color: Optional[str] = "#3b82f6"
     sample_id: Optional[str] = None  # For sample-based tracks
     sample_name: Optional[str] = None  # Cached sample name
     sample_file_path: Optional[str] = None  # Cached file path
-    instrument: Optional[str] = None  # For MIDI tracks
+    instrument: Optional[ValidInstrument] = Field(
+        None,
+        description="Instrument/synth name for MIDI tracks. Must be a valid SynthDef from SYNTHDEF_REGISTRY."
+    )
 
 
 class UpdateTrackRequest(BaseModel):
-    """Request to update track properties"""
+    """
+    Request to update track properties
+
+    Validation:
+    - instrument must be a valid SynthDef name from SYNTHDEF_REGISTRY
+    - FastAPI will return 422 if instrument is invalid
+    """
     name: Optional[str] = None
     volume: Optional[float] = Field(None, ge=0.0, le=2.0)
     pan: Optional[float] = Field(None, ge=-1.0, le=1.0)
-    instrument: Optional[str] = None
+    instrument: Optional[ValidInstrument] = Field(
+        None,
+        description="Instrument/synth name for MIDI tracks. Must be a valid SynthDef from SYNTHDEF_REGISTRY."
+    )
 
 
 class UpdateTrackMuteRequest(BaseModel):

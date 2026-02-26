@@ -14,24 +14,42 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Music, Plus, FolderOpen, Clock } from "lucide-react";
+import { Music, Plus, FolderOpen, Clock, Trash2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
-export function CompositionLoader() {
+interface CompositionLoaderProps {
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+}
+
+export function CompositionLoader({ open: controlledOpen, onOpenChange }: CompositionLoaderProps = {}) {
     // Get state and actions from Zustand store
     const activeComposition = useDAWStore(state => state.activeComposition);
     const compositions = useDAWStore(state => state.compositions);
     const loadComposition = useDAWStore(state => state.loadComposition);
     const createComposition = useDAWStore(state => state.createComposition);
+    const deleteComposition = useDAWStore(state => state.deleteComposition);
     const loadSynthDefs = useDAWStore(state => state.loadSynthDefs);
     const initialize = useDAWStore(state => state.initialize);
 
     const [newCompositionName, setNewCompositionName] = useState("");
     const [isCreating, setIsCreating] = useState(false);
     const [isInitializing, setIsInitializing] = useState(true);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [compositionToDelete, setCompositionToDelete] = useState<{ id: string; name: string } | null>(null);
 
     // Initialize: Load compositions list, SynthDefs, and auto-load last active composition
     useEffect(() => {
@@ -52,8 +70,17 @@ export function CompositionLoader() {
         init();
     }, []); // Run once on mount
 
-    // Dialog is open when no composition is active AND not initializing
-    const isOpen = !activeComposition && !isInitializing;
+    // Dialog is open when:
+    // - Controlled mode: use controlledOpen prop
+    // - Auto mode: no composition is active AND not initializing
+    const isOpen = controlledOpen !== undefined ? controlledOpen : (!activeComposition && !isInitializing);
+
+    const handleOpenChange = (open: boolean) => {
+        if (onOpenChange) {
+            onOpenChange(open);
+        }
+        // In auto mode, don't allow closing if no composition is active
+    };
 
     const handleCreate = async () => {
         if (!newCompositionName.trim()) return;
@@ -62,7 +89,10 @@ export function CompositionLoader() {
         try {
             await createComposition(newCompositionName.trim());
             setNewCompositionName("");
-            // Modal will close automatically when activeCompositionId is set
+            // Close dialog if controlled
+            if (onOpenChange) {
+                onOpenChange(false);
+            }
         } catch (error) {
             console.error("Failed to create composition:", error);
         } finally {
@@ -72,20 +102,48 @@ export function CompositionLoader() {
 
     const handleLoad = async (compositionId: string) => {
         await loadComposition(compositionId);
+        // Close dialog if controlled
+        if (onOpenChange) {
+            onOpenChange(false);
+        }
+    };
+
+    const handleDeleteClick = (e: React.MouseEvent, compositionId: string, compositionName: string) => {
+        e.stopPropagation();
+        setCompositionToDelete({ id: compositionId, name: compositionName });
+        setDeleteDialogOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!compositionToDelete) return;
+
+        try {
+            await deleteComposition(compositionToDelete.id);
+            setDeleteDialogOpen(false);
+            setCompositionToDelete(null);
+        } catch (error) {
+            console.error("Failed to delete composition:", error);
+        }
+    };
+
+    const handleDeleteCancel = () => {
+        setDeleteDialogOpen(false);
+        setCompositionToDelete(null);
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={() => {}}>
-            <DialogContent className="sm:max-w-[600px]" showCloseButton={false}>
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2 text-2xl">
-                        <Music className="h-6 w-6" />
-                        Welcome to Sonic Claude
-                    </DialogTitle>
-                    <DialogDescription>
-                        Create a new composition or load an existing one to get started
-                    </DialogDescription>
-                </DialogHeader>
+        <>
+            <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+                <DialogContent className="sm:max-w-[600px]" showCloseButton={controlledOpen !== undefined}>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-2xl">
+                            <Music className="h-6 w-6" />
+                            {controlledOpen !== undefined ? "Manage Compositions" : "Welcome to Sonic Claude"}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Create a new composition or load an existing one to get started
+                        </DialogDescription>
+                    </DialogHeader>
 
                 <div className="space-y-6 py-4">
                     {/* Create New Composition */}
@@ -123,20 +181,32 @@ export function CompositionLoader() {
                             <div className="h-[300px] rounded-md border overflow-y-auto">
                                 <div className="p-2 space-y-2">
                                     {compositions.map((comp) => (
-                                        <Button
+                                        <div
                                             key={comp.id}
-                                            variant="outline"
-                                            className="w-full justify-start h-auto py-3 px-4"
-                                            onClick={() => handleLoad(comp.id)}
+                                            className="flex items-center gap-2 w-full"
                                         >
-                                            <div className="flex flex-col items-start gap-1 w-full">
-                                                <div className="font-semibold">{comp.name}</div>
-                                                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                                    <Clock className="h-3 w-3" />
-                                                    {formatDate(comp.updated_at)}
+                                            <Button
+                                                variant="outline"
+                                                className="flex-1 justify-start h-auto py-3 px-4"
+                                                onClick={() => handleLoad(comp.id)}
+                                            >
+                                                <div className="flex flex-col items-start gap-1 w-full">
+                                                    <div className="font-semibold">{comp.name}</div>
+                                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                        <Clock className="h-3 w-3" />
+                                                        {formatDate(comp.updated_at)}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </Button>
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-auto py-3 px-3 hover:bg-destructive/10 hover:text-destructive shrink-0"
+                                                onClick={(e) => handleDeleteClick(e, comp.id, comp.name)}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
@@ -151,6 +221,31 @@ export function CompositionLoader() {
                 </div>
             </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Composition?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Are you sure you want to delete <strong>"{compositionToDelete?.name}"</strong>?
+                        <br />
+                        <br />
+                        This will permanently delete the composition and all its history. This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={handleDeleteCancel}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={handleDeleteConfirm}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                        Delete
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+        </>
     );
 }
 

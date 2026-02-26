@@ -15,6 +15,10 @@ UNDO/REDO SYSTEM (BUILT-IN):
 - Redo pops from redo stack, pushes to undo stack
 - New mutation clears redo stack
 - Stacks are NOT persisted (cleared on app restart)
+
+VALIDATION:
+- Instrument names are validated against SYNTHDEF_REGISTRY
+- Invalid instruments raise ValueError with helpful error messages
 """
 import logging
 import uuid
@@ -30,6 +34,7 @@ from backend.models.sequence import (
     AddClipRequest,
     UpdateClipRequest,
 )
+from backend.models.instrument_types import validate_instrument
 
 logger = logging.getLogger(__name__)
 
@@ -188,11 +193,37 @@ class CompositionStateService:
         sample_file_path: Optional[str] = None,
         instrument: Optional[str] = None
     ) -> Optional[Track]:
-        """Create a new track in a composition"""
+        """
+        Create a new track in a composition
+
+        Validation:
+        - Validates instrument against SYNTHDEF_REGISTRY
+        - Raises ValueError if instrument is invalid
+
+        Args:
+            composition_id: ID of composition to add track to
+            name: Track name
+            track_type: Track type (midi, audio, sample)
+            color: Track color (hex)
+            sample_id: Sample ID for sample tracks
+            sample_name: Cached sample name
+            sample_file_path: Cached sample file path
+            instrument: Instrument/synth name for MIDI tracks
+
+        Returns:
+            Created Track or None if composition not found
+
+        Raises:
+            ValueError: If instrument is invalid
+        """
         composition = self.compositions.get(composition_id)
         if not composition:
             logger.error(f"❌ Composition {composition_id} not found")
             return None
+
+        # VALIDATION LAYER 3: Service-level validation
+        # This is the final line of defense - validates instrument before track creation
+        validate_instrument(instrument)
 
         track_id = str(uuid.uuid4())
         track = Track(
@@ -248,10 +279,35 @@ class CompositionStateService:
         pan: Optional[float] = None,
         instrument: Optional[str] = None
     ) -> Optional[Track]:
-        """Update track properties"""
+        """
+        Update track properties
+
+        Validation:
+        - Validates instrument against SYNTHDEF_REGISTRY if provided
+        - Raises ValueError if instrument is invalid
+
+        Args:
+            composition_id: ID of composition containing the track
+            track_id: ID of track to update
+            name: New track name (optional)
+            volume: New volume (optional)
+            pan: New pan (optional)
+            instrument: New instrument (optional, validated)
+
+        Returns:
+            Updated Track or None if not found
+
+        Raises:
+            ValueError: If instrument is invalid
+        """
         composition = self.compositions.get(composition_id)
         if not composition:
             return None
+
+        # VALIDATION LAYER 3: Service-level validation
+        # Validate instrument before updating
+        if instrument is not None:
+            validate_instrument(instrument)
 
         for track in composition.tracks:
             if track.id == track_id:

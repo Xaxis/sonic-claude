@@ -7,6 +7,10 @@ Performance optimizations:
 - Compact prompts with structured output
 - Caching of LLM responses
 - Rate limiting to prevent token waste
+
+Validation:
+- Tool definitions dynamically generated from SYNTHDEF_REGISTRY
+- Ensures AI can only select valid instruments (no hallucination)
 """
 import logging
 from typing import Optional, List, Dict, Any
@@ -19,6 +23,7 @@ from backend.models.ai_actions import DAWAction, ActionResult
 from backend.services.ai.state_collector_service import DAWStateService
 from backend.services.ai.action_executor_service import DAWActionService
 from backend.services.analysis.sample_analyzer_service import SampleFileAnalyzer
+from backend.models.instrument_types import get_valid_instruments_list, get_instruments_by_category
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -1255,8 +1260,41 @@ If nothing is playing, you might suggest starting with a basic rhythm or melody.
 
 Keep suggestions simple and musical. Explain your reasoning briefly."""
 
+    def _build_instrument_description(self) -> str:
+        """
+        Build comprehensive instrument description for AI tool schema
+
+        This dynamically generates the description from SYNTHDEF_REGISTRY,
+        ensuring the AI knows about all available instruments organized by category.
+
+        Returns:
+            Formatted description string with all instruments by category
+        """
+        by_category = get_instruments_by_category()
+
+        # Build description with categories
+        desc_parts = ["Instrument/synth name for MIDI tracks. REQUIRED for MIDI tracks to produce sound.\n\nAvailable instruments by category:"]
+
+        for category in sorted(by_category.keys()):
+            instruments = by_category[category]
+            # Limit to first 10 per category in description to keep it readable
+            if len(instruments) > 10:
+                instrument_list = ", ".join(instruments[:10]) + f", ... ({len(instruments)} total)"
+            else:
+                instrument_list = ", ".join(instruments)
+            desc_parts.append(f"\n- {category}: {instrument_list}")
+
+        desc_parts.append("\n\nExamples: 'acousticGrandPiano', 'kick808', 'synthBass1', 'trumpet', 'electricGuitarClean'")
+
+        return "".join(desc_parts)
+
     def _get_tool_definitions(self) -> List[Dict[str, Any]]:
-        """Get Claude function calling tool definitions"""
+        """
+        Get Claude function calling tool definitions
+
+        CRITICAL: Instrument enum is dynamically generated from SYNTHDEF_REGISTRY
+        to prevent AI hallucination of invalid instrument names.
+        """
         return [
             {
                 "name": "create_midi_clip",
@@ -1333,7 +1371,11 @@ Keep suggestions simple and musical. Explain your reasoning briefly."""
                     "properties": {
                         "name": {"type": "string", "description": "Track name (e.g., 'Kick Drum', 'Bass', 'Pad')"},
                         "type": {"type": "string", "enum": ["midi", "audio"], "description": "Track type - use 'midi' for synthesized instruments"},
-                        "instrument": {"type": "string", "description": "Instrument/synth name for MIDI tracks. Available: sine, saw, square, triangle, kick, snare, hihat. REQUIRED for MIDI tracks to produce sound."}
+                        "instrument": {
+                            "type": "string",
+                            "enum": get_valid_instruments_list(),
+                            "description": self._build_instrument_description()
+                        }
                     },
                     "required": ["name", "type", "instrument"]
                 }
@@ -1474,7 +1516,11 @@ Keep suggestions simple and musical. Explain your reasoning briefly."""
                     "type": "object",
                     "properties": {
                         "track_id": {"type": "string", "description": "Track ID"},
-                        "instrument": {"type": "string", "description": "New instrument name (e.g., sine, saw, square, kick, snare, hihat)"}
+                        "instrument": {
+                            "type": "string",
+                            "enum": get_valid_instruments_list(),
+                            "description": "New instrument name. Must be a valid SynthDef from SYNTHDEF_REGISTRY."
+                        }
                     },
                     "required": ["track_id", "instrument"]
                 }

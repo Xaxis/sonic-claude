@@ -3,12 +3,15 @@ AI Action Models - Structured actions for LLM tool calling
 
 Design principles:
 - Each action is a discrete, atomic operation
-- Validation at the model level
+- Validation at the model level (including instrument validation)
 - Clear success/failure responses
 - Idempotent where possible
 """
 from typing import List, Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field
+
+# Import validated instrument type for type safety
+from backend.models.instrument_types import ValidInstrument
 
 
 # ============================================================================
@@ -42,11 +45,20 @@ class DeleteClipAction(BaseModel):
 
 
 class CreateTrackAction(BaseModel):
-    """Create a new track"""
+    """
+    Create a new track
+
+    Validation:
+    - instrument must be a valid SynthDef name from SYNTHDEF_REGISTRY
+    - Pydantic will reject invalid instruments at the model level
+    """
     action: Literal["create_track"] = "create_track"
     name: str
     type: Literal["midi", "audio", "sample"]
-    instrument: Optional[str] = Field(None, description="Instrument/synth name for MIDI tracks")
+    instrument: Optional[ValidInstrument] = Field(
+        None,
+        description="Instrument/synth name for MIDI tracks. Must be a valid SynthDef from SYNTHDEF_REGISTRY."
+    )
     color: Optional[str] = Field(None, description="Track color (hex)")
 
 
