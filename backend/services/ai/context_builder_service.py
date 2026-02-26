@@ -15,7 +15,7 @@ import logging
 from typing import Dict, Any, Optional, List
 from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.mixer_service import MixerService
-from backend.services.daw.effects_service import TrackEffectsService
+from backend.services.daw.track_effects_service import TrackEffectsService
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ class ContextBuilderService:
                     "parameters": e.parameters,
                     "is_bypassed": e.is_bypassed
                 }
-                for e in (track_effects.effects if track_effects else [])
+                for e in (track_effects.track_effects if track_effects else [])
             ],
             "mixer": {
                 "fader": mixer_channel.fader if mixer_channel else 0.0,

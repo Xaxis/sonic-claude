@@ -14,9 +14,9 @@ Services in this module manage DAW state and functionality:
 from .composition_state_service import CompositionStateService
 from .playback_engine_service import PlaybackEngineService
 from .mixer_service import MixerService
-from .mixer_channel_service import MixerChannelSynthManager
-from .track_meter_service import TrackMeterHandler
-from .effects_service import TrackEffectsService
+from .mixer_track_channels_service import MixerTrackChannelsService
+from .track_meters_service import TrackMetersService
+from .track_effects_service import TrackEffectsService
 from .effect_definitions import EFFECT_DEFINITIONS, get_effect_definition
 from .synthesis_service import SynthesisService
 
@@ -24,8 +24,8 @@ __all__ = [
     "CompositionStateService",
     "PlaybackEngineService",
     "MixerService",
-    "MixerChannelSynthManager",
-    "TrackMeterHandler",
+    "MixerTrackChannelsService",
+    "TrackMetersService",
     "TrackEffectsService",
     "EFFECT_DEFINITIONS",
     "get_effect_definition",

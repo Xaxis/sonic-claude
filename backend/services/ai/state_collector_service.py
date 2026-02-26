@@ -171,7 +171,7 @@ class DAWStateService:
         track_effects_map = {}
         if hasattr(seq, 'track_effects') and seq.track_effects:
             for track_effect_chain in seq.track_effects:
-                track_effects_map[track_effect_chain.track_id] = track_effect_chain.effects
+                track_effects_map[track_effect_chain.track_id] = track_effect_chain.track_effects
 
         # Convert tracks with effect chains
         tracks = []

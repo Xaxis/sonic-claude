@@ -20,7 +20,7 @@ from backend.core.exceptions import (
 from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.composition_service import CompositionService
 from backend.services.daw.mixer_service import MixerService
-from backend.services.daw.effects_service import TrackEffectsService
+from backend.services.daw.track_effects_service import TrackEffectsService
 from backend.models.sequence import Clip, AddClipRequest, UpdateClipRequest
 
 router = APIRouter()

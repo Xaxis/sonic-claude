@@ -3,9 +3,7 @@ Mixer Service - Manages mixer channels, routing, and audio processing
 """
 import logging
 import uuid
-from typing import Dict, List, Optional
-from pathlib import Path
-import json
+from typing import List, Optional
 
 from backend.models.mixer import (
     MixerChannel,

@@ -1,5 +1,5 @@
 """
-Mixer Channel Service - Manages mixer channel synths for tracks
+Mixer Track Channel Service - Manages mixer channel synths for tracks
 
 Each track gets a mixer channel synth that:
 - Reads audio from the track's bus
@@ -13,7 +13,7 @@ from typing import Dict, Optional
 logger = logging.getLogger(__name__)
 
 
-class MixerChannelSynthManager:
+class MixerTrackChannelsService:
     """
     Manages mixer channel synths for sequencer tracks (low-level SC integration)
 

@@ -14,7 +14,7 @@ from backend.core.dependencies import (
     get_composition_state_service,
     get_mixer_service
 )
-from backend.services.daw.effects_service import TrackEffectsService
+from backend.services.daw.track_effects_service import TrackEffectsService
 from backend.services.daw.composition_service import CompositionService
 from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.mixer_service import MixerService

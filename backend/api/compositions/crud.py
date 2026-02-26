@@ -25,7 +25,7 @@ from backend.core.dependencies import (
 from backend.services.daw.composition_service import CompositionService
 from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.mixer_service import MixerService
-from backend.services.daw.effects_service import TrackEffectsService
+from backend.services.daw.track_effects_service import TrackEffectsService
 from backend.services.ai.agent_service import AIAgentService
 from backend.core.exceptions import ServiceError, ResourceNotFoundError
 from backend.models.composition import (

@@ -41,9 +41,9 @@ from backend.services.daw.synthesis_service import SynthesisService
 from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.playback_engine_service import PlaybackEngineService
 from backend.services.daw.mixer_service import MixerService
-from backend.services.daw.mixer_channel_service import MixerChannelSynthManager
-from backend.services.daw.track_meter_service import TrackMeterHandler
-from backend.services.daw.effects_service import TrackEffectsService
+from backend.services.daw.mixer_track_channels_service import MixerTrackChannelsService
+from backend.services.daw.track_meters_service import TrackMetersService
+from backend.services.daw.track_effects_service import TrackEffectsService
 
 # AI services
 from backend.services.ai.state_collector_service import DAWStateService
@@ -72,9 +72,9 @@ _playback_engine_service: Optional[PlaybackEngineService] = None
 _ws_manager: Optional[WebSocketManager] = None
 _buffer_manager: Optional[BufferManager] = None
 _mixer_service: Optional[MixerService] = None
-_track_meter_service: Optional[TrackMeterHandler] = None
+_track_meter_service: Optional[TrackMetersService] = None
 _audio_bus_manager: Optional[AudioBusManager] = None
-_mixer_channel_service: Optional[MixerChannelSynthManager] = None
+_mixer_channel_service: Optional[MixerTrackChannelsService] = None
 _track_effects_service: Optional[TrackEffectsService] = None
 _audio_feature_extractor: Optional[AudioFeatureExtractor] = None
 _musical_context_analyzer: Optional[MIDIAnalyzer] = None
@@ -120,8 +120,8 @@ async def initialize_services(settings: Settings) -> None:
     # Step 3: Initialize per-track metering and effects services
     logger.info("🎚️ Initializing per-track metering and effects...")
     _audio_bus_manager = AudioBusManager()
-    _mixer_channel_service = MixerChannelSynthManager(_engine_manager, _audio_bus_manager)
-    _track_meter_service = TrackMeterHandler(_engine_manager, _mixer_channel_service)
+    _mixer_channel_service = MixerTrackChannelsService(_engine_manager, _audio_bus_manager)
+    _track_meter_service = TrackMetersService(_engine_manager, _mixer_channel_service)
     _track_effects_service = TrackEffectsService(_engine_manager, _audio_bus_manager, _mixer_channel_service)
 
     # Step 4: Initialize unified composition service FIRST (needed by other services)
@@ -354,7 +354,7 @@ def get_mixer_service() -> MixerService:
     return _mixer_service
 
 
-def get_track_meter_service() -> TrackMeterHandler:
+def get_track_meter_service() -> TrackMetersService:
     """Get TrackMeterHandler instance"""
     if _track_meter_service is None:
         raise RuntimeError("TrackMeterHandler not initialized")
@@ -368,7 +368,7 @@ def get_audio_bus_manager() -> AudioBusManager:
     return _audio_bus_manager
 
 
-def get_mixer_channel_service() -> MixerChannelSynthManager:
+def get_mixer_channel_service() -> MixerTrackChannelsService:
     """Get MixerChannelSynthManager instance"""
     if _mixer_channel_service is None:
         raise RuntimeError("MixerChannelSynthManager not initialized")

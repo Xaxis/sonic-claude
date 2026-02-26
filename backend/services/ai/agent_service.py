@@ -318,7 +318,7 @@ Call ALL the tools needed to complete ALL steps. Don't stop after one tool call.
         context_builder = ContextBuilderService(
             composition_state_service=self.action_service.composition_state,
             mixer_service=self.action_service.mixer,
-            effects_service=self.action_service.effects
+            effects_service=self.action_service.track_effects
         )
 
         # Get entity-specific context
@@ -452,7 +452,7 @@ Call ALL the tools needed to complete ALL steps. Don't stop after one tool call.
         try:
             # Check if we have all required services
             if not all([self.composition_service, self.action_service.composition_state,
-                       self.action_service.mixer, self.action_service.effects]):
+                        self.action_service.mixer, self.action_service.track_effects]):
                 logger.warning("⚠️ Cannot save AI iteration: missing required services")
                 return
 
@@ -500,7 +500,7 @@ Call ALL the tools needed to complete ALL steps. Don't stop after one tool call.
             captured_composition = self.composition_service.capture_composition_from_services(
                 composition_state_service=self.action_service.composition_state,
                 mixer_service=self.action_service.mixer,
-                effects_service=self.action_service.effects,
+                effects_service=self.action_service.track_effects,
                 composition_id=composition_id
             )
 

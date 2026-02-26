@@ -55,7 +55,7 @@ from backend.models.sequence import (
 from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.playback_engine_service import PlaybackEngineService
 from backend.services.daw.mixer_service import MixerService
-from backend.services.daw.effects_service import TrackEffectsService
+from backend.services.daw.track_effects_service import TrackEffectsService
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ class DAWActionService:
         self.composition_state = composition_state_service
         self.playback_engine = playback_engine_service
         self.mixer = mixer_service
-        self.effects = track_effects_service
+        self.track_effects = track_effects_service
     
     async def execute_action(self, action: DAWAction) -> ActionResult:
         """Execute a single action"""
@@ -466,7 +466,7 @@ class DAWActionService:
     async def _add_effect(self, params: Dict[str, Any]) -> ActionResult:
         """Add effect to track"""
         try:
-            effect = await self.effects.create_effect(
+            effect = await self.track_effects.create_effect(
                 track_id=params["track_id"],
                 effect_name=params["effect_name"],
                 slot_index=params.get("slot_index"),
@@ -487,7 +487,7 @@ class DAWActionService:
     async def _set_effect_parameter(self, params: Dict[str, Any]) -> ActionResult:
         """Set effect parameter"""
         try:
-            effect = await self.effects.update_effect_parameter(
+            effect = await self.track_effects.update_effect_parameter(
                 effect_id=params["effect_id"],
                 parameter_name=params["parameter_name"],
                 value=params["value"]
@@ -1021,7 +1021,7 @@ class DAWActionService:
     async def _remove_effect(self, params: Dict[str, Any]) -> ActionResult:
         """Remove an effect from a track"""
         try:
-            await self.effects.delete_effect(params["effect_id"])
+            await self.track_effects.delete_effect(params["effect_id"])
             return ActionResult(
                 success=True,
                 action="remove_effect",
@@ -1035,7 +1035,7 @@ class DAWActionService:
     async def _bypass_effect(self, params: Dict[str, Any]) -> ActionResult:
         """Bypass/unbypass an effect"""
         try:
-            effect = await self.effects.update_effect(
+            effect = await self.track_effects.update_effect(
                 effect_id=params["effect_id"],
                 is_bypassed=params["bypassed"]
             )

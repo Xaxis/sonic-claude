@@ -22,7 +22,7 @@ from backend.services.audio.buffer_manager_service import BufferManager
 from backend.core.engine_manager import AudioEngineManager
 from backend.services.websocket import WebSocketManager
 from backend.services.audio.bus_manager_service import AudioBusManager
-from backend.services.daw.mixer_channel_service import MixerChannelSynthManager
+from backend.services.daw.mixer_track_channels_service import MixerTrackChannelsService
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class PlaybackEngineService:
         engine_manager: Optional[AudioEngineManager] = None,
         websocket_manager: Optional[WebSocketManager] = None,
         audio_bus_manager: Optional[AudioBusManager] = None,
-        mixer_channel_service: Optional[MixerChannelSynthManager] = None
+        mixer_channel_service: Optional[MixerTrackChannelsService] = None
     ) -> None:
         """Initialize playback engine service"""
         # Dependencies
