@@ -1,30 +1,33 @@
 /**
- * SequencerPianoRollGrid - Piano roll note grid with editing capabilities
- *
- * REFACTORED: Self-contained component following Zustand best practices
- * - Reads ALL state from Zustand (pianoRollClipId, clips, tracks, settings, transport)
- * - Calls updateClip() directly for all note editing operations
- * - Manages local UI state (selectedNotes, copiedNotes, drag state)
- * - Handles keyboard shortcuts (Ctrl+C, Ctrl+V, Delete)
- * - No props needed - completely self-contained!
+ * SequencerPianoRollGrid - Piano roll with immediate, responsive note editing
+ * 
+ * ARCHITECTURE:
+ * - Local state is ALWAYS the source of truth for rendering
+ * - All interactions update local state immediately (no backend calls during interaction)
+ * - Backend sync happens ONCE when interaction completes
+ * - Clear separation between interaction modes
  */
 
-import { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useDAWStore } from "@/stores/dawStore";
-import { useTimelineCalculations } from '../../hooks/useTimelineCalculations.ts';
+import { useTimelineCalculations } from '../../hooks/useTimelineCalculations';
 import { api } from "@/services/api";
 import type { MIDIEvent } from "../../types";
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-interface SequencerPianoRollGridProps {
-    // No props needed - reads everything from Zustand!
-}
+// Interaction modes
+type InteractionMode =
+    | { type: 'IDLE' }
+    | { type: 'DRAGGING_NOTE'; noteIndex: number; startX: number; startY: number; offsetX: number; offsetY: number; hasMoved: boolean }
+    | { type: 'RESIZING_NOTE'; noteIndex: number; startX: number; originalDuration: number; hasMoved: boolean }
+    | { type: 'PAINTING_NOTES'; paintedCells: Set<string> };
+
+interface SequencerPianoRollGridProps {}
 
 export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     // ========================================================================
-    // STATE: Read from Zustand store
+    // ZUSTAND STATE
     // ========================================================================
     const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
     const clips = useDAWStore(state => state.clips);
@@ -32,45 +35,20 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     const snapEnabled = useDAWStore(state => state.snapEnabled);
     const gridSize = useDAWStore(state => state.gridSize);
     const transport = useDAWStore(state => state.transport);
-
-    // ========================================================================
-    // ACTIONS: Get from Zustand store
-    // ========================================================================
     const updateClip = useDAWStore(state => state.updateClip);
 
-    // ========================================================================
-    // SHARED TIMELINE CALCULATIONS: Use the same hook as timeline for consistency!
-    // ========================================================================
-    const { pixelsPerBeat, totalWidth, zoom } = useTimelineCalculations();
+    const { pixelsPerBeat, zoom } = useTimelineCalculations();
     const beatWidth = pixelsPerBeat * zoom;
 
     // ========================================================================
-    // LOCAL STATE (UI state - not persisted)
+    // LOCAL STATE - Source of truth for rendering
     // ========================================================================
+    const [localNotes, setLocalNotes] = useState<MIDIEvent[]>([]);
+    const [mode, setMode] = useState<InteractionMode>({ type: 'IDLE' });
     const gridRef = useRef<HTMLDivElement>(null);
-    const [isDragging, setIsDragging] = useState<number | null>(null);
-    const [isResizing, setIsResizing] = useState<number | null>(null);
-    const [dragStartX, setDragStartX] = useState(0);
-    const [dragStartY, setDragStartY] = useState(0);
-    const [dragStartTime, setDragStartTime] = useState(0);
-    const [dragStartPitch, setDragStartPitch] = useState(0);
-    const [dragStartDuration, setDragStartDuration] = useState(0);
-    const [hasDragged, setHasDragged] = useState(false); // Track if mouse moved during mousedown
-    const justFinishedDragRef = useRef(false); // Ref to prevent click handler after drag/resize
-    const waitingForUpdateRef = useRef(false); // Track if we're waiting for backend update to complete
-
-    // Note preview state (for drag/resize - only commit on mouse up)
-    const [previewNotes, setPreviewNotes] = useState<MIDIEvent[] | null>(null);
-
-    // Note selection state (local UI state)
-    const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
-    const [copiedNotes, setCopiedNotes] = useState<MIDIEvent[]>([]);
-
-    // Mouse position tracking for cursor feedback
-    const [mouseX, setMouseX] = useState<number | null>(null);
 
     // ========================================================================
-    // DERIVED STATE: Get clip data
+    // CLIP DATA
     // ========================================================================
     const clip = pianoRollClipId ? clips.find(c => c.id === pianoRollClipId) : undefined;
     if (!clip || clip.type !== 'midi') {
@@ -78,38 +56,26 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     }
 
     const track = tracks.find(t => t.id === clip.track_id);
-    // Use preview notes during drag/resize, otherwise use actual clip notes
-    const notes = previewNotes ?? (clip.midi_events || []);
     const clipStartTime = clip.start_time;
     const clipDuration = clip.duration;
     const instrument = track?.instrument || 'sine';
     const clipId = clip.id;
-
-    // Transport state
     const activeNotes = transport?.active_notes || [];
 
-    // Debug: Log active notes when they change (only in development)
-    useEffect(() => {
-        if (activeNotes.length > 0) {
-            console.log('🎵 Active notes:', activeNotes);
-        }
-    }, [activeNotes]);
-
-    // Clear preview notes when clip data has been updated from backend
-    // This prevents notes from vanishing after drag completes
-    useEffect(() => {
-        // Only clear preview if we're waiting for an update AND not currently dragging
-        if (waitingForUpdateRef.current && previewNotes && !isDragging && !isResizing) {
-            // Clear preview now that update is complete
-            setPreviewNotes(null);
-            waitingForUpdateRef.current = false;
-        }
-    }, [clip.midi_events, previewNotes, isDragging, isResizing]);
-
-    // Piano roll settings (constants)
-    const minPitch = 21; // A0 - Full piano range
+    // Piano roll settings
+    const minPitch = 21; // A0
     const maxPitch = 108; // C8
-    const noteHeight = 20; // pixels per note row
+    const noteHeight = 20;
+    const gridSubdivision = 1 / gridSize;
+
+    // ========================================================================
+    // SYNC: Update local notes from clip when not interacting
+    // ========================================================================
+    useEffect(() => {
+        if (mode.type === 'IDLE') {
+            setLocalNotes(clip.midi_events || []);
+        }
+    }, [clip.midi_events, mode.type]);
 
     // ========================================================================
     // HELPER FUNCTIONS
@@ -120,345 +86,310 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
         return `${noteName}${octave}`;
     };
 
-    // Grid subdivision size in beats (e.g., gridSize=16 → 0.0625 beats = 1/16 note)
-    const gridSubdivision = 1 / gridSize;
-
-    // Grid spans the full composition width (like timeline) - allows scrolling freely
-    // Clip region is visually highlighted so user knows the clip boundaries
-    const totalHeight = (maxPitch - minPitch + 1) * noteHeight;
-
-    // Clip region boundaries (for visual highlight)
-    const clipStartX = clipStartTime * beatWidth;
-    const clipEndX = (clipStartTime + clipDuration) * beatWidth;
-
-    const pixelsToPitch = (y: number): number => {
-        const pitchIndex = Math.floor(y / noteHeight);
-        return maxPitch - pitchIndex;
-    };
-
-    const pixelsToBeats = (x: number): number => {
-        return x / beatWidth;
-    };
-
-    // Snap beats to grid (used for note placement, movement, and resizing)
-    // CRITICAL: Use Math.floor() to snap to the START of the grid cell you clicked in
-    // Math.round() would place notes in the wrong cell when clicking past 50% of cell width
     const snapBeatsToGrid = (beats: number): number => {
         if (!snapEnabled) return beats;
         return Math.floor(beats / gridSubdivision) * gridSubdivision;
     };
 
-    // ========================================================================
-    // NOTE EDITING HANDLERS: Call Zustand actions directly
-    // ========================================================================
-    const handleAddNote = async (pitch: number, startTime: number) => {
-        const newNote: MIDIEvent = {
-            note: pitch,
-            note_name: getNoteName(pitch),
-            start_time: snapBeatsToGrid(startTime),
-            duration: snapEnabled ? gridSubdivision : 0.25,
-            velocity: 100,
-            channel: 0,
-        };
-        await updateClip(clipId, { midi_events: [...notes, newNote] });
+    const pixelsToBeats = (pixels: number): number => pixels / beatWidth;
+    const beatsToPixels = (beats: number): number => beats * beatWidth;
+    
+    const pixelsToPitch = (pixels: number): number => {
+        const pitchIndex = Math.floor(pixels / noteHeight);
+        return maxPitch - pitchIndex;
+    };
+    
+    const pitchToPixels = (pitch: number): number => (maxPitch - pitch) * noteHeight;
 
-        // Preview the note
+    const clipStartX = beatsToPixels(clipStartTime);
+    const clipEndX = beatsToPixels(clipStartTime + clipDuration);
+
+    // Create cell key for painting mode
+    const getCellKey = (pitch: number, time: number): string => {
+        const snappedTime = snapBeatsToGrid(time);
+        return `${pitch}-${snappedTime}`;
+    };
+
+    // Check if note exists at position
+    const noteExistsAt = (pitch: number, time: number): boolean => {
+        const snappedTime = snapBeatsToGrid(time);
+        return localNotes.some(note => 
+            note.note === pitch && snapBeatsToGrid(note.start_time) === snappedTime
+        );
+    };
+
+    // Preview note sound
+    const previewNote = async (pitch: number, velocity: number = 100) => {
         try {
             await api.audio.previewNote({
                 note: pitch,
-                velocity: 100,
+                velocity,
                 duration: 0.5,
-                synthdef: instrument || "sine"
+                synthdef: instrument
             });
         } catch (error) {
-            console.error("Failed to preview note:", error);
+            // Ignore preview errors
         }
     };
 
-    const handleMoveNote = (index: number, newStartTime: number, newPitch: number) => {
-        // CRITICAL: Only update preview state during drag, don't call updateClip!
-        const currentNotes = previewNotes ?? notes;
-        const updatedNotes = [...currentNotes];
-        const oldPitch = updatedNotes[index].note;
+    // ========================================================================
+    // COMMIT: Save to backend
+    // ========================================================================
+    const commitToBackend = useCallback(async () => {
+        await updateClip(clipId, { midi_events: localNotes });
+    }, [clipId, localNotes, updateClip]);
 
-        updatedNotes[index] = {
-            ...updatedNotes[index],
-            note: newPitch,
-            note_name: getNoteName(newPitch),
-            start_time: snapBeatsToGrid(newStartTime),
+    // ========================================================================
+    // INTERACTION HANDLERS
+    // ========================================================================
+
+    // Add note at position
+    const addNote = useCallback((pitch: number, time: number) => {
+        const snappedTime = snapBeatsToGrid(time);
+
+        // Don't add if note already exists
+        if (noteExistsAt(pitch, time)) return;
+
+        const newNote: MIDIEvent = {
+            note: pitch,
+            note_name: getNoteName(pitch),
+            velocity: 100,
+            start_time: snappedTime,
+            duration: gridSubdivision,
+            channel: 0
         };
 
-        setPreviewNotes(updatedNotes);
+        setLocalNotes(prev => [...prev, newNote]);
+        previewNote(pitch);
+    }, [gridSubdivision, snapEnabled]);
 
-        // Preview the note only if pitch changed
-        if (newPitch !== oldPitch) {
-            try {
-                api.audio.previewNote({
-                    note: newPitch,
-                    velocity: updatedNotes[index].velocity,
-                    duration: 0.5,
-                    synthdef: instrument || "sine"
-                });
-            } catch (error) {
-                console.error("Failed to preview note:", error);
-            }
-        }
-    };
+    // Delete note at index
+    const deleteNote = useCallback((index: number) => {
+        setLocalNotes(prev => prev.filter((_, i) => i !== index));
+    }, []);
 
-    const handleResizeNote = (index: number, newDuration: number) => {
-        // CRITICAL: Only update preview state during resize, don't call updateClip!
-        const currentNotes = previewNotes ?? notes;
-        const updatedNotes = [...currentNotes];
-        const snappedDuration = snapBeatsToGrid(newDuration);
-        // Ensure minimum duration of one grid subdivision (or 1/16 note if snap is off)
-        const minDuration = snapEnabled ? gridSubdivision : 0.0625;
-
-        updatedNotes[index] = {
-            ...updatedNotes[index],
-            duration: Math.max(minDuration, snappedDuration),
-        };
-
-        setPreviewNotes(updatedNotes);
-    };
-
-    const handleDeleteNote = async (index: number) => {
-        await updateClip(clipId, { midi_events: notes.filter((_, i) => i !== index) });
-    };
-
-    const handleDeleteSelected = async () => {
-        if (selectedNotes.size === 0) return;
-        await updateClip(clipId, { midi_events: notes.filter((_, i) => !selectedNotes.has(i)) });
-        setSelectedNotes(new Set());
-    };
-
-    const handleCopyNotes = () => {
-        if (selectedNotes.size === 0) return;
-        const notesToCopy = Array.from(selectedNotes).map(i => notes[i]);
-        setCopiedNotes(notesToCopy);
-    };
-
-    const handlePasteNotes = async () => {
-        if (copiedNotes.length === 0) return;
-
-        // Find the earliest start time in copied notes
-        const minStartTime = Math.min(...copiedNotes.map(n => n.start_time));
-
-        // Paste notes at the current playhead position (or start of clip)
-        const pasteOffset = 0 - minStartTime; // Paste at beginning for now
-
-        const pastedNotes = copiedNotes.map(note => ({
-            ...note,
-            start_time: note.start_time + pasteOffset,
-        }));
-
-        await updateClip(clipId, { midi_events: [...notes, ...pastedNotes] });
-    };
-
-    const handleGridMouseMove = (e: React.MouseEvent) => {
-        const rect = gridRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        const x = e.clientX - rect.left;
-        setMouseX(x);
-    };
-
-    const handleGridMouseLeave = () => {
-        setMouseX(null);
-    };
-
-    const handleGridClick = (e: React.MouseEvent) => {
-        // Don't add/delete notes if we just finished dragging/resizing
-        // Use ref to prevent click handler from firing after drag/resize completes
-        if (isDragging !== null || isResizing !== null || justFinishedDragRef.current) return;
-
+    // Handle grid click - add note or start painting
+    const handleGridMouseDown = useCallback((e: React.MouseEvent) => {
         const rect = gridRef.current?.getBoundingClientRect();
         if (!rect) return;
 
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        // Only allow adding notes within the clip region
+        // Only allow interaction within clip region
         if (x < clipStartX || x >= clipEndX) return;
 
         const pitch = pixelsToPitch(y);
         const absoluteTime = pixelsToBeats(x);
-        // Convert to clip-relative time
         const clipRelativeTime = absoluteTime - clipStartTime;
 
-        // Check if there's already a note at this position
-        const clickedNoteIndex = findNoteAtPosition(pitch, clipRelativeTime);
+        // Clamp to clip boundaries
+        if (clipRelativeTime < 0 || clipRelativeTime >= clipDuration) return;
 
-        if (clickedNoteIndex !== -1) {
-            // Note exists - delete it (toggle behavior like FL Studio/Ableton)
-            handleDeleteNote(clickedNoteIndex);
-        } else {
-            // No note - add one
-            handleAddNote(pitch, clipRelativeTime);
-        }
-    };
+        // Add first note and start painting mode
+        addNote(pitch, clipRelativeTime);
 
-    // Helper function to find if a note exists at a given position
-    const findNoteAtPosition = (pitch: number, time: number): number => {
-        // CRITICAL: We need to check if the SNAPPED click position matches the note's SNAPPED start position
-        // Don't use tolerance - that causes adjacent notes to be detected incorrectly
-        const snappedClickTime = snapBeatsToGrid(time);
+        const cellKey = getCellKey(pitch, clipRelativeTime);
+        setMode({ type: 'PAINTING_NOTES', paintedCells: new Set([cellKey]) });
+    }, [clipStartX, clipEndX, clipStartTime, clipDuration, addNote]);
 
-        return notes.findIndex(note => {
-            const snappedNoteStartTime = snapBeatsToGrid(note.start_time);
-
-            return (
-                note.note === pitch &&
-                snappedClickTime === snappedNoteStartTime
-            );
-        });
-    };
-
-    const handleNoteClick = (e: React.MouseEvent, index: number) => {
+    // Handle note mouse down - start drag or resize
+    const handleNoteMouseDown = useCallback((e: React.MouseEvent, index: number, isResize: boolean) => {
         e.stopPropagation();
 
-        // Only delete if we didn't just finish dragging
-        if (!justFinishedDragRef.current) {
-            handleDeleteNote(index);
-        }
-    };
+        const rect = gridRef.current?.getBoundingClientRect();
+        if (!rect) return;
 
-    const handleNoteMouseDown = (e: React.MouseEvent, index: number, action: "move" | "resize") => {
-        e.stopPropagation();
+        const note = localNotes[index];
 
-        const note = notes[index];
-        setDragStartX(e.clientX);
-        setDragStartY(e.clientY);
-        setDragStartTime(note.start_time);
-        setDragStartPitch(note.note);
-        setDragStartDuration(note.duration);
-        setHasDragged(false); // Reset drag flag
-
-        if (action === "move") {
-            setIsDragging(index);
-            // Handle selection
-            if (!e.shiftKey) {
-                // Single select
-                setSelectedNotes(new Set([index]));
-            } else {
-                // Toggle select (Shift+click)
-                const newSelected = new Set(selectedNotes);
-                if (newSelected.has(index)) {
-                    newSelected.delete(index);
-                } else {
-                    newSelected.add(index);
-                }
-                setSelectedNotes(newSelected);
-            }
+        if (isResize) {
+            // Start resize mode
+            setMode({
+                type: 'RESIZING_NOTE',
+                noteIndex: index,
+                startX: e.clientX,
+                originalDuration: note.duration,
+                hasMoved: false
+            });
         } else {
-            setIsResizing(index);
-        }
-    };
+            // Start drag mode - calculate offset from note position
+            const noteX = beatsToPixels(clipStartTime + note.start_time);
+            const noteY = pitchToPixels(note.note);
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
 
-    // Global mouse event handlers for drag/resize
+            setMode({
+                type: 'DRAGGING_NOTE',
+                noteIndex: index,
+                startX: e.clientX,
+                startY: e.clientY,
+                offsetX: clickX - noteX,
+                offsetY: clickY - noteY,
+                hasMoved: false
+            });
+        }
+    }, [localNotes, clipStartTime]);
+
+    // Note: Click handler removed - we handle delete in mouse up if didn't move
+
+    // ========================================================================
+    // GLOBAL MOUSE HANDLERS - Attached when interacting
+    // ========================================================================
     useEffect(() => {
-        if (isDragging === null && isResizing === null) return;
+        if (mode.type === 'IDLE') return;
 
         const handleMouseMove = (e: MouseEvent) => {
             const rect = gridRef.current?.getBoundingClientRect();
             if (!rect) return;
 
-            const deltaX = e.clientX - dragStartX;
-            const deltaY = e.clientY - dragStartY;
+            const currentX = e.clientX - rect.left;
+            const currentY = e.clientY - rect.top;
 
-            // Detect if mouse has moved significantly (more than 3 pixels)
-            const dragThreshold = 3;
-            if (Math.abs(deltaX) > dragThreshold || Math.abs(deltaY) > dragThreshold) {
-                setHasDragged(true);
-            }
+            if (mode.type === 'DRAGGING_NOTE') {
+                const deltaX = e.clientX - mode.startX;
+                const deltaY = e.clientY - mode.startY;
 
-            if (isDragging !== null) {
-                const deltaBeats = deltaX / beatWidth;
-                const deltaPitch = -Math.round(deltaY / noteHeight);
+                // Mark as moved if we've moved more than 3 pixels
+                if (!mode.hasMoved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {
+                    setMode(prev => prev.type === 'DRAGGING_NOTE' ? { ...prev, hasMoved: true } : prev);
+                }
 
-                const newStartTime = Math.max(0, dragStartTime + deltaBeats);
-                const newPitch = Math.max(minPitch, Math.min(maxPitch, dragStartPitch + deltaPitch));
+                // Calculate note position (cursor - offset)
+                const noteX = currentX - mode.offsetX;
+                const noteY = currentY - mode.offsetY;
 
-                handleMoveNote(isDragging, newStartTime, newPitch);
-            } else if (isResizing !== null) {
-                const deltaBeats = deltaX / beatWidth;
-                const newDuration = Math.max(0.0625, dragStartDuration + deltaBeats);
+                // Convert to time and pitch
+                const absoluteTime = pixelsToBeats(noteX);
+                const clipRelativeTime = absoluteTime - clipStartTime;
+                const pitch = pixelsToPitch(noteY);
 
-                handleResizeNote(isResizing, newDuration);
+                // Snap and clamp
+                let newTime = snapBeatsToGrid(clipRelativeTime);
+                let newPitch = Math.max(minPitch, Math.min(maxPitch, pitch));
+
+                const note = localNotes[mode.noteIndex];
+                newTime = Math.max(0, Math.min(clipDuration - note.duration, newTime));
+
+                // Update note immediately
+                setLocalNotes(prev => {
+                    const updated = [...prev];
+                    const oldPitch = updated[mode.noteIndex].note;
+
+                    updated[mode.noteIndex] = {
+                        ...updated[mode.noteIndex],
+                        start_time: newTime,
+                        note: newPitch,
+                        note_name: getNoteName(newPitch)
+                    };
+
+                    // Preview if pitch changed
+                    if (newPitch !== oldPitch) {
+                        previewNote(newPitch, updated[mode.noteIndex].velocity);
+                    }
+
+                    return updated;
+                });
+
+            } else if (mode.type === 'RESIZING_NOTE') {
+                const deltaX = e.clientX - mode.startX;
+
+                // Mark as moved if we've moved more than 3 pixels
+                if (!mode.hasMoved && Math.abs(deltaX) > 3) {
+                    setMode(prev => prev.type === 'RESIZING_NOTE' ? { ...prev, hasMoved: true } : prev);
+                }
+
+                const deltaBeats = pixelsToBeats(deltaX);
+                let newDuration = mode.originalDuration + deltaBeats;
+
+                // Snap and clamp
+                newDuration = snapBeatsToGrid(newDuration);
+                const minDuration = snapEnabled ? gridSubdivision : 0.0625;
+                newDuration = Math.max(minDuration, newDuration);
+
+                const note = localNotes[mode.noteIndex];
+                const maxDuration = clipDuration - note.start_time;
+                newDuration = Math.min(newDuration, maxDuration);
+
+                // Update note immediately
+                setLocalNotes(prev => {
+                    const updated = [...prev];
+                    updated[mode.noteIndex] = {
+                        ...updated[mode.noteIndex],
+                        duration: newDuration
+                    };
+                    return updated;
+                });
+
+            } else if (mode.type === 'PAINTING_NOTES') {
+                // Only allow painting within clip region
+                if (currentX < clipStartX || currentX >= clipEndX) return;
+
+                const pitch = pixelsToPitch(currentY);
+                const absoluteTime = pixelsToBeats(currentX);
+                const clipRelativeTime = absoluteTime - clipStartTime;
+
+                if (clipRelativeTime < 0 || clipRelativeTime >= clipDuration) return;
+
+                const cellKey = getCellKey(pitch, clipRelativeTime);
+
+                // Add note if we haven't painted this cell yet
+                if (!mode.paintedCells.has(cellKey) && !noteExistsAt(pitch, clipRelativeTime)) {
+                    addNote(pitch, clipRelativeTime);
+                    setMode(prev => {
+                        if (prev.type === 'PAINTING_NOTES') {
+                            const newPainted = new Set(prev.paintedCells);
+                            newPainted.add(cellKey);
+                            return { ...prev, paintedCells: newPainted };
+                        }
+                        return prev;
+                    });
+                }
             }
         };
 
         const handleMouseUp = async () => {
-            setIsDragging(null);
-            setIsResizing(null);
-
-            // If we actually dragged/resized, commit the preview changes
-            if (hasDragged && previewNotes) {
-                // CRITICAL: Only call updateClip ONCE when drag/resize completes
-                // Set flag to indicate we're waiting for backend update
-                waitingForUpdateRef.current = true;
-                await updateClip(clipId, { midi_events: previewNotes });
-                // useEffect will clear previewNotes when clip data updates
-
-                justFinishedDragRef.current = true;
-                // Clear the flag after a short delay (after click event would have fired)
-                setTimeout(() => {
-                    justFinishedDragRef.current = false;
-                }, 50);
+            // Handle click-to-delete (if we didn't move)
+            if (mode.type === 'DRAGGING_NOTE' && !mode.hasMoved) {
+                // Delete note and commit directly
+                const updatedNotes = localNotes.filter((_, i) => i !== mode.noteIndex);
+                await updateClip(clipId, { midi_events: updatedNotes });
+            } else if (mode.type === 'RESIZING_NOTE' && !mode.hasMoved) {
+                // If we clicked resize handle but didn't move, do nothing
             } else {
-                // If we didn't drag, clear preview immediately
-                setPreviewNotes(null);
+                // We moved - commit changes to backend
+                await commitToBackend();
             }
 
-            setHasDragged(false);
+            // Return to idle mode
+            setMode({ type: 'IDLE' });
         };
 
-        document.addEventListener("mousemove", handleMouseMove);
-        document.addEventListener("mouseup", handleMouseUp);
+        // Attach listeners
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
 
         return () => {
-            document.removeEventListener("mousemove", handleMouseMove);
-            document.removeEventListener("mouseup", handleMouseUp);
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [isDragging, isResizing, dragStartX, dragStartY, dragStartTime, dragStartPitch, dragStartDuration, beatWidth, noteHeight, minPitch, maxPitch, hasDragged, previewNotes, clipId, updateClip]);
+    }, [mode, localNotes, clipStartTime, clipDuration, clipStartX, clipEndX, minPitch, maxPitch, snapEnabled, gridSubdivision, commitToBackend, addNote]);
 
-    // Keyboard shortcuts: Copy/Paste/Delete
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedNotes.size > 0) {
-                e.preventDefault();
-                handleCopyNotes();
-            } else if ((e.ctrlKey || e.metaKey) && e.key === 'v' && copiedNotes.length > 0) {
-                e.preventDefault();
-                handlePasteNotes();
-            } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNotes.size > 0) {
-                e.preventDefault();
-                handleDeleteSelected();
-            }
-        };
-
-        document.addEventListener("keydown", handleKeyDown);
-        return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [selectedNotes, copiedNotes, notes, handleDeleteSelected, handleCopyNotes, handlePasteNotes]);
-
-    // Calculate grid line spacing based on gridSize
-    // gridSize = 4 (1/4 notes) → 4 lines per beat
-    // gridSize = 16 (1/16 notes) → 16 lines per beat
-    const gridLineSpacing = beatWidth / gridSize;
-
-    // Determine cursor based on mouse position
-    const isMouseInClipRegion = mouseX !== null && mouseX >= clipStartX && mouseX < clipEndX;
-    const gridCursor = isMouseInClipRegion ? 'cursor-crosshair' : 'cursor-not-allowed';
+    // ========================================================================
+    // RENDERING
+    // ========================================================================
+    const totalBeats = 64;
+    const totalWidth = beatsToPixels(totalBeats);
+    const totalHeight = (maxPitch - minPitch + 1) * noteHeight;
+    const gridLineSpacing = beatWidth;
 
     return (
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto bg-background">
             <div
                 ref={gridRef}
-                className={cn("relative", gridCursor)}
+                className="relative cursor-crosshair"
                 style={{
                     width: `${totalWidth}px`,
                     height: `${totalHeight}px`,
-                    // Grid lines match the snap grid subdivision
-                    // Horizontal lines: every gridSubdivision beats
-                    // Vertical lines: every note (piano key)
                     backgroundImage: `
                         linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
                         linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px)
@@ -466,97 +397,53 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
                     backgroundSize: `${gridLineSpacing}px ${noteHeight}px`,
                     backgroundColor: '#0a0a0a'
                 }}
-                onClick={handleGridClick}
-                onMouseMove={handleGridMouseMove}
-                onMouseLeave={handleGridMouseLeave}
+                onMouseDown={handleGridMouseDown}
             >
-
-                {/* Clip Region Highlight - Enhanced visibility */}
+                {/* Clip Region Highlight */}
                 <div
                     className="absolute top-0 bottom-0 bg-cyan-500/10 border-l-2 border-r-2 border-cyan-500/50 pointer-events-none"
                     style={{
                         left: `${clipStartX}px`,
                         width: `${clipEndX - clipStartX}px`,
                     }}
-                >
-                    {/* Empty state hint - show when no notes */}
-                    {notes.length === 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="text-center text-muted-foreground/60 text-sm px-4">
-                                <div className="font-semibold mb-1">Click to add notes</div>
-                                <div className="text-xs">Notes can only be added within the clip region (highlighted area)</div>
-                            </div>
-                        </div>
-                    )}
-                </div>
+                />
 
-                {/* Beat Lines - Stronger lines every beat (every gridSize subdivisions) */}
-                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
-                    {Array.from({ length: Math.ceil(totalWidth / beatWidth) + 1 }).map((_, i) => (
-                        <line
-                            key={`beat-${i}`}
-                            x1={i * beatWidth}
-                            y1={0}
-                            x2={i * beatWidth}
-                            y2={totalHeight}
-                            stroke="rgba(255, 255, 255, 0.2)"
-                            strokeWidth={i % 4 === 0 ? 1.5 : 1}
-                            opacity={i % 4 === 0 ? 0.4 : 0.2}
-                        />
-                    ))}
-                </svg>
-
-                {/* MIDI Notes - Positioned at absolute time */}
-                {notes.map((note, index) => {
-                    const y = (maxPitch - note.note) * noteHeight;
-                    // Note times are clip-relative, convert to absolute
-                    const x = (clipStartTime + note.start_time) * beatWidth;
-                    const width = note.duration * beatWidth;
-                    const isSelected = selectedNotes.has(index);
-
-                    // Check if this note is currently playing
-                    // Match by clip_id, note pitch, AND start_time to uniquely identify the note instance
-                    const isPlaying = activeNotes?.some(
-                        an => an.clip_id === clipId && an.note === note.note && an.start_time === note.start_time
-                    ) ?? false;
-
-                    // Velocity determines color intensity (0-127 -> 0.3-1.0 opacity)
-                    const velocityOpacity = 0.3 + (note.velocity / 127) * 0.7;
+                {/* Notes */}
+                {localNotes.map((note, index) => {
+                    const x = beatsToPixels(clipStartTime + note.start_time);
+                    const y = pitchToPixels(note.note);
+                    const width = beatsToPixels(note.duration);
+                    const isPlaying = activeNotes.some(
+                        activeNote => activeNote.clip_id === clipId &&
+                                     activeNote.note === note.note &&
+                                     activeNote.start_time === note.start_time
+                    );
+                    const velocityOpacity = 0.4 + (note.velocity / 127) * 0.6;
 
                     return (
                         <div
                             key={index}
-                            className={cn(
-                                "absolute rounded cursor-move transition-colors group",
-                                isSelected
-                                    ? "border-2 border-cyan-300 z-10"
-                                    : "border border-cyan-500 hover:border-cyan-300",
-                                isPlaying && "animate-pulse ring-2 ring-cyan-400 shadow-lg shadow-cyan-400/50"
-                            )}
+                            className="absolute rounded cursor-move select-none"
                             style={{
                                 left: `${x}px`,
                                 top: `${y}px`,
                                 width: `${width}px`,
                                 height: `${noteHeight}px`,
-                                backgroundColor: isSelected
-                                    ? `rgba(6, 182, 212, ${velocityOpacity})`
-                                    : `rgba(8, 145, 178, ${velocityOpacity})`,
+                                backgroundColor: `rgba(8, 145, 178, ${velocityOpacity})`,
                                 boxShadow: isPlaying ? '0 0 20px rgba(6, 182, 212, 0.8)' : undefined,
                             }}
-                            onClick={(e) => handleNoteClick(e, index)}
-                            onMouseDown={(e) => handleNoteMouseDown(e, index, "move")}
-                            title={`Velocity: ${note.velocity}`}
+                            onMouseDown={(e) => handleNoteMouseDown(e, index, false)}
                         >
-                            {/* Velocity bar (bottom of note) */}
+                            {/* Velocity bar */}
                             <div
                                 className="absolute bottom-0 left-0 right-0 bg-cyan-300/40"
                                 style={{ height: `${(note.velocity / 127) * 100}%` }}
                             />
 
-                            {/* Resize handle (right edge) */}
+                            {/* Resize handle */}
                             <div
                                 className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/20 z-10"
-                                onMouseDown={(e) => handleNoteMouseDown(e, index, "resize")}
+                                onMouseDown={(e) => handleNoteMouseDown(e, index, true)}
                             />
                         </div>
                     );
