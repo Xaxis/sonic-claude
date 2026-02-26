@@ -45,6 +45,31 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     const beatWidth = pixelsPerBeat * zoom;
 
     // ========================================================================
+    // LOCAL STATE (UI state - not persisted)
+    // ========================================================================
+    const gridRef = useRef<HTMLDivElement>(null);
+    const [isDragging, setIsDragging] = useState<number | null>(null);
+    const [isResizing, setIsResizing] = useState<number | null>(null);
+    const [dragStartX, setDragStartX] = useState(0);
+    const [dragStartY, setDragStartY] = useState(0);
+    const [dragStartTime, setDragStartTime] = useState(0);
+    const [dragStartPitch, setDragStartPitch] = useState(0);
+    const [dragStartDuration, setDragStartDuration] = useState(0);
+    const [hasDragged, setHasDragged] = useState(false); // Track if mouse moved during mousedown
+    const justFinishedDragRef = useRef(false); // Ref to prevent click handler after drag/resize
+    const waitingForUpdateRef = useRef(false); // Track if we're waiting for backend update to complete
+
+    // Note preview state (for drag/resize - only commit on mouse up)
+    const [previewNotes, setPreviewNotes] = useState<MIDIEvent[] | null>(null);
+
+    // Note selection state (local UI state)
+    const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
+    const [copiedNotes, setCopiedNotes] = useState<MIDIEvent[]>([]);
+
+    // Mouse position tracking for cursor feedback
+    const [mouseX, setMouseX] = useState<number | null>(null);
+
+    // ========================================================================
     // DERIVED STATE: Get clip data
     // ========================================================================
     const clip = pianoRollClipId ? clips.find(c => c.id === pianoRollClipId) : undefined;
@@ -53,7 +78,8 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     }
 
     const track = tracks.find(t => t.id === clip.track_id);
-    const notes = clip.midi_events || [];
+    // Use preview notes during drag/resize, otherwise use actual clip notes
+    const notes = previewNotes ?? (clip.midi_events || []);
     const clipStartTime = clip.start_time;
     const clipDuration = clip.duration;
     const instrument = track?.instrument || 'sine';
@@ -69,28 +95,21 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
         }
     }, [activeNotes]);
 
+    // Clear preview notes when clip data has been updated from backend
+    // This prevents notes from vanishing after drag completes
+    useEffect(() => {
+        // Only clear preview if we're waiting for an update AND not currently dragging
+        if (waitingForUpdateRef.current && previewNotes && !isDragging && !isResizing) {
+            // Clear preview now that update is complete
+            setPreviewNotes(null);
+            waitingForUpdateRef.current = false;
+        }
+    }, [clip.midi_events, previewNotes, isDragging, isResizing]);
+
     // Piano roll settings (constants)
     const minPitch = 21; // A0 - Full piano range
     const maxPitch = 108; // C8
     const noteHeight = 20; // pixels per note row
-
-    // ========================================================================
-    // LOCAL STATE (UI state - not persisted)
-    // ========================================================================
-    const gridRef = useRef<HTMLDivElement>(null);
-    const [isDragging, setIsDragging] = useState<number | null>(null);
-    const [isResizing, setIsResizing] = useState<number | null>(null);
-    const [dragStartX, setDragStartX] = useState(0);
-    const [dragStartY, setDragStartY] = useState(0);
-    const [dragStartTime, setDragStartTime] = useState(0);
-    const [dragStartPitch, setDragStartPitch] = useState(0);
-    const [dragStartDuration, setDragStartDuration] = useState(0);
-    const [hasDragged, setHasDragged] = useState(false); // Track if mouse moved during mousedown
-    const justFinishedDragRef = useRef(false); // Ref to prevent click handler after drag/resize
-
-    // Note selection state (local UI state)
-    const [selectedNotes, setSelectedNotes] = useState<Set<number>>(new Set());
-    const [copiedNotes, setCopiedNotes] = useState<MIDIEvent[]>([]);
 
     // ========================================================================
     // HELPER FUNCTIONS
@@ -122,9 +141,11 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     };
 
     // Snap beats to grid (used for note placement, movement, and resizing)
+    // CRITICAL: Use Math.floor() to snap to the START of the grid cell you clicked in
+    // Math.round() would place notes in the wrong cell when clicking past 50% of cell width
     const snapBeatsToGrid = (beats: number): number => {
         if (!snapEnabled) return beats;
-        return Math.round(beats / gridSubdivision) * gridSubdivision;
+        return Math.floor(beats / gridSubdivision) * gridSubdivision;
     };
 
     // ========================================================================
@@ -154,21 +175,25 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
         }
     };
 
-    const handleMoveNote = async (index: number, newStartTime: number, newPitch: number) => {
-        const updatedNotes = [...notes];
+    const handleMoveNote = (index: number, newStartTime: number, newPitch: number) => {
+        // CRITICAL: Only update preview state during drag, don't call updateClip!
+        const currentNotes = previewNotes ?? notes;
+        const updatedNotes = [...currentNotes];
         const oldPitch = updatedNotes[index].note;
+
         updatedNotes[index] = {
             ...updatedNotes[index],
             note: newPitch,
             note_name: getNoteName(newPitch),
             start_time: snapBeatsToGrid(newStartTime),
         };
-        await updateClip(clipId, { midi_events: updatedNotes });
+
+        setPreviewNotes(updatedNotes);
 
         // Preview the note only if pitch changed
         if (newPitch !== oldPitch) {
             try {
-                await api.audio.previewNote({
+                api.audio.previewNote({
                     note: newPitch,
                     velocity: updatedNotes[index].velocity,
                     duration: 0.5,
@@ -180,16 +205,20 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
         }
     };
 
-    const handleResizeNote = async (index: number, newDuration: number) => {
-        const updatedNotes = [...notes];
+    const handleResizeNote = (index: number, newDuration: number) => {
+        // CRITICAL: Only update preview state during resize, don't call updateClip!
+        const currentNotes = previewNotes ?? notes;
+        const updatedNotes = [...currentNotes];
         const snappedDuration = snapBeatsToGrid(newDuration);
         // Ensure minimum duration of one grid subdivision (or 1/16 note if snap is off)
         const minDuration = snapEnabled ? gridSubdivision : 0.0625;
+
         updatedNotes[index] = {
             ...updatedNotes[index],
             duration: Math.max(minDuration, snappedDuration),
         };
-        await updateClip(clipId, { midi_events: updatedNotes });
+
+        setPreviewNotes(updatedNotes);
     };
 
     const handleDeleteNote = async (index: number) => {
@@ -225,6 +254,17 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
         await updateClip(clipId, { midi_events: [...notes, ...pastedNotes] });
     };
 
+    const handleGridMouseMove = (e: React.MouseEvent) => {
+        const rect = gridRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const x = e.clientX - rect.left;
+        setMouseX(x);
+    };
+
+    const handleGridMouseLeave = () => {
+        setMouseX(null);
+    };
+
     const handleGridClick = (e: React.MouseEvent) => {
         // Don't add/delete notes if we just finished dragging/resizing
         // Use ref to prevent click handler from firing after drag/resize completes
@@ -258,17 +298,16 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
 
     // Helper function to find if a note exists at a given position
     const findNoteAtPosition = (pitch: number, time: number): number => {
-        // Calculate tolerance based on grid size for click detection
-        const timeTolerance = snapEnabled ? gridSubdivision * 0.5 : 0.1;
+        // CRITICAL: We need to check if the SNAPPED click position matches the note's SNAPPED start position
+        // Don't use tolerance - that causes adjacent notes to be detected incorrectly
+        const snappedClickTime = snapBeatsToGrid(time);
 
         return notes.findIndex(note => {
-            const noteAbsoluteTime = note.start_time;
-            const noteEndTime = noteAbsoluteTime + note.duration;
+            const snappedNoteStartTime = snapBeatsToGrid(note.start_time);
 
             return (
                 note.note === pitch &&
-                time >= noteAbsoluteTime - timeTolerance &&
-                time <= noteEndTime + timeTolerance
+                snappedClickTime === snappedNoteStartTime
             );
         });
     };
@@ -347,18 +386,28 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
             }
         };
 
-        const handleMouseUp = () => {
-            // If we actually dragged/resized, set the ref to prevent click handler
-            if (hasDragged) {
+        const handleMouseUp = async () => {
+            setIsDragging(null);
+            setIsResizing(null);
+
+            // If we actually dragged/resized, commit the preview changes
+            if (hasDragged && previewNotes) {
+                // CRITICAL: Only call updateClip ONCE when drag/resize completes
+                // Set flag to indicate we're waiting for backend update
+                waitingForUpdateRef.current = true;
+                await updateClip(clipId, { midi_events: previewNotes });
+                // useEffect will clear previewNotes when clip data updates
+
                 justFinishedDragRef.current = true;
                 // Clear the flag after a short delay (after click event would have fired)
                 setTimeout(() => {
                     justFinishedDragRef.current = false;
                 }, 50);
+            } else {
+                // If we didn't drag, clear preview immediately
+                setPreviewNotes(null);
             }
 
-            setIsDragging(null);
-            setIsResizing(null);
             setHasDragged(false);
         };
 
@@ -369,7 +418,7 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
             document.removeEventListener("mousemove", handleMouseMove);
             document.removeEventListener("mouseup", handleMouseUp);
         };
-    }, [isDragging, isResizing, dragStartX, dragStartY, dragStartTime, dragStartPitch, dragStartDuration, beatWidth, noteHeight, minPitch, maxPitch, hasDragged, handleDeleteNote, handleMoveNote, handleResizeNote]);
+    }, [isDragging, isResizing, dragStartX, dragStartY, dragStartTime, dragStartPitch, dragStartDuration, beatWidth, noteHeight, minPitch, maxPitch, hasDragged, previewNotes, clipId, updateClip]);
 
     // Keyboard shortcuts: Copy/Paste/Delete
     useEffect(() => {
@@ -395,11 +444,15 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     // gridSize = 16 (1/16 notes) → 16 lines per beat
     const gridLineSpacing = beatWidth / gridSize;
 
+    // Determine cursor based on mouse position
+    const isMouseInClipRegion = mouseX !== null && mouseX >= clipStartX && mouseX < clipEndX;
+    const gridCursor = isMouseInClipRegion ? 'cursor-crosshair' : 'cursor-not-allowed';
+
     return (
         <div className="flex-1 overflow-auto">
             <div
                 ref={gridRef}
-                className="relative cursor-crosshair"
+                className={cn("relative", gridCursor)}
                 style={{
                     width: `${totalWidth}px`,
                     height: `${totalHeight}px`,
@@ -414,16 +467,28 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
                     backgroundColor: '#0a0a0a'
                 }}
                 onClick={handleGridClick}
+                onMouseMove={handleGridMouseMove}
+                onMouseLeave={handleGridMouseLeave}
             >
 
-                {/* Clip Region Highlight */}
+                {/* Clip Region Highlight - Enhanced visibility */}
                 <div
-                    className="absolute top-0 bottom-0 bg-cyan-500/5 border-l-2 border-r-2 border-cyan-500/30 pointer-events-none"
+                    className="absolute top-0 bottom-0 bg-cyan-500/10 border-l-2 border-r-2 border-cyan-500/50 pointer-events-none"
                     style={{
                         left: `${clipStartX}px`,
                         width: `${clipEndX - clipStartX}px`,
                     }}
-                />
+                >
+                    {/* Empty state hint - show when no notes */}
+                    {notes.length === 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="text-center text-muted-foreground/60 text-sm px-4">
+                                <div className="font-semibold mb-1">Click to add notes</div>
+                                <div className="text-xs">Notes can only be added within the clip region (highlighted area)</div>
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 {/* Beat Lines - Stronger lines every beat (every gridSize subdivisions) */}
                 <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
