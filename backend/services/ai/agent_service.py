@@ -26,6 +26,8 @@ from backend.services.perception.sample_analysis import SampleAnalyzer
 from backend.services.perception.musical_perception import MusicalPerceptionAnalyzer
 from backend.services.perception.composition_perception import CompositionPerceptionAnalyzer
 from backend.models.instrument_types import get_valid_instruments_list, get_instruments_by_category
+from backend.services.ai.tools.composite_tools import CompositeToolExecutor
+from backend.services.ai.routing import IntentRouter, Intent
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -63,6 +65,12 @@ class AIAgentService:
         self.client = anthropic.Anthropic(api_key=api_key) if api_key else None
         self.model = model
 
+        # Composite tool executor (poka-yoke design)
+        self.composite_tools = CompositeToolExecutor(action_service)
+
+        # Intent router (LLM-based classification)
+        self.router = IntentRouter(api_key=api_key)
+
         # Sample analyzer for audio understanding
         self.sample_analyzer = SampleAnalyzer(samples_dir=samples_dir)
 
@@ -78,16 +86,14 @@ class AIAgentService:
     
     async def send_message(self, user_message: str) -> Dict[str, Any]:
         """
-        TWO-STAGE AI EXECUTION:
+        ROUTED WORKFLOW-BASED EXECUTION (Anthropic Best Practices)
 
-        STAGE 1 (PLANNING): Analyze request + DAW state → Generate detailed execution plan
-        STAGE 2 (EXECUTION): Execute plan with tool calls
+        1. Route request to intent category
+        2. Load only relevant tools for that intent
+        3. Use specialized prompt for that intent
+        4. Single LLM call with focused context
 
-        This ensures:
-        - AI fully understands the request before acting
-        - Complete workflows (e.g., create_track → create_midi_clip → add_effect)
-        - No skipped steps or empty tracks
-        - Better constraint enforcement
+        This prevents tool bloat and prompt bloat while handling all use cases.
 
         Args:
             user_message: User's message/request
@@ -95,182 +101,133 @@ class AIAgentService:
         Returns:
             Dict with 'response' (str) and 'actions_executed' (list of ActionResult)
         """
-        # Get current state (FRESH - no history)
+        # FIX 1: Force-refresh key/scale analysis before building context so state.musical is never stale
+        self.state_service.analyze_current_sequence()
+
+        # Get current state
         state_response = self.state_service.get_state(previous_hash=self.last_state_hash)
         context_message = self._build_context_message(state_response.full_state)
 
         # ====================================================================
-        # STAGE 1: PLANNING
+        # STEP 1: ROUTE REQUEST TO INTENT (LLM-based)
         # ====================================================================
-        logger.info(f"🎯 STAGE 1: Planning for request: '{user_message}'")
+        # Build brief state summary for routing context
+        state_summary = self._build_brief_state_summary(state_response.full_state)
+        intent = self.router.route(user_message, daw_state_summary=state_summary)
+        logger.info(f"🔀 Intent: {intent.value}")
 
-        planning_prompt = self._build_planning_prompt(user_message, context_message)
+        # ====================================================================
+        # STEP 2: GET FOCUSED TOOLS AND PROMPT FOR INTENT
+        # ====================================================================
+        relevant_tool_names = self.router.get_tools_for_intent(intent)
+        instruments_list = self._build_instruments_list()
+        effects_list = self._build_effects_list()
+        system_prompt = self.router.get_system_prompt_for_intent(intent, instruments_list, effects_list)
 
-        planning_response = self.client.messages.create(
+        # Filter tools to only include relevant ones
+        all_tools = self._get_tool_definitions()
+        if relevant_tool_names:
+            tools = [t for t in all_tools if t["name"] in relevant_tool_names]
+            logger.info(f"🛠️  Using {len(tools)}/{len(all_tools)} tools for {intent.value}")
+        else:
+            # Query state - no tools needed
+            tools = []
+            logger.info(f"🛠️  No tools needed for {intent.value}")
+
+        # ====================================================================
+        # STEP 3: SINGLE LLM CALL WITH FOCUSED CONTEXT
+        # ====================================================================
+        logger.info(f"🎯 Processing request: '{user_message}'")
+
+        actions_executed = []
+        assistant_message = ""
+
+        # FIX 2: Include conversation history so AI has context from prior exchanges
+        messages = self._build_messages_with_history(user_message, context_message)
+
+        logger.info(f"🤖 Calling LLM with {len(tools)} tools, {len(messages)} messages in context...")
+
+        response = self.client.messages.create(
             model=self.model,
-            max_tokens=2048,
-            system=planning_prompt,
-            messages=[{
-                "role": "user",
-                "content": f"User request: {user_message}\n\nCurrent DAW state:\n{context_message}"
-            }]
+            max_tokens=4096,
+            system=system_prompt,
+            messages=messages,
+            tools=tools if tools else None  # None if no tools (query state)
         )
 
-        # Extract plan from response
-        plan_text = ""
-        for block in planning_response.content:
+        # Process response blocks, collecting tool calls and results
+        tool_results = []
+        for block in response.content:
             if block.type == "text":
-                plan_text += block.text
+                assistant_message += block.text
+            elif block.type == "tool_use":
+                logger.info(f"🎯 AI calling tool: {block.name} with params: {block.input}")
 
-        logger.info(f"📋 Generated plan:\n{plan_text}")
-
-        # ====================================================================
-        # PLAN VALIDATION: Check for empty track creation
-        # ====================================================================
-        plan_lower = plan_text.lower()
-        if "create_track" in plan_lower:
-            # Check if plan mentions creating clips after tracks
-            has_create_track = "create_track" in plan_lower
-            has_create_clip = "create_midi_clip" in plan_lower or "create_clip" in plan_lower
-
-            if has_create_track and not has_create_clip:
-                logger.warning("🚨 PLAN VALIDATION FAILED: Plan creates tracks but doesn't mention adding clips!")
-                logger.warning("🚨 Injecting reminder to add clips to all tracks...")
-                plan_text += "\n\n🚨 CRITICAL REMINDER: You MUST add clips with notes to EVERY track you create. A track without clips is useless!"
-
-        # ====================================================================
-        # STAGE 2: EXECUTION (MULTI-TURN LOOP)
-        # ====================================================================
-        logger.info(f"⚡ STAGE 2: Executing plan")
-
-        execution_prompt = self._build_execution_prompt()
-
-        # Inject the plan into the execution request
-        initial_message = f"""EXECUTION PLAN (follow this EXACTLY):
-{plan_text}
-
-Current DAW state:
-{context_message}
-
-Original user request: {user_message}
-
-Execute the plan above using the available tools. Follow EVERY step in the plan.
-Call ALL the tools needed to complete ALL steps. Don't stop after one tool call."""
-
-        # Multi-turn execution loop
-        actions_executed = []
-        track_ids_created = []  # Track IDs from create_track actions
-        assistant_message = ""
-        track_name_to_id = {}  # Map track names to IDs for reference
-
-        # Build conversation history for multi-turn execution
-        messages = [{
-            "role": "user",
-            "content": initial_message
-        }]
-
-        max_turns = 10  # Safety limit to prevent infinite loops
-        turn = 0
-
-        while turn < max_turns:
-            turn += 1
-            logger.info(f"🔄 Execution turn {turn}/{max_turns}")
-
-            # Call Claude with function calling for execution
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=4096,  # More tokens for execution
-                system=execution_prompt,
-                messages=messages,
-                tools=self._get_tool_definitions()
-            )
-
-            # Update last call time
-            self.last_call_time = datetime.now()
-
-            # Check if Claude made any tool calls
-            tool_calls_made = False
-            turn_results = []
-
-            # Process response blocks
-            for block in response.content:
-                if block.type == "text":
-                    assistant_message += block.text
-                elif block.type == "tool_use":
-                    tool_calls_made = True
-
-                    # Execute action
+                # Handle composite tools
+                if block.name == "create_track_with_content":
+                    result = await self.composite_tools.create_track_with_content(
+                        name=block.input["name"],
+                        instrument=block.input["instrument"],
+                        notes=block.input["notes"],
+                        effects=block.input.get("effects"),
+                        start_time=block.input.get("start_time", 0.0),
+                        duration=block.input.get("duration", 4.0),
+                        clip_name=block.input.get("clip_name")
+                    )
+                else:
+                    # Regular tools
                     action = DAWAction(
                         action=block.name,
                         parameters=block.input
                     )
-
-                    logger.info(f"🎯 AI calling tool: {block.name} with params: {block.input}")
-
                     result = await self.action_service.execute_action(action)
-                    actions_executed.append(result)
 
-                    # Track create_track actions to detect empty tracks
-                    if block.name == "create_track":
-                        if result.success and result.data and "track_id" in result.data:
-                            track_id = result.data["track_id"]
-                            track_name = block.input.get("name", "Unknown")
-                            track_ids_created.append(track_id)
-                            track_name_to_id[track_name] = track_id
-                            logger.info(f"✅ Created track: {track_name} -> {track_id}")
+                actions_executed.append(result)
 
-                    # Log if create_midi_clip is called
-                    if block.name == "create_midi_clip":
-                        track_id = block.input.get("track_id")
-                        if track_id in track_ids_created:
-                            track_ids_created.remove(track_id)  # Track now has content
-                            logger.info(f"✅ Added clip to track: {track_id}")
+                result_content = f"Success: {result.message}" if result.success else f"Error: {result.error}"
+                if result.data:
+                    result_content += f"\nData: {result.data}"
 
-                    # Add result to message
-                    assistant_message += f"\n[Executed: {block.name}]"
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result_content
+                })
 
-                    # Build tool result message with track ID mapping if relevant
-                    result_content = f"Success: {result.message}" if result.success else f"Error: {result.error}"
-
-                    # If this was create_track, include the track_id in the result
-                    if block.name == "create_track" and result.success and result.data:
-                        track_id = result.data.get("track_id")
-                        track_name = block.input.get("name")
-                        result_content += f"\n✅ Track ID for '{track_name}': {track_id}"
-                        result_content += f"\n⚠️ IMPORTANT: Use track_id='{track_id}' (not '{track_name}') for subsequent operations on this track"
-
-                    # Store tool result for next turn
-                    turn_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": result_content
+        # FIX 3: Send tool results back to LLM so it can respond to outcomes and recover from errors
+        if tool_results:
+            # Serialize assistant content blocks (tool_use objects → dicts for API)
+            assistant_content = []
+            for block in response.content:
+                if block.type == "text":
+                    assistant_content.append({"type": "text", "text": block.text})
+                elif block.type == "tool_use":
+                    assistant_content.append({
+                        "type": "tool_use",
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.input
                     })
 
-            # If no tool calls were made, we're done
-            if not tool_calls_made:
-                logger.info(f"✅ Execution complete - no more tool calls")
-                break
+            follow_up_messages = messages + [
+                {"role": "assistant", "content": assistant_content},
+                {"role": "user", "content": tool_results}
+            ]
 
-            # Add assistant response to conversation
-            messages.append({
-                "role": "assistant",
-                "content": response.content
-            })
+            logger.info(f"🔄 Sending {len(tool_results)} tool result(s) back to LLM...")
+            follow_up = self.client.messages.create(
+                model=self.model,
+                max_tokens=1024,
+                system=system_prompt,
+                messages=follow_up_messages
+                # No tools — just get final natural language response
+            )
 
-            # Add tool results to conversation
-            messages.append({
-                "role": "user",
-                "content": turn_results
-            })
+            for block in follow_up.content:
+                if block.type == "text":
+                    assistant_message += block.text
 
-            logger.info(f"📊 Turn {turn} complete: {len(turn_results)} tools executed, {len(actions_executed)} total actions")
-
-        # CRITICAL: Warn if tracks were created without clips
-        if track_ids_created:
-            logger.error(f"🚨 AI CREATED EMPTY TRACKS: {track_ids_created}")
-            logger.error(f"🚨 This violates the system prompt! Tracks without clips are useless!")
-
-        logger.info(f"✅ Execution complete after {turn} turns: {len(actions_executed)} total actions")
+        logger.info(f"✅ Execution complete: {len(actions_executed)} actions")
 
         # Log execution summary
         if actions_executed:
@@ -278,19 +235,12 @@ Call ALL the tools needed to complete ALL steps. Don't stop after one tool call.
             for action in actions_executed:
                 action_type = action.action
                 action_summary[action_type] = action_summary.get(action_type, 0) + 1
-
             logger.info(f"📊 Action summary: {action_summary}")
         else:
-            logger.warning(f"⚠️ No actions were executed! This might indicate a problem.")
+            logger.warning(f"⚠️ No actions were executed!")
 
-        # Build comprehensive response including plan
-        full_response = f"""**PLAN:**
-{plan_text}
-
-**EXECUTION:**
-{assistant_message}
-
-**ACTIONS EXECUTED:** {len(actions_executed)}"""
+        # Build response
+        full_response = assistant_message if assistant_message else f"Executed {len(actions_executed)} actions successfully."
 
         # Auto-save composition as iteration if actions were executed
         if actions_executed and len(actions_executed) > 0:
@@ -306,8 +256,7 @@ Call ALL the tools needed to complete ALL steps. Don't stop after one tool call.
         return {
             "response": full_response,
             "actions_executed": actions_executed,
-            "musical_context": context_message,  # Include the full musical analysis
-            "plan": plan_text  # Include the plan separately for frontend
+            "musical_context": context_message
         }
 
     async def send_contextual_message(
@@ -365,85 +314,66 @@ Call ALL the tools needed to complete ALL steps. Don't stop after one tool call.
             additional_context=additional_context
         )
 
-        # Execute with AI (similar to send_message but with focused context)
+        # Execute with AI (single LLM call, no planning stage)
         logger.info(f"🎯 Contextual AI request for {entity_type} {entity_id}: '{message}'")
-
-        # Planning stage
-        planning_response = self.client.messages.create(
-            model=self.model,
-            max_tokens=2048,
-            system=contextual_prompt,
-            messages=[{
-                "role": "user",
-                "content": message
-            }]
-        )
-
-        plan_text = planning_response.content[0].text if planning_response.content else ""
-        logger.info(f"📋 Contextual Plan:\n{plan_text}")
-
-        # Execution stage
-        execution_prompt = self._build_execution_prompt()
-        messages = [
-            {"role": "user", "content": message},
-            {"role": "assistant", "content": plan_text},
-            {"role": "user", "content": "Execute the plan using the available tools."}
-        ]
 
         actions_executed = []
         affected_entities = []
-        max_turns = 10
-        turn = 0
+        assistant_message = ""
 
-        while turn < max_turns:
-            turn += 1
+        messages = [{
+            "role": "user",
+            "content": message
+        }]
 
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=4096,
-                system=execution_prompt,
-                messages=messages,
-                tools=self._get_tool_definitions()
-            )
+        # Single LLM call with tools
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=4096,
+            system=contextual_prompt,
+            messages=messages,
+            tools=self._get_tool_definitions()
+        )
 
-            tool_calls_made = False
+        # Process response blocks
+        for block in response.content:
+            if block.type == "text":
+                assistant_message += block.text
+            elif block.type == "tool_use":
+                logger.info(f"🎯 AI calling tool: {block.name} with params: {block.input}")
 
-            for block in response.content:
-                if block.type == "tool_use":
-                    tool_calls_made = True
-
+                # Handle composite tools
+                if block.name == "create_track_with_content":
+                    result = await self.composite_tools.create_track_with_content(
+                        name=block.input["name"],
+                        instrument=block.input["instrument"],
+                        notes=block.input["notes"],
+                        effects=block.input.get("effects"),
+                        start_time=block.input.get("start_time", 0.0),
+                        duration=block.input.get("duration", 4.0),
+                        clip_name=block.input.get("clip_name")
+                    )
+                else:
+                    # Regular tools
                     action = DAWAction(
                         action=block.name,
                         parameters=block.input
                     )
-
                     result = await self.action_service.execute_action(action)
-                    actions_executed.append(result)
 
-                    # Track affected entities for highlighting
-                    if result.success and result.data:
-                        affected_entity = self._extract_affected_entity(action, result)
-                        if affected_entity:
-                            affected_entities.append(affected_entity)
+                actions_executed.append(result)
 
-                    messages.append({
-                        "role": "assistant",
-                        "content": response.content
-                    })
-                    messages.append({
-                        "role": "user",
-                        "content": [{
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": f"Success: {result.success}\nMessage: {result.message}"
-                        }]
-                    })
+                # Track affected entities
+                if result.success and result.data:
+                    if "track_id" in result.data:
+                        affected_entities.append({"type": "track", "id": result.data["track_id"]})
+                    if "clip_id" in result.data:
+                        affected_entities.append({"type": "clip", "id": result.data["clip_id"]})
 
-            if not tool_calls_made:
-                break
+        logger.info(f"✅ Contextual execution complete: {len(actions_executed)} actions")
 
         # Build response message
-        full_response = f"✅ Modified {entity_type} '{entity_id}'\n\n{plan_text}"
+        full_response = assistant_message if assistant_message else f"✅ Modified {entity_type} '{entity_id}'"
 
         return {
             "response": full_response,
@@ -555,91 +485,29 @@ Call ALL the tools needed to complete ALL steps. Don't stop after one tool call.
         except Exception as e:
             logger.error(f"❌ Failed to save AI iteration: {e}", exc_info=True)
 
-    def _build_planning_prompt(self, user_message: str, context_message: str) -> str:
-        """Build STAGE 1 planning prompt"""
+    def _build_simple_system_prompt(self) -> str:
+        """
+        Build simplified system prompt (Anthropic best practices)
+
+        10-20 lines, clear and direct. No bloat.
+        """
         instruments_list = self._build_instruments_list()
         effects_list = self._build_effects_list()
 
-        return f"""You are a music production AI in PLANNING mode.
+        return f"""You are a music production assistant. Help users create and modify music.
 
-Your task: Analyze the user's request and current DAW state, then generate a DETAILED execution plan.
+When the user asks to add tracks/instruments:
+- Use create_track_with_content for each track
+- Provide realistic MIDI notes based on the instrument type
+- Add appropriate effects for the genre
 
-═══════════════════════════════════════════════════════════════════════════════
-PLANNING GUIDELINES
-═══════════════════════════════════════════════════════════════════════════════
-
-1. **Understand the request holistically**
-   - What is the user trying to achieve musically?
-   - What changes are needed to existing tracks/clips/effects/mixer?
-   - What new elements need to be created?
-
-2. **Analyze current state**
-   - What tracks/clips/effects already exist?
-   - What's the current tempo, key, style?
-   - What's missing or needs modification?
-
-3. **Generate COMPLETE workflow**
-   - For NEW tracks: ALWAYS include create_track → create_midi_clip → add_effect
-   - For MODIFICATIONS: Specify exact clips/tracks to modify and how
-   - For MIXER changes: Specify exact parameter adjustments
-   - For EFFECTS: Specify which tracks and which effects
-
-   🚨 CRITICAL: If the user says "add EDM tracks" or "add some tracks", they OBVIOUSLY mean:
-   - Create the track
-   - Add a clip with actual musical notes to that track
-   - Optionally add effects
-
-   A track without clips is COMPLETELY USELESS. It's like creating a folder without files.
-   NEVER plan to create a track without IMMEDIATELY planning to add a clip with notes.
-
-4. **Be SPECIFIC with musical content**
-   - Specify exact MIDI note patterns (not "add some notes")
-   - Specify exact parameter values (not "adjust volume")
-   - Specify exact timing (start_time, duration in beats)
-
-═══════════════════════════════════════════════════════════════════════════════
-AVAILABLE INSTRUMENTS
-═══════════════════════════════════════════════════════════════════════════════
+AVAILABLE INSTRUMENTS:
 {instruments_list}
 
-═══════════════════════════════════════════════════════════════════════════════
-AVAILABLE EFFECTS
-═══════════════════════════════════════════════════════════════════════════════
+AVAILABLE EFFECTS:
 {effects_list}
 
-═══════════════════════════════════════════════════════════════════════════════
-OUTPUT FORMAT
-═══════════════════════════════════════════════════════════════════════════════
-
-Generate a plan in this format:
-
-**ANALYSIS:**
-[Brief analysis of the request and current state]
-
-**PLAN:**
-Step 1: [Action] - [Specific details]
-  - Parameter 1: [value]
-  - Parameter 2: [value]
-
-Step 2: [Action] - [Specific details]
-  - Parameter 1: [value]
-  - Parameter 2: [value]
-
-[Continue for all steps...]
-
-**MUSICAL REASONING:**
-[Explain why this plan achieves the user's goal]
-
-═══════════════════════════════════════════════════════════════════════════════
-CRITICAL RULES
-═══════════════════════════════════════════════════════════════════════════════
-
-🚨 **NEVER plan to create a track without immediately adding a clip with notes**
-🚨 **ALWAYS specify exact MIDI note patterns** - use format: {{n: 60, s: 0, d: 1, v: 100}}
-🚨 **ALWAYS specify exact parameter values** - no vague terms like "adjust" or "tweak"
-🚨 **THINK COMPLETE WORKFLOWS** - don't plan half-finished actions
-
-Remember: You're PLANNING, not executing. Be thorough and specific."""
+Always provide complete musical content - tracks without notes are not useful."""
 
     def _build_contextual_prompt(
         self,
@@ -757,63 +625,7 @@ CRITICAL RULES
 
 Remember: You're planning focused edits to this specific {entity_type}."""
 
-    def _build_execution_prompt(self) -> str:
-        """Build STAGE 2 execution prompt"""
-        return """You are a music production AI in EXECUTION mode.
 
-Your task: Execute the provided plan EXACTLY using the available tools.
-
-═══════════════════════════════════════════════════════════════════════════════
-EXECUTION RULES
-═══════════════════════════════════════════════════════════════════════════════
-
-1. **Execute ALL steps in ONE response**
-   - Make MULTIPLE tool calls in a SINGLE response
-   - Execute EVERY step in the plan sequentially
-   - Use the EXACT parameters specified in the plan
-   - Don't skip steps or improvise
-   - Don't stop after one tool call - keep going until ALL steps are complete
-
-2. **Use tools correctly**
-   - create_track: Creates a new track (returns track_id)
-   - create_midi_clip: Adds notes to a track (requires track_id from create_track)
-   - modify_clip: Changes existing clip notes/timing
-   - add_effect: Adds effect to track
-   - set_track_parameter: Adjusts volume/pan/mute/solo
-   - set_tempo: Changes global tempo
-
-3. **Complete workflows**
-   - ALWAYS call create_midi_clip immediately after create_track
-   - ALWAYS use the track_id returned from create_track
-   - ALWAYS include actual note data in create_midi_clip
-
-   🚨 CRITICAL: If you call create_track, you MUST call create_midi_clip in the SAME response.
-   🚨 A track without a clip is COMPLETELY USELESS and will be flagged as an error.
-   🚨 When the user says "add EDM tracks", they mean: create track + add clip with notes + add effects.
-   🚨 NEVER create a track and stop. ALWAYS add a clip with musical notes immediately after.
-
-4. **MIDI note format**
-   - Use compact format: {{n: MIDI_NOTE, s: START_BEAT, d: DURATION, v: VELOCITY}}
-   - Example: {{n: 60, s: 0, d: 1, v: 100}} = Middle C, beat 0, 1 beat long, velocity 100
-
-5. **Multi-step execution**
-   - If the plan has 14 steps, make 14 tool calls
-   - If the plan has 5 steps, make 5 tool calls
-   - Continue making tool calls until the entire plan is complete
-   - You can make multiple tool calls in a single response
-
-═══════════════════════════════════════════════════════════════════════════════
-CRITICAL
-═══════════════════════════════════════════════════════════════════════════════
-
-🚨 **EXECUTE THE ENTIRE PLAN IN THIS RESPONSE** - Make ALL tool calls needed
-🚨 **DON'T STOP AFTER ONE TOOL CALL** - Continue until all steps are done
-🚨 **USE EXACT VALUES FROM PLAN** - Don't improvise or change parameters
-🚨 **FOLLOW TOOL CALL ORDER** - create_track THEN create_midi_clip THEN add_effect
-
-Example: If plan has steps 1-14, you should make 14 tool calls in your response.
-
-Execute now."""
 
     def _build_instruments_list(self) -> str:
         """Build formatted list of available instruments from SYNTHDEF_REGISTRY"""
@@ -1074,6 +886,55 @@ When modifying sequences:
 - Create new tracks for new instruments/parts
 - Think holistically about the entire composition
 - ALWAYS follow through with complete workflows - never leave empty tracks"""
+
+    def _build_messages_with_history(self, user_message: str, context_message: str) -> List[Dict[str, Any]]:
+        """
+        Build messages array including recent conversation history.
+
+        Loads last 6 messages (3 exchanges) from in-memory chat history so the AI
+        remembers what was discussed and composed in prior turns.
+        """
+        messages = []
+
+        composition_id = self.action_service.composition_state.current_composition_id
+        if composition_id and composition_id in self.chat_histories:
+            history = self.chat_histories[composition_id]
+            # Last 6 entries = 3 exchanges — enough context without token bloat
+            recent = history[-6:] if len(history) > 6 else history
+
+            for entry in recent:
+                messages.append({
+                    "role": entry["role"],
+                    "content": entry["content"]
+                })
+
+            # API requires messages start with "user" role — drop any leading assistant entries
+            while messages and messages[0]["role"] == "assistant":
+                messages.pop(0)
+
+        # Append current message with full DAW state context
+        messages.append({
+            "role": "user",
+            "content": f"{user_message}\n\nCurrent DAW state:\n{context_message}"
+        })
+
+        return messages
+
+    def _build_brief_state_summary(self, state: DAWStateSnapshot) -> str:
+        """
+        Build brief state summary for routing context.
+        """
+        if not state or not state.sequence:
+            return "Empty composition"
+
+        track_count = len(state.sequence.tracks)
+        clip_count = len(state.sequence.clips)
+        summary = f"{track_count} tracks, {clip_count} clips, {state.tempo} BPM"
+
+        if state.musical and state.musical.key:
+            summary += f", key: {state.musical.key}"
+
+        return summary
 
     def _build_context_message(self, state: Optional[DAWStateSnapshot]) -> str:
         """Build COMPLETE MUSICAL CONTEXT - everything AI needs to understand and modify the sequence"""
@@ -1416,11 +1277,58 @@ Keep suggestions simple and musical. Explain your reasoning briefly."""
 
         CRITICAL: Instrument enum is dynamically generated from SYNTHDEF_REGISTRY
         to prevent AI hallucination of invalid instrument names.
+
+        COMPOSITE TOOLS FIRST - These prevent mistakes through design.
         """
         return [
+            # ================================================================
+            # COMPOSITE TOOL (Poka-Yoke Design - Prevents Empty Tracks)
+            # ================================================================
+            {
+                "name": "create_track_with_content",
+                "description": "Create a complete track with musical content in ONE operation. This is the PRIMARY tool for adding tracks. It creates the track, adds a clip with notes, and optionally adds effects - all atomically. This makes it IMPOSSIBLE to create empty tracks.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "Track name (e.g., 'Kick Drum', 'Bass', 'Lead Synth')"},
+                        "instrument": {
+                            "type": "string",
+                            "enum": get_valid_instruments_list(),
+                            "description": self._build_instrument_description()
+                        },
+                        "notes": {
+                            "type": "array",
+                            "description": "MIDI notes for the clip (REQUIRED, min 1 note). Format: [{n: MIDI_NOTE, s: START_BEAT, d: DURATION, v: VELOCITY}, ...]. Example: [{n: 60, s: 0, d: 1, v: 100}, {n: 64, s: 1, d: 1, v: 100}]",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "n": {"type": "integer", "description": "MIDI note number (0-127). Middle C = 60, Kick = 36"},
+                                    "s": {"type": "number", "description": "Start time in beats (relative to clip start)"},
+                                    "d": {"type": "number", "description": "Duration in beats"},
+                                    "v": {"type": "integer", "description": "Velocity (0-127, default 100)"}
+                                },
+                                "required": ["n", "s", "d"]
+                            }
+                        },
+                        "effects": {
+                            "type": "array",
+                            "description": "Effects to add (optional). Example: ['reverb', 'delay', 'lpf']",
+                            "items": {"type": "string"}
+                        },
+                        "start_time": {"type": "number", "description": "Clip start time in beats (default: 0)"},
+                        "duration": {"type": "number", "description": "Clip duration in beats (default: 4)"},
+                        "clip_name": {"type": "string", "description": "Clip name (optional, defaults to '{name} Pattern')"}
+                    },
+                    "required": ["name", "instrument", "notes"]
+                }
+            },
+            # ================================================================
+            # LEGACY TOOLS (For advanced use cases only)
+            # ================================================================
             {
                 "name": "create_midi_clip",
-                "description": "Create a new MIDI clip with notes on a track. This is how you add actual musical content to a track. You MUST call this immediately after create_track. The 'notes' array contains the actual musical pattern - don't leave it empty!",
+                "description": "Create a new MIDI clip with notes on a track. DEPRECATED: Use create_track_with_content instead for new tracks.",
                 "input_schema": {
                     "type": "object",
                     "properties": {
