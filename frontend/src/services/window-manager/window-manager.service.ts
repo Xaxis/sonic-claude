@@ -14,6 +14,8 @@ export interface StateUpdate {
 class WindowManagerService {
     private channel: BroadcastChannel;
     private listeners: Map<string, Set<(value: any) => void>> = new Map();
+    private pendingUpdates: Map<string, any> = new Map();
+    private rafId: number | null = null;
 
     constructor() {
         this.channel = new BroadcastChannel("sonic-claude-sync");
@@ -25,12 +27,30 @@ class WindowManagerService {
         this.channel.onmessage = (event: MessageEvent<StateUpdate>) => {
             const { key, value } = event.data;
 
-            // Notify all listeners for this key
+            // Batch updates using requestAnimationFrame to avoid blocking the main thread
+            this.pendingUpdates.set(key, value);
+
+            // Schedule a single RAF callback to process all pending updates
+            if (this.rafId === null) {
+                this.rafId = requestAnimationFrame(() => {
+                    this.processPendingUpdates();
+                });
+            }
+        };
+    }
+
+    private processPendingUpdates() {
+        // Process all pending updates in a single frame
+        this.pendingUpdates.forEach((value, key) => {
             const keyListeners = this.listeners.get(key);
             if (keyListeners) {
                 keyListeners.forEach((listener) => listener(value));
             }
-        };
+        });
+
+        // Clear pending updates and RAF ID
+        this.pendingUpdates.clear();
+        this.rafId = null;
     }
 
     /**
@@ -96,6 +116,16 @@ class WindowManagerService {
      * Cleanup on window close
      */
     public cleanup() {
+        // Cancel any pending RAF
+        if (this.rafId !== null) {
+            cancelAnimationFrame(this.rafId);
+            this.rafId = null;
+        }
+
+        // Clear pending updates
+        this.pendingUpdates.clear();
+
+        // Close channel
         this.channel.close();
         console.log("🪟 WindowManager cleaned up");
     }
