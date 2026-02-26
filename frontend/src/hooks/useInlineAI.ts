@@ -30,7 +30,7 @@ import { useState, useCallback, useRef } from "react";
 import { useDAWStore } from "@/stores/dawStore";
 
 export interface InlineAIConfig {
-    entityType: "track" | "clip" | "effect" | "mixer_channel" | "composition";
+    entityType: "track" | "clip" | "effect" | "mixer_channel" | "composition" | "panel";
     entityId: string;
     longPressDelay?: number; // ms, default 500
     disabled?: boolean;

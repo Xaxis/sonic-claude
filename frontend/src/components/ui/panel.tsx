@@ -66,6 +66,18 @@ export interface PanelProps extends React.HTMLAttributes<HTMLDivElement> {
 
     /** Whether to show header at all */
     showHeader?: boolean;
+
+    /** AI handlers for inline AI on panel header */
+    aiHandlers?: {
+        onMouseDown: (e: React.MouseEvent) => void;
+        onMouseMove: (e: React.MouseEvent) => void;
+        onMouseUp: () => void;
+        onMouseLeave: () => void;
+        onTouchStart: (e: React.TouchEvent) => void;
+        onTouchMove: (e: React.TouchEvent) => void;
+        onTouchEnd: () => void;
+        onTouchCancel: () => void;
+    };
 }
 
 export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
@@ -81,6 +93,7 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
             headerActions,
             headerContent,
             showHeader = true,
+            aiHandlers,
             className,
             children,
             ...props
@@ -96,6 +109,7 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
                     className
                 )}
                 {...props}
+                {...(aiHandlers || {})}
             >
                 {/* Panel Header */}
                 {showHeader && (

@@ -15,20 +15,11 @@ import { useEffect } from "react";
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { useDAWStore } from "@/stores/dawStore";
 import { EffectsChannelList } from "@/modules/effects/components/Layouts/EffectsChannelList";
-import { useInlineAI } from "@/hooks/useInlineAI";
-import { InlineAIPromptPopover } from "@/components/ai/InlineAIPromptPopover";
 
 export function EffectsPanel() {
     // Get state and actions from Zustand store
     const activeComposition = useDAWStore(state => state.activeComposition);
     const loadEffectDefinitions = useDAWStore(state => state.loadEffectDefinitions);
-
-    // Inline AI for panel-level operations
-    const { handlers: aiHandlers, showPrompt: showAIPrompt, position: aiPosition, closePrompt: closeAIPrompt } = useInlineAI({
-        entityType: "panel",
-        entityId: "Panel: Effects",
-        disabled: !activeComposition,
-    });
 
     // Load effect definitions when composition is active
     useEffect(() => {
@@ -46,11 +37,6 @@ export function EffectsPanel() {
                         title="EFFECTS"
                         showHeader={true}
                         contentOverflow="hidden"
-                        headerActions={
-                            <div className="text-[10px] text-muted-foreground/60 italic" {...aiHandlers}>
-                                Hold to ask AI
-                            </div>
-                        }
                     >
                         {/* Channel List - Flexible */}
                         <div className="flex-1 overflow-hidden bg-gradient-to-b from-background to-background/95">
@@ -59,17 +45,6 @@ export function EffectsPanel() {
                     </SubPanel>
                 </div>
             </div>
-
-            {/* INLINE AI PROMPT - Panel-level */}
-            {showAIPrompt && aiPosition && (
-                <InlineAIPromptPopover
-                    entityType="panel"
-                    entityId="effects"
-                    position={aiPosition}
-                    onClose={closeAIPrompt}
-                    contextLabel="Panel: Effects"
-                />
-            )}
         </>
     );
 }

@@ -100,6 +100,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         title: "SEQUENCER",
         component: createElement(SequencerPanel),
         closeable: false,
+        enableAI: true,
         getSubtitle: () => "Timeline + Transport • 0 tracks • 0 clips",
         defaultLayout: { x: 0, y: 6, w: 12, h: 12 },
     },
@@ -108,6 +109,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         title: "MIXER",
         component: createElement(MixerPanel),
         closeable: false,
+        enableAI: true,
         getSubtitle: () => "0 channels • Master: 0.0 dB",
         defaultLayout: { x: 0, y: 12, w: 12, h: 14 },
     },
@@ -116,6 +118,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         title: "EFFECTS",
         component: createElement(EffectsPanel),
         closeable: false,
+        enableAI: true,
         getSubtitle: () => "Track FX • 0 effects",
         defaultLayout: { x: 0, y: 26, w: 12, h: 12 },
         snapTargets: [

@@ -19,9 +19,6 @@ import { SequencerTransportToolbar } from "./components/Toolbars/SequencerTransp
 import { SequencerActionToolbar } from "@/modules/sequencer/components/Toolbars/SequencerActionToolbar.tsx";
 import { SequencerSplitLayout } from "@/modules/sequencer/components/Layouts/SequencerSplitLayout.tsx";
 import { toast } from "sonner";
-import { useInlineAI } from "@/hooks/useInlineAI";
-import { InlineAIPromptPopover } from "@/components/ai/InlineAIPromptPopover";
-import { cn } from "@/lib/utils";
 
 export function SequencerPanel() {
     // ========================================================================
@@ -41,14 +38,7 @@ export function SequencerPanel() {
     const pianoRollScrollRef = useRef<HTMLDivElement>(null);
     const sampleEditorScrollRef = useRef<HTMLDivElement>(null);
 
-    // ========================================================================
-    // INLINE AI: Panel-level AI integration
-    // ========================================================================
-    const { handlers: aiHandlers, showPrompt: showAIPrompt, position: aiPosition, closePrompt: closeAIPrompt } = useInlineAI({
-        entityType: "panel",
-        entityId: "Panel: Sequencer",
-        disabled: !activeComposition,
-    });
+
 
     // ========================================================================
     // DERIVED STATE
@@ -93,11 +83,6 @@ export function SequencerPanel() {
                         title="SEQUENCER"
                         showHeader={true}
                         contentOverflow="hidden"
-                        headerActions={
-                            <div className="text-[10px] text-muted-foreground/60 italic" {...aiHandlers}>
-                                Hold to ask AI
-                            </div>
-                        }
                     >
                         <SequencerSplitLayout
                         timelineScrollRef={timelineScrollRef}
@@ -107,17 +92,6 @@ export function SequencerPanel() {
                 </SubPanel>
             </div>
         </div>
-
-        {/* INLINE AI PROMPT - Panel-level */}
-        {showAIPrompt && aiPosition && (
-            <InlineAIPromptPopover
-                entityType="panel"
-                entityId="sequencer"
-                position={aiPosition}
-                onClose={closeAIPrompt}
-                contextLabel="Panel: Sequencer"
-            />
-        )}
         </>
     );
 }

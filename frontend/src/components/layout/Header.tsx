@@ -1,5 +1,6 @@
 import { Music, Activity } from "lucide-react";
 import { CompositionSwitcher } from "@/components/composition/CompositionSwitcher";
+import { AIStatusIndicator } from "./AIStatusIndicator";
 
 interface HeaderProps {
     isEngineRunning?: boolean;
@@ -25,26 +26,8 @@ export function Header({ isEngineRunning = false, cpuUsage = 0, activeSynths = 0
 
             {/* Right: Status Indicators */}
             <div className="flex items-center gap-6">
-                {/* Engine Status */}
-                <div className="flex items-center gap-2">
-                    <div
-                        className={`h-2 w-2 rounded-full ${
-                            isEngineRunning
-                                ? "bg-primary animate-pulse shadow-[0_0_8px_rgba(0,255,255,0.6)]"
-                                : "bg-destructive"
-                        }`}
-                    />
-                    <span className="text-muted-foreground text-xs font-medium tracking-wider">
-                        ENGINE
-                    </span>
-                    <span
-                        className={`text-xs font-bold tracking-wider ${
-                            isEngineRunning ? "text-primary" : "text-destructive"
-                        }`}
-                    >
-                        {isEngineRunning ? "READY" : "OFFLINE"}
-                    </span>
-                </div>
+                {/* AI Status - Primary indicator */}
+                <AIStatusIndicator />
 
                 {/* CPU Usage */}
                 {isEngineRunning && (

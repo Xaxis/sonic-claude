@@ -28,7 +28,6 @@ import { useEffect, useRef, useState } from "react";
 import { Send, Loader2, Sparkles, X, CheckCircle2, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { useDAWStore } from "@/stores/dawStore";
 import { createPortal } from "react-dom";
 
@@ -162,7 +161,7 @@ export function InlineAIPromptPopover({
                 for (const chain of Object.values(effectChains)) {
                     const effect = chain.effects.find(e => e.id === entityId);
                     if (effect) {
-                        return `Effect: ${effect.effect_type}`;
+                        return `Effect: ${effect.effect_name}`;
                     }
                 }
                 return "Effect";
@@ -176,7 +175,7 @@ export function InlineAIPromptPopover({
             case "panel":
                 return entityId; // Panel name passed as entityId
             default:
-                return entityType.replace("_", " ");
+                return String(entityType).replace("_", " ");
         }
     })();
 

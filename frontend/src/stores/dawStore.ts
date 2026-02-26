@@ -125,6 +125,20 @@ export interface AIActivity {
     metadata?: Record<string, any>;
 }
 
+export interface AIRequestHistoryEntry {
+    id: string;
+    timestamp: number;
+    source: "inline" | "chat";  // Where the request came from
+    entityType?: "track" | "clip" | "effect" | "mixer_channel" | "composition" | "panel";
+    entityId?: string;
+    entityLabel?: string;  // e.g., "Track: Drums", "Clip: Bass Loop", "Chat Panel"
+    userMessage: string;
+    aiResponse?: string;
+    status: "pending" | "success" | "error";
+    error?: string;
+    actionsExecuted?: any[];
+}
+
 // ============================================================================
 // STORE STATE INTERFACE
 // ============================================================================
@@ -250,6 +264,9 @@ interface DAWStore {
     // Inline AI State (for context-aware editing)
     inlineAIHighlights: Map<string, number>;  // entity_id -> timestamp (for animation)
     activeInlineAIPrompt: { entityType: string; entityId: string } | null;
+
+    // AI Request History (both inline and chat)
+    aiRequestHistory: AIRequestHistoryEntry[];  // Complete history of ALL AI requests (max 100)
 
     // Inputs UI State
     activeInputsTab: "audio" | "midi" | "library";
@@ -423,7 +440,6 @@ interface DAWStore {
     // Clip Launcher UI actions
     setClipLauncherMode: (mode: "pad" | "assignment") => void;
     setSelectedClipSlot: (trackIndex: number, slotIndex: number) => void;
-    assignClipToSlot: (trackIndex: number, slotIndex: number, clipId: string | null) => Promise<void>;
     loadClipSlots: () => Promise<void>;
     setSelectedEffectId: (id: string | null) => void;
     setShowEffectBrowser: (show: boolean) => void;
@@ -585,6 +601,9 @@ export const useDAWStore = create<DAWStore>()(
                 // Inline AI State
                 inlineAIHighlights: new Map(),
                 activeInlineAIPrompt: null,
+
+                // AI Request History
+                aiRequestHistory: [],
 
                 // Inputs UI State (PERSISTED)
                 activeInputsTab: "audio",
@@ -2404,8 +2423,23 @@ export const useDAWStore = create<DAWStore>()(
         },
 
         sendMessage: async (message) => {
+            const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
             try {
                 set({ isSendingMessage: true });
+
+                // Add to AI request history (pending)
+                const historyEntry: AIRequestHistoryEntry = {
+                    id: requestId,
+                    timestamp: Date.now(),
+                    source: "chat",
+                    entityLabel: "Chat Panel",
+                    userMessage: message,
+                    status: "pending",
+                };
+                set((state) => ({
+                    aiRequestHistory: [historyEntry, ...state.aiRequestHistory].slice(0, 100)
+                }));
 
                 // Add user message to chat history
                 const userMessage: ChatMessage = {
@@ -2436,6 +2470,15 @@ export const useDAWStore = create<DAWStore>()(
                     get().setAIContext(response.musical_context);
                 }
 
+                // Update history entry with success
+                set((state) => ({
+                    aiRequestHistory: state.aiRequestHistory.map(entry =>
+                        entry.id === requestId
+                            ? { ...entry, status: "success" as const, aiResponse: response.response, actionsExecuted: response.actions_executed }
+                            : entry
+                    )
+                }));
+
                 // Add analysis event if actions were executed
                 if (response.actions_executed && response.actions_executed.length > 0) {
                     const analysisEvent: AnalysisEvent = {
@@ -2458,6 +2501,15 @@ export const useDAWStore = create<DAWStore>()(
             } catch (error) {
                 console.error("Failed to send message:", error);
                 toast.error("Failed to send message");
+
+                // Update history entry with error
+                set((state) => ({
+                    aiRequestHistory: state.aiRequestHistory.map(entry =>
+                        entry.id === requestId
+                            ? { ...entry, status: "error" as const, error: error instanceof Error ? error.message : "Unknown error" }
+                            : entry
+                    )
+                }));
             } finally {
                 set({ isSendingMessage: false });
             }
@@ -2489,8 +2541,37 @@ export const useDAWStore = create<DAWStore>()(
         // ====================================================================
 
         sendContextualMessage: async (params) => {
+            const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const { message, entity_type, entity_id, composition_id } = params;
+
+            // Get entity label for history
+            let entityLabel = `${entity_type}: ${entity_id}`;
+            const state = get();
+            if (entity_type === "track") {
+                const track = state.tracks.find(t => t.id === entity_id);
+                if (track) entityLabel = `Track: ${track.name}`;
+            } else if (entity_type === "clip") {
+                const clip = state.clips.find(c => c.id === entity_id);
+                if (clip) entityLabel = `Clip: ${clip.id.substring(0, 8)}`;
+            } else if (entity_type === "composition") {
+                entityLabel = `Panel: ${entity_id}`;
+            }
+
             try {
-                const { message, entity_type, entity_id, composition_id } = params;
+                // Add to AI request history (pending)
+                const historyEntry: AIRequestHistoryEntry = {
+                    id: requestId,
+                    timestamp: Date.now(),
+                    source: "inline",
+                    entityType: entity_type as any,
+                    entityId: entity_id,
+                    entityLabel,
+                    userMessage: message,
+                    status: "pending",
+                };
+                set((state) => ({
+                    aiRequestHistory: [historyEntry, ...state.aiRequestHistory].slice(0, 100)
+                }));
 
                 // Send contextual message to backend
                 const response = await api.assistant.contextualChat({
@@ -2499,6 +2580,15 @@ export const useDAWStore = create<DAWStore>()(
                     entity_id,
                     composition_id,
                 });
+
+                // Update history entry with success
+                set((state) => ({
+                    aiRequestHistory: state.aiRequestHistory.map(entry =>
+                        entry.id === requestId
+                            ? { ...entry, status: "success" as const, aiResponse: response.response, actionsExecuted: response.actions_executed }
+                            : entry
+                    )
+                }));
 
                 // Highlight affected entities
                 if (response.affected_entities) {
@@ -2518,6 +2608,16 @@ export const useDAWStore = create<DAWStore>()(
             } catch (error) {
                 console.error("Failed to send contextual message:", error);
                 toast.error("Failed to process AI request");
+
+                // Update history entry with error
+                set((state) => ({
+                    aiRequestHistory: state.aiRequestHistory.map(entry =>
+                        entry.id === requestId
+                            ? { ...entry, status: "error" as const, error: error instanceof Error ? error.message : "Unknown error" }
+                            : entry
+                    )
+                }));
+
                 throw error;
             }
         },
