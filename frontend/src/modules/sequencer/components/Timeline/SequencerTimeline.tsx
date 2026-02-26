@@ -45,7 +45,7 @@ export function SequencerTimeline({
     // ========================================================================
     // CALCULATIONS
     // ========================================================================
-    const { pixelsPerBeat, rulerMarkers, zoom } = useTimelineCalculations();
+    const { pixelsPerBeat, rulerMarkers, zoom, totalWidth } = useTimelineCalculations();
     const playheadX = currentPosition * pixelsPerBeat * zoom;
 
     // ========================================================================
@@ -89,7 +89,7 @@ export function SequencerTimeline({
                     No tracks. Add a track to start sequencing.
                 </div>
             ) : (
-                <div className="relative">
+                <div className="relative" style={{ width: `${totalWidth}px` }}>
                     {/* Grid Lines */}
                     <SequencerTimelineGrid rulerMarkers={rulerMarkers} />
 

@@ -403,8 +403,8 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     // ========================================================================
     // RENDERING
     // ========================================================================
-    const totalBeats = 64;
-    const totalWidth = beatsToPixels(totalBeats);
+    // Use shared timeline calculations for consistent width across all views
+    const { totalWidth: sharedTotalWidth, totalBeats } = useTimelineCalculations();
     const totalHeight = (maxPitch - minPitch + 1) * noteHeight;
     const gridLineSpacing = beatWidth;
 
@@ -414,7 +414,7 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
                 ref={gridRef}
                 className="relative cursor-crosshair"
                 style={{
-                    width: `${totalWidth}px`,
+                    width: `${sharedTotalWidth}px`,
                     height: `${totalHeight}px`,
                     backgroundImage: `
                         linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
