@@ -279,8 +279,19 @@ export function SequencerClip({
                     borderColor: (isEditingInPianoRoll || isEditingInSampleEditor) ? "#22d3ee" : trackColor,
                 }}
             onClick={handleClick}
-            onMouseDown={(e) => handleMouseDown(e, "move")}
-            {...aiHandlers}
+            onMouseDown={(e) => {
+                // Call clip's drag handler first
+                handleMouseDown(e, "move");
+                // Then call AI handler
+                aiHandlers.onMouseDown(e);
+            }}
+            onMouseMove={aiHandlers.onMouseMove}
+            onMouseUp={aiHandlers.onMouseUp}
+            onMouseLeave={aiHandlers.onMouseLeave}
+            onTouchStart={aiHandlers.onTouchStart}
+            onTouchMove={aiHandlers.onTouchMove}
+            onTouchEnd={aiHandlers.onTouchEnd}
+            onTouchCancel={aiHandlers.onTouchCancel}
         >
             {/* Left resize handle */}
             <div

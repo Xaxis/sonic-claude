@@ -19,6 +19,9 @@ import { SequencerTransportToolbar } from "./components/Toolbars/SequencerTransp
 import { SequencerActionToolbar } from "@/modules/sequencer/components/Toolbars/SequencerActionToolbar.tsx";
 import { SequencerSplitLayout } from "@/modules/sequencer/components/Layouts/SequencerSplitLayout.tsx";
 import { toast } from "sonner";
+import { useInlineAI } from "@/hooks/useInlineAI";
+import { InlineAIPromptPopover } from "@/components/ai/InlineAIPromptPopover";
+import { cn } from "@/lib/utils";
 
 export function SequencerPanel() {
     // ========================================================================
@@ -37,6 +40,15 @@ export function SequencerPanel() {
     const timelineScrollRef = useRef<HTMLDivElement>(null);
     const pianoRollScrollRef = useRef<HTMLDivElement>(null);
     const sampleEditorScrollRef = useRef<HTMLDivElement>(null);
+
+    // ========================================================================
+    // INLINE AI: Panel-level AI integration
+    // ========================================================================
+    const { handlers: aiHandlers, showPrompt: showAIPrompt, position: aiPosition, closePrompt: closeAIPrompt } = useInlineAI({
+        entityType: "panel",
+        entityId: "Panel: Sequencer",
+        disabled: !activeComposition,
+    });
 
     // ========================================================================
     // DERIVED STATE
@@ -60,24 +72,34 @@ export function SequencerPanel() {
     }
 
     return (
-        <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
-            {/* Combined Transport and Toolbar */}
-            <div className="flex-shrink-0">
-                <SubPanel title="TRANSPORT" showHeader={false}>
-                    <div className="px-4 py-3 bg-gradient-to-r from-muted/20 to-muted/10 flex items-center justify-between">
-                        {/* Left: Transport Controls */}
-                        <SequencerTransportToolbar />
+        <>
+            <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
+                {/* Combined Transport and Toolbar */}
+                <div className="flex-shrink-0">
+                    <SubPanel title="TRANSPORT" showHeader={false}>
+                        <div className="px-4 py-3 bg-gradient-to-r from-muted/20 to-muted/10 flex items-center justify-between">
+                            {/* Left: Transport Controls */}
+                            <SequencerTransportToolbar />
 
-                        {/* Right: Toolbar Controls */}
-                        <SequencerActionToolbar />
-                    </div>
-                </SubPanel>
-            </div>
+                            {/* Right: Toolbar Controls */}
+                            <SequencerActionToolbar />
+                        </div>
+                    </SubPanel>
+                </div>
 
-            {/* Main Content Area */}
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                <SubPanel title="SEQUENCER" showHeader={false} contentOverflow="hidden">
-                    <SequencerSplitLayout
+                {/* Main Content Area */}
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <SubPanel
+                        title="SEQUENCER"
+                        showHeader={true}
+                        contentOverflow="hidden"
+                        headerActions={
+                            <div className="text-[10px] text-muted-foreground/60 italic" {...aiHandlers}>
+                                Hold to ask AI
+                            </div>
+                        }
+                    >
+                        <SequencerSplitLayout
                         timelineScrollRef={timelineScrollRef}
                         pianoRollScrollRef={pianoRollScrollRef}
                         sampleEditorScrollRef={sampleEditorScrollRef}
@@ -85,5 +107,17 @@ export function SequencerPanel() {
                 </SubPanel>
             </div>
         </div>
+
+        {/* INLINE AI PROMPT - Panel-level */}
+        {showAIPrompt && aiPosition && (
+            <InlineAIPromptPopover
+                entityType="panel"
+                entityId="sequencer"
+                position={aiPosition}
+                onClose={closeAIPrompt}
+                contextLabel="Panel: Sequencer"
+            />
+        )}
+        </>
     );
 }

@@ -33,10 +33,11 @@ import { useDAWStore } from "@/stores/dawStore";
 import { createPortal } from "react-dom";
 
 interface InlineAIPromptPopoverProps {
-    entityType: "track" | "clip" | "effect" | "mixer_channel" | "composition";
+    entityType: "track" | "clip" | "effect" | "mixer_channel" | "composition" | "panel";
     entityId: string;
     position: { x: number; y: number };
     onClose: () => void;
+    contextLabel?: string; // Optional override for the context label (e.g., "Track: Drums", "Panel: Sequencer")
 }
 
 export function InlineAIPromptPopover({
@@ -44,18 +45,22 @@ export function InlineAIPromptPopover({
     entityId,
     position,
     onClose,
+    contextLabel,
 }: InlineAIPromptPopoverProps) {
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [adjustedPosition, setAdjustedPosition] = useState(position);
-    
+
     const inputRef = useRef<HTMLInputElement>(null);
     const popoverRef = useRef<HTMLDivElement>(null);
 
     const activeComposition = useDAWStore((state) => state.activeComposition);
     const sendContextualMessage = useDAWStore((state) => state.sendContextualMessage);
+    const tracks = useDAWStore((state) => state.tracks);
+    const clips = useDAWStore((state) => state.clips);
+    const effectChains = useDAWStore((state) => state.effectChains);
 
     // Auto-focus on mount
     useEffect(() => {
@@ -141,7 +146,39 @@ export function InlineAIPromptPopover({
         }
     };
 
-    const entityLabel = entityType.replace("_", " ");
+    // Compute context label if not provided
+    const computedContextLabel = contextLabel || (() => {
+        switch (entityType) {
+            case "track": {
+                const track = tracks.find(t => t.id === entityId);
+                return track ? `Track: ${track.name}` : "Track";
+            }
+            case "clip": {
+                const clip = clips.find(c => c.id === entityId);
+                return clip ? `Clip: ${clip.name}` : "Clip";
+            }
+            case "effect": {
+                // Find effect in any chain
+                for (const chain of Object.values(effectChains)) {
+                    const effect = chain.effects.find(e => e.id === entityId);
+                    if (effect) {
+                        return `Effect: ${effect.effect_type}`;
+                    }
+                }
+                return "Effect";
+            }
+            case "mixer_channel": {
+                const track = tracks.find(t => t.id === entityId);
+                return track ? `Mixer: ${track.name}` : "Mixer Channel";
+            }
+            case "composition":
+                return activeComposition ? `Composition: ${activeComposition.name}` : "Composition";
+            case "panel":
+                return entityId; // Panel name passed as entityId
+            default:
+                return entityType.replace("_", " ");
+        }
+    })();
 
     return createPortal(
         <>
@@ -166,7 +203,7 @@ export function InlineAIPromptPopover({
                         <div className="flex items-center gap-2">
                             <Sparkles size={16} className="text-primary animate-pulse" />
                             <span className="text-sm font-semibold">
-                                AI Edit <span className="text-primary">{entityLabel}</span>
+                                <span className="text-primary">{computedContextLabel}</span>
                             </span>
                         </div>
                         <Button
@@ -186,7 +223,7 @@ export function InlineAIPromptPopover({
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder={`Describe changes to this ${entityLabel}...`}
+                            placeholder={`What would you like to change?`}
                             disabled={isLoading}
                             className="flex-1 h-9 text-sm"
                         />
