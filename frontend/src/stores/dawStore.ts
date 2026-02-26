@@ -715,7 +715,7 @@ export const useDAWStore = create<DAWStore>()(
                 const newEnabled = !currentEnabled;
 
                 // Call backend to toggle metronome
-                await api.audio.updateMetronome({ enabled: newEnabled });
+                await api.playback.updateMetronome({ enabled: newEnabled });
 
                 // Note: State will be updated via WebSocket transport message
                 // No need to update local state here
@@ -1863,7 +1863,7 @@ export const useDAWStore = create<DAWStore>()(
 
         previewNote: async (note, velocity = 100, duration = 1.0, instrument = "default") => {
             try {
-                await api.audio.previewNote({
+                await api.playback.previewNote({
                     note,
                     velocity,
                     duration,

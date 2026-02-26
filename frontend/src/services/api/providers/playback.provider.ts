@@ -3,11 +3,13 @@
  * Thin HTTP client for playback transport controls
  *
  * Backend routes:
- * - POST /api/playback/play    - Play current composition
- * - POST /api/playback/stop    - Stop playback
- * - POST /api/playback/seek    - Seek to position
- * - PUT  /api/playback/tempo   - Set tempo
- * - PUT  /api/playback/loop    - Set loop points
+ * - POST /api/playback/play      - Play current composition
+ * - POST /api/playback/stop      - Stop playback
+ * - POST /api/playback/seek      - Seek to position
+ * - PUT  /api/playback/tempo     - Set tempo
+ * - PUT  /api/playback/loop      - Set loop points
+ * - POST /api/playback/preview   - Preview MIDI note
+ * - PUT  /api/playback/metronome - Update metronome settings
  */
 
 import { BaseAPIClient } from "../base";
@@ -35,6 +37,18 @@ export interface SetLoopRequest {
     enabled: boolean;
     start?: number;
     end?: number;
+}
+
+export interface PreviewNoteRequest {
+    note: number;
+    velocity?: number;
+    duration?: number;
+    synthdef?: string;
+}
+
+export interface UpdateMetronomeRequest {
+    enabled?: boolean;
+    volume?: number;
 }
 
 // ============================================================================
@@ -96,6 +110,22 @@ export class PlaybackProvider extends BaseAPIClient {
      */
     async setLoop(enabled: boolean, start?: number, end?: number): Promise<any> {
         return this.put("/api/playback/loop", { enabled, start, end });
+    }
+
+    /**
+     * Preview a MIDI note (for piano roll keyboard)
+     * POST /api/playback/preview
+     */
+    async previewNote(request: PreviewNoteRequest): Promise<any> {
+        return this.post("/api/playback/preview", request);
+    }
+
+    /**
+     * Update metronome settings
+     * PUT /api/playback/metronome
+     */
+    async updateMetronome(request: UpdateMetronomeRequest): Promise<any> {
+        return this.put("/api/playback/metronome", request);
     }
 }
 

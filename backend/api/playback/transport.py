@@ -48,6 +48,20 @@ class SetLoopRequest(BaseModel):
     end: Optional[float] = Field(default=None, gt=0, description="Loop end in beats")
 
 
+class PreviewNoteRequest(BaseModel):
+    """Request to preview a MIDI note"""
+    note: int = Field(ge=0, le=127, description="MIDI note number")
+    velocity: Optional[int] = Field(default=100, ge=1, le=127, description="Note velocity")
+    duration: Optional[float] = Field(default=0.5, gt=0, description="Note duration in seconds")
+    synthdef: Optional[str] = Field(default="default", description="Synth definition to use")
+
+
+class UpdateMetronomeRequest(BaseModel):
+    """Request to update metronome settings"""
+    enabled: Optional[bool] = Field(default=None, description="Enable/disable metronome")
+    volume: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Metronome volume (0.0 to 1.0)")
+
+
 # ============================================================================
 # PLAYBACK CONTROL
 # ============================================================================
@@ -237,4 +251,60 @@ async def set_loop(
     except Exception as e:
         logger.error(f"❌ Failed to set loop: {e}")
         raise ServiceError(f"Failed to set loop: {str(e)}")
+
+
+# ============================================================================
+# PREVIEW NOTE (for piano roll keyboard)
+# ============================================================================
+
+@router.post("/preview")
+async def preview_note(
+    request: PreviewNoteRequest,
+    playback_engine_service: PlaybackEngineService = Depends(get_playback_engine_service)
+):
+    """Preview a MIDI note by playing it briefly"""
+    try:
+        await playback_engine_service.preview_note(
+            note=request.note,
+            velocity=request.velocity or 100,
+            duration=request.duration or 0.5,
+            synthdef=request.synthdef or "default"
+        )
+        return {"status": "ok"}
+
+    except Exception as e:
+        logger.error(f"❌ Failed to preview note: {e}")
+        raise ServiceError(f"Failed to preview note: {str(e)}")
+
+
+# ============================================================================
+# METRONOME
+# ============================================================================
+
+@router.put("/metronome")
+async def update_metronome(
+    request: UpdateMetronomeRequest,
+    playback_engine_service: PlaybackEngineService = Depends(get_playback_engine_service)
+):
+    """Update metronome settings (enable/disable, volume)"""
+    try:
+        result = {}
+
+        if request.enabled is not None:
+            playback_engine_service.metronome_enabled = request.enabled
+            result["enabled"] = request.enabled
+            logger.info(f"🎵 Metronome {'enabled' if request.enabled else 'disabled'}")
+
+        if request.volume is not None:
+            playback_engine_service.set_metronome_volume(request.volume)
+            result["volume"] = request.volume
+
+        return {
+            "status": "ok",
+            **result
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Failed to update metronome: {e}")
+        raise ServiceError(f"Failed to update metronome: {str(e)}")
 

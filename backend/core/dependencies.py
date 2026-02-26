@@ -12,13 +12,13 @@ Architecture:
 
 Usage:
     from fastapi import Depends
-    from backend.core.dependencies import get_synthesis_service
+    from backend.core.dependencies import get_playback_engine_service
 
-    @router.post("/synth")
-    async def create_synth(
-        synthesis_service: SynthesisService = Depends(get_synthesis_service)
+    @router.post("/preview")
+    async def preview_note(
+        playback_engine_service: PlaybackEngineService = Depends(get_playback_engine_service)
     ):
-        return await synthesis_service.create_synth(...)
+        return await playback_engine_service.preview_note(...)
 """
 import logging
 from typing import Optional
@@ -37,7 +37,6 @@ from backend.services.analysis.audio_features_service import AudioFeatureExtract
 from backend.services.analysis.midi_analyzer_service import MIDIAnalyzer
 
 # DAW services
-from backend.services.daw.synthesis_service import SynthesisService
 from backend.services.daw.composition_state_service import CompositionStateService
 from backend.services.daw.playback_engine_service import PlaybackEngineService
 from backend.services.daw.mixer_service import MixerService
@@ -66,7 +65,6 @@ logger = logging.getLogger(__name__)
 _engine_manager: Optional[AudioEngineManager] = None
 _audio_analyzer: Optional[RealtimeAudioAnalyzer] = None
 _audio_input_service: Optional[AudioInputService] = None
-_synthesis_service: Optional[SynthesisService] = None
 _composition_state_service: Optional[CompositionStateService] = None
 _playback_engine_service: Optional[PlaybackEngineService] = None
 _ws_manager: Optional[WebSocketManager] = None
@@ -100,7 +98,7 @@ async def initialize_services(settings: Settings) -> None:
         settings: Application settings
     """
     global _engine_manager, _audio_analyzer, _audio_input_service
-    global _synthesis_service, _composition_state_service, _playback_engine_service
+    global _composition_state_service, _playback_engine_service
     global _ws_manager, _buffer_manager, _mixer_service
     global _track_meter_service, _audio_bus_manager, _mixer_channel_service, _track_effects_service
     global _audio_feature_extractor, _musical_context_analyzer, _daw_state_service
@@ -135,7 +133,6 @@ async def initialize_services(settings: Settings) -> None:
     logger.info("🎵 Initializing audio services...")
     _audio_analyzer = RealtimeAudioAnalyzer(_engine_manager)
     _audio_input_service = AudioInputService(_engine_manager)
-    _synthesis_service = SynthesisService(_engine_manager)
 
     # Initialize composition state service (no dependencies)
     logger.info("📦 Initializing composition state service...")
@@ -260,7 +257,7 @@ async def shutdown_services() -> None:
     It ensures proper cleanup of resources.
     """
     global _engine_manager, _audio_analyzer, _audio_input_service
-    global _synthesis_service, _ws_manager, _buffer_manager, _mixer_service
+    global _ws_manager, _buffer_manager, _mixer_service
     global _track_meter_service, _audio_bus_manager, _mixer_channel_service
 
     logger.info("🛑 Shutting down services...")
@@ -274,10 +271,6 @@ async def shutdown_services() -> None:
 
     if _audio_input_service:
         await _audio_input_service.stop_monitoring()
-
-    # Free all synths
-    if _synthesis_service:
-        await _synthesis_service.free_all_synths()
 
     # Disconnect engine
     if _engine_manager:
@@ -310,13 +303,6 @@ def get_audio_input_service() -> AudioInputService:
     if _audio_input_service is None:
         raise RuntimeError("AudioInputService not initialized")
     return _audio_input_service
-
-
-def get_synthesis_service() -> SynthesisService:
-    """Get SynthesisService instance"""
-    if _synthesis_service is None:
-        raise RuntimeError("SynthesisService not initialized")
-    return _synthesis_service
 
 
 def get_composition_state_service() -> CompositionStateService:

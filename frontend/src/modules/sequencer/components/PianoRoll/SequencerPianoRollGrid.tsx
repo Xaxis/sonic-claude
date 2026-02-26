@@ -125,7 +125,7 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     // Preview note sound
     const previewNote = async (pitch: number, velocity: number = 100) => {
         try {
-            await api.audio.previewNote({
+            await api.playback.previewNote({
                 note: pitch,
                 velocity,
                 duration: 0.5,

@@ -3,10 +3,9 @@ DAW Services - Digital Audio Workstation state management
 
 Services in this module manage DAW state and functionality:
 - CompositionState (compositions, tracks, clips)
-- PlaybackEngine (playback control, scheduling)
+- PlaybackEngine (playback control, scheduling, note preview)
 - Mixer (channels, routing, master)
 - Effects (definitions, track effects)
-- Synthesis (synth instances)
 - Mixer channels (SC synth management)
 - Track meters (per-track metering)
 """
@@ -18,7 +17,6 @@ from .mixer_track_channels_service import MixerTrackChannelsService
 from .track_meters_service import TrackMetersService
 from .track_effects_service import TrackEffectsService
 from .effect_definitions import EFFECT_DEFINITIONS, get_effect_definition
-from .synthesis_service import SynthesisService
 
 __all__ = [
     "CompositionStateService",
@@ -29,5 +27,4 @@ __all__ = [
     "TrackEffectsService",
     "EFFECT_DEFINITIONS",
     "get_effect_definition",
-    "SynthesisService",
 ]

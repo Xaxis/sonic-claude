@@ -90,6 +90,69 @@ class PlaybackEngineService:
         logger.info("✅ PlaybackEngineService initialized")
 
     # ========================================================================
+    # PREVIEW NOTE (for piano roll keyboard)
+    # ========================================================================
+
+    async def preview_note(
+        self,
+        note: int,
+        velocity: int = 100,
+        duration: float = 0.5,
+        synthdef: str = "default"
+    ) -> None:
+        """
+        Preview a MIDI note by playing it briefly
+
+        Args:
+            note: MIDI note number (0-127)
+            velocity: Note velocity (1-127)
+            duration: Note duration in seconds
+            synthdef: SynthDef to use for playback
+        """
+        if not self.engine_manager:
+            logger.warning("Cannot preview note: engine_manager not available")
+            return
+
+        try:
+            # Allocate node ID
+            node_id = self.engine_manager.allocate_node_id()
+
+            # Convert MIDI note to frequency
+            freq = 440.0 * (2.0 ** ((note - 69) / 12.0))
+            amp = velocity / 127.0
+
+            # Create synth
+            self.engine_manager.send_message(
+                "/s_new",
+                synthdef,
+                node_id,
+                1,  # Add action: addToTail
+                1,  # Target group: synths
+                "freq", freq,
+                "amp", amp,
+                "gate", 1
+            )
+
+            logger.debug(f"🎹 Preview note {note} (freq={freq:.1f}Hz, vel={velocity})")
+
+            # Schedule release after duration
+            async def release_after_duration():
+                await asyncio.sleep(duration)
+                try:
+                    # Send gate=0 to trigger release envelope
+                    self.engine_manager.send_message("/n_set", node_id, "gate", 0)
+                    logger.debug(f"🔇 Released preview note {note} after {duration}s")
+                except Exception as e:
+                    logger.warning(f"Failed to release preview note {node_id}: {e}")
+
+            # Start release task (fire and forget)
+            asyncio.create_task(release_after_duration())
+
+        except Exception as e:
+            logger.error(f"❌ Failed to preview note: {e}")
+            raise
+
+    # ========================================================================
     # PLAYBACK CONTROL
     # ========================================================================
 

@@ -3,7 +3,7 @@ Sonic Claude Backend - FastAPI Application
 
 COMPLETE PIPELINE:
 SuperCollider → Python OSC → Audio Analyzer → WebSocket → Frontend
-Frontend → REST API → Synthesis Service → SuperCollider OSC
+Frontend → REST API → Playback Engine → SuperCollider OSC
 """
 import logging
 import asyncio
@@ -19,7 +19,6 @@ from backend.core.dependencies import (
     get_engine_manager,
     get_audio_analyzer,
     get_audio_input_service,
-    get_synthesis_service,
 )
 from backend.core.exceptions import (
     SonicClaudeException,
@@ -97,7 +96,7 @@ async def lifespan(app: FastAPI):
         logger.info("=" * 60)
         logger.info("✅ Sonic Claude Backend READY")
         logger.info("   Pipeline: SC → OSC → Analyzer → WebSocket → Frontend")
-        logger.info("   Control: Frontend → REST → Synthesis → OSC → SC")
+        logger.info("   Control: Frontend → REST → Playback Engine → OSC → SC")
         logger.info("   Input: Mic/Line-in → SC → OSC → Input Service → WebSocket → Frontend")
         logger.info("=" * 60)
 
@@ -204,8 +203,8 @@ async def sonic_claude_exception_handler(request: Request, exc: SonicClaudeExcep
 #   - /api/samples/* - Sample management
 #
 # Service Operations (RPC-style):
-#   - /api/playback/* - Transport control (play, stop, seek)
-#   - /api/audio/* - Audio synthesis and metronome
+#   - /api/playback/* - Transport control (play, stop, seek, preview)
+#   - /api/audio/* - Audio input monitoring and metronome
 #   - /api/assistant/* - Assistant chat and actions
 #   - /api/ws/* - WebSocket streams
 # ============================================================================
@@ -235,13 +234,11 @@ async def root(settings: Settings = Depends(get_settings)):
 async def health(
     engine_manager=Depends(get_engine_manager),
     audio_analyzer=Depends(get_audio_analyzer),
-    synthesis_service=Depends(get_synthesis_service),
 ):
     """Health check endpoint"""
     return {
         "status": "healthy",
         "engine_connected": engine_manager.is_connected,
         "monitoring": audio_analyzer.is_monitoring,
-        "active_synths": len(synthesis_service.active_synths),
     }
 
