@@ -116,7 +116,7 @@ export class AudioProvider extends BaseAPIClient {
     }
 
     async getSynthDefs(): Promise<SynthDefInfo[]> {
-        const response = await this.get("/api/audio/synthdefs");
+        const response = await this.get("/api/compositions/synthdefs");
         // Backend returns array of SynthDefInfo objects directly
         return Array.isArray(response) ? response : [];
     }

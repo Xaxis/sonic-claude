@@ -12,7 +12,7 @@ This module organizes composition routes into logical groups:
 """
 from fastapi import APIRouter
 
-from . import crud, history, tracks, clips, mixers, effects, clip_launcher, startup
+from . import synthdefs, crud, history, tracks, clips, mixers, effects, clip_launcher, startup
 
 # Create main router
 router = APIRouter()
@@ -20,6 +20,7 @@ router = APIRouter()
 # Include all sub-routers (no prefix needed - they define their own paths)
 # IMPORTANT: Register more specific routes (with prefixes) BEFORE generic routes with path parameters
 # This prevents /{composition_id} from catching "mixers", "effects", etc. as composition IDs
+router.include_router(synthdefs.router, tags=["compositions-synthdefs"])
 router.include_router(clip_launcher.router, tags=["compositions-clip-launcher"])
 router.include_router(mixers.router, tags=["compositions-mixers"])
 router.include_router(effects.router, tags=["compositions-effects"])

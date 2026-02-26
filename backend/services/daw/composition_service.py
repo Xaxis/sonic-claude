@@ -396,7 +396,7 @@ class CompositionService:
         track_effects = []
         for track in composition.tracks:
             effect_chain = effects_service.get_track_effect_chain(track.id)
-            if effect_chain and effect_chain.track_effects:  # Only include if there are effects
+            if effect_chain and effect_chain.effects:  # Only include if there are effects
                 track_effects.append(effect_chain)
         composition.track_effects = track_effects
 
