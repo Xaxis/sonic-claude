@@ -28,6 +28,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { useDAWStore } from "@/stores/dawStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 export interface InlineAIConfig {
     entityType: "track" | "clip" | "effect" | "mixer_channel" | "composition" | "panel";
@@ -60,9 +61,12 @@ export interface InlineAIResult {
 export function useInlineAI({
     entityType,
     entityId,
-    longPressDelay = 500,
+    longPressDelay,
     disabled = false,
 }: InlineAIConfig): InlineAIResult {
+    const storedDelay = useSettingsStore(s => s.inlineAILongPressDelay);
+    // Caller can override the delay per-instance; otherwise use global setting
+    const effectiveLongPressDelay = longPressDelay ?? storedDelay;
     const [showPrompt, setShowPrompt] = useState(false);
     const [position, setPosition] = useState<InlineAIPosition | null>(null);
     const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -109,8 +113,8 @@ export function useInlineAI({
             if (isLongPressing.current) {
                 openPrompt(x, y);
             }
-        }, longPressDelay);
-    }, [openPrompt, longPressDelay]);
+        }, effectiveLongPressDelay);
+    }, [openPrompt, effectiveLongPressDelay]);
 
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
         if (!isLongPressing.current || !startPosition.current) return;
@@ -144,8 +148,8 @@ export function useInlineAI({
             if (isLongPressing.current) {
                 openPrompt(x, y);
             }
-        }, longPressDelay);
-    }, [openPrompt, longPressDelay]);
+        }, effectiveLongPressDelay);
+    }, [openPrompt, effectiveLongPressDelay]);
 
     const handleTouchMove = useCallback((e: React.TouchEvent) => {
         if (!isLongPressing.current || !startPosition.current) return;

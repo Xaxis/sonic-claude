@@ -8,3 +8,5 @@ frontend/dist
 data/compositions
 data/samples
 .claude
+.agent
+.agents

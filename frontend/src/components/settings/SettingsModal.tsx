@@ -15,7 +15,7 @@
  * Keyboard shortcut: ⌘, / Ctrl+, (registered in Header.tsx)
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     LayoutGrid,
     Music2,
@@ -395,24 +395,290 @@ function MixerSection() {
     );
 }
 
+// ── Quick Command editor ──────────────────────────────────────────────────────
+function QuickCommandEditor() {
+    const aiQuickCommands    = useSettingsStore(s => s.aiQuickCommands);
+    const setAIQuickCommands = useSettingsStore(s => s.setAIQuickCommands);
+
+    const updateCommand = (idx: number, field: "label" | "prompt", value: string) => {
+        const next = aiQuickCommands.map((cmd, i) =>
+            i === idx ? { ...cmd, [field]: value } : cmd
+        );
+        setAIQuickCommands(next);
+    };
+
+    const removeCommand = (idx: number) => {
+        setAIQuickCommands(aiQuickCommands.filter((_, i) => i !== idx));
+    };
+
+    const addCommand = () => {
+        if (aiQuickCommands.length >= 8) return;
+        setAIQuickCommands([...aiQuickCommands, { label: "New Command", prompt: "" }]);
+    };
+
+    return (
+        <div className="space-y-2">
+            {aiQuickCommands.map((cmd, idx) => (
+                <div key={idx} className="flex items-start gap-2">
+                    <input
+                        type="text"
+                        value={cmd.label}
+                        onChange={e => updateCommand(idx, "label", e.target.value)}
+                        placeholder="Label"
+                        className="w-24 flex-shrink-0 bg-background border border-border/60 rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                    />
+                    <input
+                        type="text"
+                        value={cmd.prompt}
+                        onChange={e => updateCommand(idx, "prompt", e.target.value)}
+                        placeholder="Prompt sent to AI…"
+                        className="flex-1 min-w-0 bg-background border border-border/60 rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                    />
+                    <button
+                        onClick={() => removeCommand(idx)}
+                        className="flex-shrink-0 text-muted-foreground/50 hover:text-destructive transition-colors px-1 py-1 text-xs"
+                        title="Remove"
+                    >
+                        ✕
+                    </button>
+                </div>
+            ))}
+            {aiQuickCommands.length < 8 && (
+                <button
+                    onClick={addCommand}
+                    className="text-xs text-primary/70 hover:text-primary transition-colors"
+                >
+                    + Add command
+                </button>
+            )}
+        </div>
+    );
+}
+
 function AISection() {
-    const inlineAIEnabled    = useSettingsStore(s => s.inlineAIEnabled);
-    const setInlineAIEnabled = useSettingsStore(s => s.setInlineAIEnabled);
+    // Model & Intelligence
+    const aiExecutionModel    = useSettingsStore(s => s.aiExecutionModel);
+    const aiCreativity        = useSettingsStore(s => s.aiCreativity);
+    const aiResponseStyle     = useSettingsStore(s => s.aiResponseStyle);
+    const setAIExecutionModel = useSettingsStore(s => s.setAIExecutionModel);
+    const setAICreativity     = useSettingsStore(s => s.setAICreativity);
+    const setAIResponseStyle  = useSettingsStore(s => s.setAIResponseStyle);
+
+    // Context & Memory
+    const aiHistoryLength          = useSettingsStore(s => s.aiHistoryLength);
+    const aiIncludeHarmonicContext = useSettingsStore(s => s.aiIncludeHarmonicContext);
+    const aiIncludeRhythmicContext = useSettingsStore(s => s.aiIncludeRhythmicContext);
+    const aiIncludeTimbreContext   = useSettingsStore(s => s.aiIncludeTimbreContext);
+    const setAIHistoryLength           = useSettingsStore(s => s.setAIHistoryLength);
+    const setAIIncludeHarmonicContext  = useSettingsStore(s => s.setAIIncludeHarmonicContext);
+    const setAIIncludeRhythmicContext  = useSettingsStore(s => s.setAIIncludeRhythmicContext);
+    const setAIIncludeTimbreContext    = useSettingsStore(s => s.setAIIncludeTimbreContext);
+
+    // Behavior
+    const aiAutoPlayAfterChanges  = useSettingsStore(s => s.aiAutoPlayAfterChanges);
+    const aiUseIntentRouting      = useSettingsStore(s => s.aiUseIntentRouting);
+    const setAIAutoPlayAfterChanges = useSettingsStore(s => s.setAIAutoPlayAfterChanges);
+    const setAIUseIntentRouting     = useSettingsStore(s => s.setAIUseIntentRouting);
+
+    // Inline AI
+    const inlineAIEnabled       = useSettingsStore(s => s.inlineAIEnabled);
+    const inlineAILongPressDelay = useSettingsStore(s => s.inlineAILongPressDelay);
+    const setInlineAIEnabled        = useSettingsStore(s => s.setInlineAIEnabled);
+    const setInlineAILongPressDelay = useSettingsStore(s => s.setInlineAILongPressDelay);
+
+    // Transparency
+    const aiShowRoutingIntent  = useSettingsStore(s => s.aiShowRoutingIntent);
+    const aiShowMusicalContext = useSettingsStore(s => s.aiShowMusicalContext);
+    const setAIShowRoutingIntent  = useSettingsStore(s => s.setAIShowRoutingIntent);
+    const setAIShowMusicalContext = useSettingsStore(s => s.setAIShowMusicalContext);
+
+    // Local state for creativity slider
+    const [localCreativity, setLocalCreativity] = useState(aiCreativity);
+    useEffect(() => { setLocalCreativity(aiCreativity); }, [aiCreativity]);
 
     return (
         <div>
-            <SettingGroup title="Inline AI" />
+            {/* ── Model & Intelligence ──────────────────────────────── */}
+            <SettingGroup title="Model & Intelligence" />
+
             <SettingRow
-                label="Inline AI Prompts"
-                description="Show the AI editing popover when long-pressing or right-clicking clips and tracks in the sequencer."
+                label="Execution Model"
+                description="Which Claude model processes your requests. Haiku is fastest; Opus is most capable."
+            >
+                <div className="flex rounded border border-border/60 overflow-hidden">
+                    {(["haiku", "sonnet", "opus"] as const).map((m, i) => (
+                        <button
+                            key={m}
+                            onClick={() => setAIExecutionModel(m)}
+                            className={cn(
+                                "px-3 py-1.5 text-xs font-medium transition-colors",
+                                i > 0 && "border-l border-border/60",
+                                aiExecutionModel === m
+                                    ? "bg-primary/15 text-primary"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/30",
+                            )}
+                        >
+                            {m === "haiku" ? "Haiku" : m === "sonnet" ? "Sonnet" : "Opus"}
+                        </button>
+                    ))}
+                </div>
+            </SettingRow>
+
+            {/* Model speed/capability hint */}
+            <div className="mb-2 flex justify-between text-[10px] text-muted-foreground/40 px-0.5">
+                <span>← Fastest / cheapest</span>
+                <span>Most capable / creative →</span>
+            </div>
+
+            <SettingRow
+                label="Creativity"
+                description="Controls how exploratory and surprising the AI is. Low = precise and reliable. High = unexpected and experimental."
+            >
+                <div className="flex items-center gap-3 w-44">
+                    <Slider
+                        value={[localCreativity * 100]}
+                        onValueChange={([v]) => setLocalCreativity(v / 100)}
+                        onValueCommit={([v]) => setAICreativity(v / 100)}
+                        min={0}
+                        max={100}
+                        step={5}
+                        className="flex-1"
+                    />
+                    <span className="text-xs tabular-nums text-muted-foreground w-14 text-right">
+                        {localCreativity < 0.3 ? "Precise" : localCreativity > 0.7 ? "Creative" : "Balanced"}
+                    </span>
+                </div>
+            </SettingRow>
+
+            <SettingRow
+                label="Response Style"
+                description="How much the AI explains what it's doing. Concise = just act; Detailed = full reasoning."
+            >
+                <SettingSegment<"concise" | "balanced" | "detailed">
+                    value={aiResponseStyle}
+                    onChange={setAIResponseStyle}
+                    options={[
+                        { value: "concise",  label: "Concise"  },
+                        { value: "balanced", label: "Balanced" },
+                        { value: "detailed", label: "Detailed" },
+                    ]}
+                />
+            </SettingRow>
+
+            {/* ── Context & Memory ──────────────────────────────────── */}
+            <SettingGroup title="Context & Memory" />
+
+            <SettingRow
+                label="Conversation Memory"
+                description="How many recent messages the AI remembers. More = better continuity but more tokens."
+            >
+                <SettingSelect
+                    value={aiHistoryLength}
+                    onChange={setAIHistoryLength}
+                    options={[
+                        { value: 2,  label: "2 messages" },
+                        { value: 4,  label: "4 messages" },
+                        { value: 6,  label: "6 messages" },
+                        { value: 10, label: "10 messages" },
+                        { value: 20, label: "20 messages" },
+                    ]}
+                    className="w-32"
+                />
+            </SettingRow>
+
+            <SettingRow
+                label="Harmonic Analysis"
+                description="Include chord progressions, key and scale detection in the AI context. Helpful for melodic/harmonic tasks."
+            >
+                <SettingToggle checked={aiIncludeHarmonicContext} onCheckedChange={setAIIncludeHarmonicContext} />
+            </SettingRow>
+
+            <SettingRow
+                label="Rhythmic Analysis"
+                description="Include groove patterns, syncopation and timing data in the AI context. Helpful for drum and rhythm tasks."
+            >
+                <SettingToggle checked={aiIncludeRhythmicContext} onCheckedChange={setAIIncludeRhythmicContext} />
+            </SettingRow>
+
+            <SettingRow
+                label="Timbral Analysis"
+                description="Include audio energy, brightness and loudness data in the AI context. Helps with mix and texture decisions."
+            >
+                <SettingToggle checked={aiIncludeTimbreContext} onCheckedChange={setAIIncludeTimbreContext} />
+            </SettingRow>
+
+            {/* ── Behavior ──────────────────────────────────────────── */}
+            <SettingGroup title="Behavior" />
+
+            <SettingRow
+                label="Auto-play After Changes"
+                description="Automatically start playback after the AI makes compositional changes so you hear the result immediately."
+            >
+                <SettingToggle checked={aiAutoPlayAfterChanges} onCheckedChange={setAIAutoPlayAfterChanges} />
+            </SettingRow>
+
+            <SettingRow
+                label="Intent-based Routing"
+                description="Route requests to the best-fit tool set for each intent (recommended). Disable to always load all tools — slower but maximally flexible."
+            >
+                <SettingToggle checked={aiUseIntentRouting} onCheckedChange={setAIUseIntentRouting} />
+            </SettingRow>
+
+            {/* ── Inline AI ─────────────────────────────────────────── */}
+            <SettingGroup title="Inline AI Prompts" />
+
+            <SettingRow
+                label="Inline AI Enabled"
+                description="Show the AI editing popover when long-pressing clips, tracks, or mixer channels."
             >
                 <SettingToggle checked={inlineAIEnabled} onCheckedChange={setInlineAIEnabled} />
             </SettingRow>
-            <div className="mt-4 p-3 rounded bg-muted/20 border border-border/30">
-                <p className="text-xs text-muted-foreground/70 leading-relaxed">
-                    The AI assistant in the chat panel is always available regardless of this setting.
-                    This only controls whether context-sensitive prompts appear inline while editing.
+
+            <SettingRow
+                label="Long-press Delay"
+                description="How long to hold before the inline AI popover appears."
+                // Dimmed when disabled
+            >
+                <div className={cn("flex items-center gap-3 w-44", !inlineAIEnabled && "opacity-40 pointer-events-none")}>
+                    <Slider
+                        value={[inlineAILongPressDelay]}
+                        onValueChange={([v]) => setInlineAILongPressDelay(v)}
+                        onValueCommit={([v]) => setInlineAILongPressDelay(v)}
+                        min={250}
+                        max={1500}
+                        step={50}
+                        className="flex-1"
+                    />
+                    <span className="text-xs tabular-nums text-muted-foreground w-12 text-right">
+                        {inlineAILongPressDelay}ms
+                    </span>
+                </div>
+            </SettingRow>
+
+            {/* ── Transparency ──────────────────────────────────────── */}
+            <SettingGroup title="Transparency" />
+
+            <SettingRow
+                label="Show Routing Intent"
+                description="Display a badge in each AI response showing the detected intent (Create, Modify, Effects…)."
+            >
+                <SettingToggle checked={aiShowRoutingIntent} onCheckedChange={setAIShowRoutingIntent} />
+            </SettingRow>
+
+            <SettingRow
+                label="Show Musical Context"
+                description="Add an expandable panel to each AI response showing the full DAW state that was sent to the model. Useful for debugging or learning."
+            >
+                <SettingToggle checked={aiShowMusicalContext} onCheckedChange={setAIShowMusicalContext} />
+            </SettingRow>
+
+            {/* ── Quick Commands ────────────────────────────────────── */}
+            <SettingGroup title="Quick Commands" />
+            <div className="py-2">
+                <p className="text-xs text-muted-foreground/60 mb-3 leading-relaxed">
+                    One-click prompt buttons shown at the top of the chat panel. Up to 8 commands.
                 </p>
+                <QuickCommandEditor />
             </div>
         </div>
     );
@@ -518,7 +784,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
                 className="p-0 gap-0 overflow-hidden border-border/60"
-                style={{ maxWidth: 680, height: "min(80vh, 600px)" }}
+                style={{ maxWidth: 800, height: "min(88vh, 740px)" }}
                 showCloseButton={false}
             >
                 <div className="flex h-full">
@@ -557,7 +823,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     </div>
 
                     {/* ── Right: Section content ─────────────────────────── */}
-                    <div className="flex flex-col flex-1 min-w-0">
+                    <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
                         {/* Section header */}
                         <div className="flex items-center justify-between px-6 py-3.5 border-b border-border/30 flex-shrink-0">
                             <div className="flex items-center gap-2.5">
@@ -580,7 +846,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                         </div>
 
                         {/* Section body */}
-                        <div className="flex-1 overflow-y-auto px-6 py-4">
+                        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
                             <SectionContent />
                         </div>
                     </div>

@@ -19,12 +19,22 @@ import { BaseAPIClient } from "../base";
 export interface ChatRequest {
     message: string;
     stream?: boolean;
+    // Per-request AI preferences (all optional; backend uses defaults when absent)
+    execution_model?: "haiku" | "sonnet" | "opus";
+    temperature?: number;
+    response_style?: "concise" | "balanced" | "detailed";
+    history_length?: number;
+    use_intent_routing?: boolean;
+    include_harmonic_context?: boolean;
+    include_rhythmic_context?: boolean;
+    include_timbre_context?: boolean;
 }
 
 export interface ChatResponse {
     response: string;
     actions_executed?: any[];
     musical_context?: string | null;
+    routing_intent?: string | null;
 }
 
 export interface ContextualChatRequest {

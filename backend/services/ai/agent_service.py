@@ -84,11 +84,36 @@ class AIAgentService:
         # Chat history tracking (per composition)
         self.chat_histories: Dict[str, List[Dict[str, Any]]] = {}
     
-    async def send_message(self, user_message: str) -> Dict[str, Any]:
+    # Model identifiers for the execution_model shorthand values
+    _EXECUTION_MODEL_MAP: Dict[str, str] = {
+        "haiku":  "claude-haiku-4-5-20251001",
+        "sonnet": "claude-sonnet-4-5-20250929",
+        "opus":   "claude-opus-4-6",
+    }
+
+    # System-prompt appendix for each response style
+    _RESPONSE_STYLE_APPENDIX: Dict[str, str] = {
+        "concise":  "\n\nIMPORTANT: Keep responses very brief — 1-2 sentences maximum. Skip explanations. Just do it and confirm concisely.",
+        "detailed": "\n\nIMPORTANT: Provide detailed explanations of every decision. Describe what you changed, why you made each choice, and the musical reasoning behind it.",
+    }
+
+    async def send_message(
+        self,
+        user_message: str,
+        *,
+        execution_model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        response_style: str = "balanced",
+        history_length: int = 6,
+        use_intent_routing: bool = True,
+        include_harmonic_context: bool = True,
+        include_rhythmic_context: bool = True,
+        include_timbre_context: bool = True,
+    ) -> Dict[str, Any]:
         """
         ROUTED WORKFLOW-BASED EXECUTION (Anthropic Best Practices)
 
-        1. Route request to intent category
+        1. Route request to intent category (unless use_intent_routing=False)
         2. Load only relevant tools for that intent
         3. Use specialized prompt for that intent
         4. Single LLM call with focused context
@@ -97,42 +122,70 @@ class AIAgentService:
 
         Args:
             user_message: User's message/request
+            execution_model: "haiku" | "sonnet" | "opus" shorthand, or None to use default
+            temperature: Creativity 0.0–1.0 (None = Anthropic default)
+            response_style: "concise" | "balanced" | "detailed" — modifies system prompt
+            history_length: How many recent messages to include as context (2–20)
+            use_intent_routing: If False skip routing and load all tools
+            include_harmonic_context: Include chord/key/scale section in context
+            include_rhythmic_context: Include rhythmic analysis section in context
+            include_timbre_context: Include audio energy/brightness section in context
 
         Returns:
-            Dict with 'response' (str) and 'actions_executed' (list of ActionResult)
+            Dict with 'response', 'actions_executed', 'musical_context', 'routing_intent'
         """
+        # Resolve which model to use for this request
+        effective_model = (
+            self._EXECUTION_MODEL_MAP.get(execution_model, self.model)
+            if execution_model else self.model
+        )
+
         # FIX 1: Force-refresh key/scale analysis before building context so state.musical is never stale
         self.state_service.analyze_current_sequence()
 
         # Get current state
         state_response = self.state_service.get_state(previous_hash=self.last_state_hash)
-        context_message = self._build_context_message(state_response.full_state)
+        context_message = self._build_context_message(
+            state_response.full_state,
+            include_harmonic=include_harmonic_context,
+            include_rhythmic=include_rhythmic_context,
+            include_timbre=include_timbre_context,
+        )
 
         # ====================================================================
-        # STEP 1: ROUTE REQUEST TO INTENT (LLM-based)
+        # STEP 1: ROUTE REQUEST TO INTENT (LLM-based, or bypass)
         # ====================================================================
-        # Build brief state summary for routing context
-        state_summary = self._build_brief_state_summary(state_response.full_state)
-        intent = self.router.route(user_message, daw_state_summary=state_summary)
-        logger.info(f"🔀 Intent: {intent.value}")
-
-        # ====================================================================
-        # STEP 2: GET FOCUSED TOOLS AND PROMPT FOR INTENT
-        # ====================================================================
-        relevant_tool_names = self.router.get_tools_for_intent(intent)
         instruments_list = self._build_instruments_list()
         effects_list = self._build_effects_list()
-        system_prompt = self.router.get_system_prompt_for_intent(intent, instruments_list, effects_list)
-
-        # Filter tools to only include relevant ones
         all_tools = self._get_tool_definitions()
-        if relevant_tool_names:
-            tools = [t for t in all_tools if t["name"] in relevant_tool_names]
-            logger.info(f"🛠️  Using {len(tools)}/{len(all_tools)} tools for {intent.value}")
+        intent = None
+
+        if use_intent_routing:
+            state_summary = self._build_brief_state_summary(state_response.full_state)
+            intent = self.router.route(user_message, daw_state_summary=state_summary)
+            logger.info(f"🔀 Intent: {intent.value}")
+
+            # ================================================================
+            # STEP 2: GET FOCUSED TOOLS AND PROMPT FOR INTENT
+            # ================================================================
+            relevant_tool_names = self.router.get_tools_for_intent(intent)
+            system_prompt = self.router.get_system_prompt_for_intent(intent, instruments_list, effects_list)
+
+            if relevant_tool_names:
+                tools = [t for t in all_tools if t["name"] in relevant_tool_names]
+                logger.info(f"🛠️  Using {len(tools)}/{len(all_tools)} tools for {intent.value}")
+            else:
+                tools = []
+                logger.info(f"🛠️  No tools needed for {intent.value}")
         else:
-            # Query state - no tools needed
-            tools = []
-            logger.info(f"🛠️  No tools needed for {intent.value}")
+            # No routing — load all tools, use the general-purpose prompt
+            tools = all_tools
+            system_prompt = self.router.get_system_prompt_for_intent(Intent.GENERAL_CHAT, instruments_list, effects_list)
+            logger.info(f"🛠️  Routing bypassed — using all {len(tools)} tools")
+
+        # Apply response-style modifier (concise / detailed) to system prompt
+        if response_style in self._RESPONSE_STYLE_APPENDIX:
+            system_prompt += self._RESPONSE_STYLE_APPENDIX[response_style]
 
         # ====================================================================
         # STEP 3: SINGLE LLM CALL WITH FOCUSED CONTEXT
@@ -143,17 +196,21 @@ class AIAgentService:
         assistant_message = ""
 
         # FIX 2: Include conversation history so AI has context from prior exchanges
-        messages = self._build_messages_with_history(user_message, context_message)
+        messages = self._build_messages_with_history(user_message, context_message, history_length=history_length)
 
-        logger.info(f"🤖 Calling LLM with {len(tools)} tools, {len(messages)} messages in context...")
+        logger.info(f"🤖 Calling {effective_model} with {len(tools)} tools, {len(messages)} messages in context...")
 
-        response = self.client.messages.create(
-            model=self.model,
+        create_kwargs: Dict[str, Any] = dict(
+            model=effective_model,
             max_tokens=4096,
             system=system_prompt,
             messages=messages,
-            tools=tools if tools else None  # None if no tools (query state)
+            tools=tools if tools else None,
         )
+        if temperature is not None:
+            create_kwargs["temperature"] = temperature
+
+        response = self.client.messages.create(**create_kwargs)
 
         # Process response blocks, collecting tool calls and results
         tool_results = []
@@ -258,7 +315,8 @@ class AIAgentService:
         return {
             "response": full_response,
             "actions_executed": actions_executed,
-            "musical_context": context_message
+            "musical_context": context_message,
+            "routing_intent": intent.value if intent else None,
         }
 
     async def send_contextual_message(
@@ -889,11 +947,16 @@ When modifying sequences:
 - Think holistically about the entire composition
 - ALWAYS follow through with complete workflows - never leave empty tracks"""
 
-    def _build_messages_with_history(self, user_message: str, context_message: str) -> List[Dict[str, Any]]:
+    def _build_messages_with_history(
+        self,
+        user_message: str,
+        context_message: str,
+        history_length: int = 6,
+    ) -> List[Dict[str, Any]]:
         """
         Build messages array including recent conversation history.
 
-        Loads last 6 messages (3 exchanges) from in-memory chat history so the AI
+        Loads the last `history_length` messages from in-memory chat history so the AI
         remembers what was discussed and composed in prior turns.
         """
         messages = []
@@ -901,8 +964,7 @@ When modifying sequences:
         composition_id = self.action_service.composition_state.current_composition_id
         if composition_id and composition_id in self.chat_histories:
             history = self.chat_histories[composition_id]
-            # Last 6 entries = 3 exchanges — enough context without token bloat
-            recent = history[-6:] if len(history) > 6 else history
+            recent = history[-history_length:] if len(history) > history_length else history
 
             for entry in recent:
                 messages.append({
@@ -938,8 +1000,22 @@ When modifying sequences:
 
         return summary
 
-    def _build_context_message(self, state: Optional[DAWStateSnapshot]) -> str:
-        """Build COMPLETE MUSICAL CONTEXT - everything AI needs to understand and modify the sequence"""
+    def _build_context_message(
+        self,
+        state: Optional[DAWStateSnapshot],
+        *,
+        include_harmonic: bool = True,
+        include_rhythmic: bool = True,
+        include_timbre: bool = True,
+    ) -> str:
+        """
+        Build COMPLETE MUSICAL CONTEXT — everything AI needs to understand and modify the sequence.
+
+        Args:
+            include_harmonic: Include harmonic/chord analysis section.
+            include_rhythmic: Include rhythmic/groove analysis section.
+            include_timbre:   Include audio energy/brightness section.
+        """
         if not state or not state.sequence:
             return "Current state: No active sequence"
 
@@ -957,7 +1033,7 @@ When modifying sequences:
             parts.append(f"Pitch Range: {state.musical.pitch_range[0]}-{state.musical.pitch_range[1]} (MIDI)")
             parts.append(f"Complexity: {state.musical.complexity:.0%}")
 
-        if state.audio:
+        if include_timbre and state.audio:
             parts.append(f"Energy: {state.audio.energy:.0%} | Brightness: {state.audio.brightness:.0%} | Loudness: {state.audio.loudness_db:.1f}dB")
 
         # === PERCEPTUAL ANALYSIS (NEW) ===
@@ -1032,15 +1108,17 @@ When modifying sequences:
                     parts.append(f"    timbre_tags: {', '.join(analysis.timbre.tags)}")
                     parts.append(f"    frequency_distribution: sub-bass:{analysis.spectral.sub_bass_energy:.0%} bass:{analysis.spectral.bass_energy:.0%} mid:{analysis.spectral.mid_energy:.0%} high:{analysis.spectral.high_energy:.0%}")
 
-        # === HARMONIC ANALYSIS ===
-        parts.append("\n=== HARMONIC ANALYSIS ===")
-        harmony_analysis = self._analyze_harmony_over_time(state.sequence)
-        parts.append(harmony_analysis)
+        # === HARMONIC ANALYSIS (optional) ===
+        if include_harmonic:
+            parts.append("\n=== HARMONIC ANALYSIS ===")
+            harmony_analysis = self._analyze_harmony_over_time(state.sequence)
+            parts.append(harmony_analysis)
 
-        # === RHYTHMIC ANALYSIS ===
-        parts.append("\n=== RHYTHMIC ANALYSIS ===")
-        rhythm_analysis = self._analyze_rhythm_patterns(state.sequence)
-        parts.append(rhythm_analysis)
+        # === RHYTHMIC ANALYSIS (optional) ===
+        if include_rhythmic:
+            parts.append("\n=== RHYTHMIC ANALYSIS ===")
+            rhythm_analysis = self._analyze_rhythm_patterns(state.sequence)
+            parts.append(rhythm_analysis)
 
         # === ARRANGEMENT STRUCTURE ===
         parts.append("\n=== ARRANGEMENT ===")

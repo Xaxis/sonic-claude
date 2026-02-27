@@ -100,6 +100,8 @@ export interface ChatMessage {
     content: string;
     timestamp: string;
     actions_executed?: ActionResult[];
+    routing_intent?: string | null;
+    musical_context?: string | null;
 }
 
 export interface ChatRequest {

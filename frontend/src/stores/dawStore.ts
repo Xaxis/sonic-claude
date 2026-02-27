@@ -108,6 +108,7 @@ export interface Composition {
 
 // AI & Activity Types
 import type { ChatMessage, AnalysisEvent, DAWStateSnapshot } from '@/modules/assistant/types';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 export type ActivityStatus = "pending" | "in-progress" | "success" | "error";
 export type ActivityTargetType = "track" | "clip" | "effect" | "mixer" | "tempo" | "playback";
@@ -2475,18 +2476,31 @@ export const useDAWStore = create<DAWStore>()(
                 };
                 get().addChatMessage(userMessage);
 
-                // Send to backend
+                // Read AI preferences from settingsStore (non-hook, safe to call in store action)
+                const aiPrefs = useSettingsStore.getState();
+
+                // Send to backend with current AI preferences
                 const response = await api.assistant.chat({
                     message,
+                    execution_model:          aiPrefs.aiExecutionModel,
+                    temperature:              aiPrefs.aiCreativity,
+                    response_style:           aiPrefs.aiResponseStyle,
+                    history_length:           aiPrefs.aiHistoryLength,
+                    use_intent_routing:       aiPrefs.aiUseIntentRouting,
+                    include_harmonic_context: aiPrefs.aiIncludeHarmonicContext,
+                    include_rhythmic_context: aiPrefs.aiIncludeRhythmicContext,
+                    include_timbre_context:   aiPrefs.aiIncludeTimbreContext,
                 });
 
-                // Add assistant response to chat history
+                // Add assistant response to chat history (including metadata for transparency)
                 const assistantMessage: ChatMessage = {
                     id: `msg-${Date.now()}-response`,
                     role: "assistant",
                     content: response.response,
                     timestamp: new Date().toISOString(),
                     actions_executed: response.actions_executed,
+                    routing_intent: response.routing_intent ?? null,
+                    musical_context: response.musical_context ?? null,
                 };
                 get().addChatMessage(assistantMessage);
 
@@ -2521,6 +2535,11 @@ export const useDAWStore = create<DAWStore>()(
                     if (activeComposition) {
                         await get().loadComposition(activeComposition.id);
                         await get().refreshUndoRedoStatus();
+                    }
+
+                    // Auto-play if the user has that preference enabled
+                    if (useSettingsStore.getState().aiAutoPlayAfterChanges) {
+                        try { await get().play(); } catch { /* non-fatal */ }
                     }
                 }
             } catch (error) {
