@@ -7,3 +7,4 @@ __pycache__
 frontend/dist
 data/compositions
 data/samples
+.claude

@@ -15,15 +15,19 @@
 
 import { useEffect, useRef } from 'react';
 import { useDAWStore } from '@/stores/dawStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { api } from '@/services/api';
-
-const SNAPSHOT_INTERVAL_MS = 60000; // 1 minute
 
 export function useAutosave() {
     const intervalRef = useRef<number | undefined>(undefined);
     const isSavingRef = useRef(false);
 
+    const autosaveEnabled    = useSettingsStore(s => s.autosaveEnabled);
+    const autosaveIntervalMs = useSettingsStore(s => s.autosaveIntervalMs);
+
     useEffect(() => {
+        if (!autosaveEnabled) return;
+
         // Create periodic history snapshots
         intervalRef.current = window.setInterval(async () => {
             const state = useDAWStore.getState();
@@ -52,7 +56,7 @@ export function useAutosave() {
             } finally {
                 isSavingRef.current = false;
             }
-        }, SNAPSHOT_INTERVAL_MS);
+        }, autosaveIntervalMs);
 
         // Cleanup
         return () => {
@@ -60,6 +64,6 @@ export function useAutosave() {
                 clearInterval(intervalRef.current);
             }
         };
-    }, []);
+    }, [autosaveEnabled, autosaveIntervalMs]);
 }
 
