@@ -143,7 +143,7 @@ class CompositeToolExecutor:
                         action="add_effect",
                         parameters={
                             "track_id": track_id,
-                            "effect_type": effect_type
+                            "effect_name": effect_type
                         }
                     )
                     effect_result = await self.action_service.execute_action(add_effect_action)

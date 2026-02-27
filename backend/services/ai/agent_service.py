@@ -209,18 +209,20 @@ class AIAgentService:
                         "input": block.input
                     })
 
-            follow_up_messages = messages + [
+            # Minimal context for follow-up — just the original request + tool exchange.
+            # Do NOT resend full DAW state or history; this is purely a summary call.
+            follow_up_messages = [
+                {"role": "user", "content": user_message},
                 {"role": "assistant", "content": assistant_content},
                 {"role": "user", "content": tool_results}
             ]
 
             logger.info(f"🔄 Sending {len(tool_results)} tool result(s) back to LLM...")
             follow_up = self.client.messages.create(
-                model=self.model,
-                max_tokens=1024,
+                model="claude-haiku-4-5-20251001",  # Haiku — fast/cheap for summarizing results
+                max_tokens=512,
                 system=system_prompt,
                 messages=follow_up_messages
-                # No tools — just get final natural language response
             )
 
             for block in follow_up.content:
@@ -1120,11 +1122,20 @@ When modifying sequences:
 
                 parts.append(f"\n{composition_perception.summary}")
 
-                # Add actionable insights
-                if composition_perception.insights:
+                # Derive insights from actual model fields (insights is not a model field)
+                fb = composition_perception.frequency_balance
+                insight_lines = []
+                for r in fb.crowded_ranges:
+                    insight_lines.append(f"Consider reducing elements in {r} to avoid masking")
+                for r in fb.empty_ranges:
+                    insight_lines.append(f"{r} is empty — could add content here")
+                for conflict in composition_perception.harmonic_conflicts:
+                    insight_lines.append(conflict.suggestion)
+
+                if insight_lines:
                     parts.append("\nMix Insights:")
-                    for insight in composition_perception.insights:
-                        parts.append(f"  • {insight}")
+                    for line in insight_lines:
+                        parts.append(f"  • {line}")
 
             return "\n".join(parts)
 
