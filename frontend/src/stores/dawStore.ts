@@ -171,6 +171,7 @@ interface DAWStore {
     compositions: CompositionMetadata[];             // List of all compositions (for browsing)
     hasUnsavedChanges: boolean;
     _persistedCompositionId: string | null; // For auto-load on startup (persisted by middleware)
+    _isInitialized: boolean; // Guards against duplicate initialize() calls (StrictMode, dual mounts)
 
     // Undo/Redo (built-in to composition system)
     canUndo: boolean;
@@ -291,7 +292,7 @@ interface DAWStore {
     loadCompositions: () => Promise<void>;
     initialize: () => Promise<void>;
     createComposition: (name: string, tempo?: number, timeSignature?: string) => Promise<void>;
-    loadComposition: (compositionId: string) => Promise<void>;
+    loadComposition: (compositionId: string, options?: { silent?: boolean }) => Promise<void>;
     saveComposition: (createHistory?: boolean, isAutosave?: boolean) => Promise<void>;
     updateCompositionMetadata: (name?: string, tempo?: number, timeSignature?: string) => Promise<void>;
     deleteComposition: (compositionId: string) => Promise<void>;
@@ -530,6 +531,7 @@ export const useDAWStore = create<DAWStore>()(
                 compositions: [],
                 hasUnsavedChanges: false,
                 _persistedCompositionId: null, // Restored by persist middleware
+                _isInitialized: false,
                 canUndo: false,
                 canRedo: false,
 
@@ -1911,26 +1913,26 @@ export const useDAWStore = create<DAWStore>()(
          * - Auto-loads last active composition if available
          */
         initialize: async () => {
-            try {
-                console.log('🚀 Initializing DAW store...');
+            // Idempotent guard: React StrictMode double-fires effects, and
+            // CompositionLoader is mounted in two places. Only run once.
+            if (get()._isInitialized) return;
+            set({ _isInitialized: true });
 
+            try {
                 // Load all compositions
                 await get().loadCompositions();
 
                 // Get persisted composition ID from state (restored by persist middleware)
                 const { _persistedCompositionId } = get();
 
-                console.log('🔍 Checking for persisted composition ID:', _persistedCompositionId);
-
                 if (_persistedCompositionId) {
-                    console.log(`🔄 Auto-loading last composition: ${_persistedCompositionId}`);
-                    await get().loadComposition(_persistedCompositionId);
-                } else {
-                    console.log('⚠️ No persisted composition ID found - showing composition loader');
+                    // Auto-load silently — no toast for background startup restore
+                    await get().loadComposition(_persistedCompositionId, { silent: true });
                 }
             } catch (error) {
                 console.error("Failed to initialize store:", error);
-                // Don't show error toast - this is background initialization
+                // Reset the flag so a page refresh can retry
+                set({ _isInitialized: false });
             }
         },
 
@@ -1956,7 +1958,8 @@ export const useDAWStore = create<DAWStore>()(
             }
         },
 
-        loadComposition: async (compositionId) => {
+        loadComposition: async (compositionId, options = {}) => {
+            const { silent = false } = options;
             try {
                 const snapshot = await api.compositions.getById(compositionId);
 
@@ -2015,7 +2018,9 @@ export const useDAWStore = create<DAWStore>()(
                 windowManager.broadcastState('scenes', scenes);
                 windowManager.broadcastState('launchQuantization', launchQuantization);
 
-                toast.success(`Loaded composition: ${snapshot.name}`);
+                if (!silent) {
+                    toast.success(`Loaded composition: ${snapshot.name}`);
+                }
 
                 // Refresh undo/redo status
                 await get().refreshUndoRedoStatus();

@@ -5,7 +5,7 @@
  * Shows when no composition is active
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useDAWStore } from "@/stores/dawStore";
 import {
     Dialog,
@@ -42,38 +42,21 @@ export function CompositionLoader({ open: controlledOpen, onOpenChange }: Compos
     const loadComposition = useDAWStore(state => state.loadComposition);
     const createComposition = useDAWStore(state => state.createComposition);
     const deleteComposition = useDAWStore(state => state.deleteComposition);
-    const loadSynthDefs = useDAWStore(state => state.loadSynthDefs);
-    const initialize = useDAWStore(state => state.initialize);
 
     const [newCompositionName, setNewCompositionName] = useState("");
     const [isCreating, setIsCreating] = useState(false);
-    const [isInitializing, setIsInitializing] = useState(true);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [compositionToDelete, setCompositionToDelete] = useState<{ id: string; name: string } | null>(null);
 
-    // Initialize: Load compositions list, SynthDefs, and auto-load last active composition
-    useEffect(() => {
-        const init = async () => {
-            try {
-                // Load SynthDefs (needed for instrument selector)
-                await loadSynthDefs();
-
-                // Initialize store (loads compositions + auto-loads last active)
-                await initialize();
-            } catch (error) {
-                console.error("Failed to initialize compositions:", error);
-            } finally {
-                setIsInitializing(false);
-            }
-        };
-
-        init();
-    }, []); // Run once on mount
+    // Initialization is now handled once in App.tsx via dawStore.initialize().
+    // We read _isInitialized from the store so the dialog stays closed while
+    // the startup auto-load is in progress.
+    const isInitialized = useDAWStore(state => state._isInitialized);
 
     // Dialog is open when:
     // - Controlled mode: use controlledOpen prop
-    // - Auto mode: no composition is active AND not initializing
-    const isOpen = controlledOpen !== undefined ? controlledOpen : (!activeComposition && !isInitializing);
+    // - Auto mode: initialization is done AND no composition is active
+    const isOpen = controlledOpen !== undefined ? controlledOpen : (isInitialized && !activeComposition);
 
     const handleOpenChange = (open: boolean) => {
         if (onOpenChange) {

@@ -17,7 +17,17 @@ import { DEFAULT_PANELS } from "@/config/layout.config";
 export default function App() {
     const { tabs, activeTab, setActiveTab, createTab, deleteTab, popoutTab } = useLayoutStore();
 
-    // Note: DAW store initialization is handled by CompositionLoader on mount
+    // ── App startup: initialize DAW store exactly once ────────────────────────
+    // Kept here (not in CompositionLoader) so it runs regardless of how many
+    // CompositionLoader instances are mounted. The store's _isInitialized guard
+    // makes initialize() idempotent — safe with React StrictMode double-fires.
+    const initialize    = useDAWStore(state => state.initialize);
+    const loadSynthDefs = useDAWStore(state => state.loadSynthDefs);
+
+    useEffect(() => {
+        initialize();
+        loadSynthDefs();
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Enable autosave
     useAutosave();

@@ -200,7 +200,7 @@ export function SampleEditorWaveform({
     // DERIVED STATE
     // ========================================================================
     const clip = sampleEditorClipId ? clips.find(c => c.id === sampleEditorClipId) : undefined;
-    const { audioOffset, audioEnd, loopEnabled, loopStart, loopEnd } = safeClipDefaults(clip ?? {} as any);
+    const { audioOffset, audioEnd, loopEnabled, loopStart, loopEnd, fadeIn, fadeOut } = safeClipDefaults(clip ?? {} as any);
 
     const dur     = fileDuration > 0 ? fileDuration : 1;
     const isStereo = waveformDataRight.length > 0;
@@ -398,6 +398,78 @@ export function SampleEditorWaveform({
                             style={{ left: `${(localTrimEnd / dur) * 100}%`, right: 0 }}
                         />
                     )}
+
+                    {/* ── Layer 4.5: Fade In / Fade Out envelope overlays ─────── */}
+                    {/*
+                     * Industry standard (Ableton, Logic, Audition): show the fade
+                     * region as a triangle/gradient dimming overlay + diagonal
+                     * amplitude lines.  Represents that audio is attenuated to
+                     * zero at the trim edge and ramps to full over the fade duration.
+                     *
+                     * Positions use local trim state so the overlay tracks the
+                     * trim handles in real time. Fade values come from the store
+                     * (update on slider commit via onValueCommit).
+                     */}
+                    {(() => {
+                        const activeLen     = localTrimEnd - localAudioOffset;
+                        const effFadeIn     = Math.max(0, Math.min(fadeIn,  activeLen));
+                        const effFadeOut    = Math.max(0, Math.min(fadeOut, activeLen - effFadeIn));
+                        const fadeInEndT    = localAudioOffset + effFadeIn;
+                        const fadeOutStartT = localTrimEnd - effFadeOut;
+
+                        if (effFadeIn === 0 && effFadeOut === 0) return null;
+
+                        const pct = (t: number) => `${(t / dur) * 100}%`;
+
+                        return (
+                            <>
+                                {/* Gradient dim regions */}
+                                {effFadeIn > 0 && (
+                                    <div
+                                        className="absolute inset-y-0 pointer-events-none"
+                                        style={{
+                                            left:       pct(localAudioOffset),
+                                            width:      pct(effFadeIn),
+                                            background: "linear-gradient(to right, rgba(0,0,0,0.45), transparent)",
+                                        }}
+                                    />
+                                )}
+                                {effFadeOut > 0 && (
+                                    <div
+                                        className="absolute inset-y-0 pointer-events-none"
+                                        style={{
+                                            left:       pct(fadeOutStartT),
+                                            width:      pct(effFadeOut),
+                                            background: "linear-gradient(to left, rgba(0,0,0,0.45), transparent)",
+                                        }}
+                                    />
+                                )}
+
+                                {/* Amplitude envelope lines (V-shape for stereo center-based waveform) */}
+                                <svg
+                                    className="absolute inset-0 w-full h-full pointer-events-none"
+                                    preserveAspectRatio="none"
+                                >
+                                    {effFadeIn > 0 && (
+                                        <>
+                                            <line x1={pct(localAudioOffset)} y1="50%" x2={pct(fadeInEndT)} y2="0%"
+                                                stroke="rgba(255,255,255,0.45)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                                            <line x1={pct(localAudioOffset)} y1="50%" x2={pct(fadeInEndT)} y2="100%"
+                                                stroke="rgba(255,255,255,0.45)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                                        </>
+                                    )}
+                                    {effFadeOut > 0 && (
+                                        <>
+                                            <line x1={pct(fadeOutStartT)} y1="0%"   x2={pct(localTrimEnd)} y2="50%"
+                                                stroke="rgba(255,255,255,0.45)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                                            <line x1={pct(fadeOutStartT)} y1="100%" x2={pct(localTrimEnd)} y2="50%"
+                                                stroke="rgba(255,255,255,0.45)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                                        </>
+                                    )}
+                                </svg>
+                            </>
+                        );
+                    })()}
 
                     {/* Layer 5: Loop region */}
                     {loopEnabled && (
