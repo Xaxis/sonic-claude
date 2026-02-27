@@ -26,25 +26,28 @@ class WebSocketManager:
     
     # Client type metadata
     CLIENT_TYPES = {
-        "spectrum": {"emoji": "📊", "name": "Spectrum"},
-        "waveform": {"emoji": "📈", "name": "Waveform"},
-        "meters": {"emoji": "📏", "name": "Meters"},
-        "transport": {"emoji": "⏯️", "name": "Transport"},
+        "spectrum":    {"emoji": "📊", "name": "Spectrum"},
+        "waveform":    {"emoji": "📈", "name": "Waveform"},
+        "meters":      {"emoji": "📏", "name": "Meters"},
+        "transport":   {"emoji": "⏯️", "name": "Transport"},
+        "ai_pipeline": {"emoji": "🤖", "name": "AI Pipeline"},
     }
-    
+
     def __init__(self) -> None:
         """Initialize WebSocket manager with empty client sets"""
         self.spectrum_clients: Set[WebSocket] = set()
         self.waveform_clients: Set[WebSocket] = set()
         self.meter_clients: Set[WebSocket] = set()
         self.transport_clients: Set[WebSocket] = set()
-        
+        self.ai_pipeline_clients: Set[WebSocket] = set()
+
         # Map client types to their sets
         self._client_sets: Dict[str, Set[WebSocket]] = {
-            "spectrum": self.spectrum_clients,
-            "waveform": self.waveform_clients,
-            "meters": self.meter_clients,
-            "transport": self.transport_clients,
+            "spectrum":    self.spectrum_clients,
+            "waveform":    self.waveform_clients,
+            "meters":      self.meter_clients,
+            "transport":   self.transport_clients,
+            "ai_pipeline": self.ai_pipeline_clients,
         }
     
     async def _connect_client(self, websocket: WebSocket, client_type: str) -> None:
@@ -192,4 +195,21 @@ class WebSocketManager:
             data: Transport state data to broadcast
         """
         await self._broadcast_to_clients(data, "transport", debug_log=True)
+
+    async def connect_ai_pipeline(self, websocket: WebSocket) -> None:
+        """Connect an AI pipeline WebSocket client"""
+        await self._connect_client(websocket, "ai_pipeline")
+
+    def disconnect_ai_pipeline(self, websocket: WebSocket) -> None:
+        """Disconnect an AI pipeline WebSocket client"""
+        self._disconnect_client(websocket, "ai_pipeline")
+
+    async def broadcast_ai_pipeline(self, data: Dict[str, Any]) -> None:
+        """
+        Broadcast an AI pipeline stage event to all connected clients.
+
+        Args:
+            data: Pipeline event dict (type, request_id, stage, status, ts, detail)
+        """
+        await self._broadcast_to_clients(data, "ai_pipeline")
 

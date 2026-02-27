@@ -221,7 +221,8 @@ async def initialize_services(settings: Settings) -> None:
         model=settings.ai.model,
         samples_dir=settings.storage.samples_dir,
         musical_perception_analyzer=_musical_perception_analyzer,
-        composition_perception_analyzer=_composition_perception_analyzer
+        composition_perception_analyzer=_composition_perception_analyzer,
+        ws_manager=_ws_manager,
     )
 
     # Configure AI settings

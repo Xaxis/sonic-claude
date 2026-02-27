@@ -13,6 +13,7 @@ Validation:
 - Ensures AI can only select valid instruments (no hallucination)
 """
 import logging
+import time
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pathlib import Path
@@ -57,13 +58,15 @@ class AIAgentService:
         model: str = "claude-sonnet-4-5-20250929",
         samples_dir: Optional[Path] = None,
         musical_perception_analyzer: Optional[MusicalPerceptionAnalyzer] = None,
-        composition_perception_analyzer: Optional[CompositionPerceptionAnalyzer] = None
+        composition_perception_analyzer: Optional[CompositionPerceptionAnalyzer] = None,
+        ws_manager=None,  # Optional[WebSocketManager] — avoid circular import via type hint
     ):
         self.state_service = state_service
         self.action_service = action_service
         self.composition_service = composition_service
         self.client = anthropic.Anthropic(api_key=api_key) if api_key else None
         self.model = model
+        self.ws_manager = ws_manager  # For real-time pipeline events
 
         # Composite tool executor (poka-yoke design)
         self.composite_tools = CompositeToolExecutor(action_service)
@@ -83,6 +86,28 @@ class AIAgentService:
 
         # Chat history tracking (per composition)
         self.chat_histories: Dict[str, List[Dict[str, Any]]] = {}
+
+    async def _emit_pipeline(
+        self,
+        request_id: str,
+        stage: str,
+        status: str,
+        detail: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Emit a real-time AI pipeline stage event via WebSocket (fire-and-forget)."""
+        if not self.ws_manager:
+            return
+        try:
+            await self.ws_manager.broadcast_ai_pipeline({
+                "type":       "ai_pipeline",
+                "request_id": request_id,
+                "stage":      stage,
+                "status":     status,
+                "ts":         time.time(),
+                "detail":     detail or {},
+            })
+        except Exception as e:
+            logger.debug(f"Pipeline event broadcast failed (non-fatal): {e}")
     
     # Model identifiers for the execution_model shorthand values
     _EXECUTION_MODEL_MAP: Dict[str, str] = {
@@ -134,11 +159,17 @@ class AIAgentService:
         Returns:
             Dict with 'response', 'actions_executed', 'musical_context', 'routing_intent'
         """
+        # Unique ID for correlating pipeline events for this request
+        request_id = f"req-{int(time.time() * 1000)}"
+
         # Resolve which model to use for this request
         effective_model = (
             self._EXECUTION_MODEL_MAP.get(execution_model, self.model)
             if execution_model else self.model
         )
+
+        # STAGE: context — build DAW state snapshot
+        await self._emit_pipeline(request_id, "context", "start")
 
         # FIX 1: Force-refresh key/scale analysis before building context so state.musical is never stale
         self.state_service.analyze_current_sequence()
@@ -152,6 +183,15 @@ class AIAgentService:
             include_timbre=include_timbre_context,
         )
 
+        # Emit context complete with a brief snapshot
+        _state = state_response.full_state
+        await self._emit_pipeline(request_id, "context", "complete", {
+            "track_count": len(_state.sequence.tracks) if _state and _state.sequence else 0,
+            "clip_count":  sum(len(t.clips) for t in _state.sequence.tracks) if _state and _state.sequence else 0,
+            "tempo":       _state.sequence.tempo if _state and _state.sequence else None,
+            "key":         f"{_state.musical.key} {_state.musical.scale}" if _state and _state.musical else None,
+        })
+
         # ====================================================================
         # STEP 1: ROUTE REQUEST TO INTENT (LLM-based, or bypass)
         # ====================================================================
@@ -161,6 +201,7 @@ class AIAgentService:
         intent = None
 
         if use_intent_routing:
+            await self._emit_pipeline(request_id, "routing", "start", {"model": "haiku"})
             state_summary = self._build_brief_state_summary(state_response.full_state)
             intent = self.router.route(user_message, daw_state_summary=state_summary)
             logger.info(f"🔀 Intent: {intent.value}")
@@ -177,11 +218,18 @@ class AIAgentService:
             else:
                 tools = []
                 logger.info(f"🛠️  No tools needed for {intent.value}")
+
+            await self._emit_pipeline(request_id, "routing", "complete", {
+                "intent": intent.value,
+                "tools_loaded": len(tools),
+                "model": "haiku",
+            })
         else:
             # No routing — load all tools, use the general-purpose prompt
             tools = all_tools
             system_prompt = self.router.get_system_prompt_for_intent(Intent.GENERAL_CHAT, instruments_list, effects_list)
             logger.info(f"🛠️  Routing bypassed — using all {len(tools)} tools")
+            await self._emit_pipeline(request_id, "routing", "skipped", {"tools_loaded": len(tools)})
 
         # Apply response-style modifier (concise / detailed) to system prompt
         if response_style in self._RESPONSE_STYLE_APPENDIX:
@@ -199,6 +247,11 @@ class AIAgentService:
         messages = self._build_messages_with_history(user_message, context_message, history_length=history_length)
 
         logger.info(f"🤖 Calling {effective_model} with {len(tools)} tools, {len(messages)} messages in context...")
+        await self._emit_pipeline(request_id, "execution", "start", {
+            "model": effective_model,
+            "tool_count": len(tools),
+            "history_messages": len(messages),
+        })
 
         create_kwargs: Dict[str, Any] = dict(
             model=effective_model,
@@ -212,8 +265,19 @@ class AIAgentService:
 
         response = self.client.messages.create(**create_kwargs)
 
+        tool_call_count = sum(1 for b in response.content if b.type == "tool_use")
+        await self._emit_pipeline(request_id, "execution", "complete", {
+            "model": effective_model,
+            "tool_calls": tool_call_count,
+            "stop_reason": response.stop_reason,
+        })
+
         # Process response blocks, collecting tool calls and results
         tool_results = []
+        _tool_action_results: list = []
+        if tool_call_count > 0:
+            await self._emit_pipeline(request_id, "tools", "start", {"total": tool_call_count})
+
         for block in response.content:
             if block.type == "text":
                 assistant_message += block.text
@@ -240,6 +304,7 @@ class AIAgentService:
                     result = await self.action_service.execute_action(action)
 
                 actions_executed.append(result)
+                _tool_action_results.append({"name": block.name, "success": result.success})
 
                 result_content = f"Success: {result.message}" if result.success else f"Error: {result.error}"
                 if result.data:
@@ -250,6 +315,13 @@ class AIAgentService:
                     "tool_use_id": block.id,
                     "content": result_content
                 })
+
+        if tool_call_count > 0:
+            await self._emit_pipeline(request_id, "tools", "complete", {
+                "actions": _tool_action_results,
+                "succeeded": sum(1 for a in _tool_action_results if a["success"]),
+                "total": tool_call_count,
+            })
 
         # FIX 3: Send tool results back to LLM so it can respond to outcomes and recover from errors
         if tool_results:
@@ -275,6 +347,10 @@ class AIAgentService:
             ]
 
             logger.info(f"🔄 Sending {len(tool_results)} tool result(s) back to LLM...")
+            await self._emit_pipeline(request_id, "summary", "start", {
+                "model": "haiku",
+                "tool_results": len(tool_results),
+            })
             follow_up = self.client.messages.create(
                 model="claude-haiku-4-5-20251001",  # Haiku — fast/cheap for summarizing results
                 max_tokens=512,
@@ -285,6 +361,8 @@ class AIAgentService:
             for block in follow_up.content:
                 if block.type == "text":
                     assistant_message += block.text
+
+            await self._emit_pipeline(request_id, "summary", "complete", {"model": "haiku"})
 
         logger.info(f"✅ Execution complete: {len(actions_executed)} actions")
 
@@ -311,6 +389,11 @@ class AIAgentService:
 
         # Store actions count for API response
         self.last_actions_executed = len(actions_executed)
+
+        await self._emit_pipeline(request_id, "response", "complete", {
+            "actions": len(actions_executed),
+            "has_tools": tool_call_count > 0,
+        })
 
         return {
             "response": full_response,

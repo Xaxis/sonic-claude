@@ -69,3 +69,17 @@ async def websocket_transport(
     except WebSocketDisconnect:
         ws_manager.disconnect_transport(websocket)
 
+
+@router.websocket("/ai_pipeline")
+async def websocket_ai_pipeline(
+    websocket: WebSocket,
+    ws_manager: WebSocketManager = Depends(get_ws_manager)
+):
+    """WebSocket endpoint for real-time AI pipeline stage events"""
+    await ws_manager.connect_ai_pipeline(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        ws_manager.disconnect_ai_pipeline(websocket)
+

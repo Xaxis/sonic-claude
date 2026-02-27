@@ -91,6 +91,19 @@ export interface AnalyticsMessage extends BaseWebSocketMessage {
 }
 
 /**
+ * AI Pipeline Stage Event
+ * Emitted by the backend during each stage of AI request processing
+ */
+export interface AIPipelineMessage extends BaseWebSocketMessage {
+    type:       "ai_pipeline";
+    request_id: string;
+    stage:      "context" | "routing" | "execution" | "tools" | "summary" | "response";
+    status:     "start" | "complete" | "error" | "skipped";
+    ts:         number;                 // Unix timestamp (seconds, float)
+    detail:     Record<string, any>;   // Stage-specific detail payload
+}
+
+/**
  * Union type of all WebSocket messages
  */
 export type WebSocketMessage =
@@ -98,5 +111,6 @@ export type WebSocketMessage =
     | SpectrumMessage
     | WaveformMessage
     | MeterMessage
-    | AnalyticsMessage;
+    | AnalyticsMessage
+    | AIPipelineMessage;
 
