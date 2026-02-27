@@ -16,6 +16,7 @@ import { PanelRightOpen, PanelRightClose } from "lucide-react";
 export interface PanelConfig {
     id: string;
     title: string;
+    icon?: React.ComponentType<{ className?: string }>;
     component: React.ReactNode;
     closeable?: boolean;
     getSubtitle?: () => string; // Function to get dynamic subtitle
@@ -168,6 +169,7 @@ export const PanelGridItem = React.forwardRef<HTMLDivElement, {
         >
             <Panel
                 title={combinedTitle}
+                icon={panel.icon}
                 subtitle={panel.getSubtitle?.()}
                 draggable={!isAttachedChild} // Child panels can't be dragged independently
                 closeable={panel.closeable ?? true}

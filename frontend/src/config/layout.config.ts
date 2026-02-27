@@ -53,6 +53,7 @@ import { MixerPanel } from "@/modules/mixer";
 import { EffectsPanel } from "@/modules/effects";
 import { AssistantPanel } from "@/modules/assistant";
 import { ClipLauncherPanel } from "@/modules/clip-launcher";
+import { FolderOpen, Activity, AlignJustify, SlidersHorizontal, Wand2, Bot, LayoutGrid } from "lucide-react";
 
 /**
  * Grid Layout Settings
@@ -82,6 +83,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
     {
         id: "input",
         title: "INPUT",
+        icon: FolderOpen,
         component: createElement(InputsPanel),
         closeable: false,
         pinnable: true,
@@ -91,6 +93,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
     {
         id: "visualizer",
         title: "VISUALIZER",
+        icon: Activity,
         component: createElement(VisualizerPanel),
         closeable: false,
         pinnable: true,
@@ -100,6 +103,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
     {
         id: "sequencer",
         title: "SEQUENCER",
+        icon: AlignJustify,
         component: createElement(SequencerPanel),
         closeable: false,
         enableAI: true,
@@ -109,6 +113,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
     {
         id: "mixer",
         title: "MIXER",
+        icon: SlidersHorizontal,
         component: createElement(MixerPanel),
         closeable: false,
         enableAI: true,
@@ -118,6 +123,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
     {
         id: "effects",
         title: "EFFECTS",
+        icon: Wand2,
         component: createElement(EffectsPanel),
         closeable: false,
         enableAI: true,
@@ -134,6 +140,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
     {
         id: "ai",
         title: "ASSISTANT",
+        icon: Bot,
         component: createElement(AssistantPanel),
         closeable: false,
         pinnable: true,
@@ -147,6 +154,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
     {
         id: "clip-launcher",
         title: "CLIP LAUNCHER",
+        icon: LayoutGrid,
         component: createElement(ClipLauncherPanel),
         closeable: false,
         getSubtitle: () => "Performance Mode • 0 scenes",

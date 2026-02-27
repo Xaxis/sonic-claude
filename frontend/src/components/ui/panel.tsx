@@ -40,6 +40,9 @@ export interface PanelProps extends React.HTMLAttributes<HTMLDivElement> {
     /** Panel title displayed in header */
     title?: string;
 
+    /** Icon displayed before the title */
+    icon?: React.ComponentType<{ className?: string }>;
+
     /** Subtitle/context bar - shows dynamic status information */
     subtitle?: string;
 
@@ -84,6 +87,7 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
     (
         {
             title,
+            icon: Icon,
             subtitle,
             draggable = false,
             closeable = false,
@@ -124,9 +128,10 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
                                 headerContent
                             ) : (
                                 <>
-                                    <span className="text-primary flex-1 text-xs font-bold tracking-widest uppercase">
+                                    <div className="text-primary flex flex-1 items-center gap-1.5 text-xs font-bold tracking-widest uppercase">
+                                        {Icon && <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />}
                                         {title}
-                                    </span>
+                                    </div>
                                     <div className="flex items-center gap-2">
                                         {headerActions}
                                         {onMaximize && (

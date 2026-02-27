@@ -59,6 +59,9 @@ interface LayoutStore {
     // Sidebar navigation
     sidebarCollapsed: boolean;
 
+    // Right column collapse
+    rightColumnCollapsed: boolean;
+
     // Right column pin system
     pinnedPanelIds: string[];          // Ordered; persisted
     minimizedPinnedIds: Set<string>;   // Ephemeral — not persisted (always start expanded)
@@ -109,6 +112,12 @@ interface LayoutStore {
     setSidebarCollapsed: (collapsed: boolean) => void;
 
     // ========================================================================
+    // ACTIONS - Right Column
+    // ========================================================================
+    toggleRightColumn: () => void;
+    setRightColumnCollapsed: (collapsed: boolean) => void;
+
+    // ========================================================================
     // ACTIONS - Right Column Pin System
     // ========================================================================
     pinPanel:            (panelId: string) => void;
@@ -144,6 +153,7 @@ export const useLayoutStore = create<LayoutStore>()(
                 maximizedPanel: null,
                 attachments: {},
                 sidebarCollapsed: false,
+                rightColumnCollapsed: false,
                 pinnedPanelIds: [],
                 minimizedPinnedIds: new Set(),
                 xrayEnabled: false,
@@ -308,6 +318,12 @@ export const useLayoutStore = create<LayoutStore>()(
                 setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 
                 // ====================================================================
+                // RIGHT COLUMN ACTIONS
+                // ====================================================================
+                toggleRightColumn: () => set((state) => ({ rightColumnCollapsed: !state.rightColumnCollapsed })),
+                setRightColumnCollapsed: (collapsed) => set({ rightColumnCollapsed: collapsed }),
+
+                // ====================================================================
                 // RIGHT COLUMN PIN ACTIONS
                 // ====================================================================
                 pinPanel: (panelId) => {
@@ -455,6 +471,7 @@ export const useLayoutStore = create<LayoutStore>()(
                     maximizedPanel: state.maximizedPanel,
                     attachments: state.attachments,
                     sidebarCollapsed: state.sidebarCollapsed,
+                    rightColumnCollapsed: state.rightColumnCollapsed,
                     pinnedPanelIds: state.pinnedPanelIds,
                     // NOTE: poppedOutTabs & minimizedPinnedIds are NOT persisted (ephemeral)
                     xrayEnabled: state.xrayEnabled,

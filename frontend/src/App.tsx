@@ -36,7 +36,7 @@ import { useAutosave } from "@/hooks/useAutosave";
 import { DEFAULT_PANELS } from "@/config/layout.config";
 
 export default function App() {
-    const { tabs, activeTab, setActiveTab, createTab, deleteTab, popoutTab, pinnedPanelIds } = useLayoutStore();
+    const { tabs, activeTab, setActiveTab, createTab, deleteTab, popoutTab, pinnedPanelIds, rightColumnCollapsed } = useLayoutStore();
     const hasRightColumn = pinnedPanelIds.length > 0;
 
     // ── App startup: initialize DAW store exactly once ────────────────────────
@@ -101,7 +101,7 @@ export default function App() {
                     isEngineRunning={isEngineRunning}
                     cpuUsage={cpuUsage}
                     activeSynths={activeSynthsCount}
-                    showSettings={!hasRightColumn}
+                    showSettings={!hasRightColumn || rightColumnCollapsed}
                 />
 
                 <div className="flex-1 min-h-0 overflow-hidden">
