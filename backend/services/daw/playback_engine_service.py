@@ -767,76 +767,76 @@ class PlaybackEngineService:
 
     async def pause_playback(self):
         """Pause playback"""
-        if self.is_playing:
-            self.is_playing = False
-            self.is_paused = True
+        # Do NOT guard on self.is_playing — if the playback loop crashed it sets
+        # is_playing=False but MIDI tasks keep running. Always clean up.
+        self.is_playing = False
+        self.is_paused = True
 
-            # Cancel playback loop (but keep position)
-            if self.playback_task:
-                self.playback_task.cancel()
-                try:
-                    await self.playback_task
-                except asyncio.CancelledError:
-                    pass
-                self.playback_task = None
+        # Cancel playback loop (but keep position)
+        if self.playback_task:
+            self.playback_task.cancel()
+            try:
+                await self.playback_task
+            except asyncio.CancelledError:
+                pass
+            self.playback_task = None
 
-            # Stop all active synths (sample/audio clips) - TIMELINE PLAYBACK
-            logger.info(f"🛑 Stopping {len(self.timeline_active_synths)} active sample/audio synths")
-            if self.engine_manager:
-                for clip_id, node_id in self.timeline_active_synths.items():
-                    logger.info(f"🛑 Freeing synth node {node_id} for clip {clip_id}")
-                    self.engine_manager.send_message("/n_free", node_id)
-            else:
-                logger.warning("⚠️ No engine_manager available to free synths!")
-            self.timeline_active_synths.clear()
+        # Stop all active synths (sample/audio clips) - TIMELINE PLAYBACK
+        logger.info(f"🛑 Stopping {len(self.timeline_active_synths)} active sample/audio synths")
+        if self.engine_manager:
+            for clip_id, node_id in self.timeline_active_synths.items():
+                logger.info(f"🛑 Freeing synth node {node_id} for clip {clip_id}")
+                self.engine_manager.send_message("/n_free", node_id)
+        else:
+            logger.warning("⚠️ No engine_manager available to free synths!")
+        self.timeline_active_synths.clear()
 
-            # Cancel all scheduled MIDI note tasks - TIMELINE PLAYBACK
-            logger.info(f"🛑 Cancelling {len(self.timeline_midi_note_tasks)} MIDI note tasks")
-            for task in self.timeline_midi_note_tasks:
-                task.cancel()
-            # Wait for all tasks to be cancelled
-            if self.timeline_midi_note_tasks:
-                await asyncio.gather(*self.timeline_midi_note_tasks, return_exceptions=True)
-            self.timeline_midi_note_tasks.clear()
+        # Cancel all scheduled MIDI note tasks - TIMELINE PLAYBACK
+        logger.info(f"🛑 Cancelling {len(self.timeline_midi_note_tasks)} MIDI note tasks")
+        for task in self.timeline_midi_note_tasks:
+            task.cancel()
+        if self.timeline_midi_note_tasks:
+            await asyncio.gather(*self.timeline_midi_note_tasks, return_exceptions=True)
+        self.timeline_midi_note_tasks.clear()
 
-            # Stop all active MIDI notes (use /n_free for immediate silence) - TIMELINE PLAYBACK
-            logger.info(f"🛑 Stopping {len(self.timeline_active_midi_notes)} active MIDI notes")
-            if self.engine_manager:
-                for node_id, note_info in self.timeline_active_midi_notes.items():
-                    logger.info(f"🛑 Freeing MIDI note node {node_id} (note={note_info['note']}, clip={note_info['clip_id']})")
-                    self.engine_manager.send_message("/n_free", node_id)
-            self.timeline_active_midi_notes.clear()
+        # Stop all active MIDI notes (use /n_free for immediate silence) - TIMELINE PLAYBACK
+        logger.info(f"🛑 Stopping {len(self.timeline_active_midi_notes)} active MIDI notes")
+        if self.engine_manager:
+            for node_id, note_info in self.timeline_active_midi_notes.items():
+                logger.info(f"🛑 Freeing MIDI note node {node_id} (note={note_info['note']}, clip={note_info['clip_id']})")
+                self.engine_manager.send_message("/n_free", node_id)
+        self.timeline_active_midi_notes.clear()
 
-            # Broadcast paused state via WebSocket
-            if self.websocket_manager and self.composition_state_service.current_composition_id:
-                composition = self.composition_state_service.get_composition(
-                    self.composition_state_service.current_composition_id
-                )
-                if composition:
-                    time_sig_parts = composition.time_signature.split("/")
-                    time_sig_num = int(time_sig_parts[0]) if len(time_sig_parts) > 0 else 4
-                    time_sig_den = int(time_sig_parts[1]) if len(time_sig_parts) > 1 else 4
+        # Broadcast paused state via WebSocket
+        if self.websocket_manager and self.composition_state_service.current_composition_id:
+            composition = self.composition_state_service.get_composition(
+                self.composition_state_service.current_composition_id
+            )
+            if composition:
+                time_sig_parts = composition.time_signature.split("/")
+                time_sig_num = int(time_sig_parts[0]) if len(time_sig_parts) > 0 else 4
+                time_sig_den = int(time_sig_parts[1]) if len(time_sig_parts) > 1 else 4
 
-                    transport_data = {
-                        "type": "transport",
-                        "is_playing": False,
-                        "is_paused": True,
-                        "position_beats": self.playhead_position,
-                        "position_seconds": self.playhead_position * (60.0 / self.tempo),
-                        "tempo": self.tempo,
-                        "time_signature_num": time_sig_num,
-                        "time_signature_den": time_sig_den,
-                        "loop_enabled": composition.loop_enabled,
-                        "loop_start": composition.loop_start,
-                        "loop_end": composition.loop_end,
-                        "metronome_enabled": self.metronome_enabled,
-                        "active_notes": [],
-                        "playing_clips": list(self.active_synths.keys()),
-                        "triggered_clips": list(self.triggered_clips.keys()),
-                    }
-                    await self.websocket_manager.broadcast_transport(transport_data)
+                transport_data = {
+                    "type": "transport",
+                    "is_playing": False,
+                    "is_paused": True,
+                    "position_beats": self.playhead_position,
+                    "position_seconds": self.playhead_position * (60.0 / self.tempo),
+                    "tempo": self.tempo,
+                    "time_signature_num": time_sig_num,
+                    "time_signature_den": time_sig_den,
+                    "loop_enabled": composition.loop_enabled,
+                    "loop_start": composition.loop_start,
+                    "loop_end": composition.loop_end,
+                    "metronome_enabled": self.metronome_enabled,
+                    "active_notes": [],
+                    "playing_clips": list(self.launcher_active_synths.keys()),
+                    "triggered_clips": list(self.triggered_clips.keys()),
+                }
+                await self.websocket_manager.broadcast_transport(transport_data)
 
-            logger.info("⏸️  Paused playback")
+        logger.info("⏸️  Paused playback")
 
     async def seek(self, position: float, trigger_audio: bool = True):
         """Seek to position"""
