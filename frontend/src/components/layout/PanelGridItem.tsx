@@ -11,6 +11,7 @@ import type { PanelSnapTarget, PanelAttachment, SnapZone } from "@/types/grid-la
 import { useInlineAI } from "@/hooks/useInlineAI";
 import { InlineAIPromptPopover } from "@/components/ai/InlineAIPromptPopover";
 import { useDAWStore } from "@/stores/dawStore";
+import { PanelRightOpen, PanelRightClose } from "lucide-react";
 
 export interface PanelConfig {
     id: string;
@@ -28,6 +29,23 @@ export interface PanelConfig {
     // Panel attachment system
     snapTargets?: PanelSnapTarget[]; // Which panels this panel can snap to
     attachment?: PanelAttachment | null; // Current attachment state (persisted)
+    // Right column pin system
+    pinnable?: boolean; // Whether this panel can be pinned to the right column
+}
+
+function PanelPlaceholder({ title, onRestore }: { title: string; onRestore: () => void }) {
+    return (
+        <div className="panel-glass h-full flex flex-col items-center justify-center gap-3 opacity-40 border border-dashed border-border/50">
+            <PanelRightClose className="h-5 w-5 text-muted-foreground" />
+            <span className="text-xs font-bold tracking-widest uppercase text-muted-foreground">{title}</span>
+            <button
+                onClick={onRestore}
+                className="text-xs text-primary/70 hover:text-primary transition-colors px-2 py-1 rounded border border-primary/20 hover:border-primary/50 hover:bg-primary/5"
+            >
+                Restore to grid
+            </button>
+        </div>
+    );
 }
 
 /**
@@ -44,6 +62,9 @@ export const PanelGridItem = React.forwardRef<HTMLDivElement, {
     onPanelClose?: (panelId: string) => void;
     maximizePanel: (panelId: string) => void;
     detachPanel: (panelId: string) => void;
+    isPinned: boolean;
+    onPin: () => void;
+    onUnpin: () => void;
     className?: string;
     style?: React.CSSProperties;
 }>(({
@@ -55,6 +76,9 @@ export const PanelGridItem = React.forwardRef<HTMLDivElement, {
     onPanelClose,
     maximizePanel,
     detachPanel,
+    isPinned,
+    onPin,
+    onUnpin,
     className: gridClassName,
     style: gridStyle,
     ...rest
@@ -70,6 +94,15 @@ export const PanelGridItem = React.forwardRef<HTMLDivElement, {
         entityId: panel.id,
         disabled: !activeComposition || !panel.enableAI,
     });
+
+    // If pinned to right column, render placeholder in grid cell
+    if (isPinned) {
+        return (
+            <div ref={ref} className={`grid-item-wrapper relative ${gridClassName || ''}`} style={gridStyle} {...rest}>
+                <PanelPlaceholder title={panel.title} onRestore={onUnpin} />
+            </div>
+        );
+    }
 
     // Check if this panel is attached to another (child)
     const isAttachedChild = !!attachment;
@@ -109,6 +142,18 @@ export const PanelGridItem = React.forwardRef<HTMLDivElement, {
         </button>
     ) : null;
 
+    // Build pin button for header actions (only for pinnable, non-attached-child panels)
+    const pinButton = panel.pinnable && !isAttachedChild ? (
+        <button
+            onClick={(e) => { e.stopPropagation(); onPin(); }}
+            className="hover:bg-primary/20 cursor-pointer touch-manipulation rounded p-2 transition-colors"
+            aria-label="Pin to right column"
+            title="Pin to right column"
+        >
+            <PanelRightOpen className="h-4 w-4" />
+        </button>
+    ) : null;
+
     return (
         <div
             ref={ref}
@@ -130,7 +175,7 @@ export const PanelGridItem = React.forwardRef<HTMLDivElement, {
                 isMaximized={false}
                 onMaximize={() => maximizePanel(panel.id)}
                 showHeader={!isAttachedChild} // ALWAYS hide child panel's header
-                headerActions={detachButton}
+                headerActions={<>{detachButton}{pinButton}</>}
                 aiHandlers={panel.enableAI ? aiHandlers : undefined}
                 className={`h-full transition-all ${
                     // When attached to parent's bottom edge: child is below, remove top border/corners

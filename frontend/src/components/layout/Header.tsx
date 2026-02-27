@@ -18,9 +18,10 @@ interface HeaderProps {
     isEngineRunning?: boolean;
     cpuUsage?: number;
     activeSynths?: number;
+    showSettings?: boolean;
 }
 
-export function Header({ isEngineRunning = false, cpuUsage = 0, activeSynths = 0 }: HeaderProps) {
+export function Header({ isEngineRunning = false, cpuUsage = 0, activeSynths = 0, showSettings = true }: HeaderProps) {
     const [settingsOpen, setSettingsOpen] = useState(false);
 
     // ⌘, / Ctrl+, keyboard shortcut
@@ -70,18 +71,20 @@ export function Header({ isEngineRunning = false, cpuUsage = 0, activeSynths = 0
                         </div>
                     )}
 
-                    {/* Settings gear button */}
-                    <button
-                        onClick={() => setSettingsOpen(true)}
-                        title="Settings (⌘,)"
-                        className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded hover:bg-muted/30"
-                    >
-                        <Settings className="h-4 w-4" />
-                    </button>
+                    {/* Settings gear button — hidden when RightColumn owns the settings instance */}
+                    {showSettings && (
+                        <button
+                            onClick={() => setSettingsOpen(true)}
+                            title="Settings (⌘,)"
+                            className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded hover:bg-muted/30"
+                        >
+                            <Settings className="h-4 w-4" />
+                        </button>
+                    )}
                 </div>
             </header>
 
-            <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
+            {showSettings && <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />}
         </>
     );
 }

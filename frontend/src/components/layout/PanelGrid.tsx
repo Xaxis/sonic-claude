@@ -36,6 +36,8 @@ export interface PanelConfig {
     // Panel attachment system
     snapTargets?: PanelSnapTarget[]; // Which panels this panel can snap to
     attachment?: PanelAttachment | null; // Current attachment state (persisted)
+    // Right column pin system
+    pinnable?: boolean; // Whether this panel can be pinned to the right column
 }
 
 interface PanelGridProps {
@@ -47,7 +49,7 @@ interface PanelGridProps {
 export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-    const { maximizedPanel, maximizePanel, minimizePanel, attachments, attachPanel, detachPanel } = useLayoutStore();
+    const { maximizedPanel, maximizePanel, minimizePanel, attachments, attachPanel, detachPanel, pinnedPanelIds, pinPanel, unpinPanel } = useLayoutStore();
     const [activeSnapZone, setActiveSnapZone] = useState<SnapZone | null>(null);
     const [draggingPanelId, setDraggingPanelId] = useState<string | null>(null);
 
@@ -382,6 +384,9 @@ export function PanelGrid({ panels, onLayoutChange, onPanelClose }: PanelGridPro
                             onPanelClose={onPanelClose}
                             maximizePanel={maximizePanel}
                             detachPanel={detachPanel}
+                            isPinned={pinnedPanelIds.includes(panel.id)}
+                            onPin={() => pinPanel(panel.id)}
+                            onUnpin={() => unpinPanel(panel.id)}
                         />
                     );
                 })}

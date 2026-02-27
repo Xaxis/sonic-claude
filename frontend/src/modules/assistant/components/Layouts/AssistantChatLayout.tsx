@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Send, Sparkles, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "../../types.ts";
+import { AIPipelineGraph } from "../AIPipelineGraph.tsx";
 
 // ── Routing-intent display label map ──────────────────────────────────────────
 const INTENT_LABELS: Record<string, string> = {
@@ -108,6 +109,9 @@ export function AssistantChatLayout() {
                     </div>
                 </div>
             )}
+
+            {/* AI Pipeline Flow Graph */}
+            <AIPipelineGraph />
 
             {/* Chat Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">

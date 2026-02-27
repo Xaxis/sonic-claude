@@ -187,7 +187,7 @@ class AIAgentService:
         _state = state_response.full_state
         await self._emit_pipeline(request_id, "context", "complete", {
             "track_count": len(_state.sequence.tracks) if _state and _state.sequence else 0,
-            "clip_count":  sum(len(t.clips) for t in _state.sequence.tracks) if _state and _state.sequence else 0,
+            "clip_count":  len(_state.sequence.clips) if _state and _state.sequence else 0,
             "tempo":       _state.sequence.tempo if _state and _state.sequence else None,
             "key":         f"{_state.musical.key} {_state.musical.scale}" if _state and _state.musical else None,
         })

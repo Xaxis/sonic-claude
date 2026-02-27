@@ -55,9 +55,13 @@ interface LayoutStore {
     layouts: TabLayouts;
     maximizedPanel: string | null;
     attachments: Record<string, PanelAttachment>;
-    
+
     // Sidebar navigation
     sidebarCollapsed: boolean;
+
+    // Right column pin system
+    pinnedPanelIds: string[];          // Ordered; persisted
+    minimizedPinnedIds: Set<string>;   // Ephemeral — not persisted (always start expanded)
 
     // X-Ray Mode - See through to another tab
     xrayEnabled: boolean;
@@ -105,6 +109,14 @@ interface LayoutStore {
     setSidebarCollapsed: (collapsed: boolean) => void;
 
     // ========================================================================
+    // ACTIONS - Right Column Pin System
+    // ========================================================================
+    pinPanel:            (panelId: string) => void;
+    unpinPanel:          (panelId: string) => void;
+    minimizePinnedPanel: (panelId: string) => void;
+    restorePinnedPanel:  (panelId: string) => void;
+
+    // ========================================================================
     // ACTIONS - X-Ray Mode
     // ========================================================================
     enableXray: (targetTabId: string) => void;
@@ -132,6 +144,8 @@ export const useLayoutStore = create<LayoutStore>()(
                 maximizedPanel: null,
                 attachments: {},
                 sidebarCollapsed: false,
+                pinnedPanelIds: [],
+                minimizedPinnedIds: new Set(),
                 xrayEnabled: false,
                 xraySourceTab: null,
                 xrayTargetTab: null,
@@ -294,6 +308,49 @@ export const useLayoutStore = create<LayoutStore>()(
                 setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 
                 // ====================================================================
+                // RIGHT COLUMN PIN ACTIONS
+                // ====================================================================
+                pinPanel: (panelId) => {
+                    set((state) => {
+                        if (state.pinnedPanelIds.includes(panelId)) return state;
+                        // Clear attachments where this panel is parent or child
+                        const cleanedAttachments = Object.fromEntries(
+                            Object.entries(state.attachments).filter(
+                                ([childId, att]) => childId !== panelId && att.attachedTo !== panelId
+                            )
+                        );
+                        return {
+                            pinnedPanelIds: [...state.pinnedPanelIds, panelId],
+                            maximizedPanel: state.maximizedPanel === panelId ? null : state.maximizedPanel,
+                            attachments: cleanedAttachments,
+                        };
+                    });
+                    get()._broadcastState();
+                },
+
+                unpinPanel: (panelId) => {
+                    set((state) => {
+                        const m = new Set(state.minimizedPinnedIds);
+                        m.delete(panelId);
+                        return {
+                            pinnedPanelIds: state.pinnedPanelIds.filter(id => id !== panelId),
+                            minimizedPinnedIds: m,
+                        };
+                    });
+                    get()._broadcastState();
+                },
+
+                minimizePinnedPanel: (panelId) => set((state) => ({
+                    minimizedPinnedIds: new Set([...state.minimizedPinnedIds, panelId]),
+                })),
+
+                restorePinnedPanel: (panelId) => set((state) => {
+                    const m = new Set(state.minimizedPinnedIds);
+                    m.delete(panelId);
+                    return { minimizedPinnedIds: m };
+                }),
+
+                // ====================================================================
                 // X-RAY MODE ACTIONS
                 // ====================================================================
                 enableXray: (targetTabId) => {
@@ -342,6 +399,7 @@ export const useLayoutStore = create<LayoutStore>()(
                         layouts: state.layouts,
                         maximizedPanel: state.maximizedPanel,
                         attachments: state.attachments,
+                        pinnedPanelIds: state.pinnedPanelIds,
                         xrayEnabled: state.xrayEnabled,
                         xraySourceTab: state.xraySourceTab,
                         xrayTargetTab: state.xrayTargetTab,
@@ -362,6 +420,8 @@ export const useLayoutStore = create<LayoutStore>()(
                                 layouts: newState.layouts,
                                 maximizedPanel: newState.maximizedPanel,
                                 attachments: newState.attachments,
+                                pinnedPanelIds: newState.pinnedPanelIds ?? [],
+                                minimizedPinnedIds: new Set(),
                                 xrayEnabled: newState.xrayEnabled,
                                 xraySourceTab: newState.xraySourceTab,
                                 xrayTargetTab: newState.xrayTargetTab,
@@ -395,11 +455,12 @@ export const useLayoutStore = create<LayoutStore>()(
                     maximizedPanel: state.maximizedPanel,
                     attachments: state.attachments,
                     sidebarCollapsed: state.sidebarCollapsed,
+                    pinnedPanelIds: state.pinnedPanelIds,
+                    // NOTE: poppedOutTabs & minimizedPinnedIds are NOT persisted (ephemeral)
                     xrayEnabled: state.xrayEnabled,
                     xraySourceTab: state.xraySourceTab,
                     xrayTargetTab: state.xrayTargetTab,
                     xrayOpacity: state.xrayOpacity,
-                    // NOTE: poppedOutTabs is NOT persisted (ephemeral window state)
                 }),
 
                 // Merge: Restore persisted state on hydration
@@ -415,6 +476,8 @@ export const useLayoutStore = create<LayoutStore>()(
                         tabs: mergedTabs,
                         // IMPORTANT: Always start with no popouts (windows are closed on page load)
                         poppedOutTabs: new Set(),
+                        // minimizedPinnedIds is ephemeral — always start expanded
+                        minimizedPinnedIds: new Set(),
                     };
                 },
 

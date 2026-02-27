@@ -27,6 +27,7 @@ import { useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { NavSidebar } from "@/components/layout/NavSidebar";
 import { TabbedWrapper } from "@/components/layout/TabbedWrapper";
+import { RightColumn } from "@/components/layout/RightColumn";
 import { ActivityContainer } from "@/components/activity";
 import { CompositionLoader } from "@/components/composition/CompositionLoader";
 import { useLayoutStore } from "@/stores/layoutStore";
@@ -35,7 +36,8 @@ import { useAutosave } from "@/hooks/useAutosave";
 import { DEFAULT_PANELS } from "@/config/layout.config";
 
 export default function App() {
-    const { tabs, activeTab, setActiveTab, createTab, deleteTab, popoutTab } = useLayoutStore();
+    const { tabs, activeTab, setActiveTab, createTab, deleteTab, popoutTab, pinnedPanelIds } = useLayoutStore();
+    const hasRightColumn = pinnedPanelIds.length > 0;
 
     // ── App startup: initialize DAW store exactly once ────────────────────────
     const initialize    = useDAWStore(state => state.initialize);
@@ -93,12 +95,13 @@ export default function App() {
                 onTabPopout={popoutTab}
             />
 
-            {/* Right: Status bar + workspace */}
+            {/* Center: Status bar + workspace */}
             <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
                 <Header
                     isEngineRunning={isEngineRunning}
                     cpuUsage={cpuUsage}
                     activeSynths={activeSynthsCount}
+                    showSettings={!hasRightColumn}
                 />
 
                 <div className="flex-1 min-h-0 overflow-hidden">
@@ -110,6 +113,9 @@ export default function App() {
                     />
                 </div>
             </div>
+
+            {/* Right: Pinned panel column (appears when panels are pinned) */}
+            {hasRightColumn && <RightColumn panels={DEFAULT_PANELS} />}
 
             {/* Global: AI activity animations overlay */}
             <ActivityContainer />
