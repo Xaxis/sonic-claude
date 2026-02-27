@@ -5,8 +5,8 @@
  * - Reads track from Zustand directly (no prop drilling)
  * - Only receives trackId (identifier) and disabled (local UI state)
  *
- * Dropdown selector for choosing MIDI track instruments (SynthDefs).
- * Displays instrument name with category grouping.
+ * Searchable dropdown selector for choosing MIDI track instruments (SynthDefs).
+ * Displays instrument name with category grouping and search filtering.
  *
  * Architecture:
  * - Reads available SynthDefs from Zustand store
@@ -17,16 +17,8 @@
  */
 
 import { Music } from "lucide-react";
-import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectLabel,
-    SelectTrigger,
-} from "@/components/ui/select.tsx";
+import { SearchableDropdown, type SearchableDropdownItem } from "@/components/ui/searchable-dropdown";
 import { useDAWStore } from "@/stores/dawStore";
-import type { SynthDefInfo } from "../../types.ts";
 
 interface SequencerInstrumentSelectorProps {
     trackId: string;    // Identifier - acceptable to pass
@@ -54,18 +46,13 @@ export function SequencerInstrumentSelector({
     const track = tracks.find(t => t.id === trackId);
     const currentInstrument = track?.instrument;
 
-    // Group SynthDefs by category
-    const groupedSynthDefs = synthDefs.reduce((acc, synthDef) => {
-        if (!acc[synthDef.category]) {
-            acc[synthDef.category] = [];
-        }
-        acc[synthDef.category].push(synthDef);
-        return acc;
-    }, {} as Record<string, SynthDefInfo[]>);
-
-    // Get display name for current instrument
-    const currentSynthDef = synthDefs.find((def) => def.name === currentInstrument);
-    const displayValue = currentSynthDef?.display_name || currentInstrument || "Instrument";
+    // Map SynthDefs to SearchableDropdownItem format
+    const items: SearchableDropdownItem[] = synthDefs.map(synthDef => ({
+        value: synthDef.name,
+        label: synthDef.display_name,
+        category: synthDef.category,
+        description: synthDef.description,
+    }));
 
     // Handle selection - call Zustand action directly
     const handleValueChange = (value: string) => {
@@ -83,41 +70,16 @@ export function SequencerInstrumentSelector({
     }
 
     return (
-        <Select
-            value={currentInstrument || ""}
+        <SearchableDropdown
+            items={items}
+            value={currentInstrument}
             onValueChange={handleValueChange}
+            placeholder="Instrument"
+            icon={Music}
             disabled={disabled}
-        >
-            <SelectTrigger className="h-7 w-32 text-xs border-border/50 hover:border-border transition-colors min-w-0">
-                <div className="flex items-center gap-1.5 min-w-0 w-full overflow-hidden">
-                    <Music size={12} className="text-muted-foreground flex-shrink-0" />
-                    <span className="truncate text-xs">{displayValue}</span>
-                </div>
-            </SelectTrigger>
-            <SelectContent className="max-h-80 z-[9999]" align="start" position="popper" sideOffset={4}>
-                {Object.entries(groupedSynthDefs).map(([category, defs]) => (
-                    <SelectGroup key={category}>
-                        <SelectLabel className="text-xs font-semibold text-muted-foreground">
-                            {category}
-                        </SelectLabel>
-                        {defs.map((synthDef) => (
-                            <SelectItem
-                                key={synthDef.name}
-                                value={synthDef.name}
-                                className="text-xs"
-                            >
-                                <div className="flex flex-col">
-                                    <span className="font-medium">{synthDef.display_name}</span>
-                                    <span className="text-[10px] text-muted-foreground">
-                                        {synthDef.description}
-                                    </span>
-                                </div>
-                            </SelectItem>
-                        ))}
-                    </SelectGroup>
-                ))}
-            </SelectContent>
-        </Select>
+            triggerClassName="w-32"
+            searchPlaceholder="Search instruments..."
+            emptyMessage="No instruments found"
+        />
     );
 }
-

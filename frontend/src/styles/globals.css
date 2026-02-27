@@ -254,6 +254,40 @@ body {
 }
 
 /* ============================================================================
+   SONNER TOAST OVERRIDES
+   Map Sonner's CSS variables to the app's design system colors.
+   ============================================================================ */
+
+[data-sonner-toaster] {
+  --normal-bg: hsl(220 15% 9%);
+  --normal-border: hsl(220 15% 15%);
+  --normal-text: hsl(220 10% 92%);
+
+  --success-bg: hsl(187 85% 55% / 0.1);
+  --success-border: hsl(187 85% 55% / 0.5);
+  --success-text: hsl(187 85% 55%);
+
+  --error-bg: hsl(0 85% 60% / 0.1);
+  --error-border: hsl(0 85% 60% / 0.5);
+  --error-text: hsl(0 85% 60%);
+
+  --warning-bg: hsl(45 95% 60% / 0.1);
+  --warning-border: hsl(45 95% 60% / 0.5);
+  --warning-text: hsl(45 95% 60%);
+
+  --info-bg: hsl(220 15% 9%);
+  --info-border: hsl(220 15% 15%);
+  --info-text: hsl(220 10% 92%);
+}
+
+[data-sonner-toast] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.8125rem;
+  border-width: 2px !important;
+  backdrop-filter: blur(12px);
+}
+
+/* ============================================================================
    AI HIGHLIGHT ANIMATION
    ============================================================================ */
 

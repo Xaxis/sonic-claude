@@ -108,7 +108,7 @@ export interface ChatHistoryResponse {
 export interface CreateTrackRequest {
     composition_id: string;  // Used to construct URL, not sent in body
     name: string;
-    type: "midi" | "audio" | "sample";
+    type: "midi" | "audio";
     instrument?: string;  // For MIDI tracks
     color?: string;
     sample_id?: string;
@@ -144,16 +144,38 @@ export interface AddClipRequest {
     midi_events?: any[];
     audio_file_path?: string;
     name?: string;
+    // Audio editing params
+    sample_id?: string;
+    audio_end?: number;
+    pitch_semitones?: number;
+    playback_rate?: number;
+    reverse?: boolean;
+    fade_in?: number;
+    fade_out?: number;
+    loop_enabled?: boolean;
+    loop_start?: number;
+    loop_end?: number;
 }
 
 export interface UpdateClipRequest {
     start_time?: number;
     duration?: number;
+    name?: string;
     midi_events?: any[];
     is_muted?: boolean;
     is_looped?: boolean;
     gain?: number;
+    // Audio editing params
     audio_offset?: number;
+    audio_end?: number;
+    pitch_semitones?: number;
+    playback_rate?: number;
+    reverse?: boolean;
+    fade_in?: number;
+    fade_out?: number;
+    loop_enabled?: boolean;
+    loop_start?: number;
+    loop_end?: number;
 }
 
 // ============================================================================

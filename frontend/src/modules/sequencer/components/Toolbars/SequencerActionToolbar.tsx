@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/select.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { SequencerTrackTypeDialog } from "../Dialogs/SequencerTrackTypeDialog.tsx";
-import { SequencerSampleBrowser } from "../Dialogs/SequencerSampleBrowser.tsx";
 
 export function SequencerActionToolbar() {
     // Get state and actions from Zustand store
@@ -42,7 +41,6 @@ export function SequencerActionToolbar() {
 
     // Local dialog state
     const [showTrackTypeDialog, setShowTrackTypeDialog] = useState(false);
-    const [showSampleBrowser, setShowSampleBrowser] = useState(false);
 
     const hasComposition = !!activeComposition;
 
@@ -52,23 +50,19 @@ export function SequencerActionToolbar() {
 
     const handleAddMIDITrack = useCallback(async () => {
         if (!activeComposition) return;
-        const name = `Track ${tracks.length + 1}`;
+        const midiCount = tracks.filter(t => t.type === "midi").length;
+        const name = `MIDI ${midiCount + 1}`;
         await createTrack(name, "midi", "sine");
         setShowTrackTypeDialog(false);
-    }, [activeComposition, tracks.length, createTrack]);
+    }, [activeComposition, tracks, createTrack]);
 
-    const handleAddSampleTrack = useCallback(() => {
+    const handleAddAudioTrack = useCallback(async () => {
         if (!activeComposition) return;
+        const audioCount = tracks.filter(t => t.type === "audio").length;
+        const name = `Audio ${audioCount + 1}`;
+        await createTrack(name, "audio");
         setShowTrackTypeDialog(false);
-        setShowSampleBrowser(true);
-    }, [activeComposition]);
-
-    const handleSampleSelected = useCallback((sample: any) => {
-        if (!activeComposition) return;
-        const name = sample.name || `Track ${tracks.length + 1}`;
-        createTrack(name, "audio");
-        setShowSampleBrowser(false);
-    }, [activeComposition, tracks.length, createTrack]);
+    }, [activeComposition, tracks, createTrack]);
 
     const handleUndo = useCallback(async () => {
         await undo();
@@ -185,13 +179,7 @@ export function SequencerActionToolbar() {
                 isOpen={showTrackTypeDialog}
                 onClose={() => setShowTrackTypeDialog(false)}
                 onSelectMIDI={handleAddMIDITrack}
-                onSelectSample={handleAddSampleTrack}
-            />
-
-            <SequencerSampleBrowser
-                isOpen={showSampleBrowser}
-                onClose={() => setShowSampleBrowser(false)}
-                onSelectSample={handleSampleSelected}
+                onSelectAudio={handleAddAudioTrack}
             />
         </>
     );

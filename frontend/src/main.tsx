@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Toaster } from "sonner";
 import App from "./App";
 import { PopoutWindow } from "@/components/layout";
 import { WebSocketProvider } from "./providers/WebSocketProvider.tsx";
@@ -21,6 +22,9 @@ createRoot(document.getElementById("root")!).render(
                         <Route path="/" element={<App />} />
                         <Route path="/popout" element={<PopoutWindow />} />
                     </Routes>
+
+                    {/* Sonner toasts - used by store and hooks throughout the app */}
+                    <Toaster position="bottom-right" theme="dark" />
                 </ToastProvider>
             </TooltipProvider>
         </BrowserRouter>

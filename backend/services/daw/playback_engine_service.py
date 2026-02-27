@@ -399,8 +399,8 @@ class PlaybackEngineService:
             return
 
         try:
-            # Handle sample-based clips (track has sample reference)
-            if track.type == "sample" and track.sample_id:
+            # Handle audio clips whose sample is referenced via the track (track-level sample_id)
+            if track.type == "audio" and track.sample_id:
                 # Load sample into buffer if not already loaded
                 sample_id = track.sample_id or track.id
                 logger.info(f"🔍 Looking for sample: {sample_id}")
@@ -459,36 +459,45 @@ class PlaybackEngineService:
                         logger.info(f"🎚️ Created mixer channel for track {track.id} on bus {track_bus}")
 
                 # Calculate playback parameters
-                # Add audio_offset to the start position (trim the sample)
-                start_pos = (offset + (clip.audio_offset or 0.0)) / clip.duration if clip.duration > 0 else 0.0
-                loop_enabled = 1 if clip.is_looped else 0
+                buf_duration = self.buffer_manager.get_buffer_duration(sample_id) if self.buffer_manager else 0.0
+                audio_offset_secs = clip.audio_offset or 0.0
+                if buf_duration > 0:
+                    start_pos = min(audio_offset_secs / buf_duration, 1.0)
+                    end_pos = min(clip.audio_end / buf_duration, 1.0) if clip.audio_end is not None else 1.0
+                else:
+                    start_pos = 0.0
+                    end_pos = 1.0
 
-                # Send /s_new message to create samplePlayer synth
+                # Combined rate: playback_rate * pitch shift (semitones -> ratio)
+                rate = clip.playback_rate * (2.0 ** (clip.pitch_semitones / 12.0))
+                loop_enabled = 1 if clip.loop_enabled else 0
+                reverse = 1 if clip.reverse else 0
+
                 self.engine_manager.send_message(
                     "/s_new",
-                    "samplePlayer",  # synthdef name
+                    "samplePlayer",
                     node_id,
-                    0,  # addAction (0 = add to head)
-                    1,  # target (1 = default group)
+                    0,  # addAction: add to head
+                    1,  # target: default group
                     "bufnum", buffer_num,
-                    "rate", 1.0,
-                    "amp", 0.8 * clip.gain,  # Apply clip gain only (track volume handled by mixer)
-                    "pan", 0.0,  # Pan handled by mixer channel
+                    "rate", rate,
+                    "amp", clip.gain,
                     "startPos", start_pos,
+                    "endPos", end_pos,
+                    "fadeIn", max(clip.fade_in, 0.005),   # minimum 5ms to avoid clicks
+                    "fadeOut", max(clip.fade_out, 0.05),  # minimum 50ms for clean tail
+                    "reverse", reverse,
                     "loop", loop_enabled,
                     "gate", 1,
-                    "out", track_bus  # Route to track bus
+                    "out", track_bus
                 )
 
-                # Track active synth (TIMELINE PLAYBACK)
                 self.timeline_active_synths[clip.id] = node_id
+                logger.info(f"🎵 Triggered sample clip {clip.id} (node {node_id}, buf {buffer_num}, sample: {track.sample_name})")
+                logger.info(f"   rate={rate:.3f}, start={start_pos:.3f}, end={end_pos:.3f}, reverse={reverse}, loop={loop_enabled}")
 
-                logger.info(f"🎵 Triggered sample clip {clip.id} (node {node_id}, buffer {buffer_num}, sample: {track.sample_name})")
-                logger.info(f"   Volume: track={track.volume:.2f}, clip_gain={clip.gain:.2f}, final_amp={0.8 * clip.gain * track.volume:.2f}")
-                logger.info(f"   Pan: {track.pan:.2f}")
-
-            # Handle audio clips (clip has audio file reference)
-            elif clip.type == "audio" and clip.audio_file_path:
+            # Handle audio clips (clip has audio file path but track has no sample_id)
+            elif clip.type == "audio" and clip.audio_file_path and not track.sample_id:
                 # Resolve audio file path
                 audio_file_path = clip.audio_file_path
                 audio_path = None
@@ -537,32 +546,42 @@ class PlaybackEngineService:
                         logger.info(f"🎚️ Created mixer channel for track {track.id} on bus {track_bus}")
 
                 # Calculate playback parameters
-                start_pos = (offset + (clip.audio_offset or 0.0)) / clip.duration if clip.duration > 0 else 0.0
-                loop_enabled = 1 if clip.is_looped else 0
+                buf_duration = self.buffer_manager.get_buffer_duration(clip.id) if self.buffer_manager else 0.0
+                audio_offset_secs = clip.audio_offset or 0.0
+                if buf_duration > 0:
+                    start_pos = min(audio_offset_secs / buf_duration, 1.0)
+                    end_pos = min(clip.audio_end / buf_duration, 1.0) if clip.audio_end is not None else 1.0
+                else:
+                    start_pos = 0.0
+                    end_pos = 1.0
 
-                # Send /s_new message to create samplePlayer synth
+                # Combined rate: playback_rate * pitch shift (semitones -> ratio)
+                rate = clip.playback_rate * (2.0 ** (clip.pitch_semitones / 12.0))
+                loop_enabled = 1 if clip.loop_enabled else 0
+                reverse = 1 if clip.reverse else 0
+
                 self.engine_manager.send_message(
                     "/s_new",
-                    "samplePlayer",  # synthdef name
+                    "samplePlayer",
                     node_id,
-                    0,  # addAction (0 = add to head)
-                    1,  # target (1 = default group)
+                    0,  # addAction: add to head
+                    1,  # target: default group
                     "bufnum", buffer_num,
-                    "rate", 1.0,
-                    "amp", 0.8 * clip.gain,  # Apply clip gain only (track volume handled by mixer)
-                    "pan", 0.0,  # Pan handled by mixer channel
+                    "rate", rate,
+                    "amp", clip.gain,
                     "startPos", start_pos,
+                    "endPos", end_pos,
+                    "fadeIn", max(clip.fade_in, 0.005),   # minimum 5ms to avoid clicks
+                    "fadeOut", max(clip.fade_out, 0.05),  # minimum 50ms for clean tail
+                    "reverse", reverse,
                     "loop", loop_enabled,
                     "gate", 1,
-                    "out", track_bus  # Route to track bus
+                    "out", track_bus
                 )
 
-                # Track active synth (TIMELINE PLAYBACK)
                 self.timeline_active_synths[clip.id] = node_id
-
-                logger.info(f"🎵 Triggered audio clip {clip.id} (node {node_id}, buffer {buffer_num})")
-                logger.info(f"   Volume: track={track.volume:.2f}, clip_gain={clip.gain:.2f}, final_amp={0.8 * clip.gain * track.volume:.2f}")
-                logger.info(f"   Pan: {track.pan:.2f}")
+                logger.info(f"🎵 Triggered audio clip {clip.id} (node {node_id}, buf {buffer_num})")
+                logger.info(f"   rate={rate:.3f}, start={start_pos:.3f}, end={end_pos:.3f}, reverse={reverse}, loop={loop_enabled}")
 
             # Handle MIDI clips
             elif clip.type == "midi" and clip.midi_events:

@@ -95,8 +95,7 @@ async def upload_sample(
             final_file_path = os.path.join(samples_dir, final_file_name)
 
             try:
-                # Use ffmpeg to convert to WAV
-                subprocess.run([
+                result = subprocess.run([
                     'ffmpeg', '-i', temp_file_path,
                     '-acodec', 'pcm_s16le',  # 16-bit PCM
                     '-ar', '48000',  # 48kHz sample rate
@@ -124,13 +123,23 @@ async def upload_sample(
         # Get file size
         file_size = os.path.getsize(final_file_path)
 
+        # Compute actual audio duration using soundfile
+        duration = 0.0
+        try:
+            import soundfile as sf
+            info = sf.info(final_file_path)
+            duration = info.duration
+            logger.info(f"📏 Sample duration: {duration:.3f}s")
+        except Exception as e:
+            logger.warning(f"⚠️  Could not read duration: {e}")
+
         # Create metadata
         now = datetime.now().isoformat()
         metadata = SampleMetadata(
             id=sample_id,
             name=name,
             category=category,
-            duration=0.0,  # Will be updated later
+            duration=duration,
             size=file_size,
             file_name=final_file_name,
             created_at=now,
@@ -214,9 +223,22 @@ async def download_sample(
         if not os.path.exists(file_path):
             raise SampleNotFoundError(sample_id)
 
+        # Determine correct MIME type from file extension
+        ext = os.path.splitext(sample_data["file_name"])[1].lower()
+        mime_types = {
+            ".wav": "audio/wav",
+            ".aiff": "audio/aiff",
+            ".aif": "audio/aiff",
+            ".flac": "audio/flac",
+            ".mp3": "audio/mpeg",
+            ".ogg": "audio/ogg",
+            ".webm": "audio/webm",
+        }
+        media_type = mime_types.get(ext, "audio/wav")
+
         return FileResponse(
             file_path,
-            media_type="audio/webm",
+            media_type=media_type,
             filename=sample_data["file_name"]
         )
     except Exception as e:

@@ -186,7 +186,7 @@ class CompositionStateService:
         self,
         composition_id: str,
         name: str,
-        track_type: str = "sample",
+        track_type: str = "audio",
         color: str = "#3b82f6",
         sample_id: Optional[str] = None,
         sample_name: Optional[str] = None,
@@ -203,7 +203,7 @@ class CompositionStateService:
         Args:
             composition_id: ID of composition to add track to
             name: Track name
-            track_type: Track type (midi, audio, sample)
+            track_type: Track type (midi, audio)
             color: Track color (hex)
             sample_id: Sample ID for sample tracks
             sample_name: Cached sample name
@@ -224,6 +224,10 @@ class CompositionStateService:
         # VALIDATION LAYER 3: Service-level validation
         # This is the final line of defense - validates instrument before track creation
         validate_instrument(instrument)
+
+        # Backward compatibility: treat "sample" type as "audio"
+        if track_type == "sample":
+            track_type = "audio"
 
         track_id = str(uuid.uuid4())
         track = Track(
@@ -470,6 +474,16 @@ class CompositionStateService:
             midi_events=request.midi_events if request.clip_type == "midi" else None,
             audio_file_path=request.audio_file_path if request.clip_type == "audio" else None,
             audio_offset=0.0 if request.clip_type == "audio" else None,
+            sample_id=request.sample_id if request.clip_type == "audio" else None,
+            audio_end=request.audio_end if request.clip_type == "audio" else None,
+            pitch_semitones=request.pitch_semitones,
+            playback_rate=request.playback_rate,
+            reverse=request.reverse,
+            fade_in=request.fade_in,
+            fade_out=request.fade_out,
+            loop_enabled=request.loop_enabled,
+            loop_start=request.loop_start,
+            loop_end=request.loop_end,
         )
 
         composition.clips.append(clip)
@@ -501,6 +515,8 @@ class CompositionStateService:
                     clip.start_time = request.start_time
                 if request.duration is not None:
                     clip.duration = request.duration
+                if request.name is not None:
+                    clip.name = request.name
                 if request.is_muted is not None:
                     clip.is_muted = request.is_muted
                 if request.is_looped is not None:
@@ -511,6 +527,24 @@ class CompositionStateService:
                     clip.midi_events = request.midi_events
                 if request.audio_offset is not None:
                     clip.audio_offset = request.audio_offset
+                if request.audio_end is not None:
+                    clip.audio_end = request.audio_end
+                if request.pitch_semitones is not None:
+                    clip.pitch_semitones = request.pitch_semitones
+                if request.playback_rate is not None:
+                    clip.playback_rate = request.playback_rate
+                if request.reverse is not None:
+                    clip.reverse = request.reverse
+                if request.fade_in is not None:
+                    clip.fade_in = request.fade_in
+                if request.fade_out is not None:
+                    clip.fade_out = request.fade_out
+                if request.loop_enabled is not None:
+                    clip.loop_enabled = request.loop_enabled
+                if request.loop_start is not None:
+                    clip.loop_start = request.loop_start
+                if request.loop_end is not None:
+                    clip.loop_end = request.loop_end
 
                 composition.updated_at = datetime.now()
                 logger.info(f"📝 Updated clip {clip_id}")

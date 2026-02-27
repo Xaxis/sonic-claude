@@ -12,16 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Upload, Music, Play, Edit2, Trash2 } from "lucide-react";
 import type { SampleMetadata } from "@/services/api/providers";
 
-const SAMPLE_CATEGORIES = [
-    "All",
-    "Uncategorized",
-    "Drums",
-    "Bass",
-    "Synth",
-    "Vocals",
-    "FX",
-    "Loops",
-];
+const DEFAULT_CATEGORIES = ["Uncategorized", "Drums", "Bass", "Synth", "Vocals", "FX", "Loops", "Recordings"];
 
 interface SampleLibraryBrowserProps {
     // Sample data
@@ -73,6 +64,12 @@ export function InputsSampleLibrary({
     onDeleteSample,
     onSampleDragStart,
 }: SampleLibraryBrowserProps) {
+    // Build category list: defaults + any extra categories found in sample data
+    const extraCategories = samples
+        .map(s => s.category)
+        .filter(cat => cat && !DEFAULT_CATEGORIES.includes(cat));
+    const allCategories = ["All", ...DEFAULT_CATEGORIES, ...Array.from(new Set(extraCategories))];
+
     // Filter samples
     const filteredSamples = samples.filter((sample) => {
         const matchesCategory = selectedCategory === "All" || sample.category === selectedCategory;
@@ -120,7 +117,7 @@ export function InputsSampleLibrary({
 
             <SubPanel title="Categories" collapsible>
                 <div className="flex flex-wrap gap-1 p-2">
-                    {SAMPLE_CATEGORIES.map((cat) => (
+                    {allCategories.map((cat) => (
                         <Button
                             key={cat}
                             onClick={() => onCategoryChange(cat)}
@@ -157,7 +154,7 @@ export function InputsSampleLibrary({
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {SAMPLE_CATEGORIES.filter((c) => c !== "All").map((cat) => (
+                                            {allCategories.filter((c) => c !== "All").map((cat) => (
                                                 <SelectItem key={cat} value={cat}>
                                                     {cat}
                                                 </SelectItem>

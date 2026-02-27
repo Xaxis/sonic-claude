@@ -313,7 +313,7 @@ interface DAWStore {
     seek: (position: number, triggerAudio?: boolean) => Promise<void>;
 
     // Tracks (operate on active composition)
-    createTrack: (name: string, type: "midi" | "audio" | "sample", instrument?: string) => Promise<void>;
+    createTrack: (name: string, type: "midi" | "audio", instrument?: string) => Promise<void>;
     deleteTrack: (trackId: string) => Promise<void>;
     renameTrack: (trackId: string, name: string) => Promise<void>;
     updateTrack: (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => Promise<void>;
@@ -689,10 +689,15 @@ export const useDAWStore = create<DAWStore>()(
                     return;
                 }
 
-                // Execute mutation (backend handles undo automatically)
-                await api.compositions.update(activeComposition.id, {
-                    tempo,
-                });
+                // Update live playback engine first (may fail if not playing — that's OK)
+                try {
+                    await api.playback.setTempo({ tempo });
+                } catch {
+                    // Not playing or engine not ready — tempo will be applied at next play
+                }
+
+                // Persist to composition (backend handles undo automatically)
+                await api.compositions.update(activeComposition.id, { tempo });
 
                 // Reload composition (backend auto-persisted)
                 await get().loadComposition(activeComposition.id);
@@ -744,27 +749,22 @@ export const useDAWStore = create<DAWStore>()(
         // ====================================================================
 
         createTrack: async (name, type, instrument) => {
-            try {
-                const { activeComposition } = get();
-                if (!activeComposition) {
-                    toast.error("No active composition");
-                    return;
-                }
+            const { activeComposition } = get();
+            if (!activeComposition) {
+                toast.error("No active composition");
+                return;
+            }
 
-                // Execute mutation (backend handles undo automatically)
+            try {
                 await api.compositions.createTrack({
                     composition_id: activeComposition.id,
                     name,
                     type,
                     instrument,
                 });
-
-                // Reload composition (backend auto-persisted)
+                // Full reload needed to get real ID and proper track object from backend
                 await get().loadComposition(activeComposition.id);
-
-                // Refresh undo/redo status
                 await get().refreshUndoRedoStatus();
-
                 toast.success(`Created track: ${name}`);
             } catch (error) {
                 console.error("Failed to create track:", error);
@@ -773,85 +773,81 @@ export const useDAWStore = create<DAWStore>()(
         },
 
         deleteTrack: async (trackId) => {
+            const { activeComposition, tracks, clips } = get();
+            if (!activeComposition) {
+                toast.error("No active composition");
+                return;
+            }
+
+            const track = tracks.find(t => t.id === trackId);
+            if (!track) {
+                toast.error("Track not found");
+                return;
+            }
+
+            // Optimistic: remove track and its clips immediately
+            const prevTracks = tracks;
+            const prevClips = clips;
+            set({
+                tracks: tracks.filter(t => t.id !== trackId),
+                clips: clips.filter(c => c.track_id !== trackId),
+            });
+
             try {
-                const { activeComposition, tracks } = get();
-                if (!activeComposition) {
-                    toast.error("No active composition");
-                    return;
-                }
-
-                // Find the track
-                const track = tracks.find(t => t.id === trackId);
-                if (!track) {
-                    toast.error("Track not found");
-                    return;
-                }
-
-                // Execute mutation (backend handles undo automatically)
                 await api.compositions.deleteTrack(activeComposition.id, trackId);
-
-                // Reload composition (backend auto-persisted)
-                await get().loadComposition(activeComposition.id);
-
-                // Refresh undo/redo status
                 await get().refreshUndoRedoStatus();
-
                 toast.success("Track deleted");
             } catch (error) {
+                // Revert optimistic delete
+                set({ tracks: prevTracks, clips: prevClips });
                 console.error("Failed to delete track:", error);
                 toast.error("Failed to delete track");
             }
         },
 
         renameTrack: async (trackId, name) => {
+            const { activeComposition, tracks } = get();
+            if (!activeComposition) return;
+
+            const track = tracks.find(t => t.id === trackId);
+            if (!track) {
+                toast.error("Track not found");
+                return;
+            }
+
+            // Optimistic update
+            const prevTracks = tracks;
+            set({ tracks: tracks.map(t => t.id === trackId ? { ...t, name } : t) });
+
             try {
-                const { activeComposition, tracks } = get();
-                if (!activeComposition) return;
-
-                // Find the track
-                const track = tracks.find(t => t.id === trackId);
-                if (!track) {
-                    toast.error("Track not found");
-                    return;
-                }
-
-                // Execute mutation (backend handles undo automatically)
                 await api.compositions.updateTrack(activeComposition.id, trackId, { name });
-
-                // Reload composition (backend auto-persisted)
-                await get().loadComposition(activeComposition.id);
-
-                // Refresh undo/redo status
                 await get().refreshUndoRedoStatus();
-
             } catch (error) {
+                set({ tracks: prevTracks });
                 console.error("Failed to rename track:", error);
                 toast.error("Failed to rename track");
             }
         },
 
         updateTrack: async (trackId, updates) => {
+            const { activeComposition, tracks } = get();
+            if (!activeComposition) return;
+
+            const track = tracks.find(t => t.id === trackId);
+            if (!track) {
+                toast.error("Track not found");
+                return;
+            }
+
+            // Optimistic update
+            const prevTracks = tracks;
+            set({ tracks: tracks.map(t => t.id === trackId ? { ...t, ...updates } : t) });
+
             try {
-                const { activeComposition, tracks } = get();
-                if (!activeComposition) return;
-
-                // Find the track
-                const track = tracks.find(t => t.id === trackId);
-                if (!track) {
-                    toast.error("Track not found");
-                    return;
-                }
-
-                // Execute mutation (backend handles undo automatically)
                 await api.compositions.updateTrack(activeComposition.id, trackId, updates);
-
-                // Reload composition (backend auto-persisted)
-                await get().loadComposition(activeComposition.id);
-
-                // Refresh undo/redo status
                 await get().refreshUndoRedoStatus();
-
             } catch (error) {
+                set({ tracks: prevTracks });
                 console.error("Failed to update track:", error);
                 toast.error("Failed to update track");
             }
@@ -958,64 +954,79 @@ export const useDAWStore = create<DAWStore>()(
         // ====================================================================
 
         addClip: async (request) => {
+            const { activeComposition } = get();
+            if (!activeComposition) {
+                toast.error("No active composition");
+                return;
+            }
+
+            // Optimistic: add a temporary clip to UI immediately
+            const tempId = `temp-${Date.now()}`;
+            const tempClip = {
+                id: tempId,
+                name: request.name || (request.clip_type === "midi" ? "MIDI Clip" : "Audio Clip"),
+                type: request.clip_type,
+                track_id: request.track_id,
+                start_time: request.start_time,
+                duration: request.duration,
+                is_muted: false,
+                is_looped: false,
+                gain: 1.0,
+                pitch_semitones: 0.0,
+                playback_rate: 1.0,
+                reverse: false,
+                fade_in: 0.0,
+                fade_out: 0.0,
+                loop_enabled: false,
+                loop_start: 0.0,
+                midi_events: request.midi_events,
+                audio_file_path: request.audio_file_path,
+                sample_id: request.sample_id,
+            };
+            set((state) => ({ clips: [...state.clips, tempClip as any] }));
+
             try {
-                const { activeComposition } = get();
-                if (!activeComposition) {
-                    toast.error("No active composition");
-                    return;
-                }
-
-                // Execute mutation (backend handles undo automatically)
                 await api.compositions.addClip(request);
-
-                // Reload composition (backend auto-persisted)
+                // Reload to get real ID and confirmed state
                 await get().loadComposition(activeComposition.id);
-
-                // Refresh undo/redo status
                 await get().refreshUndoRedoStatus();
-
             } catch (error) {
+                // Revert: remove temp clip
+                set((state) => ({ clips: state.clips.filter(c => c.id !== tempId) }));
                 console.error("Failed to add clip:", error);
                 toast.error("Failed to add clip");
             }
         },
 
         updateClip: async (clipId, request) => {
-            try {
-                const { activeComposition, clips } = get();
-                if (!activeComposition) {
-                    console.warn("Cannot update clip: no active composition");
-                    return;
-                }
+            const { activeComposition, clips } = get();
+            if (!activeComposition) {
+                console.warn("Cannot update clip: no active composition");
+                return;
+            }
 
-                // Find the clip in current state
-                const clip = clips.find(c => c.id === clipId);
-                if (!clip) {
-                    console.warn(`Cannot update clip: clip ${clipId} not found in current composition`);
-                    // Reload composition to sync state
-                    await get().loadComposition(activeComposition.id);
-                    return;
-                }
-
-                // Execute mutation (backend handles undo automatically)
-                await api.compositions.updateClip(activeComposition.id, clipId, request);
-
-                // Reload composition (backend auto-persisted)
+            const clip = clips.find(c => c.id === clipId);
+            if (!clip) {
+                console.warn(`Cannot update clip: clip ${clipId} not found`);
                 await get().loadComposition(activeComposition.id);
+                return;
+            }
 
-                // Refresh undo/redo status
+            // Optimistic update
+            const prevClips = clips;
+            set({ clips: clips.map(c => c.id === clipId ? { ...c, ...request } : c) });
+
+            try {
+                await api.compositions.updateClip(activeComposition.id, clipId, request);
                 await get().refreshUndoRedoStatus();
-
             } catch (error: any) {
+                // Revert
+                set({ clips: prevClips });
                 console.error("Failed to update clip:", error);
 
-                // If clip not found on backend, reload composition to sync state
                 if (error?.response?.status === 404 || error?.message?.includes('not found')) {
-                    console.warn('Clip not found on backend, reloading composition to sync state');
-                    const { activeComposition } = get();
-                    if (activeComposition) {
-                        await get().loadComposition(activeComposition.id);
-                    }
+                    console.warn('Clip not found on backend, reloading composition');
+                    await get().loadComposition(activeComposition.id);
                 } else {
                     toast.error("Failed to update clip");
                 }
@@ -1023,41 +1034,34 @@ export const useDAWStore = create<DAWStore>()(
         },
 
         deleteClip: async (clipId) => {
-            try {
-                const { activeComposition, clips } = get();
-                if (!activeComposition) {
-                    console.warn("Cannot delete clip: no active composition");
-                    return;
-                }
+            const { activeComposition, clips } = get();
+            if (!activeComposition) {
+                console.warn("Cannot delete clip: no active composition");
+                return;
+            }
 
-                // Find the clip in current state
-                const clip = clips.find(c => c.id === clipId);
-                if (!clip) {
-                    console.warn(`Cannot delete clip: clip ${clipId} not found in current composition`);
-                    // Reload composition to sync state
-                    await get().loadComposition(activeComposition.id);
-                    return;
-                }
-
-                // Execute mutation (backend handles undo automatically)
-                await api.compositions.deleteClip(activeComposition.id, clipId);
-
-                // Reload composition (backend auto-persisted)
+            const clip = clips.find(c => c.id === clipId);
+            if (!clip) {
+                console.warn(`Cannot delete clip: clip ${clipId} not found`);
                 await get().loadComposition(activeComposition.id);
+                return;
+            }
 
-                // Refresh undo/redo status
+            // Optimistic: remove immediately
+            const prevClips = clips;
+            set({ clips: clips.filter(c => c.id !== clipId) });
+
+            try {
+                await api.compositions.deleteClip(activeComposition.id, clipId);
                 await get().refreshUndoRedoStatus();
-
             } catch (error: any) {
+                // Revert
+                set({ clips: prevClips });
                 console.error("Failed to delete clip:", error);
 
-                // If clip not found on backend, reload composition to sync state
                 if (error?.response?.status === 404 || error?.message?.includes('not found')) {
-                    console.warn('Clip not found on backend, reloading composition to sync state');
-                    const { activeComposition } = get();
-                    if (activeComposition) {
-                        await get().loadComposition(activeComposition.id);
-                    }
+                    console.warn('Clip not found on backend, reloading composition');
+                    await get().loadComposition(activeComposition.id);
                 } else {
                     toast.error("Failed to delete clip");
                 }
@@ -1079,9 +1083,21 @@ export const useDAWStore = create<DAWStore>()(
                     track_id: clip.track_id,
                     start_time: clip.start_time + clip.duration, // Place after original
                     duration: clip.duration,
-                    midi_events: clip.midi_events,
-                    audio_file_path: clip.audio_file_path,
                     name: clip.name ? `${clip.name} (copy)` : undefined,
+                    // MIDI fields
+                    midi_events: clip.midi_events,
+                    // Audio fields — copy all editing params so duplicate is identical
+                    audio_file_path: clip.audio_file_path,
+                    sample_id: clip.sample_id,
+                    audio_end: clip.audio_end,
+                    pitch_semitones: clip.pitch_semitones,
+                    playback_rate: clip.playback_rate,
+                    reverse: clip.reverse,
+                    fade_in: clip.fade_in,
+                    fade_out: clip.fade_out,
+                    loop_enabled: clip.loop_enabled,
+                    loop_start: clip.loop_start,
+                    loop_end: clip.loop_end,
                 });
 
                 set((state) => ({
@@ -2309,7 +2325,9 @@ export const useDAWStore = create<DAWStore>()(
         openPianoRoll: (clipId) => {
             set({
                 showPianoRoll: true,
-                pianoRollClipId: clipId
+                pianoRollClipId: clipId,
+                showSampleEditor: false,
+                sampleEditorClipId: null,
             });
 
             // Auto-scroll to notes after a brief delay to ensure DOM is ready
@@ -2325,7 +2343,9 @@ export const useDAWStore = create<DAWStore>()(
 
         openSampleEditor: (clipId) => set({
             showSampleEditor: true,
-            sampleEditorClipId: clipId
+            sampleEditorClipId: clipId,
+            showPianoRoll: false,
+            pianoRollClipId: null,
         }),
 
         closeSampleEditor: () => set({

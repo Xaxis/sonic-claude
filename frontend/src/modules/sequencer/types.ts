@@ -19,7 +19,7 @@ export interface SequencerTrack {
     id: string;
     name: string;
     sequence_id: string; // Parent sequence ID
-    type: "midi" | "audio" | "sample";
+    type: "midi" | "audio";
     color: string;
     is_muted: boolean;
     is_solo: boolean;
@@ -52,7 +52,17 @@ export interface SequencerClip {
 
     // Audio-specific
     audio_file_path?: string;
-    audio_offset?: number; // seconds
+    audio_offset?: number;      // Trim start point (seconds from file start)
+    sample_id?: string;         // Source sample ID
+    audio_end?: number;         // Trim end point (seconds from file start, undefined = full length)
+    pitch_semitones: number;    // -24 to +24
+    playback_rate: number;      // 0.25 to 4.0
+    reverse: boolean;
+    fade_in: number;            // seconds
+    fade_out: number;           // seconds
+    loop_enabled: boolean;
+    loop_start: number;         // seconds from file start
+    loop_end?: number;          // seconds from file start, undefined = full length
 
     is_muted: boolean;
     is_looped: boolean;

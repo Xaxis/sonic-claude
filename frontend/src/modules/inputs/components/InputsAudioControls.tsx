@@ -105,11 +105,12 @@ export function InputsAudioControls({
                 <div className="space-y-2 p-2">
                     <div className="flex items-center gap-2">
                         <div className="bg-background border-border h-4 flex-1 overflow-hidden rounded border">
-                            {/* Level meter - cyan to yellow to red */}
+                            {/* Level meter - sqrt-scaled so quiet signals are visually present.
+                                -60dB→0%, -40dB→58%, -30dB→71%, -20dB→82%, -10dB→91%, 0dB→100% */}
                             <div
                                 className="h-full transition-all duration-75"
                                 style={{
-                                    width: `${Math.max(0, Math.min(100, ((inputLevel + 60) / 60) * 100))}%`,
+                                    width: `${Math.sqrt(Math.max(0, (inputLevel + 60) / 60)) * 100}%`,
                                     backgroundColor:
                                         inputLevel > -6
                                             ? "hsl(0 85% 60%)"

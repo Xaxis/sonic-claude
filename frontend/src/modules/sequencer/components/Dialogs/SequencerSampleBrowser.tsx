@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { cn } from "@/lib/utils.ts";
 import { api } from "@/services/api";
+import { apiConfig } from "@/config/api.config";
 import type { SampleMetadata } from "@/services/api/providers";
 
 interface SequencerSampleBrowserProps {
@@ -57,7 +58,7 @@ export function SequencerSampleBrowser({ isOpen, onClose, onSelectSample }: Sequ
             if (audioElement) {
                 audioElement.pause();
             }
-            const audio = new Audio(`/api/samples/${sample.id}/download`);
+            const audio = new Audio(apiConfig.getURL(`/api/samples/${sample.id}/download`));
             audio.play();
             audio.onended = () => setPlayingSampleId(null);
             setAudioElement(audio);

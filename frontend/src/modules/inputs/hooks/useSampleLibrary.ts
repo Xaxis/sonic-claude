@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "@/services/api";
+import { apiConfig } from "@/config/api.config";
 import type { SampleMetadata } from "@/services/api/providers";
 import { toast } from "sonner";
 
@@ -53,7 +54,7 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
 
             if (response.sample) {
                 // Update duration after upload
-                const downloadUrl = `/api/samples/${response.sample.id}/download`;
+                const downloadUrl = apiConfig.getURL(`/api/samples/${response.sample.id}/download`);
                 const audio = new Audio(downloadUrl);
                 audio.addEventListener("loadedmetadata", async () => {
                     const duration = audio.duration;
@@ -144,7 +145,7 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
             }
 
             // Fetch and decode audio
-            const url = `/api/samples/${sampleId}/download`;
+            const url = apiConfig.getURL(`/api/samples/${sampleId}/download`);
             const response = await fetch(url);
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);

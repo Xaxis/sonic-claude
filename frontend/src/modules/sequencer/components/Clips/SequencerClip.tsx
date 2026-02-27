@@ -10,7 +10,7 @@
  * Displays a clip with waveform visualization, handles selection and actions
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils.ts";
 import type { SequencerClip } from "../../types.ts";
 import { WaveformDisplay } from "../../../../components/ui/waveform-display.tsx";
@@ -41,9 +41,10 @@ export function SequencerClip({
     const gridSize = useDAWStore(state => state.gridSize);
     const selectedClipId = useDAWStore(state => state.selectedClipId);
     const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
+    const sampleEditorClipId = useDAWStore(state => state.sampleEditorClipId);
     const isSelected = selectedClipId === clip.id;
     const isEditingInPianoRoll = pianoRollClipId === clip.id;
-    const isEditingInSampleEditor = false; // TODO: Implement sample editor
+    const isEditingInSampleEditor = sampleEditorClipId === clip.id;
 
     // ========================================================================
     // ACTIONS: Get from Zustand store
@@ -53,6 +54,7 @@ export function SequencerClip({
     const deleteClip = useDAWStore(state => state.deleteClip);
     const updateClip = useDAWStore(state => state.updateClip);
     const openPianoRoll = useDAWStore(state => state.openPianoRoll);
+    const openSampleEditor = useDAWStore(state => state.openSampleEditor);
     const setClipDragState = useDAWStore(state => state.setClipDragState);
 
     // ========================================================================
@@ -79,6 +81,7 @@ export function SequencerClip({
 
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null);
+    const didDragRef = useRef(false); // tracks if mouse actually moved during a drag gesture
     const [isEditingName, setIsEditingName] = useState(false);
 
     // ========================================================================
@@ -134,12 +137,11 @@ export function SequencerClip({
     const handleMouseDown = (e: React.MouseEvent, action: "move" | "resize-left" | "resize-right") => {
         e.stopPropagation();
         setDragStartX(e.clientX);
-        // Use displayStartTime/displayDuration which includes any pending drag state
-        // This ensures we start from the current visual position, not the backend position
         setDragStartTime(displayStartTime);
         setDragStartDuration(displayDuration);
 
         if (action === "move") {
+            didDragRef.current = false; // reset on each mousedown
             setIsDragging(true);
         } else if (action === "resize-left") {
             setIsResizing("left");
@@ -155,6 +157,11 @@ export function SequencerClip({
         const handleMouseMove = (e: MouseEvent) => {
             const deltaX = e.clientX - dragStartX;
             const deltaBeats = deltaX / (pixelsPerBeat * zoom);
+
+            // Mark as actual drag once mouse has moved meaningfully
+            if (Math.abs(deltaX) > 3) {
+                didDragRef.current = true;
+            }
 
             if (isDragging) {
                 // Calculate new position with snap
@@ -221,8 +228,10 @@ export function SequencerClip({
     }, [isDragging, isResizing, dragStartX, dragStartTime, dragStartDuration, pixelsPerBeat, zoom, snapEnabled, gridSize, clip.id, displayStartTime, displayDuration, dragState, updateClip]);
 
     const handleClick = (e: React.MouseEvent) => {
-        // Don't trigger click if we just finished dragging/resizing
-        if (isDragging || isResizing) {
+        // Don't open editor if the user actually dragged or is resizing.
+        // Check didDragRef (a ref, not state) to avoid the React batching race where
+        // isDragging state is still true when this click event fires.
+        if (didDragRef.current || isResizing) {
             return;
         }
 
@@ -231,19 +240,16 @@ export function SequencerClip({
         // Single-click: select clip
         setSelectedClipId(clip.id);
 
-        // Open piano roll for MIDI clips (only if clip still exists in store)
-        if (clip.type === "midi") {
-            // Verify clip exists in current composition before opening
-            const currentClips = useDAWStore.getState().clips;
-            const clipExists = currentClips.some(c => c.id === clip.id);
+        // Verify clip still exists in store before opening editor
+        const currentClips = useDAWStore.getState().clips;
+        const clipExists = currentClips.some(c => c.id === clip.id);
+        if (!clipExists) return;
 
-            if (clipExists) {
-                openPianoRoll(clip.id);
-            } else {
-                console.warn(`Clip ${clip.id} no longer exists in composition`);
-            }
+        if (clip.type === "midi") {
+            openPianoRoll(clip.id);
+        } else if (clip.type === "audio") {
+            openSampleEditor(clip.id);
         }
-        // TODO: Implement sample editor for audio clips
     };
 
     return (

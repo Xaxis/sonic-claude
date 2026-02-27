@@ -54,7 +54,7 @@ class CreateTrackAction(BaseModel):
     """
     action: Literal["create_track"] = "create_track"
     name: str
-    type: Literal["midi", "audio", "sample"]
+    type: Literal["midi", "audio"]
     instrument: Optional[ValidInstrument] = Field(
         None,
         description="Instrument/synth name for MIDI tracks. Must be a valid SynthDef from SYNTHDEF_REGISTRY."

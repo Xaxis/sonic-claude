@@ -1091,7 +1091,7 @@ When modifying sequences:
 
                 # Get sample analysis if available
                 sample_analysis = None
-                if track.type == "sample" and full_clips:
+                if track.type == "audio" and full_clips:
                     # Try to get sample analysis from first clip
                     first_clip = full_clips[0]
                     if hasattr(first_clip, 'audio_file_path') and first_clip.audio_file_path:

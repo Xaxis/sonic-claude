@@ -60,7 +60,7 @@ class CompactTrack(BaseModel):
     """Minimal track representation"""
     id: str
     name: str
-    type: Literal["midi", "audio", "sample"]
+    type: Literal["midi", "audio"]
     instrument: Optional[str] = None  # For MIDI tracks
     vol: float = Field(default=1.0, description="Volume (0.0-2.0)")
     pan: float = Field(default=0.0, description="Pan (-1.0 to 1.0)")

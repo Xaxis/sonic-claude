@@ -400,11 +400,11 @@ class CompositionService:
                 track_effects.append(effect_chain)
         composition.track_effects = track_effects
 
-        # Get sample assignments (from sample tracks)
+        # Get sample assignments (from audio tracks with a sample file)
         sample_assignments = {}
         for track in composition.tracks:
-            if track.type == "sample" and hasattr(track, 'sample_path') and track.sample_path:
-                sample_assignments[track.id] = track.sample_path
+            if track.type == "audio" and getattr(track, 'sample_file_path', None):
+                sample_assignments[track.id] = track.sample_file_path
         composition.sample_assignments = sample_assignments
 
         # Update timestamp

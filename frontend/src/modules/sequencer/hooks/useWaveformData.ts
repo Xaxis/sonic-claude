@@ -32,6 +32,8 @@ interface WaveformDataResult {
     leftData: number[];
     /** Right channel waveform data (empty if mono) */
     rightData: number[];
+    /** Actual audio file duration in seconds (from sample metadata) */
+    sampleDurationSeconds: number;
     /** Loading state */
     isLoading: boolean;
     /** Error message if loading failed */
@@ -46,6 +48,7 @@ export function useWaveformData({
 }: UseWaveformDataOptions): WaveformDataResult {
     const [leftData, setLeftData] = useState<number[]>([]);
     const [rightData, setRightData] = useState<number[]>([]);
+    const [sampleDurationSeconds, setSampleDurationSeconds] = useState<number>(0);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +56,7 @@ export function useWaveformData({
         if (!sampleId) {
             setLeftData([]);
             setRightData([]);
+            setSampleDurationSeconds(0);
             setIsLoading(false);
             setError(null);
             return;
@@ -65,9 +69,9 @@ export function useWaveformData({
             setError(null);
 
             try {
-                // Fetch sample metadata to get duration
+                // Fetch sample metadata to get actual file duration
                 const sampleResponse = await api.samples.getById(sampleId);
-                const sampleDurationSeconds = sampleResponse.sample?.duration ?? 0;
+                const fileDurationSeconds = sampleResponse.sample?.duration ?? 0;
 
                 // Fetch audio file
                 const url = apiConfig.getURL(`/api/samples/${sampleId}/download`);
@@ -91,7 +95,7 @@ export function useWaveformData({
 
                 // Calculate how many times the sample loops in the clip
                 // Clamp to reasonable range to avoid memory issues
-                const rawLoopCount = clipDurationSeconds / sampleDurationSeconds;
+                const rawLoopCount = fileDurationSeconds > 0 ? clipDurationSeconds / fileDurationSeconds : 1;
                 const loopCount = Math.max(1, Math.min(100, Math.ceil(rawLoopCount)));
 
                 // Extract and downsample left channel (or mono)
@@ -202,6 +206,7 @@ export function useWaveformData({
                 if (!cancelled) {
                     setLeftData(tiledLeft);
                     setRightData(tiledRight);
+                    setSampleDurationSeconds(fileDurationSeconds);
                     setIsLoading(false);
                 }
             } catch (err) {
@@ -211,6 +216,7 @@ export function useWaveformData({
                     setError(errorMessage);
                     setLeftData([]);
                     setRightData([]);
+                    setSampleDurationSeconds(0);
                     setIsLoading(false);
                 }
             }
@@ -223,6 +229,6 @@ export function useWaveformData({
         };
     }, [sampleId, clipDuration, tempo, samplesPerLoop]);
 
-    return { leftData, rightData, isLoading, error };
+    return { leftData, rightData, sampleDurationSeconds, isLoading, error };
 }
 

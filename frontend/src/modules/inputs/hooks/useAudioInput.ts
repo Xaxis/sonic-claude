@@ -134,7 +134,10 @@ export function useAudioInput({ onRecordingComplete }: UseAudioInputProps = {}) 
             for (let j = 0; j < samplesPerBar; j++) {
                 sum += freqData[i * samplesPerBar + j];
             }
-            barData.push(sum / samplesPerBar / 255); // Normalize to 0-1
+            // Normalize 0-1, then apply sqrt curve: boosts quiet signals visually
+            // e.g. a raw 10% signal becomes ~31%, 25% becomes ~50%, 50% becomes ~71%
+            const linear = sum / samplesPerBar / 255;
+            barData.push(Math.sqrt(linear));
         }
 
         setSpectrumData(barData);
@@ -183,7 +186,9 @@ export function useAudioInput({ onRecordingComplete }: UseAudioInputProps = {}) 
             // Create analyser node
             const analyser = audioContextRef.current.createAnalyser();
             analyser.fftSize = 2048;
-            analyser.smoothingTimeConstant = 0.8;
+            analyser.smoothingTimeConstant = 0.6; // Balance: responsive but bars stay visible between syllables
+            analyser.minDecibels = -100;           // Keep full dynamic range
+            analyser.maxDecibels = -10;            // Raise ceiling so -20dBFS isn't clipped at 255
             analyserRef.current = analyser;
 
             // Create gain node
@@ -302,7 +307,12 @@ export function useAudioInput({ onRecordingComplete }: UseAudioInputProps = {}) 
                     }
 
                     stream = await navigator.mediaDevices.getUserMedia({
-                        audio: { deviceId: { exact: deviceId } },
+                        audio: {
+                            deviceId: { exact: deviceId },
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false,
+                        },
                     });
                     mediaStreamRef.current = stream;
                     console.log("📡 Created media stream for recording");

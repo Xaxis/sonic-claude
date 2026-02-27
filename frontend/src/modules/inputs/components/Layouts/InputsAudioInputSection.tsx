@@ -16,17 +16,23 @@ export function InputsAudioInputSection() {
     const setActiveInputsTab = useDAWStore(state => state.setActiveInputsTab);
 
     // Handle recording completion - upload to backend
-    const handleRecordingComplete = async (file: File, _duration: number) => {
+    const handleRecordingComplete = async (file: File, durationSecs: number) => {
         try {
             // Generate name from timestamp
             const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
             const name = `Recording ${timestamp}`;
-            
-            // Upload to backend
-            await api.samples.upload(file, name, "Recordings");
-            
+
+            // Upload to backend (backend now computes duration via soundfile)
+            const response = await api.samples.upload(file, name, "Recordings");
+
+            // If backend didn't get duration (soundfile unavailable), update it from
+            // the known recording duration provided by MediaRecorder timing
+            if (response.sample && response.sample.duration === 0 && durationSecs > 0) {
+                await api.samples.updateDuration(response.sample.id, durationSecs);
+            }
+
             toast.success(`Recording saved: ${name}`);
-            
+
             // Switch to library tab to show the new recording
             setActiveInputsTab("library");
         } catch (error) {

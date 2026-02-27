@@ -43,7 +43,7 @@ class CreateTrackRequest(BaseModel):
     - FastAPI will return 422 if instrument is invalid
     """
     name: str
-    type: Optional[str] = "sample"  # "midi", "audio", or "sample"
+    type: Optional[str] = "audio"  # "midi" or "audio"
     color: Optional[str] = "#3b82f6"
     sample_id: Optional[str] = None  # For sample-based tracks
     sample_name: Optional[str] = None  # Cached sample name

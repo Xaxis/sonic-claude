@@ -30,7 +30,7 @@ export interface CompactClip {
 export interface CompactTrack {
     id: string;
     name: string;
-    type: "midi" | "audio" | "sample";
+    type: "midi" | "audio";
     instrument?: string | null;  // For MIDI tracks
     vol: number;  // Volume (0.0-2.0)
     pan: number;  // Pan (-1.0 to 1.0)

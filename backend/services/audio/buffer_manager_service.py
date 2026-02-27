@@ -10,6 +10,8 @@ import logging
 from typing import Dict, Optional
 from pathlib import Path
 
+import soundfile as sf
+
 from backend.core.engine_manager import AudioEngineManager
 
 logger = logging.getLogger(__name__)
@@ -27,6 +29,7 @@ class BufferManager:
         """
         self.engine_manager = engine_manager
         self.buffers: Dict[str, int] = {}  # sample_id -> buffer_num
+        self.buffer_durations: Dict[str, float] = {}  # sample_id -> duration in seconds
         self.next_buffer_num: int = 100  # Start at 100 to avoid conflicts with system buffers
 
         logger.info("✅ BufferManager initialized")
@@ -79,7 +82,15 @@ class BufferManager:
             
             # Store buffer mapping
             self.buffers[sample_id] = buffer_num
-            
+
+            # Store duration using soundfile
+            try:
+                info = sf.info(str(full_path))
+                self.buffer_durations[sample_id] = info.duration
+            except Exception as dur_err:
+                logger.warning(f"Could not read duration for {full_path.name}: {dur_err}")
+                self.buffer_durations[sample_id] = 0.0
+
             logger.info(f"✅ Loaded sample {sample_id} into buffer {buffer_num}: {full_path.name}")
             return buffer_num
             
@@ -87,6 +98,10 @@ class BufferManager:
             logger.error(f"❌ Failed to load sample {sample_id}: {e}")
             raise
     
+    def get_buffer_duration(self, sample_id: str) -> float:
+        """Get duration in seconds for a loaded sample (0.0 if unknown)"""
+        return self.buffer_durations.get(sample_id, 0.0)
+
     def get_buffer(self, sample_id: str) -> Optional[int]:
         """
         Get buffer number for a sample

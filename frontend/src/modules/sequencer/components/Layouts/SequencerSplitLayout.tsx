@@ -137,7 +137,7 @@ export function SequencerSplitLayout({
                                 <Music size={48} className="mx-auto mb-4 opacity-20" />
                                 <div className="text-base font-medium mb-1">No Editor Open</div>
                                 <div className="text-xs text-muted-foreground/70">
-                                    Double-click a clip in the timeline above to open it in the editor.
+                                    Click a clip to open it — MIDI clips open the piano roll, audio clips open the sample editor.
                                 </div>
                             </div>
                         </div>
