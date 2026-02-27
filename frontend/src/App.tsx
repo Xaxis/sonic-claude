@@ -2,10 +2,30 @@
  * App.tsx
  *
  * Main application component.
+ *
+ * Layout:
+ * ┌──────────┬──────────────────────────────────────────┐
+ * │ Brand    │  Header (CompositionSwitcher + status)   │
+ * │ Logo     ├──────────────────────────────────────────┤
+ * │──────────│                                          │
+ * │ COMPOSE  │  Workspace (TabbedWrapper — PanelGrid)  │
+ * │ INTERACT │                                          │
+ * │ PERFORM  │                                          │
+ * │──────────│                                          │
+ * │ + NewTab │                                          │
+ * │──────────│                                          │
+ * │ X-Ray    │                                          │
+ * │──────────│                                          │
+ * │ Collapse │                                          │
+ * └──────────┴──────────────────────────────────────────┘
+ *
+ * NavSidebar spans the full viewport height. Its brand area aligns with the
+ * Header height (60px) so the two form a cohesive top row visually.
  */
 
 import { useEffect } from "react";
 import { Header } from "@/components/layout/Header";
+import { NavSidebar } from "@/components/layout/NavSidebar";
 import { TabbedWrapper } from "@/components/layout/TabbedWrapper";
 import { ActivityContainer } from "@/components/activity";
 import { CompositionLoader } from "@/components/composition/CompositionLoader";
@@ -18,9 +38,6 @@ export default function App() {
     const { tabs, activeTab, setActiveTab, createTab, deleteTab, popoutTab } = useLayoutStore();
 
     // ── App startup: initialize DAW store exactly once ────────────────────────
-    // Kept here (not in CompositionLoader) so it runs regardless of how many
-    // CompositionLoader instances are mounted. The store's _isInitialized guard
-    // makes initialize() idempotent — safe with React StrictMode double-fires.
     const initialize    = useDAWStore(state => state.initialize);
     const loadSynthDefs = useDAWStore(state => state.loadSynthDefs);
 
@@ -29,82 +46,72 @@ export default function App() {
         loadSynthDefs();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Enable autosave
+    // ── Autosave ──────────────────────────────────────────────────────────────
     useAutosave();
 
-    // Get undo/redo actions from store
-    const undo = useDAWStore(state => state.undo);
-    const redo = useDAWStore(state => state.redo);
+    // ── Global undo / redo keyboard shortcuts ─────────────────────────────────
+    const undo    = useDAWStore(state => state.undo);
+    const redo    = useDAWStore(state => state.redo);
     const canUndo = useDAWStore(state => state.canUndo);
     const canRedo = useDAWStore(state => state.canRedo);
 
-    // Global keyboard shortcuts for undo/redo
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Check if we're in an input field (don't trigger undo/redo while typing)
             const target = e.target as HTMLElement;
-            const isInputField = target.tagName === 'INPUT' ||
-                                target.tagName === 'TEXTAREA' ||
-                                target.isContentEditable;
+            const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+            if (isInput) return;
 
-            if (isInputField) return;
-
-            // Cmd/Ctrl + Z = Undo
-            if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
-                if (canUndo) {
-                    e.preventDefault();
-                    undo();
-                }
-            }
-            // Cmd/Ctrl + Shift + Z = Redo
-            else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') {
-                if (canRedo) {
-                    e.preventDefault();
-                    redo();
-                }
+            if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
+                if (canUndo) { e.preventDefault(); undo(); }
+            } else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "z") {
+                if (canRedo) { e.preventDefault(); redo(); }
             }
         };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
     }, [undo, redo, canUndo, canRedo]);
 
-    // Get state from Zustand store
-    const analytics = useDAWStore(state => state.analytics);
-    const activeSynths = useDAWStore(state => state.activeSynths);
-
+    // ── Engine status ─────────────────────────────────────────────────────────
+    const analytics     = useDAWStore(state => state.analytics);
+    const activeSynths  = useDAWStore(state => state.activeSynths);
     const isEngineRunning = analytics !== null;
-    const cpuUsage = analytics?.cpu_usage || 0;
+    const cpuUsage        = analytics?.cpu_usage ?? 0;
     const activeSynthsCount = Object.keys(activeSynths).length;
 
     return (
-        <div className="bg-background flex h-screen w-screen flex-col overflow-hidden">
-            {/* Composition Loader - First-run experience */}
+        <div className="bg-background flex h-screen w-screen overflow-hidden">
+            {/* Global: composition loader dialog */}
             <CompositionLoader />
 
-            {/* Header - Always visible */}
-            <Header
-                isEngineRunning={isEngineRunning}
-                cpuUsage={cpuUsage}
-                activeSynths={activeSynthsCount}
+            {/* Left: Full-height navigation sidebar */}
+            <NavSidebar
+                tabs={tabs}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                onTabCreate={() => createTab("NEW TAB", [])}
+                onTabDelete={deleteTab}
+                onTabPopout={popoutTab}
             />
 
-            {/* Main Content - Tabbed Layout */}
-            <div className="flex-1 overflow-hidden">
-                <TabbedWrapper
-                    panels={DEFAULT_PANELS}
-                    tabs={tabs}
-                    activeTab={activeTab}
-                    onTabChange={setActiveTab}
-                    onTabCreate={() => {
-                        createTab("NEW TAB", []);
-                    }}
-                    onTabDelete={deleteTab}
-                    onTabPopout={popoutTab}
+            {/* Right: Status bar + workspace */}
+            <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+                <Header
+                    isEngineRunning={isEngineRunning}
+                    cpuUsage={cpuUsage}
+                    activeSynths={activeSynthsCount}
                 />
+
+                <div className="flex-1 min-h-0 overflow-hidden">
+                    <TabbedWrapper
+                        panels={DEFAULT_PANELS}
+                        tabs={tabs}
+                        activeTab={activeTab}
+                        onTabChange={setActiveTab}
+                    />
+                </div>
             </div>
 
-            {/* AI Activity Animations - Global overlay */}
+            {/* Global: AI activity animations overlay */}
             <ActivityContainer />
         </div>
     );

@@ -56,6 +56,9 @@ interface LayoutStore {
     maximizedPanel: string | null;
     attachments: Record<string, PanelAttachment>;
     
+    // Sidebar navigation
+    sidebarCollapsed: boolean;
+
     // X-Ray Mode - See through to another tab
     xrayEnabled: boolean;
     xraySourceTab: string | null;
@@ -96,6 +99,12 @@ interface LayoutStore {
     closePopout: (tabId: string) => void;
 
     // ========================================================================
+    // ACTIONS - Sidebar
+    // ========================================================================
+    toggleSidebar: () => void;
+    setSidebarCollapsed: (collapsed: boolean) => void;
+
+    // ========================================================================
     // ACTIONS - X-Ray Mode
     // ========================================================================
     enableXray: (targetTabId: string) => void;
@@ -122,6 +131,7 @@ export const useLayoutStore = create<LayoutStore>()(
                 layouts: DEFAULT_LAYOUT_STATE.layouts || {},
                 maximizedPanel: null,
                 attachments: {},
+                sidebarCollapsed: false,
                 xrayEnabled: false,
                 xraySourceTab: null,
                 xrayTargetTab: null,
@@ -278,6 +288,12 @@ export const useLayoutStore = create<LayoutStore>()(
                 },
 
                 // ====================================================================
+                // SIDEBAR ACTIONS
+                // ====================================================================
+                toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+                setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+
+                // ====================================================================
                 // X-RAY MODE ACTIONS
                 // ====================================================================
                 enableXray: (targetTabId) => {
@@ -378,6 +394,7 @@ export const useLayoutStore = create<LayoutStore>()(
                     layouts: state.layouts,
                     maximizedPanel: state.maximizedPanel,
                     attachments: state.attachments,
+                    sidebarCollapsed: state.sidebarCollapsed,
                     xrayEnabled: state.xrayEnabled,
                     xraySourceTab: state.xraySourceTab,
                     xrayTargetTab: state.xrayTargetTab,
