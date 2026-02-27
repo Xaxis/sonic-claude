@@ -20,25 +20,9 @@ import { cn } from '@/lib/utils';
 import { Square, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 
-// THEME-MATCHED COLOR PALETTE (same as PAD VIEW)
-const HARDWARE_COLORS = [
-    'hsl(187 85% 55%)',   // Cyan (primary)
-    'hsl(280 85% 65%)',   // Magenta (secondary)
-    'hsl(45 95% 60%)',    // Yellow (accent)
-    'hsl(0 85% 60%)',     // Red
-    'hsl(120 85% 55%)',   // Green
-    'hsl(210 85% 60%)',   // Blue
-    'hsl(30 90% 60%)',    // Orange
-    'hsl(270 85% 65%)',   // Purple
-    'hsl(160 85% 55%)',   // Teal
-    'hsl(330 85% 65%)',   // Pink
-    'hsl(60 90% 60%)',    // Lime
-    'hsl(180 85% 60%)',   // Aqua
-    'hsl(300 85% 65%)',   // Fuchsia
-    'hsl(15 90% 60%)',    // Coral
-    'hsl(240 85% 65%)',   // Indigo
-    'hsl(90 85% 55%)',    // Chartreuse
-];
+import { CLIP_COLOR_PALETTE } from '@/config/theme.constants';
+
+const HARDWARE_COLORS = CLIP_COLOR_PALETTE;
 
 export function ClipLauncherGrid() {
     // ========================================================================

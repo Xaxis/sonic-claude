@@ -13,12 +13,26 @@ import { RotateCcw, Repeat } from "lucide-react";
 import { Slider } from "@/components/ui/slider.tsx";
 import { useDAWStore } from "@/stores/dawStore";
 import { safeClipDefaults, debounce } from "./sampleEditorUtils";
+import { SEQUENCER_SIDEBAR_WIDTH } from "@/config/daw.constants";
+import {
+    SAMPLE_PITCH_SEMITONES_MIN,
+    SAMPLE_PITCH_SEMITONES_MAX,
+    SAMPLE_PITCH_SEMITONES_STEP,
+    SAMPLE_RATE_MIN,
+    SAMPLE_RATE_MAX,
+    SAMPLE_RATE_STEP,
+    SAMPLE_GAIN_MAX,
+    SAMPLE_GAIN_STEP,
+    SAMPLE_FADE_MAX_SECONDS,
+    SAMPLE_FADE_STEP,
+} from "@/config/audio.constants";
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-export const SAMPLE_EDITOR_SIDEBAR_WIDTH = 256; // px — matches piano roll keyboard width
+/** Re-exported for consumers that need to align their layout with the sidebar. */
+export const SAMPLE_EDITOR_SIDEBAR_WIDTH = SEQUENCER_SIDEBAR_WIDTH;
 
 // ============================================================================
 // INTERNAL SUB-COMPONENTS
@@ -145,21 +159,21 @@ export function SampleEditorControls({ fileDuration: dur }: SampleEditorControls
             <ControlRow
                 label="Pitch"
                 value={pitchSemitones}
-                min={-24} max={24} step={0.5}
+                min={SAMPLE_PITCH_SEMITONES_MIN} max={SAMPLE_PITCH_SEMITONES_MAX} step={SAMPLE_PITCH_SEMITONES_STEP}
                 formatValue={v => `${v >= 0 ? "+" : ""}${v.toFixed(1)} st`}
                 onChange={v => debouncedUpdate({ pitch_semitones: v })}
             />
             <ControlRow
                 label="Rate"
                 value={playbackRate}
-                min={0.25} max={4.0} step={0.05}
+                min={SAMPLE_RATE_MIN} max={SAMPLE_RATE_MAX} step={SAMPLE_RATE_STEP}
                 formatValue={v => `${v.toFixed(2)}×`}
                 onChange={v => debouncedUpdate({ playback_rate: v })}
             />
             <ControlRow
                 label="Gain"
                 value={gain}
-                min={0} max={2} step={0.01}
+                min={0} max={SAMPLE_GAIN_MAX} step={SAMPLE_GAIN_STEP}
                 formatValue={v => `${Math.round(v * 100)}%`}
                 onChange={v => debouncedUpdate({ gain: v })}
             />
@@ -169,14 +183,14 @@ export function SampleEditorControls({ fileDuration: dur }: SampleEditorControls
             <ControlRow
                 label="Fade In"
                 value={fadeIn}
-                min={0} max={5} step={0.05}
+                min={0} max={SAMPLE_FADE_MAX_SECONDS} step={SAMPLE_FADE_STEP}
                 formatValue={v => `${v.toFixed(2)}s`}
                 onChange={v => debouncedUpdate({ fade_in: v })}
             />
             <ControlRow
                 label="Fade Out"
                 value={fadeOut}
-                min={0} max={5} step={0.05}
+                min={0} max={SAMPLE_FADE_MAX_SECONDS} step={SAMPLE_FADE_STEP}
                 formatValue={v => `${v.toFixed(2)}s`}
                 onChange={v => debouncedUpdate({ fade_out: v })}
             />

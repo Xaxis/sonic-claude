@@ -17,14 +17,23 @@ import { useDAWStore } from "@/stores/dawStore";
 import { Activity, Waves, BarChart3, AlertTriangle } from "lucide-react";
 import { WaveformDisplay } from "../../components/ui/waveform-display.tsx";
 
-// Theme colors from globals.css
+import {
+    THEME_PRIMARY_HSL,
+    THEME_SECONDARY_HSL,
+    THEME_ACCENT_HSL,
+    THEME_DESTRUCTIVE_HSL,
+    THEME_BACKGROUND_HSL,
+    THEME_BORDER_HSL,
+} from "@/config/theme.constants";
+
+// Theme colors (from theme.constants — mirrors globals.css CSS variables)
 const THEME_COLORS = {
-    primary: "hsl(187 85% 55%)", // Cyan - left channel
-    secondary: "hsl(280 85% 65%)", // Magenta - right channel
-    accent: "hsl(45 95% 60%)", // Yellow - highlights
-    destructive: "hsl(0 85% 60%)", // Red - clipping
-    background: "hsl(220 15% 6%)",
-    border: "hsl(220 15% 15%)",
+    primary:     THEME_PRIMARY_HSL,     // Cyan - left channel
+    secondary:   THEME_SECONDARY_HSL,   // Magenta - right channel
+    accent:      THEME_ACCENT_HSL,      // Yellow - highlights
+    destructive: THEME_DESTRUCTIVE_HSL, // Red - clipping
+    background:  THEME_BACKGROUND_HSL,
+    border:      THEME_BORDER_HSL,
 };
 
 interface AudioStats {

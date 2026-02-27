@@ -13,6 +13,11 @@ import { useDAWStore } from "@/stores/dawStore";
 import { useTimelineCalculations } from '../../hooks/useTimelineCalculations';
 import { api } from "@/services/api";
 import type { MIDIEvent } from "../../types";
+import {
+    PIANO_ROLL_MIN_PITCH,
+    PIANO_ROLL_MAX_PITCH,
+    PIANO_ROLL_NOTE_HEIGHT,
+} from "@/config/daw.constants";
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -64,10 +69,10 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     const clipId = clip.id;
     const activeNotes = transport?.active_notes || [];
 
-    // Piano roll settings
-    const minPitch = 21; // A0
-    const maxPitch = 108; // C8
-    const noteHeight = 20;
+    // Piano roll settings (from daw.constants)
+    const minPitch = PIANO_ROLL_MIN_PITCH;
+    const maxPitch = PIANO_ROLL_MAX_PITCH;
+    const noteHeight = PIANO_ROLL_NOTE_HEIGHT;
     const gridSubdivision = 1 / gridSize;
 
     // ========================================================================

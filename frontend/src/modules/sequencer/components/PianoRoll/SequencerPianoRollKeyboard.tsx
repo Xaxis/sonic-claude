@@ -12,6 +12,12 @@ import { useState } from "react";
 import { cn } from "@/lib/utils.ts";
 import { api } from "@/services/api";
 import { useDAWStore } from "@/stores/dawStore";
+import {
+    PIANO_ROLL_MIN_PITCH,
+    PIANO_ROLL_MAX_PITCH,
+    PIANO_ROLL_NOTE_HEIGHT,
+    PIANO_ROLL_BLACK_KEY_OFFSETS,
+} from "@/config/daw.constants";
 
 interface SequencerPianoRollKeyboardProps {
     // No props needed - reads everything from Zustand!
@@ -39,10 +45,10 @@ export function SequencerPianoRollKeyboard({}: SequencerPianoRollKeyboardProps) 
         return <div className="flex items-center justify-center h-full text-muted-foreground">No clip selected</div>;
     }
 
-    // Piano roll settings (constants)
-    const minPitch = 21; // A0 - Full piano range
-    const maxPitch = 108; // C8
-    const noteHeight = 20; // pixels per note row
+    // Piano roll settings (from daw.constants)
+    const minPitch = PIANO_ROLL_MIN_PITCH;
+    const maxPitch = PIANO_ROLL_MAX_PITCH;
+    const noteHeight = PIANO_ROLL_NOTE_HEIGHT;
 
     // ========================================================================
     // LOCAL STATE
@@ -57,7 +63,7 @@ export function SequencerPianoRollKeyboard({}: SequencerPianoRollKeyboardProps) 
 
     const isBlackKey = (pitch: number): boolean => {
         const note = pitch % 12;
-        return [1, 3, 6, 8, 10].includes(note); // C#, D#, F#, G#, A#
+        return PIANO_ROLL_BLACK_KEY_OFFSETS.includes(note);
     };
 
     const handleKeyClick = async (pitch: number) => {

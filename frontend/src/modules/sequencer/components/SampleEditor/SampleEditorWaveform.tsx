@@ -1,19 +1,26 @@
 /**
- * SampleEditorWaveform - Waveform canvas with draggable trim and loop handles
+ * SampleEditorWaveform - Waveform display with time grid and draggable handles
  *
- * Mirrors SequencerPianoRollGrid as the main interactive content area.
- * Reads clip state (trim/loop params) directly from Zustand for handle positions.
- * Receives decoded waveform data as props (computed once by the parent).
+ * Layered composition — no custom canvas drawing:
+ *   1. bg-background (theme background from CSS vars)
+ *   2. SVG time grid  (major + minor lines matching SampleEditorRuler intervals)
+ *   3. WaveformDisplay (existing polished component — theme cyan + magenta, filled, glow)
+ *   4. Trim dim overlays (absolute divs that darken outside the active region)
+ *   5. Loop region highlight (absolute div with accent tint)
+ *   6. Draggable handles (DOM elements — trim = white, loop = accent/yellow)
  *
- * Interaction pattern (matches PianoRoll grid):
+ * Drag interaction pattern (matches SequencerPianoRollGrid):
  * - Local state is source of truth during drag (instant visual feedback)
  * - Commits to Zustand / backend only on mouse-up (single updateClip call)
  * - Syncs local state from Zustand when clip changes outside of a drag
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 import { useDAWStore } from "@/stores/dawStore";
-import { safeClipDefaults, debounce } from "./sampleEditorUtils";
+import { WaveformDisplay } from "@/components/ui/waveform-display.tsx";
+import { safeClipDefaults, getSmartInterval } from "./sampleEditorUtils";
+import { WAVEFORM_COLOR_LEFT, WAVEFORM_COLOR_RIGHT } from "@/config/theme.constants";
 
 // ============================================================================
 // TYPES
@@ -21,8 +28,136 @@ import { safeClipDefaults, debounce } from "./sampleEditorUtils";
 
 type DragHandle = "trim-start" | "trim-end" | "loop-start" | "loop-end";
 
+interface ActiveDrag {
+    handle: DragHandle;
+}
+
 // ============================================================================
-// COMPONENT
+// TIME GRID
+// ============================================================================
+
+interface TimeGridProps {
+    duration: number;
+    isStereo: boolean;
+}
+
+function TimeGrid({ duration, isStereo }: TimeGridProps) {
+    if (duration <= 0) return null;
+
+    const { major, minor } = getSmartInterval(duration);
+    const step = minor ?? major;
+    const count = Math.ceil(duration / step) + 1;
+
+    const lines: Array<{ t: number; isMajor: boolean }> = [];
+    for (let i = 0; i <= count; i++) {
+        const t = Math.round(i * step * 10000) / 10000;
+        if (t > duration + step * 0.1) break;
+        lines.push({ t, isMajor: minor === null || Math.abs(t % major) < step * 0.1 });
+    }
+
+    return (
+        <svg
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            preserveAspectRatio="none"
+        >
+            {/* Vertical time lines */}
+            {lines.map(({ t, isMajor }, i) => (
+                <line
+                    key={i}
+                    x1={`${(t / duration) * 100}%`}
+                    x2={`${(t / duration) * 100}%`}
+                    y1="0%"
+                    y2="100%"
+                    stroke="rgba(255,255,255,1)"
+                    strokeOpacity={isMajor ? 0.07 : 0.03}
+                    strokeWidth="1"
+                    vectorEffect="non-scaling-stroke"
+                />
+            ))}
+
+            {/* Horizontal channel divider (stereo only) */}
+            {isStereo && (
+                <line
+                    x1="0%" x2="100%"
+                    y1="50%" y2="50%"
+                    stroke="rgba(255,255,255,0.06)"
+                    strokeWidth="1"
+                    vectorEffect="non-scaling-stroke"
+                />
+            )}
+
+            {/* Channel center axis lines */}
+            {isStereo ? (
+                <>
+                    <line x1="0%" x2="100%" y1="25%" y2="25%" stroke="rgba(255,255,255,0.04)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                    <line x1="0%" x2="100%" y1="75%" y2="75%" stroke="rgba(255,255,255,0.04)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                </>
+            ) : (
+                <line x1="0%" x2="100%" y1="50%" y2="50%" stroke="rgba(255,255,255,0.05)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            )}
+        </svg>
+    );
+}
+
+// ============================================================================
+// HANDLE
+// ============================================================================
+
+interface HandleProps {
+    pct: number;           // 0..1 position as fraction of total duration
+    variant: "trim" | "loop";
+    side: "start" | "end";
+    onMouseDown: (e: React.MouseEvent) => void;
+}
+
+function Handle({ pct, variant, side, onMouseDown }: HandleProps) {
+    const isLoop = variant === "loop";
+
+    return (
+        <div
+            className="absolute inset-y-0 w-4 -translate-x-1/2 z-20 cursor-col-resize group/handle"
+            style={{ left: `${pct * 100}%` }}
+            onMouseDown={onMouseDown}
+        >
+            {/* Vertical line */}
+            {isLoop ? (
+                // Dashed yellow line for loop handles
+                <div
+                    className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px group-hover/handle:opacity-100 opacity-70 transition-opacity"
+                    style={{
+                        backgroundImage: "repeating-linear-gradient(to bottom, hsl(45 95% 60%) 0px, hsl(45 95% 60%) 5px, transparent 5px, transparent 9px)",
+                    }}
+                />
+            ) : (
+                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-white/70 group-hover/handle:bg-white transition-colors" />
+            )}
+
+            {/* Cap circle at top */}
+            <div
+                className={cn(
+                    "absolute top-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full transition-all shadow-sm",
+                    isLoop
+                        ? "bg-accent/80 group-hover/handle:bg-accent ring-1 ring-accent/30"
+                        : "bg-white/80 group-hover/handle:bg-white ring-1 ring-white/20",
+                )}
+            />
+
+            {/* Label (start/end indicator on hover) */}
+            <div
+                className={cn(
+                    "absolute top-5 text-[8px] font-mono uppercase tracking-wider opacity-0 group-hover/handle:opacity-100 transition-opacity whitespace-nowrap pointer-events-none",
+                    isLoop ? "text-accent" : "text-white/70",
+                    side === "start" ? "left-2" : "right-2 translate-x-full",
+                )}
+            >
+                {isLoop ? (side === "start" ? "loop in" : "loop out") : (side === "start" ? "in" : "out")}
+            </div>
+        </div>
+    );
+}
+
+// ============================================================================
+// MAIN COMPONENT
 // ============================================================================
 
 interface SampleEditorWaveformProps {
@@ -32,8 +167,6 @@ interface SampleEditorWaveformProps {
     isLoading: boolean;
     error: string | null;
 }
-
-const HANDLE_SNAP_PX = 8; // pixel proximity to snap to a handle
 
 export function SampleEditorWaveform({
     waveformData,
@@ -56,17 +189,33 @@ export function SampleEditorWaveform({
     const { audioOffset, audioEnd, loopEnabled, loopStart, loopEnd } = safeClipDefaults(clip ?? {} as any);
 
     const dur     = fileDuration > 0 ? fileDuration : 1;
-    const trimEnd = audioEnd  ?? dur;
-    const lEnd    = loopEnd   ?? dur;
+    const isStereo = waveformDataRight.length > 0;
 
     // ========================================================================
-    // LOCAL STATE: Source of truth during drag (instant canvas feedback)
+    // CONTAINER SIZE: tracked for WaveformDisplay explicit dimensions
+    // ========================================================================
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [dims, setDims] = useState({ w: 0, h: 0 });
+
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const ro = new ResizeObserver(entries => {
+            const { width, height } = entries[0].contentRect;
+            setDims({ w: Math.round(width), h: Math.round(height) });
+        });
+        ro.observe(el);
+        setDims({ w: el.clientWidth, h: el.clientHeight });
+        return () => ro.disconnect();
+    }, []);
+
+    // ========================================================================
+    // LOCAL STATE: Source of truth during drag (instant visual feedback)
     // ========================================================================
     const [localAudioOffset, setLocalAudioOffset] = useState(audioOffset);
     const [localAudioEnd,    setLocalAudioEnd]    = useState(audioEnd);
     const [localLoopStart,   setLocalLoopStart]   = useState(loopStart);
     const [localLoopEnd,     setLocalLoopEnd]     = useState(loopEnd);
-
     const isDraggingRef = useRef(false);
 
     // Sync local state from Zustand whenever the clip changes outside a drag
@@ -78,275 +227,202 @@ export function SampleEditorWaveform({
         setLocalLoopEnd(loopEnd);
     }, [audioOffset, audioEnd, loopStart, loopEnd]);
 
-    // ========================================================================
-    // CANVAS REFS
-    // ========================================================================
-    const canvasRef    = useRef<HTMLCanvasElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const draggingRef  = useRef<DragHandle | null>(null);
+    // Refs for current values — keeps global mouse handlers fresh without re-registration
+    const localAudioOffsetRef = useRef(localAudioOffset);
+    const localAudioEndRef    = useRef(localAudioEnd);
+    const localLoopStartRef   = useRef(localLoopStart);
+    const localLoopEndRef     = useRef(localLoopEnd);
 
-    // Current values for draw (resolve locals)
+    useEffect(() => { localAudioOffsetRef.current = localAudioOffset; }, [localAudioOffset]);
+    useEffect(() => { localAudioEndRef.current    = localAudioEnd;    }, [localAudioEnd]);
+    useEffect(() => { localLoopStartRef.current   = localLoopStart;   }, [localLoopStart]);
+    useEffect(() => { localLoopEndRef.current     = localLoopEnd;     }, [localLoopEnd]);
+
+    // Resolved display values
     const localTrimEnd = localAudioEnd ?? dur;
     const localLEnd    = localLoopEnd  ?? dur;
 
     // ========================================================================
-    // DRAWING: stable callback ref so ResizeObserver can always call latest draw
+    // DRAG STATE
     // ========================================================================
-    const drawRef = useRef<() => void>(() => {});
+    const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
 
+    const startDrag = (handle: DragHandle, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isDraggingRef.current = true;
+        setActiveDrag({ handle });
+    };
+
+    const pctFromClientX = (clientX: number): number => {
+        const el = containerRef.current;
+        if (!el) return 0;
+        const rect = el.getBoundingClientRect();
+        return Math.max(0, Math.min((clientX - rect.left) / rect.width, 1));
+    };
+
+    // Global listeners — registered only while a drag is active
     useEffect(() => {
-        drawRef.current = () => {
-            const canvas = canvasRef.current;
-            if (!canvas || waveformData.length === 0) return;
-            const ctx = canvas.getContext("2d");
-            if (!ctx) return;
-            const W = canvas.width;
-            const H = canvas.height;
-            if (W === 0 || H === 0) return;
+        if (!activeDrag) return;
 
-            ctx.clearRect(0, 0, W, H);
-            ctx.fillStyle = "#0a0a14";
-            ctx.fillRect(0, 0, W, H);
-
-            const drawChannelCorrect = (data: number[], color: string, midY: number, halfH: number) => {
-                if (data.length === 0) return;
-                const step = data.length / W;
-                ctx.beginPath();
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 1;
-                for (let x = 0; x < W; x++) {
-                    const si = Math.floor(x * step);
-                    const ei = Math.min(Math.ceil((x + 1) * step), data.length);
-                    let mn = 0, mx = 0;
-                    for (let s = si; s < ei; s++) {
-                        if (data[s] < mn) mn = data[s];
-                        if (data[s] > mx) mx = data[s];
-                    }
-                    ctx.moveTo(x, midY - mx * halfH);
-                    ctx.lineTo(x, midY - mn * halfH);
-                }
-                ctx.stroke();
-            };
-
-            const isStereo = waveformDataRight.length > 0;
-            if (isStereo) {
-                const qH = H / 4;
-                drawChannelCorrect(waveformData,       "rgba(74,222,128,0.85)", qH,     qH - 2);
-                drawChannelCorrect(waveformDataRight,  "rgba(96,165,250,0.85)", 3 * qH, qH - 2);
-                ctx.fillStyle = "rgba(255,255,255,0.25)";
-                ctx.font = "10px monospace";
-                ctx.fillText("L", 4, 11);
-                ctx.fillText("R", 4, H / 2 + 11);
-                ctx.strokeStyle = "rgba(255,255,255,0.05)";
-                ctx.lineWidth = 1;
-                ctx.setLineDash([]);
-                ctx.beginPath();
-                ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2);
-                ctx.stroke();
-            } else {
-                drawChannelCorrect(waveformData, "rgba(74,222,128,0.85)", H / 2, H / 2 - 4);
-            }
-
-            // Center axis lines
-            ctx.strokeStyle = "rgba(255,255,255,0.04)";
-            ctx.lineWidth = 1;
-            ctx.setLineDash([]);
-            ctx.beginPath();
-            if (isStereo) {
-                ctx.moveTo(0, H / 4);   ctx.lineTo(W, H / 4);
-                ctx.moveTo(0, 3*H / 4); ctx.lineTo(W, 3*H / 4);
-            } else {
-                ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2);
-            }
-            ctx.stroke();
-
-            // Dimmed regions outside trim
-            const trimStartX = (localAudioOffset / dur) * W;
-            const trimEndX   = (localTrimEnd     / dur) * W;
-            ctx.fillStyle = "rgba(0,0,0,0.5)";
-            if (trimStartX > 0) ctx.fillRect(0, 0, trimStartX, H);
-            if (trimEndX < W)   ctx.fillRect(trimEndX, 0, W - trimEndX, H);
-
-            // Loop region highlight
-            if (loopEnabled) {
-                ctx.fillStyle = "rgba(250,204,21,0.10)";
-                ctx.fillRect((localLoopStart / dur) * W, 0, ((localLEnd - localLoopStart) / dur) * W, H);
-            }
-
-            // Handle helper
-            const drawHandle = (x: number, color: string, dashed: boolean) => {
-                ctx.save();
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 2;
-                ctx.setLineDash(dashed ? [5, 3] : []);
-                ctx.beginPath();
-                ctx.moveTo(x, 0); ctx.lineTo(x, H);
-                ctx.stroke();
-                ctx.fillStyle = color;
-                ctx.beginPath();
-                ctx.arc(x, 6, 5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-            };
-
-            drawHandle(trimStartX, "#ffffff", false);
-            drawHandle(trimEndX,   "#ffffff", false);
-            if (loopEnabled) {
-                drawHandle((localLoopStart / dur) * W, "#facc15", true);
-                drawHandle((localLEnd      / dur) * W, "#facc15", true);
+        const onMove = (e: MouseEvent) => {
+            const s = pctFromClientX(e.clientX) * dur;
+            switch (activeDrag.handle) {
+                case "trim-start":
+                    setLocalAudioOffset(Math.min(s, (localAudioEndRef.current ?? dur) - 0.01));
+                    break;
+                case "trim-end":
+                    setLocalAudioEnd(Math.max(s, localAudioOffsetRef.current + 0.01));
+                    break;
+                case "loop-start":
+                    setLocalLoopStart(Math.min(s, (localLoopEndRef.current ?? dur) - 0.01));
+                    break;
+                case "loop-end":
+                    setLocalLoopEnd(Math.max(s, localLoopStartRef.current + 0.01));
+                    break;
             }
         };
 
-        drawRef.current();
-    }, [waveformData, waveformDataRight, dur, localAudioOffset, localTrimEnd, loopEnabled, localLoopStart, localLEnd]);
+        const onUp = () => {
+            isDraggingRef.current = false;
+            // Commit final values to Zustand / backend — single call on mouse-up
+            if (clip) {
+                if (activeDrag.handle === "trim-start" || activeDrag.handle === "trim-end") {
+                    updateClip(clip.id, {
+                        audio_offset: localAudioOffsetRef.current,
+                        audio_end:    localAudioEndRef.current,
+                    });
+                } else {
+                    updateClip(clip.id, {
+                        loop_start: localLoopStartRef.current,
+                        loop_end:   localLoopEndRef.current,
+                    });
+                }
+            }
+            setActiveDrag(null);
+        };
+
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup",   onUp);
+        return () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup",   onUp);
+        };
+    }, [activeDrag, dur, clip?.id, updateClip]);
 
     // ========================================================================
-    // EFFECTS: Resize observer — resize canvas then redraw
-    // ========================================================================
-    useEffect(() => {
-        const container = containerRef.current;
-        const canvas    = canvasRef.current;
-        if (!container || !canvas) return;
-        const ro = new ResizeObserver(() => {
-            canvas.width  = container.clientWidth;
-            canvas.height = container.clientHeight;
-            drawRef.current();
-        });
-        ro.observe(container);
-        canvas.width  = container.clientWidth;
-        canvas.height = container.clientHeight;
-        return () => ro.disconnect();
-    }, []);
-
-    // ========================================================================
-    // ACTIONS: Commit local state to Zustand on drag end
-    // ========================================================================
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const commitTrim = useCallback(
-        debounce((offset: number, end: number | undefined) => {
-            if (!clip) return;
-            updateClip(clip.id, { audio_offset: offset, audio_end: end });
-        }, 0), // no delay — called only on mouseup
-        [clip?.id, updateClip],
-    );
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const commitLoop = useCallback(
-        debounce((start: number, end: number | undefined) => {
-            if (!clip) return;
-            updateClip(clip.id, { loop_start: start, loop_end: end });
-        }, 0),
-        [clip?.id, updateClip],
-    );
-
-    // ========================================================================
-    // DRAG LOGIC
-    // ========================================================================
-    const secFromEvent = (e: React.MouseEvent<HTMLCanvasElement>): number => {
-        const canvas = canvasRef.current!;
-        const rect   = canvas.getBoundingClientRect();
-        const x      = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-        return (x / rect.width) * dur;
-    };
-
-    const detectHandle = (e: React.MouseEvent<HTMLCanvasElement>): DragHandle | null => {
-        const canvas = canvasRef.current!;
-        const rect   = canvas.getBoundingClientRect();
-        const x      = e.clientX - rect.left;
-        const W      = rect.width;
-        const candidates: [DragHandle, number][] = [
-            ["trim-start", (localAudioOffset / dur) * W],
-            ["trim-end",   (localTrimEnd     / dur) * W],
-        ];
-        if (loopEnabled) {
-            candidates.push(["loop-start", (localLoopStart / dur) * W]);
-            candidates.push(["loop-end",   (localLEnd      / dur) * W]);
-        }
-        let best: DragHandle | null = null;
-        let bestDist = HANDLE_SNAP_PX;
-        for (const [name, hx] of candidates) {
-            const d = Math.abs(x - hx);
-            if (d < bestDist) { bestDist = d; best = name; }
-        }
-        return best;
-    };
-
-    const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-        const h = detectHandle(e);
-        if (h) {
-            draggingRef.current = h;
-            isDraggingRef.current = true;
-            e.preventDefault();
-        }
-    };
-
-    const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-        if (!draggingRef.current) {
-            const canvas = canvasRef.current;
-            if (canvas) canvas.style.cursor = detectHandle(e) ? "col-resize" : "default";
-            return;
-        }
-        const s = Math.max(0, Math.min(secFromEvent(e), dur));
-        switch (draggingRef.current) {
-            case "trim-start": setLocalAudioOffset(Math.min(s, localTrimEnd - 0.01)); break;
-            case "trim-end":   setLocalAudioEnd(Math.max(s, localAudioOffset + 0.01)); break;
-            case "loop-start": setLocalLoopStart(Math.min(s, localLEnd - 0.01)); break;
-            case "loop-end":   setLocalLoopEnd(Math.max(s, localLoopStart + 0.01)); break;
-        }
-    };
-
-    const handleMouseUp = () => {
-        if (!draggingRef.current) return;
-        const h = draggingRef.current;
-        draggingRef.current  = null;
-        isDraggingRef.current = false;
-        // Commit final values to Zustand / backend
-        if (h === "trim-start" || h === "trim-end") {
-            commitTrim(localAudioOffset, localAudioEnd);
-        } else {
-            commitLoop(localLoopStart, localLoopEnd);
-        }
-    };
-
-    // ========================================================================
-    // RENDER
+    // LOADING / ERROR / EMPTY STATES
     // ========================================================================
 
     if (isLoading) {
         return (
-            <div className="flex-1 min-h-0 bg-[#0a0a14] flex items-center justify-center text-muted-foreground/40 text-xs select-none">
+            <div className="flex-1 min-h-0 bg-background flex items-center justify-center text-muted-foreground/40 text-xs select-none">
                 Loading waveform…
             </div>
         );
     }
-
     if (error) {
         return (
-            <div className="flex-1 min-h-0 bg-[#0a0a14] flex flex-col items-center justify-center gap-1 text-xs select-none">
-                <span className="text-red-400/60">Failed to load waveform</span>
+            <div className="flex-1 min-h-0 bg-background flex flex-col items-center justify-center gap-1 text-xs select-none">
+                <span className="text-destructive/60">Failed to load waveform</span>
                 <span className="text-muted-foreground/40 text-[10px] max-w-xs text-center">{error}</span>
             </div>
         );
     }
-
     if (waveformData.length === 0) {
         return (
-            <div className="flex-1 min-h-0 bg-[#0a0a14] flex items-center justify-center text-muted-foreground/40 text-xs select-none">
+            <div className="flex-1 min-h-0 bg-background flex items-center justify-center text-muted-foreground/40 text-xs select-none">
                 No waveform data
             </div>
         );
     }
 
+    // ========================================================================
+    // RENDER
+    // ========================================================================
     return (
-        <div ref={containerRef} className="flex-1 min-h-0 bg-[#0a0a14]">
-            <canvas
-                ref={canvasRef}
-                className="w-full h-full"
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
+        <div
+            ref={containerRef}
+            className={cn(
+                "relative flex-1 min-h-0 bg-background overflow-hidden select-none",
+                activeDrag && "cursor-col-resize",
+            )}
+        >
+            {/* ── Layer 2: Time grid ───────────────────────────────────────── */}
+            <TimeGrid duration={dur} isStereo={isStereo} />
+
+            {/* ── Layer 3: Waveform (existing polished component) ──────────── */}
+            {dims.w > 0 && dims.h > 0 && (
+                <WaveformDisplay
+                    data={waveformData}
+                    rightData={isStereo ? waveformDataRight : undefined}
+                    width={dims.w}
+                    height={dims.h}
+                    color={WAVEFORM_COLOR_LEFT}
+                    rightColor={WAVEFORM_COLOR_RIGHT}
+                    backgroundColor="transparent"
+                    showGrid={false}
+                    glowEffect={true}
+                    className="absolute inset-0 pointer-events-none"
+                />
+            )}
+
+            {/* ── Layer 4: Trim dim overlays ────────────────────────────────── */}
+            {localAudioOffset > 0 && (
+                <div
+                    className="absolute inset-y-0 bg-background/70 pointer-events-none"
+                    style={{ left: 0, width: `${(localAudioOffset / dur) * 100}%` }}
+                />
+            )}
+            {localAudioEnd != null && localAudioEnd < dur && (
+                <div
+                    className="absolute inset-y-0 bg-background/70 pointer-events-none"
+                    style={{ left: `${(localTrimEnd / dur) * 100}%`, right: 0 }}
+                />
+            )}
+
+            {/* ── Layer 5: Loop region ─────────────────────────────────────── */}
+            {loopEnabled && (
+                <div
+                    className="absolute inset-y-0 bg-accent/8 border-l border-r border-accent/25 pointer-events-none"
+                    style={{
+                        left:  `${(localLoopStart / dur) * 100}%`,
+                        width: `${((localLEnd - localLoopStart) / dur) * 100}%`,
+                    }}
+                />
+            )}
+
+            {/* ── Layer 6: Trim handles ─────────────────────────────────────── */}
+            <Handle
+                pct={localAudioOffset / dur}
+                variant="trim"
+                side="start"
+                onMouseDown={e => startDrag("trim-start", e)}
             />
+            <Handle
+                pct={localTrimEnd / dur}
+                variant="trim"
+                side="end"
+                onMouseDown={e => startDrag("trim-end", e)}
+            />
+
+            {/* ── Layer 6: Loop handles (conditional) ──────────────────────── */}
+            {loopEnabled && (
+                <>
+                    <Handle
+                        pct={localLoopStart / dur}
+                        variant="loop"
+                        side="start"
+                        onMouseDown={e => startDrag("loop-start", e)}
+                    />
+                    <Handle
+                        pct={localLEnd / dur}
+                        variant="loop"
+                        side="end"
+                        onMouseDown={e => startDrag("loop-end", e)}
+                    />
+                </>
+            )}
         </div>
     );
 }

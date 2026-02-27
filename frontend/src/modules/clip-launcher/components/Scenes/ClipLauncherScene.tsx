@@ -20,22 +20,11 @@ import {
     ContextMenuItem,
     ContextMenuTrigger,
 } from '@/components/ui/context-menu';
+import { CLIP_COLOR_PALETTE } from '@/config/theme.constants';
 
 interface ClipLauncherSceneProps {
     sceneIndex: number;
 }
-
-// Vibrant scene colors (cycling through theme colors)
-const SCENE_COLORS = [
-    'hsl(187 85% 55%)',  // primary (cyan)
-    'hsl(280 85% 65%)',  // secondary (purple)
-    'hsl(45 95% 60%)',   // accent (yellow)
-    'hsl(0 85% 60%)',    // destructive (red)
-    'hsl(120 85% 55%)',  // green
-    'hsl(30 95% 60%)',   // orange
-    'hsl(200 85% 60%)',  // blue
-    'hsl(330 85% 65%)',  // pink
-];
 
 export function ClipLauncherScene({ sceneIndex }: ClipLauncherSceneProps) {
     // ========================================================================
@@ -60,7 +49,7 @@ export function ClipLauncherScene({ sceneIndex }: ClipLauncherSceneProps) {
         return clipId && playingClipIds.includes(clipId);
     });
 
-    const sceneColor = SCENE_COLORS[sceneIndex % SCENE_COLORS.length];
+    const sceneColor = CLIP_COLOR_PALETTE[sceneIndex % CLIP_COLOR_PALETTE.length];
 
     // ========================================================================
     // HANDLERS
