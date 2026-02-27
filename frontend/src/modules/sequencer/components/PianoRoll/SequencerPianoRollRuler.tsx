@@ -7,7 +7,7 @@
  * - No props needed!
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useDAWStore } from '@/stores/dawStore';
 import { useTimelineCalculations } from '../../hooks/useTimelineCalculations.ts';
 
@@ -64,32 +64,38 @@ export function SequencerPianoRollRuler({}: SequencerPianoRollRulerProps) {
         zoomRef.current = zoom;
     }, [currentPosition, pixelsPerBeat, zoom]);
 
+    // Refs for drag state — let getX read fresh values without restarting the RAF
+    const isDraggingPlayheadRef       = useRef(isDraggingPlayhead);
+    const draggedPlayheadPositionRef  = useRef(draggedPlayheadPosition);
+    useEffect(() => { isDraggingPlayheadRef.current      = isDraggingPlayhead; },      [isDraggingPlayhead]);
+    useEffect(() => { draggedPlayheadPositionRef.current = draggedPlayheadPosition; }, [draggedPlayheadPosition]);
+
+    // Stable position callback — always reads from refs, never triggers effect restarts
+    const getPlayheadX = useCallback(() => {
+        const pos = isDraggingPlayheadRef.current
+            ? (draggedPlayheadPositionRef.current ?? currentPositionRef.current)
+            : currentPositionRef.current;
+        return pos * pixelsPerBeatRef.current * zoomRef.current;
+    }, []);
+
     // Smooth playhead animation using requestAnimationFrame
+    // FIX: Store animId on every frame so the cleanup always cancels the latest frame
     useEffect(() => {
-        if (!playheadRef.current || !isPlaying || isPaused || isDraggingPlayhead) {
-            // Not playing, paused, or dragging - just use exact position
-            if (playheadRef.current) {
-                const x = (draggedPlayheadPosition ?? currentPositionRef.current) * pixelsPerBeatRef.current * zoomRef.current;
-                playheadRef.current.style.transform = `translateX(${x}px)`;
-            }
+        const el = playheadRef.current;
+        if (!el) return;
+
+        const apply = () => { el.style.transform = `translateX(${getPlayheadX()}px)`; };
+
+        if (!isPlaying || isPaused || isDraggingPlayhead) {
+            apply();
             return;
         }
 
-        // Animation loop for smooth playback
-        const animate = () => {
-            if (playheadRef.current) {
-                const x = currentPositionRef.current * pixelsPerBeatRef.current * zoomRef.current;
-                playheadRef.current.style.transform = `translateX(${x}px)`;
-            }
-            requestAnimationFrame(animate);
-        };
-
-        const animationFrameId = requestAnimationFrame(animate);
-
-        return () => {
-            cancelAnimationFrame(animationFrameId);
-        };
-    }, [isPlaying, isPaused, isDraggingPlayhead, draggedPlayheadPosition]);
+        let animId: number;
+        const loop = () => { apply(); animId = requestAnimationFrame(loop); };
+        animId = requestAnimationFrame(loop);
+        return () => cancelAnimationFrame(animId);
+    }, [isPlaying, isPaused, isDraggingPlayhead, draggedPlayheadPosition, getPlayheadX]);
 
     const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (isDraggingPlayhead) return;

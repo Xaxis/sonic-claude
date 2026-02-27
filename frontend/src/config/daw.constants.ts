@@ -48,6 +48,13 @@ export const TIMELINE_MIN_BEATS = 64;
 export const TIMELINE_PADDING_BEATS = 128;
 
 // ============================================================================
+// SAMPLE EDITOR
+// ============================================================================
+
+/** Base pixels-per-second at zoom = 1.0 in the sample editor waveform */
+export const SAMPLE_EDITOR_PIXELS_PER_SECOND = 100;
+
+// ============================================================================
 // DEFAULTS
 // ============================================================================
 

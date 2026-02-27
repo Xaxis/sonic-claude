@@ -9,11 +9,18 @@
  * - Trim region shadow overlays aligned with waveform handles below
  * - Yellow loop region overlay
  * - GPU-accelerated red playhead via requestAnimationFrame + translateX
+ *   (uses shared <Playhead> component)
+ *
+ * contentWidth:
+ *   The ruler expands to contentWidth pixels (from zoom). The parent
+ *   SequencerSampleEditor wraps ruler + waveform in a single horizontal
+ *   scroll container so they scroll together.
  */
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useDAWStore } from "@/stores/dawStore";
 import { getSmartInterval, formatTime } from "./sampleEditorUtils";
+import { Playhead } from "@/components/ui/playhead";
 
 // ============================================================================
 // COMPONENT
@@ -22,9 +29,11 @@ import { getSmartInterval, formatTime } from "./sampleEditorUtils";
 interface SampleEditorRulerProps {
     /** Actual audio file duration in seconds (from useWaveformData). */
     fileDuration: number;
+    /** Scrollable content width in pixels (from parent zoom calculation). */
+    contentWidth: number;
 }
 
-export function SampleEditorRuler({ fileDuration: duration }: SampleEditorRulerProps) {
+export function SampleEditorRuler({ fileDuration: duration, contentWidth }: SampleEditorRulerProps) {
     // ========================================================================
     // STATE: Read from Zustand store
     // ========================================================================
@@ -52,64 +61,43 @@ export function SampleEditorRuler({ fileDuration: duration }: SampleEditorRulerP
     // ========================================================================
     // REFS: Keep latest values for the RAF loop without restarting it
     // ========================================================================
-    const transportBeatsRef = useRef(transport?.position_beats ?? 0);
-    const clipStartBeatsRef = useRef(clipStartBeats);
-    const tempoRef          = useRef(tempo);
-    const durationRef       = useRef(duration);
-    const containerWidthRef = useRef(0);
-    const containerRef      = useRef<HTMLDivElement>(null);
-    const playheadRef       = useRef<HTMLDivElement>(null);
+    const transportBeatsRef  = useRef(transport?.position_beats ?? 0);
+    const clipStartBeatsRef  = useRef(clipStartBeats);
+    const tempoRef           = useRef(tempo);
+    const durationRef        = useRef(duration);
+    const contentWidthRef    = useRef(contentWidth);
 
     useEffect(() => {
-        transportBeatsRef.current = transport?.position_beats ?? 0;
-        clipStartBeatsRef.current = clipStartBeats;
-        tempoRef.current          = tempo;
-        durationRef.current       = duration;
-    }, [transport?.position_beats, clipStartBeats, tempo, duration]);
+        transportBeatsRef.current  = transport?.position_beats ?? 0;
+        clipStartBeatsRef.current  = clipStartBeats;
+        tempoRef.current           = tempo;
+        durationRef.current        = duration;
+        contentWidthRef.current    = contentWidth;
+    }, [transport?.position_beats, clipStartBeats, tempo, duration, contentWidth]);
 
-    // Track container width for pixel-accurate playhead positioning
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-        const ro = new ResizeObserver(entries => {
-            containerWidthRef.current = entries[0].contentRect.width;
-        });
-        ro.observe(el);
-        containerWidthRef.current = el.offsetWidth;
-        return () => ro.disconnect();
+    // ========================================================================
+    // PLAYHEAD: getX / isVisible callbacks for <Playhead>
+    // Both are stable (no deps) — they always read from refs
+    // ========================================================================
+    const getPlayheadX = useCallback((): number => {
+        const secs = (transportBeatsRef.current - clipStartBeatsRef.current) * (60 / tempoRef.current);
+        const pct  = durationRef.current > 0
+            ? Math.max(0, Math.min(1, secs / durationRef.current))
+            : 0;
+        return pct * contentWidthRef.current;
     }, []);
 
-    // ========================================================================
-    // EFFECTS: GPU-accelerated playhead via RAF + translateX
-    // ========================================================================
-    useEffect(() => {
-        const positionPlayhead = () => {
-            if (!playheadRef.current) return;
-            const secs = (transportBeatsRef.current - clipStartBeatsRef.current) * (60 / tempoRef.current);
-            const pct  = durationRef.current > 0
-                ? Math.max(0, Math.min(1, secs / durationRef.current))
-                : 0;
-            playheadRef.current.style.transform = `translateX(${pct * containerWidthRef.current}px)`;
-            playheadRef.current.style.opacity   = (secs >= 0 && secs <= durationRef.current) ? "1" : "0";
-        };
-
-        if (!isPlaying || isPaused) {
-            positionPlayhead();
-            return;
-        }
-
-        let animId: number;
-        const loop = () => { positionPlayhead(); animId = requestAnimationFrame(loop); };
-        animId = requestAnimationFrame(loop);
-        return () => cancelAnimationFrame(animId);
-    }, [isPlaying, isPaused]);
+    const isPlayheadVisible = useCallback((): boolean => {
+        const secs = (transportBeatsRef.current - clipStartBeatsRef.current) * (60 / tempoRef.current);
+        return secs >= 0 && secs <= durationRef.current;
+    }, []);
 
     // ========================================================================
     // RENDER
     // ========================================================================
 
     if (duration <= 0) {
-        return <div className="h-8 flex-shrink-0 border-b border-border bg-muted/30" />;
+        return <div className="h-8 flex-shrink-0 border-b border-border bg-muted/30" style={{ width: contentWidth }} />;
     }
 
     const { major, minor } = getSmartInterval(duration);
@@ -128,15 +116,15 @@ export function SampleEditorRuler({ fileDuration: duration }: SampleEditorRulerP
 
     return (
         <div
-            ref={containerRef}
             className="relative h-8 flex-shrink-0 border-b border-border bg-muted/30 overflow-hidden select-none"
+            style={{ width: contentWidth }}
         >
             {/* ── Time markers ─────────────────────────────────────────────── */}
             {markers.map(({ t, isMajor }, i) => (
                 <div
                     key={i}
                     className="absolute top-0 bottom-0"
-                    style={{ left: `${(t / duration) * 100}%` }}
+                    style={{ left: `${(t / duration) * contentWidth}px` }}
                 >
                     {isMajor ? (
                         <>
@@ -155,24 +143,30 @@ export function SampleEditorRuler({ fileDuration: duration }: SampleEditorRulerP
             {audioOffset > 0 && (
                 <div
                     className="absolute inset-y-0 bg-black/35 pointer-events-none"
-                    style={{ left: 0, width: `${(audioOffset / duration) * 100}%` }}
+                    style={{ left: 0, width: `${(audioOffset / duration) * contentWidth}px` }}
                 />
             )}
             {audioEnd != null && audioEnd < duration && (
                 <div
                     className="absolute inset-y-0 bg-black/35 pointer-events-none"
-                    style={{ left: `${(audioEnd / duration) * 100}%`, right: 0 }}
+                    style={{ left: `${(audioEnd / duration) * contentWidth}px`, right: 0 }}
                 />
             )}
 
             {/* ── Trim flags ───────────────────────────────────────────────── */}
             {audioOffset > 0 && (
-                <div className="absolute inset-y-0 w-px bg-white/70 pointer-events-none" style={{ left: `${(audioOffset / duration) * 100}%` }}>
+                <div
+                    className="absolute inset-y-0 w-px bg-white/70 pointer-events-none"
+                    style={{ left: `${(audioOffset / duration) * contentWidth}px` }}
+                >
                     <div className="absolute top-0 -left-1.5 w-0 h-0" style={{ borderLeft: "6px solid transparent", borderRight: "6px solid transparent", borderTop: "7px solid rgba(255,255,255,0.7)" }} />
                 </div>
             )}
             {audioEnd != null && audioEnd < duration && (
-                <div className="absolute inset-y-0 w-px bg-white/70 pointer-events-none" style={{ left: `${(trimEnd / duration) * 100}%` }}>
+                <div
+                    className="absolute inset-y-0 w-px bg-white/70 pointer-events-none"
+                    style={{ left: `${(trimEnd / duration) * contentWidth}px` }}
+                >
                     <div className="absolute top-0 -left-1.5 w-0 h-0" style={{ borderLeft: "6px solid transparent", borderRight: "6px solid transparent", borderTop: "7px solid rgba(255,255,255,0.7)" }} />
                 </div>
             )}
@@ -182,21 +176,24 @@ export function SampleEditorRuler({ fileDuration: duration }: SampleEditorRulerP
                 <>
                     <div
                         className="absolute inset-y-0 bg-yellow-400/10 pointer-events-none"
-                        style={{ left: `${(loopStart / duration) * 100}%`, width: `${((lEnd - loopStart) / duration) * 100}%` }}
+                        style={{
+                            left:  `${(loopStart / duration) * contentWidth}px`,
+                            width: `${((lEnd - loopStart) / duration) * contentWidth}px`,
+                        }}
                     />
-                    <div className="absolute inset-y-0 w-px bg-yellow-400/70 pointer-events-none" style={{ left: `${(loopStart / duration) * 100}%` }} />
-                    <div className="absolute inset-y-0 w-px bg-yellow-400/70 pointer-events-none" style={{ left: `${(lEnd / duration) * 100}%` }} />
+                    <div className="absolute inset-y-0 w-px bg-yellow-400/70 pointer-events-none" style={{ left: `${(loopStart / duration) * contentWidth}px` }} />
+                    <div className="absolute inset-y-0 w-px bg-yellow-400/70 pointer-events-none" style={{ left: `${(lEnd / duration) * contentWidth}px` }} />
                 </>
             )}
 
-            {/* ── Playhead ─────────────────────────────────────────────────── */}
-            <div
-                ref={playheadRef}
-                className="absolute top-0 bottom-0 w-px bg-red-500 z-10 pointer-events-none"
-                style={{ left: 0, opacity: 0, willChange: "transform, opacity", boxShadow: "0 0 6px rgba(239,68,68,0.7)", transform: "translateX(0px)" }}
-            >
-                <div className="absolute top-0 -left-1.5 w-0 h-0" style={{ borderLeft: "6px solid transparent", borderRight: "6px solid transparent", borderTop: "8px solid #ef4444" }} />
-            </div>
+            {/* ── Playhead (shared component) ──────────────────────────────── */}
+            <Playhead
+                getX={getPlayheadX}
+                isVisible={isPlayheadVisible}
+                isPlaying={isPlaying}
+                isPaused={isPaused}
+                withCap
+            />
         </div>
     );
 }

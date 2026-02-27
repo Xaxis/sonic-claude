@@ -100,10 +100,6 @@ export function SequencerClip({
         updateClip(clipId, { name: newName });
         setIsEditingName(false);
     };
-    const [dragStartX, setDragStartX] = useState(0);
-    const [dragStartTime, setDragStartTime] = useState(0);
-    const [dragStartDuration, setDragStartDuration] = useState(0);
-
     // ========================================================================
     // LOCAL STATE: Drag state for live updates
     // ========================================================================
@@ -117,133 +113,112 @@ export function SequencerClip({
     // Clear drag state when backend syncs (clip props match drag state)
     useEffect(() => {
         if (dragState && !isDragging && !isResizing) {
-            // Check if backend has synced (within tolerance)
             const startTimeMatches = Math.abs(clip.start_time - dragState.startTime) < 0.01;
-            const durationMatches = Math.abs(clip.duration - dragState.duration) < 0.01;
-
-            if (startTimeMatches && durationMatches) {
-                setDragState(null);
-            }
+            const durationMatches  = Math.abs(clip.duration   - dragState.duration)  < 0.01;
+            if (startTimeMatches && durationMatches) setDragState(null);
         }
     }, [clip.start_time, clip.duration, dragState, isDragging, isResizing]);
 
-    // Calculate clip position and width (use drag state if dragging, otherwise use clip props)
+    // Calculate clip position and width (use drag state if dragging, otherwise clip props)
     const displayStartTime = dragState?.startTime ?? clip.start_time;
-    const displayDuration = dragState?.duration ?? clip.duration;
-    const left = displayStartTime * pixelsPerBeat * zoom;
-    const width = displayDuration * pixelsPerBeat * zoom;
+    const displayDuration  = dragState?.duration  ?? clip.duration;
+    const left  = displayStartTime * pixelsPerBeat * zoom;
+    const width = displayDuration  * pixelsPerBeat * zoom;
 
-    // Drag and resize handlers
+    // ========================================================================
+    // DRAG / RESIZE: Register global listeners synchronously on mousedown.
+    //
+    // WHY NOT useEffect?
+    //   useEffect runs asynchronously after the next React render commit. For a
+    //   quick click (mousedown → mouseup in < one render cycle), the global
+    //   mouseup listener would never be registered in time, so handleMouseUp
+    //   would never fire. That left isDragging stuck as true, which then caused
+    //   subsequent mouse movement to set didDragRef = true, silently suppressing
+    //   every follow-up click on the clip.
+    //
+    //   Registering directly in the mousedown handler is the standard imperative
+    //   drag pattern and eliminates the race entirely.
+    // ========================================================================
     const handleMouseDown = (e: React.MouseEvent, action: "move" | "resize-left" | "resize-right") => {
         e.stopPropagation();
-        setDragStartX(e.clientX);
-        setDragStartTime(displayStartTime);
-        setDragStartDuration(displayDuration);
 
+        // Capture start values in closure — correct for the entire gesture
+        const startX        = e.clientX;
+        const startTime     = displayStartTime;
+        const startDuration = displayDuration;
+        const ppb           = pixelsPerBeat;
+        const z             = zoom;
+        const snap          = snapEnabled;
+        const gSize         = gridSize;
+
+        // Set visual state (opacity, cursor, disables AI)
         if (action === "move") {
-            didDragRef.current = false; // reset on each mousedown
+            didDragRef.current = false;
             setIsDragging(true);
         } else if (action === "resize-left") {
             setIsResizing("left");
-        } else if (action === "resize-right") {
+        } else {
             setIsResizing("right");
         }
-    };
 
-    // Add global mouse event listeners for drag/resize
-    useEffect(() => {
-        if (!isDragging && !isResizing) return;
+        // Track final position so onUp can commit to backend
+        let finalState: { startTime: number; duration: number } | null = null;
 
-        const handleMouseMove = (e: MouseEvent) => {
-            const deltaX = e.clientX - dragStartX;
-            const deltaBeats = deltaX / (pixelsPerBeat * zoom);
+        const onMove = (ev: MouseEvent) => {
+            const deltaX     = ev.clientX - startX;
+            const deltaBeats = deltaX / (ppb * z);
 
-            // Mark as actual drag once mouse has moved meaningfully
-            if (Math.abs(deltaX) > 3) {
-                didDragRef.current = true;
+            if (Math.abs(deltaX) > 3) didDragRef.current = true;
+
+            let next: { startTime: number; duration: number };
+            if (action === "move") {
+                let newStart = Math.max(0, startTime + deltaBeats);
+                if (snap) newStart = Math.round(newStart * gSize) / gSize;
+                next = { startTime: newStart, duration: startDuration };
+            } else if (action === "resize-left") {
+                let newStart = Math.max(0, startTime + deltaBeats);
+                if (snap) newStart = Math.round(newStart * gSize) / gSize;
+                next = { startTime: newStart, duration: Math.max(0.25, startDuration - (newStart - startTime)) };
+            } else {
+                let newDur = Math.max(0.25, startDuration + deltaBeats);
+                if (snap) newDur = Math.round(newDur * gSize) / gSize;
+                next = { startTime: startTime, duration: newDur };
             }
 
-            if (isDragging) {
-                // Calculate new position with snap
-                let newStartTime = Math.max(0, dragStartTime + deltaBeats);
-                if (snapEnabled) {
-                    newStartTime = Math.round(newStartTime * gridSize) / gridSize;
-                }
-                // Update drag state for immediate visual feedback
-                // Use current display duration (which may include previous resize)
-                setDragState({
-                    startTime: newStartTime,
-                    duration: displayDuration,
-                });
-            } else if (isResizing === "left") {
-                // Resize from left (changes both start time and duration)
-                let newStartTime = Math.max(0, dragStartTime + deltaBeats);
-                if (snapEnabled) {
-                    newStartTime = Math.round(newStartTime * gridSize) / gridSize;
-                }
-                const newDuration = Math.max(0.25, dragStartDuration - (newStartTime - dragStartTime));
-                setDragState({
-                    startTime: newStartTime,
-                    duration: newDuration,
-                });
-            } else if (isResizing === "right") {
-                // Resize from right (changes only duration)
-                let newDuration = Math.max(0.25, dragStartDuration + deltaBeats);
-                if (snapEnabled) {
-                    newDuration = Math.round(newDuration * gridSize) / gridSize;
-                }
-                // Use current display start time (which may include previous move)
-                setDragState({
-                    startTime: displayStartTime,
-                    duration: newDuration,
-                });
-            }
+            finalState = next;
+            setDragState(next);
         };
 
-        const handleMouseUp = async () => {
-            // Apply final values to backend on mouse up
-            if (isDragging && dragState) {
-                await updateClip(clip.id, { start_time: dragState.startTime });
-            } else if (isResizing === "left" && dragState) {
-                await updateClip(clip.id, { start_time: dragState.startTime });
-                await updateClip(clip.id, { duration: dragState.duration });
-            } else if (isResizing === "right" && dragState) {
-                await updateClip(clip.id, { duration: dragState.duration });
+        const onUp = async () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup",   onUp);
+
+            if (finalState) {
+                if (action === "move") {
+                    await updateClip(clip.id, { start_time: finalState.startTime });
+                } else if (action === "resize-left") {
+                    await updateClip(clip.id, { start_time: finalState.startTime, duration: finalState.duration });
+                } else {
+                    await updateClip(clip.id, { duration: finalState.duration });
+                }
             }
 
-            // Clean up drag state
             setIsDragging(false);
             setIsResizing(null);
-
-            // Don't clear dragState here - let the useEffect clear it when backend syncs
         };
 
-        window.addEventListener("mousemove", handleMouseMove);
-        window.addEventListener("mouseup", handleMouseUp);
-
-        return () => {
-            window.removeEventListener("mousemove", handleMouseMove);
-            window.removeEventListener("mouseup", handleMouseUp);
-        };
-    }, [isDragging, isResizing, dragStartX, dragStartTime, dragStartDuration, pixelsPerBeat, zoom, snapEnabled, gridSize, clip.id, displayStartTime, displayDuration, dragState, updateClip]);
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup",   onUp);
+    };
 
     const handleClick = (e: React.MouseEvent) => {
-        // Don't open editor if the user actually dragged or is resizing.
-        // Check didDragRef (a ref, not state) to avoid the React batching race where
-        // isDragging state is still true when this click event fires.
-        if (didDragRef.current || isResizing) {
-            return;
-        }
+        // Suppress if the mousedown-mouseup gesture was actually a drag (mouse moved > 3px).
+        // Uses a ref (not state) so we always read the latest value even when React hasn't
+        // re-rendered yet — state like isDragging/isResizing would be stale here.
+        if (didDragRef.current) return;
 
-        e.stopPropagation(); // Prevent timeline background click
-
-        // Single-click: select clip
+        e.stopPropagation();
         setSelectedClipId(clip.id);
-
-        // Verify clip still exists in store before opening editor
-        const currentClips = useDAWStore.getState().clips;
-        const clipExists = currentClips.some(c => c.id === clip.id);
-        if (!clipExists) return;
 
         if (clip.type === "midi") {
             openPianoRoll(clip.id);

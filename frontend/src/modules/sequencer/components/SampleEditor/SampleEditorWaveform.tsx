@@ -9,13 +9,24 @@
  *   5. Loop region highlight (absolute div with accent tint)
  *   6. Draggable handles (DOM elements — trim = white, loop = accent/yellow)
  *
+ * Rendering fix — always render the outer container:
+ *   The containerRef must always be attached to a real DOM element so the
+ *   ResizeObserver can measure height on mount. Loading / error / empty states
+ *   are rendered as absolute overlays INSIDE the container, not early-returns
+ *   that replace the container (which left containerRef = null on first mount).
+ *
  * Drag interaction pattern (matches SequencerPianoRollGrid):
  * - Local state is source of truth during drag (instant visual feedback)
  * - Commits to Zustand / backend only on mouse-up (single updateClip call)
  * - Syncs local state from Zustand when clip changes outside of a drag
+ *
+ * Zoom / scroll:
+ *   contentWidth is provided by SequencerSampleEditor (computed from zoom +
+ *   fileDuration). Waveform and handles scale to contentWidth; the parent
+ *   provides a single scroll container so ruler + waveform scroll together.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useDAWStore } from "@/stores/dawStore";
 import { WaveformDisplay } from "@/components/ui/waveform-display.tsx";
@@ -166,6 +177,8 @@ interface SampleEditorWaveformProps {
     fileDuration: number;
     isLoading: boolean;
     error: string | null;
+    /** Scrollable content width in pixels (from parent zoom calculation). */
+    contentWidth: number;
 }
 
 export function SampleEditorWaveform({
@@ -174,6 +187,7 @@ export function SampleEditorWaveform({
     fileDuration,
     isLoading,
     error,
+    contentWidth,
 }: SampleEditorWaveformProps) {
     // ========================================================================
     // STATE: Read from Zustand store
@@ -192,20 +206,23 @@ export function SampleEditorWaveform({
     const isStereo = waveformDataRight.length > 0;
 
     // ========================================================================
-    // CONTAINER SIZE: tracked for WaveformDisplay explicit dimensions
+    // CONTAINER HEIGHT: tracked for WaveformDisplay explicit dimensions
+    // The container width comes from the contentWidth prop (zoom-aware).
+    // We only need ResizeObserver for the HEIGHT.
+    // IMPORTANT: The container div is always rendered (never replaced by an
+    // early-return) so this ref is always valid on mount.
     // ========================================================================
     const containerRef = useRef<HTMLDivElement>(null);
-    const [dims, setDims] = useState({ w: 0, h: 0 });
+    const [containerH, setContainerH] = useState(0);
 
     useEffect(() => {
         const el = containerRef.current;
         if (!el) return;
         const ro = new ResizeObserver(entries => {
-            const { width, height } = entries[0].contentRect;
-            setDims({ w: Math.round(width), h: Math.round(height) });
+            setContainerH(Math.round(entries[0].contentRect.height));
         });
         ro.observe(el);
-        setDims({ w: el.clientWidth, h: el.clientHeight });
+        setContainerH(el.clientHeight);
         return () => ro.disconnect();
     }, []);
 
@@ -254,12 +271,12 @@ export function SampleEditorWaveform({
         setActiveDrag({ handle });
     };
 
-    const pctFromClientX = (clientX: number): number => {
+    const pctFromClientX = useCallback((clientX: number): number => {
         const el = containerRef.current;
         if (!el) return 0;
         const rect = el.getBoundingClientRect();
         return Math.max(0, Math.min((clientX - rect.left) / rect.width, 1));
-    };
+    }, []);
 
     // Global listeners — registered only while a drag is active
     useEffect(() => {
@@ -285,7 +302,6 @@ export function SampleEditorWaveform({
 
         const onUp = () => {
             isDraggingRef.current = false;
-            // Commit final values to Zustand / backend — single call on mouse-up
             if (clip) {
                 if (activeDrag.handle === "trim-start" || activeDrag.handle === "trim-end") {
                     updateClip(clip.id, {
@@ -308,38 +324,19 @@ export function SampleEditorWaveform({
             window.removeEventListener("mousemove", onMove);
             window.removeEventListener("mouseup",   onUp);
         };
-    }, [activeDrag, dur, clip?.id, updateClip]);
-
-    // ========================================================================
-    // LOADING / ERROR / EMPTY STATES
-    // ========================================================================
-
-    if (isLoading) {
-        return (
-            <div className="flex-1 min-h-0 bg-background flex items-center justify-center text-muted-foreground/40 text-xs select-none">
-                Loading waveform…
-            </div>
-        );
-    }
-    if (error) {
-        return (
-            <div className="flex-1 min-h-0 bg-background flex flex-col items-center justify-center gap-1 text-xs select-none">
-                <span className="text-destructive/60">Failed to load waveform</span>
-                <span className="text-muted-foreground/40 text-[10px] max-w-xs text-center">{error}</span>
-            </div>
-        );
-    }
-    if (waveformData.length === 0) {
-        return (
-            <div className="flex-1 min-h-0 bg-background flex items-center justify-center text-muted-foreground/40 text-xs select-none">
-                No waveform data
-            </div>
-        );
-    }
+    }, [activeDrag, dur, clip?.id, updateClip, pctFromClientX]);
 
     // ========================================================================
     // RENDER
+    // The outer container div is ALWAYS rendered (even during loading/error).
+    // This ensures containerRef is always valid on mount, so the ResizeObserver
+    // can measure container height immediately. Loading/error/empty states are
+    // absolute overlays rendered inside the container.
     // ========================================================================
+
+    const hasData = !isLoading && !error && waveformData.length > 0;
+    const waveformReady = hasData && contentWidth > 0 && containerH > 0;
+
     return (
         <div
             ref={containerRef}
@@ -348,79 +345,102 @@ export function SampleEditorWaveform({
                 activeDrag && "cursor-col-resize",
             )}
         >
-            {/* ── Layer 2: Time grid ───────────────────────────────────────── */}
-            <TimeGrid duration={dur} isStereo={isStereo} />
-
-            {/* ── Layer 3: Waveform (existing polished component) ──────────── */}
-            {dims.w > 0 && dims.h > 0 && (
-                <WaveformDisplay
-                    data={waveformData}
-                    rightData={isStereo ? waveformDataRight : undefined}
-                    width={dims.w}
-                    height={dims.h}
-                    color={WAVEFORM_COLOR_LEFT}
-                    rightColor={WAVEFORM_COLOR_RIGHT}
-                    backgroundColor="transparent"
-                    showGrid={false}
-                    glowEffect={true}
-                    className="absolute inset-0 pointer-events-none"
-                />
+            {/* ── State overlays (loading / error / empty) ─────────────────── */}
+            {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/40 text-xs z-30 bg-background">
+                    Loading waveform…
+                </div>
+            )}
+            {!isLoading && error && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-xs z-30 bg-background">
+                    <span className="text-destructive/60">Failed to load waveform</span>
+                    <span className="text-muted-foreground/40 text-[10px] max-w-xs text-center">{error}</span>
+                </div>
+            )}
+            {!isLoading && !error && waveformData.length === 0 && (
+                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/40 text-xs z-30">
+                    No waveform data
+                </div>
             )}
 
-            {/* ── Layer 4: Trim dim overlays ────────────────────────────────── */}
-            {localAudioOffset > 0 && (
-                <div
-                    className="absolute inset-y-0 bg-background/70 pointer-events-none"
-                    style={{ left: 0, width: `${(localAudioOffset / dur) * 100}%` }}
-                />
-            )}
-            {localAudioEnd != null && localAudioEnd < dur && (
-                <div
-                    className="absolute inset-y-0 bg-background/70 pointer-events-none"
-                    style={{ left: `${(localTrimEnd / dur) * 100}%`, right: 0 }}
-                />
-            )}
-
-            {/* ── Layer 5: Loop region ─────────────────────────────────────── */}
-            {loopEnabled && (
-                <div
-                    className="absolute inset-y-0 bg-accent/8 border-l border-r border-accent/25 pointer-events-none"
-                    style={{
-                        left:  `${(localLoopStart / dur) * 100}%`,
-                        width: `${((localLEnd - localLoopStart) / dur) * 100}%`,
-                    }}
-                />
-            )}
-
-            {/* ── Layer 6: Trim handles ─────────────────────────────────────── */}
-            <Handle
-                pct={localAudioOffset / dur}
-                variant="trim"
-                side="start"
-                onMouseDown={e => startDrag("trim-start", e)}
-            />
-            <Handle
-                pct={localTrimEnd / dur}
-                variant="trim"
-                side="end"
-                onMouseDown={e => startDrag("trim-end", e)}
-            />
-
-            {/* ── Layer 6: Loop handles (conditional) ──────────────────────── */}
-            {loopEnabled && (
+            {/* ── Waveform layers (only when data is ready) ────────────────── */}
+            {hasData && (
                 <>
+                    {/* Layer 2: Time grid */}
+                    <TimeGrid duration={dur} isStereo={isStereo} />
+
+                    {/* Layer 3: Waveform */}
+                    {waveformReady && (
+                        <WaveformDisplay
+                            data={waveformData}
+                            rightData={isStereo ? waveformDataRight : undefined}
+                            width={contentWidth}
+                            height={containerH}
+                            color={WAVEFORM_COLOR_LEFT}
+                            rightColor={WAVEFORM_COLOR_RIGHT}
+                            backgroundColor="transparent"
+                            showGrid={false}
+                            glowEffect={true}
+                            className="absolute inset-0 pointer-events-none"
+                        />
+                    )}
+
+                    {/* Layer 4: Trim dim overlays */}
+                    {localAudioOffset > 0 && (
+                        <div
+                            className="absolute inset-y-0 bg-background/70 pointer-events-none"
+                            style={{ left: 0, width: `${(localAudioOffset / dur) * 100}%` }}
+                        />
+                    )}
+                    {localAudioEnd != null && localAudioEnd < dur && (
+                        <div
+                            className="absolute inset-y-0 bg-background/70 pointer-events-none"
+                            style={{ left: `${(localTrimEnd / dur) * 100}%`, right: 0 }}
+                        />
+                    )}
+
+                    {/* Layer 5: Loop region */}
+                    {loopEnabled && (
+                        <div
+                            className="absolute inset-y-0 bg-accent/8 border-l border-r border-accent/25 pointer-events-none"
+                            style={{
+                                left:  `${(localLoopStart / dur) * 100}%`,
+                                width: `${((localLEnd - localLoopStart) / dur) * 100}%`,
+                            }}
+                        />
+                    )}
+
+                    {/* Layer 6: Trim handles */}
                     <Handle
-                        pct={localLoopStart / dur}
-                        variant="loop"
+                        pct={localAudioOffset / dur}
+                        variant="trim"
                         side="start"
-                        onMouseDown={e => startDrag("loop-start", e)}
+                        onMouseDown={e => startDrag("trim-start", e)}
                     />
                     <Handle
-                        pct={localLEnd / dur}
-                        variant="loop"
+                        pct={localTrimEnd / dur}
+                        variant="trim"
                         side="end"
-                        onMouseDown={e => startDrag("loop-end", e)}
+                        onMouseDown={e => startDrag("trim-end", e)}
                     />
+
+                    {/* Layer 6: Loop handles (conditional) */}
+                    {loopEnabled && (
+                        <>
+                            <Handle
+                                pct={localLoopStart / dur}
+                                variant="loop"
+                                side="start"
+                                onMouseDown={e => startDrag("loop-start", e)}
+                            />
+                            <Handle
+                                pct={localLEnd / dur}
+                                variant="loop"
+                                side="end"
+                                onMouseDown={e => startDrag("loop-end", e)}
+                            />
+                        </>
+                    )}
                 </>
             )}
         </div>

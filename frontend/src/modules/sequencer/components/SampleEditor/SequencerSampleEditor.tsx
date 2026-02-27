@@ -11,12 +11,18 @@
  * ┌─────────────────────────────────────────────────────────────┐
  * │ Header: "Sample Editor"  │  clip name · duration · close    │
  * ├──────────────────────────┼──────────────────────────────────┤
- * │                          │  SampleEditorRuler               │
- * │  SampleEditorControls    ├──────────────────────────────────┤
- * │                          │  SampleEditorWaveform            │
+ * │                          │  [scroll container]              │
+ * │  SampleEditorControls    │    SampleEditorRuler             │
+ * │                          │    SampleEditorWaveform          │
  * └──────────────────────────┴──────────────────────────────────┘
+ *
+ * Zoom + scroll:
+ *   contentWidth = max(viewportWidth, fileDuration × PIXELS_PER_SECOND × zoom)
+ *   Ruler and waveform both render at contentWidth. A single scroll container
+ *   wraps both so they scroll together — same pattern as SequencerPianoRoll.
  */
 
+import { useEffect, useRef, useState } from "react";
 import { Music, X } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { useDAWStore } from "@/stores/dawStore";
@@ -24,6 +30,7 @@ import { useWaveformData } from "../../hooks/useWaveformData.ts";
 import { SampleEditorControls, SAMPLE_EDITOR_SIDEBAR_WIDTH } from "./SampleEditorControls.tsx";
 import { SampleEditorRuler } from "./SampleEditorRuler.tsx";
 import { SampleEditorWaveform } from "./SampleEditorWaveform.tsx";
+import { SAMPLE_EDITOR_PIXELS_PER_SECOND } from "@/config/daw.constants";
 
 // ============================================================================
 // EMPTY STATE (shared across all guard branches)
@@ -58,6 +65,7 @@ export function SequencerSampleEditor({}: SequencerSampleEditorProps) {
     const clips              = useDAWStore(s => s.clips);
     const activeComposition  = useDAWStore(s => s.activeComposition);
     const closeSampleEditor  = useDAWStore(s => s.closeSampleEditor);
+    const zoom               = useDAWStore(s => s.zoom);
     const tempo              = activeComposition?.tempo ?? 120;
 
     // ========================================================================
@@ -85,6 +93,23 @@ export function SequencerSampleEditor({}: SequencerSampleEditorProps) {
         tempo,
         samplesPerLoop: 2000,
     });
+
+    // ========================================================================
+    // SCROLL CONTAINER: Track viewport width for contentWidth calculation
+    // ========================================================================
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const [viewportWidth, setViewportWidth] = useState(0);
+
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const ro = new ResizeObserver(entries => {
+            setViewportWidth(Math.round(entries[0].contentRect.width));
+        });
+        ro.observe(el);
+        setViewportWidth(el.clientWidth);
+        return () => ro.disconnect();
+    }, []);
 
     // ========================================================================
     // EMPTY STATES
@@ -116,6 +141,9 @@ export function SequencerSampleEditor({}: SequencerSampleEditorProps) {
     // ========================================================================
     // Fall back to beat-based duration if audio file duration isn't loaded yet
     const dur = fileDuration > 0 ? fileDuration : (clip.duration / tempo) * 60;
+
+    // contentWidth: at zoom=1 the waveform fills the viewport; higher zoom zooms in
+    const contentWidth = Math.max(viewportWidth || 400, dur * SAMPLE_EDITOR_PIXELS_PER_SECOND * zoom);
 
     // ========================================================================
     // RENDER
@@ -162,16 +190,23 @@ export function SequencerSampleEditor({}: SequencerSampleEditorProps) {
                 {/* LEFT: Controls sidebar */}
                 <SampleEditorControls fileDuration={dur} />
 
-                {/* RIGHT: Ruler + Waveform */}
-                <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-                    <SampleEditorRuler fileDuration={dur} />
-                    <SampleEditorWaveform
-                        waveformData={waveformLeft}
-                        waveformDataRight={waveformRight}
-                        fileDuration={dur}
-                        isLoading={isLoading}
-                        error={error}
-                    />
+                {/* RIGHT: Single scroll container — ruler + waveform scroll together */}
+                <div
+                    ref={scrollRef}
+                    className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden flex flex-col"
+                >
+                    {/* Content panel — expands to contentWidth so both ruler and waveform scale with zoom */}
+                    <div style={{ width: contentWidth }} className="flex flex-col h-full">
+                        <SampleEditorRuler fileDuration={dur} contentWidth={contentWidth} />
+                        <SampleEditorWaveform
+                            waveformData={waveformLeft}
+                            waveformDataRight={waveformRight}
+                            fileDuration={dur}
+                            contentWidth={contentWidth}
+                            isLoading={isLoading}
+                            error={error}
+                        />
+                    </div>
                 </div>
 
             </div>

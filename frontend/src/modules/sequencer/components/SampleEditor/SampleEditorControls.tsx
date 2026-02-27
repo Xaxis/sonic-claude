@@ -6,13 +6,25 @@
  * (derived from the audio file, not stored in Zustand).
  *
  * Sections: Playback · Envelope · Modifiers · Loop Region · Trim readout
+ *
+ * Optimistic update pattern (consistent with rest of app):
+ *   - Sliders use LOCAL state as the source of truth during interaction.
+ *     onValueChange → setLocal*(v) for immediate pixel-perfect feedback.
+ *     onValueCommit → updateClip(…) fires ONCE on mouseup.
+ *     updateClip does an optimistic store update instantly, then syncs backend.
+ *   - Toggle buttons (Reverse, Loop) call updateClip directly on click
+ *     (single action, no drag involved).
+ *   - A useEffect syncs local state from the store whenever an external
+ *     change arrives (e.g. AI assistant edits the clip).
+ *
+ * Rules of Hooks: ALL hooks are called before any conditional return.
  */
 
-import { useCallback } from "react";
+import { useEffect, useState } from "react";
 import { RotateCcw, Repeat } from "lucide-react";
 import { Slider } from "@/components/ui/slider.tsx";
 import { useDAWStore } from "@/stores/dawStore";
-import { safeClipDefaults, debounce } from "./sampleEditorUtils";
+import { safeClipDefaults } from "./sampleEditorUtils";
 import { SEQUENCER_SIDEBAR_WIDTH } from "@/config/daw.constants";
 import {
     SAMPLE_PITCH_SEMITONES_MIN,
@@ -57,15 +69,19 @@ interface ControlRowProps {
     max: number;
     step: number;
     formatValue: (v: number) => string;
+    /** Called on every frame during drag — updates local state only */
     onChange: (v: number) => void;
+    /** Called once on mouseup — commits to backend via updateClip */
+    onCommit: (v: number) => void;
 }
-function ControlRow({ label, value, min, max, step, formatValue, onChange }: ControlRowProps) {
+function ControlRow({ label, value, min, max, step, formatValue, onChange, onCommit }: ControlRowProps) {
     return (
         <div className="flex items-center gap-2 py-1">
             <span className="text-xs text-muted-foreground/80 w-14 flex-shrink-0 select-none">{label}</span>
             <Slider
                 value={[value]}
                 onValueChange={([v]) => onChange(v)}
+                onValueCommit={([v]) => onCommit(v)}
                 min={min}
                 max={max}
                 step={step}
@@ -115,36 +131,55 @@ interface SampleEditorControlsProps {
 
 export function SampleEditorControls({ fileDuration: dur }: SampleEditorControlsProps) {
     // ========================================================================
-    // STATE: Read from Zustand store
+    // STORE STATE — all hooks unconditionally at the top
     // ========================================================================
     const sampleEditorClipId = useDAWStore(s => s.sampleEditorClipId);
     const clips              = useDAWStore(s => s.clips);
     const updateClip         = useDAWStore(s => s.updateClip);
 
-    // ========================================================================
-    // DERIVED STATE: Get clip and its audio-edit params
-    // ========================================================================
     const clip = sampleEditorClipId ? clips.find(c => c.id === sampleEditorClipId) : undefined;
 
-    if (!clip) return null;
-
+    // Derive current values from the store (safe defaults when clip is undefined)
     const {
         audioOffset, audioEnd,
         pitchSemitones, playbackRate, gain,
         fadeIn, fadeOut,
         reverse, loopEnabled, loopStart, loopEnd,
-    } = safeClipDefaults(clip);
+    } = safeClipDefaults(clip ?? {} as any);
 
     // ========================================================================
-    // ACTIONS: Debounced updateClip for sliders (avoids API call flood)
+    // LOCAL STATE — source of truth for sliders during interaction.
+    //
+    // Initialized from the store; synced back via useEffect when the store
+    // changes externally (different clip selected, AI edit, etc.).
+    // During a drag the local value leads the store by one frame — the slider
+    // is instant and updateClip fires only once on mouseup (onValueCommit).
     // ========================================================================
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const debouncedUpdate = useCallback(
-        debounce((updates: Parameters<typeof updateClip>[1]) => {
-            updateClip(clip.id, updates);
-        }, 250),
-        [clip.id, updateClip],
-    );
+    const [localPitch,     setLocalPitch]     = useState(pitchSemitones);
+    const [localRate,      setLocalRate]      = useState(playbackRate);
+    const [localGain,      setLocalGain]      = useState(gain);
+    const [localFadeIn,    setLocalFadeIn]    = useState(fadeIn);
+    const [localFadeOut,   setLocalFadeOut]   = useState(fadeOut);
+    const [localLoopStart, setLocalLoopStart] = useState(loopStart);
+    const [localLoopEnd,   setLocalLoopEnd]   = useState(loopEnd ?? dur);
+
+    // Sync local state whenever the store changes (new clip or external edit).
+    // Safe to run on all store value changes: if the change was triggered by
+    // our own onValueCommit, local state is already at that value → no-op.
+    useEffect(() => {
+        setLocalPitch(pitchSemitones);
+        setLocalRate(playbackRate);
+        setLocalGain(gain);
+        setLocalFadeIn(fadeIn);
+        setLocalFadeOut(fadeOut);
+        setLocalLoopStart(loopStart);
+        setLocalLoopEnd(loopEnd ?? dur);
+    }, [pitchSemitones, playbackRate, gain, fadeIn, fadeOut, loopStart, loopEnd, dur]);
+
+    // ========================================================================
+    // GUARD — after all hooks
+    // ========================================================================
+    if (!clip) return null;
 
     // ========================================================================
     // RENDER
@@ -158,41 +193,46 @@ export function SampleEditorControls({ fileDuration: dur }: SampleEditorControls
             <SectionDivider label="Playback" />
             <ControlRow
                 label="Pitch"
-                value={pitchSemitones}
+                value={localPitch}
                 min={SAMPLE_PITCH_SEMITONES_MIN} max={SAMPLE_PITCH_SEMITONES_MAX} step={SAMPLE_PITCH_SEMITONES_STEP}
                 formatValue={v => `${v >= 0 ? "+" : ""}${v.toFixed(1)} st`}
-                onChange={v => debouncedUpdate({ pitch_semitones: v })}
+                onChange={setLocalPitch}
+                onCommit={v => updateClip(clip.id, { pitch_semitones: v })}
             />
             <ControlRow
                 label="Rate"
-                value={playbackRate}
+                value={localRate}
                 min={SAMPLE_RATE_MIN} max={SAMPLE_RATE_MAX} step={SAMPLE_RATE_STEP}
                 formatValue={v => `${v.toFixed(2)}×`}
-                onChange={v => debouncedUpdate({ playback_rate: v })}
+                onChange={setLocalRate}
+                onCommit={v => updateClip(clip.id, { playback_rate: v })}
             />
             <ControlRow
                 label="Gain"
-                value={gain}
+                value={localGain}
                 min={0} max={SAMPLE_GAIN_MAX} step={SAMPLE_GAIN_STEP}
                 formatValue={v => `${Math.round(v * 100)}%`}
-                onChange={v => debouncedUpdate({ gain: v })}
+                onChange={setLocalGain}
+                onCommit={v => updateClip(clip.id, { gain: v })}
             />
 
             {/* ── Envelope ─── */}
             <SectionDivider label="Envelope" />
             <ControlRow
                 label="Fade In"
-                value={fadeIn}
+                value={localFadeIn}
                 min={0} max={SAMPLE_FADE_MAX_SECONDS} step={SAMPLE_FADE_STEP}
                 formatValue={v => `${v.toFixed(2)}s`}
-                onChange={v => debouncedUpdate({ fade_in: v })}
+                onChange={setLocalFadeIn}
+                onCommit={v => updateClip(clip.id, { fade_in: v })}
             />
             <ControlRow
                 label="Fade Out"
-                value={fadeOut}
+                value={localFadeOut}
                 min={0} max={SAMPLE_FADE_MAX_SECONDS} step={SAMPLE_FADE_STEP}
                 formatValue={v => `${v.toFixed(2)}s`}
-                onChange={v => debouncedUpdate({ fade_out: v })}
+                onChange={setLocalFadeOut}
+                onCommit={v => updateClip(clip.id, { fade_out: v })}
             />
 
             {/* ── Modifiers ─── */}
@@ -222,21 +262,23 @@ export function SampleEditorControls({ fileDuration: dur }: SampleEditorControls
                     <SectionDivider label="Loop Region" />
                     <ControlRow
                         label="Start"
-                        value={loopStart}
+                        value={localLoopStart}
                         min={0}
                         max={Math.max(dur - 0.01, 0.01)}
                         step={0.01}
                         formatValue={v => `${v.toFixed(2)}s`}
-                        onChange={v => debouncedUpdate({ loop_start: Math.min(v, (loopEnd ?? dur) - 0.01) })}
+                        onChange={v => setLocalLoopStart(Math.min(v, localLoopEnd - 0.01))}
+                        onCommit={v => updateClip(clip.id, { loop_start: Math.min(v, (loopEnd ?? dur) - 0.01) })}
                     />
                     <ControlRow
                         label="End"
-                        value={loopEnd ?? dur}
+                        value={localLoopEnd}
                         min={0.01}
                         max={Math.max(dur, 0.02)}
                         step={0.01}
                         formatValue={v => `${v.toFixed(2)}s`}
-                        onChange={v => debouncedUpdate({ loop_end: Math.max(v, loopStart + 0.01) })}
+                        onChange={v => setLocalLoopEnd(Math.max(v, localLoopStart + 0.01))}
+                        onCommit={v => updateClip(clip.id, { loop_end: Math.max(v, loopStart + 0.01) })}
                     />
                 </>
             )}
