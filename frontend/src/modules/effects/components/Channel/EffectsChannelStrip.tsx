@@ -13,8 +13,10 @@
  */
 
 import { useState } from "react";
-import { useDAWStore } from '@/stores/dawStore';
-import { EffectSlot } from "./EffectSlot";
+import { useDAWStore }        from "@/stores/dawStore";
+import { ChannelStrip }       from "@/components/ui/channel-strip.tsx";
+import { ChannelStripHeader } from "@/components/ui/channel-strip-header.tsx";
+import { EffectSlot }    from "./EffectSlot";
 import { EffectSelector } from "./EffectSelector";
 
 interface EffectsChannelStripProps {
@@ -60,32 +62,13 @@ export function EffectsChannelStrip({ trackId }: EffectsChannelStripProps) {
     const [dragOverEffectId, setDragOverEffectId] = useState<string | null>(null);
 
     return (
-        <div className="flex w-56 flex-shrink-0 flex-col gap-3 rounded-lg border border-border/70 bg-gradient-to-b from-card to-card/60 p-3 shadow-lg hover:border-border transition-all">
-            {/* Track Header - Matches MixerChannelStrip */}
-            <div className="flex flex-col gap-1.5 border-b border-border/30 pb-2.5">
-                {/* Track Name */}
-                <div
-                    className="truncate text-center text-xs font-bold uppercase tracking-wider drop-shadow-sm"
-                    style={{ color: track.color }}
-                    title={track.name}
-                >
-                    {track.name}
-                </div>
-
-                {/* Track Type Badge */}
-                <div className="flex justify-center">
-                    <span
-                        className="rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider shadow-sm"
-                        style={{
-                            backgroundColor: `${track.color}20`,
-                            color: track.color,
-                            border: `1px solid ${track.color}40`,
-                        }}
-                    >
-                        FX CHAIN
-                    </span>
-                </div>
-            </div>
+        <ChannelStrip>
+            {/* Track Header */}
+            <ChannelStripHeader
+                name={track.name}
+                color={track.color}
+                label="FX Chain"
+            />
 
             {/* Effects Chain - Scrollable with Drag and Drop */}
             <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
@@ -140,7 +123,7 @@ export function EffectsChannelStrip({ trackId }: EffectsChannelStripProps) {
                     disabled={!canAddMore}
                 />
             )}
-        </div>
+        </ChannelStrip>
     );
 }
 

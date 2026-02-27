@@ -11,6 +11,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useDAWStore } from "@/stores/dawStore";
 import { useTimelineCalculations } from '../../hooks/useTimelineCalculations';
+import { Playhead } from "@/components/ui/playhead";
 import { api } from "@/services/api";
 import type { MIDIEvent } from "../../types";
 import {
@@ -53,6 +54,15 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     const [dragPreview, setDragPreview] = useState<{ noteIndex: number; time: number; pitch: number } | null>(null);
     const [resizePreview, setResizePreview] = useState<{ noteIndex: number; duration: number } | null>(null);
     const gridRef = useRef<HTMLDivElement>(null);
+
+    // ========================================================================
+    // PLAYHEAD — refs keep values fresh without restarting the RAF effect
+    // ========================================================================
+    const phPositionRef = useRef(transport?.position_beats || 0);
+    const phBeatWidthRef = useRef(beatWidth);
+    useEffect(() => { phPositionRef.current  = transport?.position_beats || 0; });
+    useEffect(() => { phBeatWidthRef.current = beatWidth; });
+    const getPlayheadX = useCallback(() => phPositionRef.current * phBeatWidthRef.current, []);
 
     // ========================================================================
     // CLIP DATA
@@ -430,6 +440,13 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
                 }}
                 onMouseDown={handleGridMouseDown}
             >
+                {/* Playhead — extends full grid height, driven by RAF */}
+                <Playhead
+                    getX={getPlayheadX}
+                    isPlaying={transport?.is_playing || false}
+                    isPaused={transport?.is_paused ?? false}
+                />
+
                 {/* Clip Region Highlight */}
                 <div
                     className="absolute top-0 bottom-0 bg-cyan-500/10 border-l-2 border-r-2 border-cyan-500/50 pointer-events-none"

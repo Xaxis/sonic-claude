@@ -67,6 +67,13 @@ export interface SequencerClip {
     is_muted: boolean;
     is_looped: boolean;
     gain: number; // 0.0-2.0, 1.0 = unity
+
+    // MIDI clip transforms — non-destructive, applied at playback time
+    midi_transpose?: number;         // semitones, -24 to +24
+    midi_velocity_offset?: number;   // delta, -64 to +64
+    midi_gate?: number;              // duration multiplier, 0.25 to 4.0
+    midi_timing_offset?: number;     // beat offset, -1.0 to +1.0
+    midi_quantize_strength?: number; // 0-100%
 }
 
 // ============================================================================

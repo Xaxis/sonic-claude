@@ -146,6 +146,7 @@ export interface AddClipRequest {
     name?: string;
     // Audio editing params
     sample_id?: string;
+    audio_offset?: number;
     audio_end?: number;
     pitch_semitones?: number;
     playback_rate?: number;
@@ -155,6 +156,12 @@ export interface AddClipRequest {
     loop_enabled?: boolean;
     loop_start?: number;
     loop_end?: number;
+    // MIDI clip transforms
+    midi_transpose?: number;
+    midi_velocity_offset?: number;
+    midi_gate?: number;
+    midi_timing_offset?: number;
+    midi_quantize_strength?: number;
 }
 
 export interface UpdateClipRequest {
@@ -176,6 +183,12 @@ export interface UpdateClipRequest {
     loop_enabled?: boolean;
     loop_start?: number;
     loop_end?: number;
+    // MIDI clip transforms
+    midi_transpose?: number;
+    midi_velocity_offset?: number;
+    midi_gate?: number;
+    midi_timing_offset?: number;
+    midi_quantize_strength?: number;
 }
 
 // ============================================================================

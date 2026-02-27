@@ -56,7 +56,7 @@ export function SequencerTimelineSection({
     return (
         <SequencerGridLayout
             cornerHeader={
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+                <span className="flex items-center h-full px-3 text-xs font-bold text-muted-foreground uppercase tracking-wide">
                     Tracks
                 </span>
             }

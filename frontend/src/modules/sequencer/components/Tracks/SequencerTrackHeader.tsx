@@ -12,11 +12,11 @@
 import { useState } from "react";
 import {  Trash2, Edit2, Check, X, MoreVertical, Copy, Settings, ChevronDown } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
-import { Slider } from "@/components/ui/slider.tsx";
-import { Badge } from "@/components/ui/badge.tsx";
+import { ControlRow } from "@/components/ui/control-row.tsx";
+import { Badge }       from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
 import { SequencerInstrumentSelector } from "../Instruments/SequencerInstrumentSelector.tsx";
-import { SequencerTrackButton } from "././SequencerTrackButton.tsx";
+import { TrackButton } from "@/components/ui/track-button.tsx";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -139,9 +139,12 @@ export function SequencerTrackHeader({
             <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <button className="p-0.5 rounded hover:bg-muted transition-colors">
-                            <MoreVertical size={12} className="text-muted-foreground" />
-                        </button>
+                        <IconButton
+                            icon={MoreVertical}
+                            tooltip="Track options"
+                            variant="ghost"
+                            size="icon-xs"
+                        />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-36 mr-2">
                         <DropdownMenuItem onClick={handleStartEdit} className="text-xs py-1">
@@ -202,23 +205,18 @@ export function SequencerTrackHeader({
                     </div>
 
                     {/* Mute/Solo - Always visible */}
-                    <SequencerTrackButton
+                    <TrackButton
                         variant="mute"
                         active={track.is_muted}
                         onClick={handleToggleMute}
                         size="xs"
-                    >
-                        M
-                    </SequencerTrackButton>
-
-                    <SequencerTrackButton
+                    />
+                    <TrackButton
                         variant="solo"
                         active={track.is_solo}
                         onClick={handleToggleSolo}
                         size="xs"
-                    >
-                        S
-                    </SequencerTrackButton>
+                    />
                 </div>
             )}
 
@@ -228,13 +226,14 @@ export function SequencerTrackHeader({
                     {/* ROW 1: IDENTITY */}
                     <div className="flex items-center gap-2">
                         {/* Collapse Button */}
-                        <button
+                        <IconButton
+                            icon={ChevronDown}
+                            tooltip="Minimize track header"
+                            variant="ghost"
+                            size="icon-xs"
+                            className="flex-shrink-0"
                             onClick={() => onToggleExpand?.(track.id)}
-                            className="p-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
-                            title="Minimize track header"
-                        >
-                            <ChevronDown size={14} className="text-muted-foreground" />
-                        </button>
+                        />
 
                         <Badge variant={track.type} rounded="default" className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
                             {track.type}
@@ -277,73 +276,54 @@ export function SequencerTrackHeader({
 
                         {/* TRANSPORT - Mute, Solo, Arm */}
                         <div className="flex items-center gap-1.5">
-                            <SequencerTrackButton
+                            <TrackButton
                                 variant="mute"
                                 active={track.is_muted}
                                 onClick={handleToggleMute}
                                 size="sm"
                                 bordered
-                            >
-                                M
-                            </SequencerTrackButton>
-
-                            <SequencerTrackButton
+                            />
+                            <TrackButton
                                 variant="solo"
                                 active={track.is_solo}
                                 onClick={handleToggleSolo}
                                 size="sm"
                                 bordered
-                            >
-                                S
-                            </SequencerTrackButton>
-
-                            <SequencerTrackButton
+                            />
+                            <TrackButton
                                 variant="arm"
                                 active={track.is_armed}
                                 disabled
                                 size="sm"
                                 bordered
-                            >
-                                R
-                            </SequencerTrackButton>
+                            />
                         </div>
                     </div>
 
                     {/* ROW 3: MIXING - Volume and Pan */}
-                    <div className="flex items-center gap-3 text-[10px]">
-                        <div className="flex items-center gap-1.5 flex-1">
-                            <span className="text-muted-foreground w-7 flex-shrink-0">Vol</span>
-                            <Slider
-                                value={[track.volume * 100]}
-                                onValueChange={async (values) => {
-                                    await handleUpdateVolume(values[0] / 100);
-                                }}
-                                min={0}
-                                max={200}
-                                step={1}
-                                className="flex-1"
-                            />
-                            <span className="text-muted-foreground w-10 text-right flex-shrink-0 font-mono">
-                                {Math.round(track.volume * 100)}%
-                            </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 flex-1">
-                            <span className="text-muted-foreground w-7 flex-shrink-0">Pan</span>
-                            <Slider
-                                value={[track.pan * 100]}
-                                onValueChange={async (values) => {
-                                    await handleUpdatePan(values[0] / 100);
-                                }}
-                                min={-100}
-                                max={100}
-                                step={1}
-                                className="flex-1"
-                            />
-                            <span className="text-muted-foreground w-9 text-right flex-shrink-0 font-mono">
-                                {track.pan === 0 ? "C" : track.pan > 0 ? `R${Math.round(track.pan * 100)}` : `L${Math.round(Math.abs(track.pan) * 100)}`}
-                            </span>
-                        </div>
+                    <div className="flex flex-col">
+                        <ControlRow
+                            label="Vol"
+                            value={track.volume * 100}
+                            min={0}
+                            max={200}
+                            step={1}
+                            formatValue={v => `${Math.round(v)}%`}
+                            onChange={v => handleUpdateVolume(v / 100)}
+                            labelWidth="w-7"
+                            valueWidth="w-10"
+                        />
+                        <ControlRow
+                            label="Pan"
+                            value={track.pan * 100}
+                            min={-100}
+                            max={100}
+                            step={1}
+                            formatValue={v => v === 0 ? "C" : v > 0 ? `R${Math.round(v)}` : `L${Math.round(Math.abs(v))}`}
+                            onChange={v => handleUpdatePan(v / 100)}
+                            labelWidth="w-7"
+                            valueWidth="w-9"
+                        />
                     </div>
                 </>
             )}

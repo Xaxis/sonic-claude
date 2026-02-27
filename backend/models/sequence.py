@@ -80,6 +80,14 @@ class Clip(BaseModel):
     loop_start: float = 0.0                  # Loop region start (seconds from file start)
     loop_end: Optional[float] = None         # Loop region end (None = full length)
 
+    # MIDI clip transforms — non-destructive, applied at playback scheduling time.
+    # Raw midi_events are stored unmodified; these offsets are blended in at runtime.
+    midi_transpose: int = Field(default=0, ge=-24, le=24)               # semitones added to every note
+    midi_velocity_offset: int = Field(default=0, ge=-64, le=64)         # velocity delta (+/-)
+    midi_gate: float = Field(default=1.0, ge=0.25, le=4.0)              # note duration multiplier
+    midi_timing_offset: float = Field(default=0.0, ge=-1.0, le=1.0)     # beat offset (+/-)
+    midi_quantize_strength: int = Field(default=0, ge=0, le=100)        # 0 = off, 100 = full snap to 1/4 beat
+
 
 # ============================================================================
 # TRACKS
@@ -140,6 +148,7 @@ class AddClipRequest(BaseModel):
     audio_file_path: Optional[str] = None
     name: Optional[str] = None
     sample_id: Optional[str] = None
+    audio_offset: Optional[float] = Field(None, ge=0.0)
     audio_end: Optional[float] = Field(None, ge=0.0)
     pitch_semitones: float = Field(default=0.0, ge=-24.0, le=24.0)
     playback_rate: float = Field(default=1.0, ge=0.25, le=4.0)
@@ -149,6 +158,12 @@ class AddClipRequest(BaseModel):
     loop_enabled: bool = False
     loop_start: float = Field(default=0.0, ge=0.0)
     loop_end: Optional[float] = Field(None, ge=0.0)
+    # MIDI clip transforms
+    midi_transpose: int = Field(default=0, ge=-24, le=24)
+    midi_velocity_offset: int = Field(default=0, ge=-64, le=64)
+    midi_gate: float = Field(default=1.0, ge=0.25, le=4.0)
+    midi_timing_offset: float = Field(default=0.0, ge=-1.0, le=1.0)
+    midi_quantize_strength: int = Field(default=0, ge=0, le=100)
 
 
 class UpdateClipRequest(BaseModel):
@@ -174,6 +189,12 @@ class UpdateClipRequest(BaseModel):
     loop_enabled: Optional[bool] = None
     loop_start: Optional[float] = Field(None, ge=0.0)
     loop_end: Optional[float] = Field(None, ge=0.0)
+    # MIDI clip transforms
+    midi_transpose: Optional[int] = Field(None, ge=-24, le=24)
+    midi_velocity_offset: Optional[int] = Field(None, ge=-64, le=64)
+    midi_gate: Optional[float] = Field(None, ge=0.25, le=4.0)
+    midi_timing_offset: Optional[float] = Field(None, ge=-1.0, le=1.0)
+    midi_quantize_strength: Optional[int] = Field(None, ge=0, le=100)
 
     @model_validator(mode='after')
     def validate_trim_order(self) -> 'UpdateClipRequest':

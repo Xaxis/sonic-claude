@@ -1101,6 +1101,11 @@ export const useDAWStore = create<DAWStore>()(
                     loop_enabled: clip.loop_enabled,
                     loop_start: clip.loop_start,
                     loop_end: clip.loop_end,
+                    midi_transpose: clip.midi_transpose,
+                    midi_velocity_offset: clip.midi_velocity_offset,
+                    midi_gate: clip.midi_gate,
+                    midi_timing_offset: clip.midi_timing_offset,
+                    midi_quantize_strength: clip.midi_quantize_strength,
                 });
 
                 set((state) => ({

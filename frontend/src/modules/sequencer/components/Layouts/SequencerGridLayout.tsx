@@ -107,7 +107,7 @@ export function SequencerGridLayout({
             >
                 {/* Top-Left: Corner Header - Sticky to top-left corner (FIXED, doesn't scroll) */}
                 <div
-                    className="border-r border-b border-border bg-background flex items-center px-3"
+                    className="border-r border-b border-border bg-background overflow-hidden"
                     style={{
                         position: 'sticky',
                         top: 0,

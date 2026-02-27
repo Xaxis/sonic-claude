@@ -30,6 +30,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useDAWStore } from "@/stores/dawStore";
 import { WaveformDisplay } from "@/components/ui/waveform-display.tsx";
+import { Playhead } from "@/components/ui/playhead";
 import { safeClipDefaults, getSmartInterval } from "./sampleEditorUtils";
 import { WAVEFORM_COLOR_LEFT, WAVEFORM_COLOR_RIGHT } from "@/config/theme.constants";
 
@@ -195,12 +196,18 @@ export function SampleEditorWaveform({
     const sampleEditorClipId = useDAWStore(s => s.sampleEditorClipId);
     const clips              = useDAWStore(s => s.clips);
     const updateClip         = useDAWStore(s => s.updateClip);
+    const transport          = useDAWStore(s => s.transport);
+    const activeComposition  = useDAWStore(s => s.activeComposition);
+    const tempo              = activeComposition?.tempo ?? 120;
 
     // ========================================================================
     // DERIVED STATE
     // ========================================================================
     const clip = sampleEditorClipId ? clips.find(c => c.id === sampleEditorClipId) : undefined;
     const { audioOffset, audioEnd, loopEnabled, loopStart, loopEnd, fadeIn, fadeOut } = safeClipDefaults(clip ?? {} as any);
+    const clipStartBeats = clip?.start_time ?? 0;
+    const isPlaying      = transport?.is_playing ?? false;
+    const isPaused       = transport?.is_paused  ?? false;
 
     const dur     = fileDuration > 0 ? fileDuration : 1;
     const isStereo = waveformDataRight.length > 0;
@@ -254,6 +261,36 @@ export function SampleEditorWaveform({
     useEffect(() => { localAudioEndRef.current    = localAudioEnd;    }, [localAudioEnd]);
     useEffect(() => { localLoopStartRef.current   = localLoopStart;   }, [localLoopStart]);
     useEffect(() => { localLoopEndRef.current     = localLoopEnd;     }, [localLoopEnd]);
+
+    // ========================================================================
+    // PLAYHEAD REFS: Keep latest values for the RAF loop (mirrors SampleEditorRuler)
+    // ========================================================================
+    const transportBeatsRef = useRef(transport?.position_beats ?? 0);
+    const clipStartBeatsRef = useRef(clipStartBeats);
+    const tempoRef          = useRef(tempo);
+    const durationRef       = useRef(dur);
+    const contentWidthRef   = useRef(contentWidth);
+
+    useEffect(() => {
+        transportBeatsRef.current = transport?.position_beats ?? 0;
+        clipStartBeatsRef.current = clipStartBeats;
+        tempoRef.current          = tempo;
+        durationRef.current       = dur;
+        contentWidthRef.current   = contentWidth;
+    }, [transport?.position_beats, clipStartBeats, tempo, dur, contentWidth]);
+
+    const getPlayheadX = useCallback((): number => {
+        const secs = (transportBeatsRef.current - clipStartBeatsRef.current) * (60 / tempoRef.current);
+        const pct  = durationRef.current > 0
+            ? Math.max(0, Math.min(1, secs / durationRef.current))
+            : 0;
+        return pct * contentWidthRef.current;
+    }, []);
+
+    const isPlayheadVisible = useCallback((): boolean => {
+        const secs = (transportBeatsRef.current - clipStartBeatsRef.current) * (60 / tempoRef.current);
+        return secs >= 0 && secs <= durationRef.current;
+    }, []);
 
     // Resolved display values
     const localTrimEnd = localAudioEnd ?? dur;
@@ -513,6 +550,14 @@ export function SampleEditorWaveform({
                             />
                         </>
                     )}
+
+                    {/* Layer 7: Playhead (shared component — same formula as SampleEditorRuler) */}
+                    <Playhead
+                        getX={getPlayheadX}
+                        isVisible={isPlayheadVisible}
+                        isPlaying={isPlaying}
+                        isPaused={isPaused}
+                    />
                 </>
             )}
         </div>

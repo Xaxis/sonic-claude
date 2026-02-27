@@ -6,74 +6,72 @@
  * - Calls actions directly from store
  * - No props needed
  *
- * Displays the master channel with fader, meters, and limiter controls
- * Visually distinct from regular channels (wider, different color)
+ * Visually distinct from regular channels:
+ *   - border-2 border-primary/60 (bolder outline)
+ *   - gradient from-primary/10 (tinted background)
+ *   - accent ControlCells (primary-tinted borders on internal sections)
  */
 
-import { Fader } from "@/components/ui/fader.tsx";
-import { Meter } from "@/components/ui/meter.tsx";
-import { Button } from "@/components/ui/button.tsx";
-import { Label } from "@/components/ui/label.tsx";
-import { Slider } from "@/components/ui/slider.tsx";
-import { useDAWStore } from '@/stores/dawStore';
-import { formatDb } from "@/lib/audio-utils";
-import { cn } from "@/lib/utils";
+import { Fader }        from "@/components/ui/fader.tsx";
+import { Meter }        from "@/components/ui/meter.tsx";
+import { Button }       from "@/components/ui/button.tsx";
+import { ChannelStrip } from "@/components/ui/channel-strip.tsx";
+import { ControlCell }  from "@/components/ui/control-cell.tsx";
+import { ValueDisplay } from "@/components/ui/value-display.tsx";
+import { SectionLabel } from "@/components/ui/section-label.tsx";
+import { ControlRow }   from "@/components/ui/control-row.tsx";
+import { useDAWStore }  from "@/stores/dawStore";
+import { formatDb }     from "@/lib/audio-utils";
+import { cn }           from "@/lib/utils";
 
 export function MixerMasterSection() {
     // ========================================================================
     // STATE: Read from Zustand store
     // ========================================================================
-    const master = useDAWStore(state => state.master);
-    const meters = useDAWStore(state => state.meters);
+    const master     = useDAWStore(state => state.master);
+    const meters     = useDAWStore(state => state.meters);
     const showMeters = useDAWStore(state => state.showMeters);
 
     // ========================================================================
     // ACTIONS: Get from Zustand store
     // ========================================================================
-    const updateMasterFader = useDAWStore(state => state.updateMasterFader);
-    const toggleLimiter = useDAWStore(state => state.toggleLimiter);
-    const setLimiterThreshold = useDAWStore(state => state.setLimiterThreshold);
+    const updateMasterFader    = useDAWStore(state => state.updateMasterFader);
+    const toggleLimiter        = useDAWStore(state => state.toggleLimiter);
+    const setLimiterThreshold  = useDAWStore(state => state.setLimiterThreshold);
 
-    // Validation: master must exist
-    if (!master) {
-        return null;
-    }
+    if (!master) return null;
 
-    // Get real-time meter data for master
     const masterMeter = meters["master"];
-    const peakLeft = masterMeter?.peakLeft ?? master.meter_peak_left;
-    const peakRight = masterMeter?.peakRight ?? master.meter_peak_right;
+    const peakLeft    = masterMeter?.peakLeft  ?? master.meter_peak_left;
+    const peakRight   = masterMeter?.peakRight ?? master.meter_peak_right;
 
     return (
-        <div className="flex w-56 flex-shrink-0 flex-col gap-3 rounded-lg border-2 border-primary/60 bg-gradient-to-b from-primary/10 via-card to-card/80 p-4 shadow-2xl">
-            {/* Master Label */}
+        <ChannelStrip variant="master">
+
+            {/* ── Master Label ─────────────────────────────────────────────── */}
             <div className="flex flex-col items-center gap-1.5 border-b-2 border-primary/30 pb-3">
                 <div className="text-center text-sm font-black uppercase tracking-widest text-primary drop-shadow-[0_0_8px_rgba(0,245,255,0.4)]">
                     {master.name}
                 </div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-primary/70">
-                    Main Output
-                </div>
+                <SectionLabel size="sm" emphasis="primary">Main Output</SectionLabel>
             </div>
 
-            {/* Meter */}
+            {/* ── Meter ────────────────────────────────────────────────────── */}
             {showMeters && (
-                <div className="flex justify-center rounded-md bg-black/40 p-3 shadow-inner border border-primary/20">
+                <ControlCell variant="accent-inset" center>
                     <Meter
                         peak={peakLeft}
                         peakRight={peakRight}
                         stereo={true}
                         className="h-56"
                     />
-                </div>
+                </ControlCell>
             )}
 
-            {/* Limiter Controls */}
-            <div className="space-y-2.5 rounded-md border-2 border-primary/30 bg-gradient-to-b from-primary/5 to-background/60 p-3 shadow-md">
+            {/* ── Limiter Controls ─────────────────────────────────────────── */}
+            <ControlCell variant="accent" gap="3">
                 <div className="flex items-center justify-between">
-                    <Label className="text-[10px] font-black uppercase tracking-wider text-primary">
-                        Limiter
-                    </Label>
+                    <SectionLabel size="sm" emphasis="primary">Limiter</SectionLabel>
                     <Button
                         onClick={toggleLimiter}
                         variant={master.limiter_enabled ? "default" : "outline"}
@@ -86,35 +84,24 @@ export function MixerMasterSection() {
                         {master.limiter_enabled ? "ON" : "OFF"}
                     </Button>
                 </div>
-                <div className={cn("space-y-2", !master.limiter_enabled && "opacity-50 pointer-events-none")}>
-                    <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-                        Threshold
-                    </Label>
-                    <div className="flex items-center gap-2">
-                        <Slider
-                            value={[master.limiter_threshold]}
-                            onValueChange={(values) => setLimiterThreshold(values[0])}
-                            min={-12}
-                            max={0}
-                            step={0.1}
-                            className="flex-1"
-                            disabled={!master.limiter_enabled}
-                        />
-                        <span className="w-14 text-right text-[10px] font-mono font-bold text-primary">
-                            {formatDb(master.limiter_threshold)}
-                        </span>
-                    </div>
-                </div>
-            </div>
 
-            {/* Fader Section */}
-            <div className="flex flex-1 flex-col gap-2 rounded-md bg-gradient-to-b from-background/50 to-background/30 p-3 border-2 border-primary/20">
-                {/* Volume Display */}
-                <div className="text-center text-sm font-mono font-black text-primary drop-shadow-[0_0_6px_rgba(0,245,255,0.3)] tracking-tight">
-                    {formatDb(master.fader)}
-                </div>
+                <ControlRow
+                    label="Threshold"
+                    value={master.limiter_threshold}
+                    min={-12}
+                    max={0}
+                    step={0.1}
+                    formatValue={formatDb}
+                    onChange={setLimiterThreshold}
+                    disabled={!master.limiter_enabled}
+                    labelWidth="w-20"
+                    valueWidth="w-12"
+                />
+            </ControlCell>
 
-                {/* Fader */}
+            {/* ── Fader ────────────────────────────────────────────────────── */}
+            <ControlCell variant="accent" grow>
+                <ValueDisplay value={formatDb(master.fader)} size="lg" emphasis="primary" />
                 <div className="flex flex-1 justify-center">
                     <Fader
                         value={master.fader}
@@ -124,8 +111,7 @@ export function MixerMasterSection() {
                         className="flex-1"
                     />
                 </div>
-            </div>
-        </div>
+            </ControlCell>
+        </ChannelStrip>
     );
 }
-

@@ -16,6 +16,7 @@ import { useTransportWebSocket } from '@/hooks/useTransportWebsocket';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 import { Play, Pause, SkipBack, Square, Plus, Minus, Circle, Grid3x3, Gamepad2, ListTree } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -207,7 +208,7 @@ export function ClipLauncherToolbar() {
                             {formatTime(currentTime)}
                         </span>
                     </div>
-                    <div className="w-px h-6 bg-border/50" />
+                    <Separator orientation="vertical" className="h-6" />
                     <div className="flex flex-col gap-0.5">
                         <span className="text-[8px] font-bold uppercase tracking-wider text-muted-foreground">
                             Tempo

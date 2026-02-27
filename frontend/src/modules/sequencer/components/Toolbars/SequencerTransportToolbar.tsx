@@ -10,7 +10,6 @@
 import { useCallback } from "react";
 import { Play, Pause, SkipBack, Circle, Repeat, Music } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
-import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
 import { useDAWStore } from '@/stores/dawStore.ts';
 import { toast } from "sonner";
@@ -100,15 +99,13 @@ export function SequencerTransportToolbar() {
                     disabled={!canPlay}
                     className={cn((isPlaying || isPaused) && "bg-primary")}
                 />
-                <Button
+                <IconButton
+                    icon={Circle}
+                    tooltip="Record audio input"
                     onClick={handleRecord}
                     variant="ghost"
                     size="icon-sm"
-                    className={cn(isRecording && "text-red-500")}
-                    title="Record audio input"
-                >
-                    <Circle size={16} fill={isRecording ? "currentColor" : "none"} />
-                </Button>
+                />
                 <IconButton
                     icon={Repeat}
                     tooltip={isLooping ? "Loop enabled" : "Loop disabled"}

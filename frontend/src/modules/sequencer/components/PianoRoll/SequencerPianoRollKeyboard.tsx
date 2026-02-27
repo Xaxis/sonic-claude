@@ -1,11 +1,21 @@
 /**
- * SequencerPianoRollKeyboard - Piano keyboard display for piano roll
+ * SequencerPianoRollKeyboard - Piano keyboard sidebar for the piano roll
  *
- * REFACTORED: Pure component that reads everything from Zustand
- * - Reads pianoRollClipId from Zustand
- * - Reads clip data from Zustand to get instrument
- * - Uses constants for minPitch, maxPitch, noteHeight
- * - No props needed!
+ * LAYOUT (256px total sidebar width):
+ *   ┌─── 128px keys ───┬─── 128px labels ───┐
+ *   │  [white key]     │  C4                │
+ *   │  [black key]     │  C#4               │
+ *   │  [white key]     │  D4                │
+ *   └──────────────────┴────────────────────┘
+ *
+ * Keys section: standard piano keyboard visual (white/black keys, click-to-preview)
+ * Labels section: note name for every pitch row — standard in all pro DAWs
+ *   (FL Studio, Ableton Live, Cubase, Logic Pro X)
+ *
+ * Label hierarchy:
+ *   - Middle C (C4 = MIDI 60): primary accent color, semibold
+ *   - Other C notes (octave roots): gray-400, medium
+ *   - All other notes: gray-600, regular
  */
 
 import { useState } from "react";
@@ -19,117 +29,136 @@ import {
     PIANO_ROLL_BLACK_KEY_OFFSETS,
 } from "@/config/daw.constants";
 
-interface SequencerPianoRollKeyboardProps {
-    // No props needed - reads everything from Zustand!
-}
+// ─── Layout constants ─────────────────────────────────────────────────────────
+
+/** Width of the piano key visual area (left portion of sidebar). */
+const KEYBOARD_WIDTH = 128;
+/** Width of the note-name label strip (right portion of sidebar). */
+const LABEL_WIDTH = 128;
+
+// ─── Note helpers ─────────────────────────────────────────────────────────────
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-export function SequencerPianoRollKeyboard({}: SequencerPianoRollKeyboardProps) {
-    // ========================================================================
-    // STATE: Read from Zustand store
-    // ========================================================================
-    const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
-    const clips = useDAWStore(state => state.clips);
-    const tracks = useDAWStore(state => state.tracks);
+const getNoteName = (pitch: number): string => {
+    const octave = Math.floor(pitch / 12) - 1;
+    return `${NOTE_NAMES[pitch % 12]}${octave}`;
+};
 
-    // ========================================================================
-    // DERIVED STATE: Get clip data
-    // ========================================================================
-    const clip = pianoRollClipId ? clips.find(c => c.id === pianoRollClipId) : undefined;
-    const track = clip ? tracks.find(t => t.id === clip.track_id) : undefined;
+const isBlackKey = (pitch: number): boolean =>
+    PIANO_ROLL_BLACK_KEY_OFFSETS.includes(pitch % 12);
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export function SequencerPianoRollKeyboard() {
+    const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
+    const clips           = useDAWStore(state => state.clips);
+    const tracks          = useDAWStore(state => state.tracks);
+
+    const clip       = pianoRollClipId ? clips.find(c => c.id === pianoRollClipId) : undefined;
+    const track      = clip ? tracks.find(t => t.id === clip.track_id) : undefined;
     const instrument = track?.instrument || "sine";
 
-    // Early return if no clip
-    if (!clip) {
-        return <div className="flex items-center justify-center h-full text-muted-foreground">No clip selected</div>;
-    }
-
-    // Piano roll settings (from daw.constants)
-    const minPitch = PIANO_ROLL_MIN_PITCH;
-    const maxPitch = PIANO_ROLL_MAX_PITCH;
-    const noteHeight = PIANO_ROLL_NOTE_HEIGHT;
-
-    // ========================================================================
-    // LOCAL STATE
-    // ========================================================================
     const [activeKey, setActiveKey] = useState<number | null>(null);
 
-    const getNoteName = (pitch: number): string => {
-        const octave = Math.floor(pitch / 12) - 1;
-        const noteName = NOTE_NAMES[pitch % 12];
-        return `${noteName}${octave}`;
-    };
+    if (!clip) {
+        return <div className="flex items-center justify-center h-full text-muted-foreground text-xs">No clip</div>;
+    }
 
-    const isBlackKey = (pitch: number): boolean => {
-        const note = pitch % 12;
-        return PIANO_ROLL_BLACK_KEY_OFFSETS.includes(note);
-    };
-
-    const handleKeyClick = async (pitch: number) => {
-        // Preview note with track's instrument
-        setActiveKey(pitch);
-        setTimeout(() => setActiveKey(null), 300);
-
-        try {
-            await api.playback.previewNote({
-                note: pitch,
-                velocity: 100,
-                duration: 0.5,
-                synthdef: instrument
-            });
-        } catch (error) {
-            console.error("Failed to preview note:", error);
-        }
-    };
-
+    const minPitch   = PIANO_ROLL_MIN_PITCH;
+    const maxPitch   = PIANO_ROLL_MAX_PITCH;
+    const noteHeight = PIANO_ROLL_NOTE_HEIGHT;
     const totalHeight = (maxPitch - minPitch + 1) * noteHeight;
 
+    const blackKeyWidth = Math.round(KEYBOARD_WIDTH * 0.7);
+
+    const handleKeyClick = async (pitch: number) => {
+        setActiveKey(pitch);
+        setTimeout(() => setActiveKey(null), 300);
+        try {
+            await api.playback.previewNote({ note: pitch, velocity: 100, duration: 0.5, synthdef: instrument });
+        } catch { /* ignore preview errors */ }
+    };
+
     return (
-        <div className="w-32 flex-shrink-0 border-r border-border bg-gray-900 relative">
+        <div
+            className="flex-shrink-0 border-r border-border bg-[#111] relative select-none"
+            style={{ width: KEYBOARD_WIDTH + LABEL_WIDTH }}
+        >
             <div style={{ height: `${totalHeight}px`, position: 'relative' }}>
                 {Array.from({ length: maxPitch - minPitch + 1 }, (_, i) => {
-                    const pitch = maxPitch - i; // Top to bottom (high to low)
-                    const isBlack = isBlackKey(pitch);
+                    const pitch    = maxPitch - i;
+                    const isBlack  = isBlackKey(pitch);
                     const noteName = getNoteName(pitch);
                     const isActive = activeKey === pitch;
-                    const showLabel = pitch % 12 === 0; // Show octave labels on C notes
+                    const isMiddleC = pitch === 60;
+                    const isOctaveC = pitch % 12 === 0;
+                    const keyW = isBlack ? blackKeyWidth : KEYBOARD_WIDTH;
 
                     return (
                         <div
                             key={pitch}
-                            className={cn(
-                                "absolute left-0 right-0 select-none cursor-pointer transition-all border-b border-gray-700/50",
-                                isBlack
-                                    ? isActive
-                                        ? "bg-gradient-to-r from-gray-600 to-gray-500 shadow-lg z-10"
-                                        : "bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 z-10"
-                                    : isActive
-                                        ? "bg-gradient-to-r from-gray-200 to-gray-100 shadow-lg"
-                                        : "bg-gradient-to-r from-gray-100 to-white hover:from-gray-200 hover:to-gray-100"
-                            )}
+                            className="absolute"
                             style={{
-                                top: `${i * noteHeight}px`,
+                                top:    `${i * noteHeight}px`,
                                 height: `${noteHeight}px`,
-                                width: isBlack ? '70%' : '100%',
-                                right: isBlack ? '0' : 'auto',
-                                borderRight: isBlack ? 'none' : '1px solid rgba(0,0,0,0.1)',
-                                boxShadow: isBlack
-                                    ? 'inset 0 -1px 2px rgba(0,0,0,0.5), 2px 2px 4px rgba(0,0,0,0.3)'
-                                    : 'inset 0 -1px 1px rgba(0,0,0,0.1)',
+                                left:   0,
+                                width:  `${KEYBOARD_WIDTH + LABEL_WIDTH}px`,
                             }}
-                            onClick={() => handleKeyClick(pitch)}
-                            title={`Click to preview ${noteName}`}
                         >
-                            {/* Note label - only show on white keys and C notes */}
-                            {!isBlack && showLabel && (
+                            {/* ── Piano key ── */}
+                            <div
+                                className={cn(
+                                    "absolute top-0 bottom-0 left-0 cursor-pointer transition-colors border-b border-gray-700/50",
+                                    isBlack
+                                        ? isActive
+                                            ? "bg-gradient-to-r from-gray-600 to-gray-500 shadow-lg z-10"
+                                            : "bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 z-10"
+                                        : isActive
+                                            ? "bg-gradient-to-r from-gray-200 to-gray-100 shadow-lg"
+                                            : "bg-gradient-to-r from-gray-100 to-white hover:from-gray-200 hover:to-gray-100",
+                                )}
+                                style={{
+                                    width:       `${keyW}px`,
+                                    borderRight: isBlack ? 'none' : '1px solid rgba(0,0,0,0.1)',
+                                    boxShadow:   isBlack
+                                        ? 'inset 0 -1px 2px rgba(0,0,0,0.5), 2px 2px 4px rgba(0,0,0,0.3)'
+                                        : 'inset 0 -1px 1px rgba(0,0,0,0.1)',
+                                }}
+                                onClick={() => handleKeyClick(pitch)}
+                            >
+                                {/* Octave C label on the key face */}
+                                {!isBlack && isOctaveC && (
+                                    <span className={cn(
+                                        "absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold pointer-events-none",
+                                        isActive ? "text-gray-800" : "text-gray-500",
+                                    )}>
+                                        {noteName}
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* ── Note label strip ── */}
+                            <div
+                                className="absolute top-0 bottom-0 flex items-center px-1.5 border-b border-gray-700/20"
+                                style={{
+                                    left:            `${KEYBOARD_WIDTH}px`,
+                                    right:           0,
+                                    backgroundColor: isBlack ? '#141414' : '#1c1c1c',
+                                    borderLeft:      '1px solid rgba(75,85,99,0.25)',
+                                }}
+                            >
                                 <span className={cn(
-                                    "absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold",
-                                    isActive ? "text-gray-800" : "text-gray-500"
+                                    "text-[9px] leading-none tabular-nums pointer-events-none",
+                                    isMiddleC   ? "font-semibold"  : isOctaveC ? "font-medium" : "",
+                                    isMiddleC   ? "text-primary/80"
+                                               : isOctaveC ? "text-gray-400"
+                                               : isBlack   ? "text-gray-600"
+                                                           : "text-gray-600",
                                 )}>
                                     {noteName}
                                 </span>
-                            )}
+                            </div>
                         </div>
                     );
                 })}
@@ -137,4 +166,3 @@ export function SequencerPianoRollKeyboard({}: SequencerPianoRollKeyboardProps) 
         </div>
     );
 }
-

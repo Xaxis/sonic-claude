@@ -6,16 +6,25 @@
  * - Composes SequencerGridLayout with keyboard, ruler, and grid
  */
 
-import { useEffect } from "react";
-import { X, Music } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, Music, SlidersHorizontal } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
+import { EditorTabBar } from "@/components/ui/editor-tab-bar.tsx";
 import { SequencerPianoRollKeyboard } from "./SequencerPianoRollKeyboard.tsx";
 import { SequencerPianoRollGrid } from "./SequencerPianoRollGrid.tsx";
 import { SequencerPianoRollRuler } from "./SequencerPianoRollRuler.tsx";
+import { MidiClipControls } from "./MidiClipControls.tsx";
 import { SequencerTimelineLoopRegion } from "../Timeline/SequencerTimelineLoopRegion.tsx";
 import { SequencerGridLayout } from "../Layouts/SequencerGridLayout.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
+
+type PianoRollTab = "keys" | "clip";
+
+const PIANO_ROLL_TABS = [
+    { id: "keys" as PianoRollTab, icon: Music,              label: "Keys" },
+    { id: "clip" as PianoRollTab, icon: SlidersHorizontal,  label: "Clip" },
+];
 
 interface SequencerPianoRollProps {
     // Only receives scroll ref (follows SequencerTimelineSection pattern)
@@ -57,9 +66,9 @@ export function SequencerPianoRoll({
     const { totalWidth } = useTimelineCalculations();
 
     // ========================================================================
-    // LOCAL UI STATE (not persisted to store)
+    // LOCAL UI STATE
     // ========================================================================
-    // Note: selectedNotes and copiedNotes are now managed in SequencerPianoRollGrid
+    const [activeTab, setActiveTab] = useState<PianoRollTab>("keys");
 
     // ========================================================================
     // DERIVED STATE: Get clip data
@@ -151,15 +160,19 @@ export function SequencerPianoRoll({
             {/* Piano Roll Content - Grid Layout */}
             <SequencerGridLayout
                 cornerHeader={
-                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
-                        Notes
-                    </span>
+                    <EditorTabBar
+                        tabs={PIANO_ROLL_TABS}
+                        activeTab={activeTab}
+                        onChange={setActiveTab}
+                    />
                 }
                 ruler={
                     <SequencerPianoRollRuler />
                 }
                 sidebar={
-                    <SequencerPianoRollKeyboard />
+                    activeTab === "keys"
+                        ? <SequencerPianoRollKeyboard />
+                        : <MidiClipControls />
                 }
                 mainContent={
                     <div className="relative">

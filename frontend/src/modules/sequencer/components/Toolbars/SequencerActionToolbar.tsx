@@ -8,9 +8,10 @@
 
 import { useState, useCallback } from "react";
 import { Plus, ZoomIn, ZoomOut, Grid3x3, Undo2, Redo2 } from "lucide-react";
-import { Button } from "@/components/ui/button.tsx";
+import { Button }    from "@/components/ui/button.tsx";
 import { IconButton } from "@/components/ui/icon-button.tsx";
-import { Label } from "@/components/ui/label.tsx";
+import { Separator } from "@/components/ui/separator.tsx";
+import { Label }     from "@/components/ui/label.tsx";
 import {
     Select,
     SelectContent,
@@ -84,8 +85,7 @@ export function SequencerActionToolbar() {
                     </Button>
                 </div>
 
-                {/* Divider */}
-                <div className="h-6 w-px bg-border" />
+                <Separator orientation="vertical" className="h-6" />
 
                 {/* Undo/Redo Buttons */}
                 <div className="flex items-center gap-1">
@@ -107,8 +107,7 @@ export function SequencerActionToolbar() {
                     />
                 </div>
 
-                {/* Divider */}
-                <div className="h-6 w-px bg-border" />
+                <Separator orientation="vertical" className="h-6" />
 
                 {/* Zoom Controls */}
                 <div className="flex items-center gap-1">
@@ -133,8 +132,7 @@ export function SequencerActionToolbar() {
                     />
                 </div>
 
-                {/* Divider */}
-                <div className="h-6 w-px bg-border" />
+                <Separator orientation="vertical" className="h-6" />
 
                 {/* Snap to Grid */}
                 <div className="flex items-center gap-1 ml-2">

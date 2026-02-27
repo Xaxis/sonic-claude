@@ -57,14 +57,47 @@ export const SAMPLE_RATE_MAX = 4.0;
 /** Step size for rate slider */
 export const SAMPLE_RATE_STEP = 0.05;
 
+/** Minimum gain multiplier (silence) */
+export const SAMPLE_GAIN_MIN = 0;
+
 /** Maximum gain multiplier (2.0 = +6 dB) */
 export const SAMPLE_GAIN_MAX = 2.0;
 
 /** Step size for gain slider */
 export const SAMPLE_GAIN_STEP = 0.01;
 
+/** Minimum fade in/out duration in seconds */
+export const SAMPLE_FADE_MIN = 0;
+
 /** Maximum fade in/out duration in seconds */
 export const SAMPLE_FADE_MAX_SECONDS = 5.0;
 
 /** Step size for fade sliders */
 export const SAMPLE_FADE_STEP = 0.05;
+
+/** Step size for trim in/out sliders (10ms precision) */
+export const SAMPLE_TRIM_STEP = 0.01;
+
+// ============================================================================
+// MIDI CLIP TRANSFORM RANGES
+// ============================================================================
+
+export const MIDI_TRANSPOSE_MIN = -24;
+export const MIDI_TRANSPOSE_MAX = 24;
+export const MIDI_TRANSPOSE_STEP = 1;
+
+export const MIDI_VELOCITY_OFFSET_MIN = -64;
+export const MIDI_VELOCITY_OFFSET_MAX = 64;
+export const MIDI_VELOCITY_OFFSET_STEP = 1;
+
+export const MIDI_GATE_MIN = 0.25;
+export const MIDI_GATE_MAX = 4.0;
+export const MIDI_GATE_STEP = 0.05;
+
+export const MIDI_TIMING_OFFSET_MIN = -1.0;
+export const MIDI_TIMING_OFFSET_MAX = 1.0;
+export const MIDI_TIMING_OFFSET_STEP = 0.01;
+
+export const MIDI_QUANTIZE_STRENGTH_MIN = 0;
+export const MIDI_QUANTIZE_STRENGTH_MAX = 100;
+export const MIDI_QUANTIZE_STRENGTH_STEP = 1;

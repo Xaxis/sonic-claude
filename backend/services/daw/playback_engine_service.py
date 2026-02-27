@@ -616,21 +616,43 @@ class PlaybackEngineService:
                 for note in clip.midi_events:
                     logger.info(f"   Checking note: {note.note_name} (start={note.start_time:.2f}, duration={note.duration:.2f}, end={note.start_time + note.duration:.2f})")
 
+                    # ── Apply MIDI clip transforms ──────────────────────────
+                    # 1. Quantize: blend toward nearest 1/4-beat grid position
+                    raw_start = note.start_time
+                    if clip.midi_quantize_strength > 0:
+                        grid = 0.25  # 1/4 beat quantisation grid
+                        quantized = round(raw_start / grid) * grid
+                        strength = clip.midi_quantize_strength / 100.0
+                        raw_start = raw_start + (quantized - raw_start) * strength
+
+                    # 2. Timing offset (shift whole clip forward/back)
+                    effective_start = max(0.0, raw_start + clip.midi_timing_offset)
+
+                    # 3. Transpose (shift MIDI note number, clamped 0-127)
+                    effective_note = max(0, min(127, note.note + clip.midi_transpose))
+
+                    # 4. Velocity offset (clamped 1-127)
+                    effective_velocity = max(1, min(127, note.velocity + clip.midi_velocity_offset))
+
+                    # 5. Gate (scale note duration)
+                    effective_duration = note.duration * clip.midi_gate
+                    # ────────────────────────────────────────────────────────
+
                     # Calculate when this note should start relative to now
                     # If offset is 6.0 and note starts at 1.0, we've already passed it - skip
                     # If offset is 6.0 and note starts at 8.0, schedule it for 2.0 beats from now
-                    if note.start_time >= offset:
+                    if effective_start >= offset:
                         # Note hasn't started yet - schedule it
-                        delay_beats = note.start_time - offset
+                        delay_beats = effective_start - offset
                         delay_seconds = delay_beats * (60.0 / self.tempo)
 
                         node_id = self.engine_manager.allocate_node_id()
 
-                        # Convert MIDI note to frequency
-                        freq = 440.0 * (2.0 ** ((note.note - 69) / 12.0))
+                        # Convert MIDI note to frequency (uses transposed note)
+                        freq = 440.0 * (2.0 ** ((effective_note - 69) / 12.0))
 
-                        # Calculate amplitude (apply velocity and clip gain only - track volume handled by mixer)
-                        amp = note.velocity / 127.0 * 0.8 * clip.gain
+                        # Calculate amplitude (apply effective velocity and clip gain only - track volume handled by mixer)
+                        amp = effective_velocity / 127.0 * 0.8 * clip.gain
 
                         triggered_count += 1
                         logger.info(f"      ✅ SCHEDULED! node={node_id}, freq={freq:.2f}Hz, amp={amp:.2f}, delay={delay_seconds:.2f}s, bus={track_bus}")
@@ -695,12 +717,12 @@ class PlaybackEngineService:
                             except Exception as e:
                                 logger.error(f"❌ MIDI note {nid} task FAILED: {e}", exc_info=True)
 
-                        task = asyncio.create_task(play_note(node_id, freq, amp, synthdef, delay_seconds, note.duration, note.note, note.start_time, clip.id, track_bus))
+                        task = asyncio.create_task(play_note(node_id, freq, amp, synthdef, delay_seconds, effective_duration, effective_note, effective_start, clip.id, track_bus))
                         self.timeline_midi_note_tasks.add(task)
                         # Remove task from set when it completes
                         task.add_done_callback(self.timeline_midi_note_tasks.discard)
                     else:
-                        logger.info(f"      ❌ SKIPPED (note already passed: offset={offset:.2f}, note_start={note.start_time:.2f})")
+                        logger.info(f"      ❌ SKIPPED (note already passed: offset={offset:.2f}, effective_start={effective_start:.2f})")
 
                 logger.info(f"   Total notes scheduled: {triggered_count}/{len(clip.midi_events)}")
 

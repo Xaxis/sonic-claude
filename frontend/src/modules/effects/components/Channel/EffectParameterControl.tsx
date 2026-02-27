@@ -8,7 +8,8 @@
  * - Real-time value updates
  */
 
-import { Slider } from "@/components/ui/slider";
+import { Slider }       from "@/components/ui/slider";
+import { ValueDisplay } from "@/components/ui/value-display.tsx";
 import type { EffectParameter } from "@/services/api/providers";
 
 interface EffectParameterControlProps {
@@ -71,9 +72,7 @@ export function EffectParameterControl({
                 <span className="text-[10px] font-medium text-muted-foreground">
                     {parameter.display_name}
                 </span>
-                <span className="text-[10px] font-mono font-bold text-foreground">
-                    {formatValue(value)}
-                </span>
+                <ValueDisplay value={formatValue(value)} size="xs" emphasis="muted" align="right" />
             </div>
 
             {/* Slider */}
