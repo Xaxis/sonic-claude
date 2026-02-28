@@ -61,14 +61,20 @@ export function SequencerPanel() {
             <div className="flex h-full flex-1 flex-col gap-2 overflow-hidden p-2">
                 {/* Combined Transport and Toolbar */}
                 <div className="flex-shrink-0">
-                    <SubPanel title="TRANSPORT" showHeader={false}>
-                        <div className="px-4 py-3 bg-gradient-to-r from-muted/20 to-muted/10 flex items-center justify-between">
-                            {/* Left: Transport Controls (timer + buttons + BPM) */}
-                            <SequencerTransportToolbar />
+                    <SubPanel
+                        title="TRANSPORT"
+                        showHeader={false}
+                        toolbar={
+                            <div className="flex items-center justify-between">
+                                {/* Left: Transport Controls (timer + buttons + BPM) */}
+                                <SequencerTransportToolbar />
 
-                            {/* Right: Edit/View Tools */}
-                            <SequencerActionToolbar />
-                        </div>
+                                {/* Right: Edit/View Tools */}
+                                <SequencerActionToolbar />
+                            </div>
+                        }
+                    >
+                        {/* Empty - toolbar handles all content */}
                     </SubPanel>
                 </div>
 

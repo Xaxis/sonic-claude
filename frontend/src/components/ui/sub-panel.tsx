@@ -25,6 +25,7 @@ export interface SubPanelProps extends React.HTMLAttributes<HTMLDivElement> {
     collapsible?: boolean;
     defaultCollapsed?: boolean;
     contentOverflow?: 'auto' | 'hidden'; // Control overflow behavior
+    toolbar?: React.ReactNode; // Optional toolbar section below header
 }
 
 export const SubPanel = React.forwardRef<HTMLDivElement, SubPanelProps>(
@@ -36,6 +37,7 @@ export const SubPanel = React.forwardRef<HTMLDivElement, SubPanelProps>(
             collapsible = false,
             defaultCollapsed = false,
             contentOverflow = 'auto',
+            toolbar,
             className,
             children,
             ...props
@@ -78,6 +80,11 @@ export const SubPanel = React.forwardRef<HTMLDivElement, SubPanelProps>(
                                 </Button>
                             )}
                         </div>
+                    </div>
+                )}
+                {toolbar && !isCollapsed && (
+                    <div className="border-b-2 border-border/70 bg-gradient-to-b from-muted/30 to-muted/10 px-4 py-2.5 flex-shrink-0 shadow-sm">
+                        {toolbar}
                     </div>
                 )}
                 {!isCollapsed && (

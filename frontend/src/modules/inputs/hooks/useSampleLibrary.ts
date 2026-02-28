@@ -10,6 +10,7 @@ import { api } from "@/services/api";
 import { apiConfig } from "@/config/api.config";
 import type { SampleMetadata } from "@/services/api/providers";
 import { toast } from "sonner";
+import { useDAWStore } from "@/stores/dawStore";
 
 interface UseSampleLibraryProps {
     onSampleSelect?: (sample: SampleMetadata) => void;
@@ -23,6 +24,8 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
     const [editingSampleId, setEditingSampleId] = useState<string | null>(null);
     const [editName, setEditName] = useState("");
     const [editCategory, setEditCategory] = useState("");
+
+    const syncToStore = useCallback(() => useDAWStore.getState().loadSamples(), []);
     
     // Playback state
     const [playingSampleId, setPlayingSampleId] = useState<string | null>(null);
@@ -65,13 +68,14 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
 
             toast.success(`Sample "${name}" uploaded successfully`);
             await loadSamples();
+            syncToStore();
         } catch (error) {
             console.error("Failed to upload sample:", error);
             toast.error("Failed to upload sample");
         } finally {
             setIsUploading(false);
         }
-    }, [loadSamples]);
+    }, [loadSamples, syncToStore]);
 
     // Handle sample selection
     const handleSelectSample = useCallback((sample: SampleMetadata) => {
@@ -101,11 +105,12 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
             toast.success("Sample updated successfully");
             setEditingSampleId(null);
             await loadSamples();
+            syncToStore();
         } catch (error) {
             console.error("Failed to update sample:", error);
             toast.error("Failed to update sample");
         }
-    }, [editingSampleId, editName, editCategory, loadSamples]);
+    }, [editingSampleId, editName, editCategory, loadSamples, syncToStore]);
 
     // Cancel editing
     const handleCancelEdit = useCallback(() => {
@@ -120,6 +125,7 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
             await api.samples.deleteSample(sampleId);
             toast.success("Sample deleted successfully");
             await loadSamples();
+            syncToStore();
 
             if (selectedSample?.id === sampleId) {
                 setSelectedSample(null);
@@ -128,7 +134,7 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
             console.error("Failed to delete sample:", error);
             toast.error(error.message || "Failed to delete sample");
         }
-    }, [loadSamples, selectedSample]);
+    }, [loadSamples, syncToStore, selectedSample]);
 
     // Play sample preview
     const handlePlaySample = useCallback(async (sampleId: string) => {

@@ -13,7 +13,7 @@
  *   Audio Effects · MIDI Effects · Grooves · Templates
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Search, X } from "lucide-react";
 import { Panel } from "@/components/ui/panel";
 import { useDAWStore } from "@/stores/dawStore";
@@ -38,38 +38,47 @@ export function SoundBrowserPanel() {
     const [searchQuery, setSearchQuery]       = useState("");
     const [selectedItem, setSelectedItem]     = useState<BrowserItem | null>(null);
     const [previewNote, setPreviewNote]       = useState(DEFAULT_PREVIEW_NOTE);
-    const [isPreviewingInst, setIsPreviewingInst] = useState(false);
+    const [previewingItemId, setPreviewingItemId] = useState<string | null>(null);
     const [isCreating, setIsCreating]         = useState(false);
 
     // ── Data ──────────────────────────────────────────────────────────────────
 
-    const { filteredItems, categoryItems, isLoading } = useBrowserItems(activeCategory, searchQuery);
-    const samplePreview = useSamplePreview();
-    const createTrack   = useDAWStore((s) => s.createTrack);
+    const { filteredItems, categoryItems } = useBrowserItems(activeCategory, searchQuery);
+    const activeComposition = useDAWStore((s) => s.activeComposition);
+    const createTrack       = useDAWStore((s) => s.createTrack);
 
-    // ── Category counts ───────────────────────────────────────────────────────
+    // ── Sample preview (H6: stable stop ref; H5: AudioContext closed on unmount) ─
 
-    const counts = Object.fromEntries(
-        BROWSER_CATEGORIES.map(({ id }) => [id, categoryItems(id).length]),
-    ) as Record<BrowserCategory, number>;
+    const { play: playSample, stop: stopSample } = useSamplePreview({
+        onEnded: () => setPreviewingItemId(null),
+    });
+
+    // ── Category counts (M2: memoized) ────────────────────────────────────────
+
+    const counts = useMemo(
+        () =>
+            Object.fromEntries(
+                BROWSER_CATEGORIES.map(({ id }) => [id, categoryItems(id).length]),
+            ) as Record<BrowserCategory, number>,
+        [categoryItems],
+    );
 
     // ── Preview helpers ───────────────────────────────────────────────────────
 
-    const isPreviewing = selectedItem?.type === "instrument"
-        ? isPreviewingInst
-        : samplePreview.playingSampleId === selectedItem?.name;
-
+    // stopAll depends only on stable stopSample (H6 fix)
     const stopAll = useCallback(() => {
-        samplePreview.stop();
-        setIsPreviewingInst(false);
-    }, [samplePreview]);
+        stopSample();
+        setPreviewingItemId(null);
+    }, [stopSample]);
 
     const previewItem = useCallback(async (item: BrowserItem) => {
         stopAll();
+        setPreviewingItemId(item.id);
+
         if (item.type === "instrument") {
-            setIsPreviewingInst(true);
             try {
-                await api.audio.previewNote({
+                // C1: use api.playback.previewNote (not api.audio)
+                await api.playback.previewNote({
                     note: previewNote,
                     velocity: 80,
                     duration: 1.5,
@@ -78,12 +87,15 @@ export function SoundBrowserPanel() {
             } catch {
                 toast.error("Preview failed — is the audio engine running?");
             }
-            // Instrument preview fires once; clear flag after expected duration
-            setTimeout(() => setIsPreviewingInst(false), 1600);
+            // Clear after expected duration; guard against race (another item started)
+            setTimeout(
+                () => setPreviewingItemId((prev) => (prev === item.id ? null : prev)),
+                1600,
+            );
         } else {
-            await samplePreview.play(item.name);
+            await playSample(item.name);
         }
-    }, [previewNote, samplePreview, stopAll]);
+    }, [previewNote, playSample, stopAll]);
 
     // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -96,41 +108,39 @@ export function SoundBrowserPanel() {
         previewItem(item);
     }, [previewItem]);
 
+    // C3: previewingId is single source of truth for both strip and list
     const handlePreviewToggle = useCallback((item: BrowserItem) => {
-        const alreadyPreviewing =
-            item.type === "instrument"
-                ? isPreviewingInst && selectedItem?.id === item.id
-                : samplePreview.playingSampleId === item.name;
-
-        if (alreadyPreviewing) {
+        if (previewingItemId === item.id) {
             stopAll();
         } else {
             setSelectedItem(item);
             previewItem(item);
         }
-    }, [isPreviewingInst, samplePreview.playingSampleId, selectedItem, previewItem, stopAll]);
+    }, [previewingItemId, previewItem, stopAll]);
 
     const handleStripPlayToggle = useCallback(() => {
         if (!selectedItem) return;
-        if (isPreviewing) {
+        if (previewingItemId === selectedItem.id) {
             stopAll();
         } else {
             previewItem(selectedItem);
         }
-    }, [selectedItem, isPreviewing, previewItem, stopAll]);
+    }, [selectedItem, previewingItemId, previewItem, stopAll]);
 
+    // C2: No toast here — createTrack already fires success/error toast
     const handleCreateTrack = useCallback(async () => {
-        if (!selectedItem || selectedItem.type !== "instrument") return;
+        if (!selectedItem || !activeComposition) return;
         setIsCreating(true);
         try {
-            await createTrack(selectedItem.displayName, "midi", selectedItem.name);
-            toast.success(`Track "${selectedItem.displayName}" added`);
-        } catch {
-            toast.error("Failed to create track");
+            if (selectedItem.type === "instrument") {
+                await createTrack(selectedItem.displayName, "midi", selectedItem.name);
+            } else {
+                await createTrack(selectedItem.displayName, "audio");
+            }
         } finally {
             setIsCreating(false);
         }
-    }, [selectedItem, createTrack]);
+    }, [selectedItem, activeComposition, createTrack]);
 
     const handleCategorySelect = useCallback((cat: BrowserCategory) => {
         setActiveCategory(cat);
@@ -147,16 +157,15 @@ export function SoundBrowserPanel() {
 
     // ── Subtitle ──────────────────────────────────────────────────────────────
 
-    const subtitle = isLoading
-        ? "Loading…"
-        : `${counts.all ?? 0} items · ${activeCategory.toUpperCase()}`;
+    const subtitle = `${counts.all ?? 0} items · ${activeCategory.toUpperCase()}`;
 
     // ─────────────────────────────────────────────────────────────────────────
     // Render
     // ─────────────────────────────────────────────────────────────────────────
 
     return (
-        <Panel title="BROWSER" subtitle={subtitle} draggable>
+        // H3: overflow-hidden flex flex-col so internal scroll layout works
+        <Panel title="BROWSER" subtitle={subtitle} draggable contentClassName="overflow-hidden flex flex-col">
 
             {/* ── Search bar ───────────────────────────────────────────────── */}
             <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30 flex-shrink-0">
@@ -190,22 +199,14 @@ export function SoundBrowserPanel() {
                 <BrowserItemList
                     items={filteredItems}
                     selectedId={selectedItem?.id ?? null}
-                    previewingId={
-                        isPreviewingInst
-                            ? selectedItem?.id ?? null
-                            : selectedItem?.type === "sample" && samplePreview.playingSampleId
-                                ? `sample:${samplePreview.playingSampleId}`
-                                : null
-                    }
+                    previewingId={previewingItemId}
                     onSelect={handleSelect}
                     onDoubleClick={handleDoubleClick}
                     onPreviewToggle={handlePreviewToggle}
                     emptyMessage={
                         searchQuery
                             ? `No results for "${searchQuery}"`
-                            : isLoading
-                                ? "Loading…"
-                                : "No items in this category"
+                            : "No items in this category"
                     }
                 />
 
@@ -214,12 +215,13 @@ export function SoundBrowserPanel() {
             {/* ── Preview strip ─────────────────────────────────────────────── */}
             <BrowserPreviewStrip
                 item={selectedItem}
-                isPreviewing={isPreviewing}
+                isPreviewing={previewingItemId === selectedItem?.id}
                 previewNote={previewNote}
                 onPlayToggle={handleStripPlayToggle}
                 onPreviewNoteChange={setPreviewNote}
                 onCreateTrack={handleCreateTrack}
                 isCreating={isCreating}
+                canCreateTrack={!!activeComposition}
             />
 
         </Panel>

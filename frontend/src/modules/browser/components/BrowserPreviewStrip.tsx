@@ -3,13 +3,13 @@
  *
  * Fixed bottom strip that shows the selected item and provides:
  *   - Play / Stop preview button
- *   - For instruments: note selector (C2-C6) + velocity
- *   - "Create Track" button (creates a new track in the active composition)
+ *   - For instruments: note selector (C2-C6)
+ *   - "Add Track" button (instruments → MIDI track, samples → audio track)
  *
  * Empty state shown when nothing is selected.
  */
 
-import { Play, Square, Plus, Music } from "lucide-react";
+import { Play, Square, Plus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BrowserItem } from "../types";
 import { PREVIEW_NOTES } from "../types";
@@ -22,6 +22,8 @@ interface BrowserPreviewStripProps {
     onPreviewNoteChange: (midi: number) => void;
     onCreateTrack: () => void;
     isCreating?: boolean;
+    /** Disabled when no active composition */
+    canCreateTrack?: boolean;
 }
 
 export function BrowserPreviewStrip({
@@ -32,6 +34,7 @@ export function BrowserPreviewStrip({
     onPreviewNoteChange,
     onCreateTrack,
     isCreating = false,
+    canCreateTrack = true,
 }: BrowserPreviewStripProps) {
 
     if (!item) {
@@ -43,6 +46,8 @@ export function BrowserPreviewStrip({
             </div>
         );
     }
+
+    const addTrackDisabled = isCreating || !canCreateTrack;
 
     return (
         <div className="flex items-center gap-3 px-3 h-[68px] border-t border-border/30 bg-muted/5 flex-shrink-0">
@@ -64,14 +69,13 @@ export function BrowserPreviewStrip({
                 }
             </button>
 
-            {/* Item info */}
+            {/* Item info — subcategory only (no duration; duration visible in list) */}
             <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                 <span className="text-xs font-semibold truncate leading-none">
                     {item.displayName}
                 </span>
                 <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 truncate leading-none">
                     {item.subcategory}
-                    {item.description ? ` · ${item.description}` : ""}
                 </span>
             </div>
 
@@ -95,25 +99,27 @@ export function BrowserPreviewStrip({
                 </div>
             )}
 
-            {/* Create Track / Add to Composition */}
+            {/* Add Track — works for both instruments and samples */}
             <button
                 onClick={onCreateTrack}
-                disabled={isCreating || item.type === "sample"}
+                disabled={addTrackDisabled}
                 title={
-                    item.type === "sample"
-                        ? "Drag sample to an audio track in the sequencer"
-                        : "Create a new MIDI track with this instrument"
+                    !canCreateTrack
+                        ? "No active composition — open or create one first"
+                        : item.type === "instrument"
+                            ? "Create a new MIDI track with this instrument"
+                            : "Create a new audio track"
                 }
                 className={cn(
                     "flex-shrink-0 flex items-center gap-1.5 h-7 px-2.5 rounded border text-[10px] font-bold uppercase tracking-wider transition-colors",
-                    item.type === "instrument"
-                        ? "border-primary/40 text-primary bg-primary/10 hover:bg-primary/20 cursor-pointer"
-                        : "border-border/20 text-muted-foreground/30 cursor-not-allowed opacity-40",
+                    addTrackDisabled
+                        ? "border-border/20 text-muted-foreground/30 cursor-not-allowed opacity-40"
+                        : "border-primary/40 text-primary bg-primary/10 hover:bg-primary/20 cursor-pointer",
                 )}
             >
-                {item.type === "instrument"
-                    ? <><Plus size={10} /> Add Track</>
-                    : <><Music size={10} /> Drag to Track</>
+                {isCreating
+                    ? <><Loader2 size={10} className="animate-spin" /> Creating…</>
+                    : <><Plus size={10} /> Add Track</>
                 }
             </button>
 

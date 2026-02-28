@@ -34,7 +34,6 @@ export function EffectsPanel() {
                 {/* Effects Content - Flexible, takes all space */}
                 <div className="flex-1 min-h-0 flex flex-col">
                     <SubPanel
-                        title="EFFECTS"
                         showHeader={true}
                         contentOverflow="hidden"
                     >

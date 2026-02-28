@@ -43,10 +43,12 @@ export default function App() {
     // ── App startup: initialize DAW store exactly once ────────────────────────
     const initialize    = useDAWStore(state => state.initialize);
     const loadSynthDefs = useDAWStore(state => state.loadSynthDefs);
+    const loadSamples   = useDAWStore(state => state.loadSamples);
 
     useEffect(() => {
         initialize();
         loadSynthDefs();
+        loadSamples();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── UI Density — sync persisted setting to CSS custom property ────────────

@@ -81,6 +81,9 @@ export interface PanelProps extends React.HTMLAttributes<HTMLDivElement> {
         onTouchEnd: () => void;
         onTouchCancel: () => void;
     };
+
+    /** Extra className applied to the panel content div */
+    contentClassName?: string;
 }
 
 export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
@@ -98,6 +101,7 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
             headerContent,
             showHeader = true,
             aiHandlers,
+            contentClassName,
             className,
             children,
             ...props
@@ -181,7 +185,7 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
 
                 {/* Panel Content */}
                 <div
-                    className="min-h-0 flex-1 overflow-auto"
+                    className={cn("min-h-0 flex-1 overflow-auto", contentClassName)}
                     onMouseDown={(e) => draggable && e.stopPropagation()}
                     onPointerDown={(e) => draggable && e.stopPropagation()}
                 >

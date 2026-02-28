@@ -2,7 +2,9 @@
  * BrowserItemList
  *
  * Scrollable list of BrowserItems grouped by subcategory.
- * Each row shows: name · type badge · hover play button.
+ * Each row shows: name · type badge · duration (samples) · hover play button.
+ *
+ * Groups are sorted alphabetically; items within each group are sorted by displayName.
  *
  * Interactions:
  *   • Click        → select item (populates preview strip)
@@ -12,6 +14,7 @@
 
 import { Play, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { BrowserItem } from "../types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,6 +60,7 @@ interface BrowserItemListProps {
     onDoubleClick: (item: BrowserItem) => void;
     onPreviewToggle: (item: BrowserItem) => void;
     emptyMessage?: string;
+    error?: string;
 }
 
 export function BrowserItemList({
@@ -67,15 +71,15 @@ export function BrowserItemList({
     onDoubleClick,
     onPreviewToggle,
     emptyMessage = "No items found",
+    error,
 }: BrowserItemListProps) {
 
-    // ── Group by subcategory ──────────────────────────────────────────────────
-
-    const groups: Map<string, BrowserItem[]> = new Map();
-    for (const item of items) {
-        const group = groups.get(item.subcategory) ?? [];
-        group.push(item);
-        groups.set(item.subcategory, group);
+    if (error) {
+        return (
+            <div className="flex flex-1 min-h-0">
+                <EmptyState title="Failed to load" description={error} />
+            </div>
+        );
     }
 
     if (items.length === 0) {
@@ -88,14 +92,30 @@ export function BrowserItemList({
         );
     }
 
+    // ── Group by subcategory ──────────────────────────────────────────────────
+
+    const groups: Map<string, BrowserItem[]> = new Map();
+    for (const item of items) {
+        const group = groups.get(item.subcategory) ?? [];
+        group.push(item);
+        groups.set(item.subcategory, group);
+    }
+
+    // Sort groups alphabetically; sort items within each group by displayName
+    const sortedEntries = Array.from(groups.entries())
+        .sort(([a], [b]) => a.localeCompare(b));
+    for (const [, groupItems] of sortedEntries) {
+        groupItems.sort((a, b) => a.displayName.localeCompare(b.displayName));
+    }
+
     return (
         <div className="flex-1 overflow-y-auto min-h-0">
-            {Array.from(groups.entries()).map(([subcategory, groupItems]) => (
+            {sortedEntries.map(([subcategory, groupItems]) => (
                 <div key={subcategory}>
                     <GroupHeader label={subcategory} count={groupItems.length} />
 
                     {groupItems.map((item) => {
-                        const isSelected = selectedId === item.id;
+                        const isSelected   = selectedId   === item.id;
                         const isPreviewing = previewingId === item.id;
 
                         return (

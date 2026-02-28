@@ -29,15 +29,10 @@ export function MixerPanel() {
                 {/* Mixer Content - Flexible, takes all space */}
                 <div className="flex-1 min-h-0 flex flex-col">
                     <SubPanel
-                        title="MIXER"
                         showHeader={true}
                         contentOverflow="hidden"
+                        toolbar={<MixerToolbar />}
                     >
-                        {/* Toolbar - Fixed */}
-                        <div className="border-b-2 border-border/70 bg-gradient-to-b from-muted/30 to-muted/10 px-4 py-2.5 flex-shrink-0 shadow-sm">
-                            <MixerToolbar />
-                        </div>
-
                         {/* Channel List - Flexible */}
                         <div className="flex-1 overflow-hidden bg-gradient-to-b from-background to-background/95">
                             <MixerChannelList />
