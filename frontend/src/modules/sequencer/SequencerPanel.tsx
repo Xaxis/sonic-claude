@@ -16,6 +16,7 @@ import { useDAWStore } from '@/stores/dawStore';
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { SequencerEmptyState } from "./components/States/SequencerEmptyState.tsx";
 import { SequencerTransportToolbar } from "./components/Toolbars/SequencerTransportToolbar.tsx";
+import { SequencerTransportTimer } from "./components/Toolbars/SequencerTransportTimer.tsx";
 import { SequencerActionToolbar } from "@/modules/sequencer/components/Toolbars/SequencerActionToolbar.tsx";
 import { SequencerSplitLayout } from "@/modules/sequencer/components/Layouts/SequencerSplitLayout.tsx";
 import { toast } from "sonner";
@@ -67,9 +68,12 @@ export function SequencerPanel() {
                 {/* Combined Transport and Toolbar */}
                 <div className="flex-shrink-0">
                     <SubPanel title="TRANSPORT" showHeader={false}>
-                        <div className="px-4 py-3 bg-gradient-to-r from-muted/20 to-muted/10 flex items-center justify-between">
+                        <div className="px-4 py-3 bg-gradient-to-r from-muted/20 to-muted/10 flex items-center justify-between gap-4">
                             {/* Left: Transport Controls */}
                             <SequencerTransportToolbar />
+
+                            {/* Center: Playback Timer */}
+                            <SequencerTransportTimer />
 
                             {/* Right: Toolbar Controls */}
                             <SequencerActionToolbar />

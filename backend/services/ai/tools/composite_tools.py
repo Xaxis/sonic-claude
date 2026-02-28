@@ -68,9 +68,10 @@ class CompositeToolExecutor:
             return ActionResult(
                 action="create_track_with_content",
                 success=False,
+                message=error_msg,
                 error=error_msg
             )
-        
+
         # Validate note format
         for i, note in enumerate(notes):
             if "n" not in note or "s" not in note or "d" not in note:
@@ -79,6 +80,7 @@ class CompositeToolExecutor:
                 return ActionResult(
                     action="create_track_with_content",
                     success=False,
+                    message=error_msg,
                     error=error_msg
                 )
         

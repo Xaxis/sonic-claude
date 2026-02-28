@@ -15,11 +15,13 @@ import { useDAWStore } from '@/stores/dawStore';
 interface SequencerTimelinePlayheadProps {
     pixelsPerBeat: number;
     onSeek?: (position: number, triggerAudio?: boolean) => void;
+    scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export function SequencerTimelinePlayhead({
     pixelsPerBeat,
     onSeek,
+    scrollContainerRef,
 }: SequencerTimelinePlayheadProps) {
     // Get state from Zustand store
     const transport = useDAWStore(state => state.transport);
@@ -116,9 +118,21 @@ export function SequencerTimelinePlayhead({
             interpolatedPositionRef.current += (expectedPosition - interpolatedPositionRef.current) * lerpFactor;
 
             // Update DOM directly for performance (avoid React re-renders)
+            const x = interpolatedPositionRef.current * pixelsPerBeatRef.current * zoomRef.current;
             if (playheadRef.current) {
-                const x = interpolatedPositionRef.current * pixelsPerBeatRef.current * zoomRef.current;
                 playheadRef.current.style.transform = `translateX(${x}px)`;
+            }
+
+            // Auto-scroll: keep playhead in view, driven at RAF rate for perfect sync
+            const container = scrollContainerRef?.current;
+            if (container) {
+                const cw = container.clientWidth;
+                const rel = x - container.scrollLeft;
+                if (rel > cw * 0.8) {
+                    container.scrollLeft = Math.max(0, x - cw * 0.5);
+                } else if (rel < 0) {
+                    container.scrollLeft = Math.max(0, x - cw * 0.2);
+                }
             }
 
             animationFrameRef.current = requestAnimationFrame(animate);

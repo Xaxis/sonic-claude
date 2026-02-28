@@ -13,6 +13,7 @@ Validation:
 - Ensures AI can only select valid instruments (no hallucination)
 """
 import logging
+import re
 import time
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -64,7 +65,7 @@ class AIAgentService:
         self.state_service = state_service
         self.action_service = action_service
         self.composition_service = composition_service
-        self.client = anthropic.Anthropic(api_key=api_key) if api_key else None
+        self.client = anthropic.AsyncAnthropic(api_key=api_key) if api_key else None
         self.model = model
         self.ws_manager = ws_manager  # For real-time pipeline events
 
@@ -203,7 +204,7 @@ class AIAgentService:
         if use_intent_routing:
             await self._emit_pipeline(request_id, "routing", "start", {"model": "haiku"})
             state_summary = self._build_brief_state_summary(state_response.full_state)
-            intent = self.router.route(user_message, daw_state_summary=state_summary)
+            intent = await self.router.route(user_message, daw_state_summary=state_summary)
             logger.info(f"🔀 Intent: {intent.value}")
 
             # ================================================================
@@ -244,7 +245,8 @@ class AIAgentService:
         assistant_message = ""
 
         # FIX 2: Include conversation history so AI has context from prior exchanges
-        messages = self._build_messages_with_history(user_message, context_message, history_length=history_length)
+        _tempo = state_response.full_state.tempo if state_response.full_state else 120.0
+        messages = self._build_messages_with_history(user_message, context_message, history_length=history_length, tempo=_tempo)
 
         logger.info(f"🤖 Calling {effective_model} with {len(tools)} tools, {len(messages)} messages in context...")
         await self._emit_pipeline(request_id, "execution", "start", {
@@ -263,7 +265,7 @@ class AIAgentService:
         if temperature is not None:
             create_kwargs["temperature"] = temperature
 
-        response = self.client.messages.create(**create_kwargs)
+        response = await self.client.messages.create(**create_kwargs)
 
         tool_call_count = sum(1 for b in response.content if b.type == "tool_use")
         await self._emit_pipeline(request_id, "execution", "complete", {
@@ -289,7 +291,7 @@ class AIAgentService:
                     result = await self.composite_tools.create_track_with_content(
                         name=block.input["name"],
                         instrument=block.input["instrument"],
-                        notes=block.input["notes"],
+                        notes=block.input.get("notes", []),
                         effects=block.input.get("effects"),
                         start_time=block.input.get("start_time", 0.0),
                         duration=block.input.get("duration", 4.0),
@@ -351,7 +353,7 @@ class AIAgentService:
                 "model": "haiku",
                 "tool_results": len(tool_results),
             })
-            follow_up = self.client.messages.create(
+            follow_up = await self.client.messages.create(
                 model="claude-haiku-4-5-20251001",  # Haiku — fast/cheap for summarizing results
                 max_tokens=512,
                 system=system_prompt,
@@ -470,7 +472,7 @@ class AIAgentService:
         }]
 
         # Single LLM call with tools
-        response = self.client.messages.create(
+        response = await self.client.messages.create(
             model=self.model,
             max_tokens=4096,
             system=contextual_prompt,
@@ -490,7 +492,7 @@ class AIAgentService:
                     result = await self.composite_tools.create_track_with_content(
                         name=block.input["name"],
                         instrument=block.input["instrument"],
-                        notes=block.input["notes"],
+                        notes=block.input.get("notes", []),
                         effects=block.input.get("effects"),
                         start_time=block.input.get("start_time", 0.0),
                         duration=block.input.get("duration", 4.0),
@@ -1035,6 +1037,7 @@ When modifying sequences:
         user_message: str,
         context_message: str,
         history_length: int = 6,
+        tempo: float = 120.0,
     ) -> List[Dict[str, Any]]:
         """
         Build messages array including recent conversation history.
@@ -1060,9 +1063,10 @@ When modifying sequences:
                 messages.pop(0)
 
         # Append current message with full DAW state context
+        duration_hints = self._extract_duration_hints(user_message, tempo)
         messages.append({
             "role": "user",
-            "content": f"{user_message}\n\nCurrent DAW state:\n{context_message}"
+            "content": f"{user_message}{duration_hints}\n\nCurrent DAW state:\n{context_message}"
         })
 
         return messages
@@ -1082,6 +1086,40 @@ When modifying sequences:
             summary += f", key: {state.musical.key}"
 
         return summary
+
+    def _extract_duration_hints(self, message: str, tempo: float, beats_per_bar: int = 4) -> str:
+        """
+        Parse user message for time/duration expressions and return pre-computed beat equivalents.
+        Handles: seconds, minutes, bars/measures, beats.
+        Returns empty string when no time expressions are found.
+        """
+        spb = 60.0 / tempo  # seconds per beat
+        hints = []
+
+        # Seconds: "30 seconds", "30 second", "30-second", "30 sec", "30s"
+        for m in re.finditer(r'(\d+(?:\.\d+)?)\s*[-\s]?(?:seconds?|secs?)\b', message, re.IGNORECASE):
+            secs = float(m.group(1))
+            beats = secs / spb
+            bars = beats / beats_per_bar
+            hints.append(f'"{m.group(0).strip()}" → {beats:.1f} beats ({bars:.1f} bars) at {tempo} BPM')
+
+        # Minutes: "2 minutes", "2 minute", "2 min"
+        for m in re.finditer(r'(\d+(?:\.\d+)?)\s*[-\s]?(?:minutes?|mins?)\b', message, re.IGNORECASE):
+            mins = float(m.group(1))
+            beats = mins * tempo
+            bars = beats / beats_per_bar
+            hints.append(f'"{m.group(0).strip()}" → {beats:.1f} beats ({bars:.1f} bars) at {tempo} BPM')
+
+        # Bars/measures: "16 bars", "8 measures", "4 bar"
+        for m in re.finditer(r'(\d+(?:\.\d+)?)\s*[-\s]?(?:bars?|measures?)\b', message, re.IGNORECASE):
+            bars = float(m.group(1))
+            beats = bars * beats_per_bar
+            secs = beats * spb
+            hints.append(f'"{m.group(0).strip()}" → {beats:.1f} beats ({secs:.1f}s) at {tempo} BPM')
+
+        if not hints:
+            return ""
+        return "\n[Duration hints for this request]\n" + "\n".join(f"  • {h}" for h in hints)
 
     def _build_context_message(
         self,
@@ -1109,6 +1147,14 @@ When modifying sequences:
         parts.append(f"Tempo: {state.tempo} BPM")
         parts.append(f"Time Signature: {state.sequence.time_sig}")
         parts.append(f"Playing: {state.playing} | Position: {state.position:.2f} beats")
+
+        # === TIMING REFERENCE ===
+        _spb = 60.0 / state.tempo  # seconds per beat
+        _bpb = int(state.sequence.time_sig.split("/")[0]) if state.sequence.time_sig and "/" in state.sequence.time_sig else 4
+        parts.append(f"\n=== TIMING REFERENCE ({state.tempo} BPM) ===")
+        parts.append(f"  1 beat={_spb:.3f}s | 1 bar ({_bpb} beats)={_spb*_bpb:.2f}s | 8 bars={_spb*_bpb*8:.1f}s | 16 bars={_spb*_bpb*16:.1f}s")
+        parts.append(f"  Conversion: beats = seconds × {state.tempo/60:.4f} | bars = beats ÷ {_bpb}")
+        parts.append(f"  30s={30/_spb:.1f} beats ({30/(_spb*_bpb):.1f} bars) | 1min={60/_spb:.1f} beats ({60/(_spb*_bpb):.1f} bars)")
 
         if state.musical:
             parts.append(f"Key: {state.musical.key or 'Unknown'} | Scale: {state.musical.scale or 'Unknown'}")

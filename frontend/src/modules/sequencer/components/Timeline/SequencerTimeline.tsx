@@ -13,7 +13,7 @@
  * - SequencerTimelineTrackRow: Individual track rows with clips
  */
 
-import { useEffect } from "react";
+import React from "react";
 import { SequencerTimelineGrid } from "./SequencerTimelineGrid.tsx";
 import { SequencerTimelineLoopRegion } from "./SequencerTimelineLoopRegion.tsx";
 import { SequencerTimelinePlayhead } from "./SequencerTimelinePlayhead.tsx";
@@ -34,8 +34,6 @@ export function SequencerTimeline({
     // STATE: Read directly from Zustand store
     // ========================================================================
     const tracks = useDAWStore(state => state.tracks);
-    const transport = useDAWStore(state => state.transport);
-    const currentPosition = transport?.position_beats ?? 0;
 
     // ========================================================================
     // ACTIONS: Get directly from Zustand store
@@ -45,41 +43,10 @@ export function SequencerTimeline({
     // ========================================================================
     // CALCULATIONS
     // ========================================================================
-    const { pixelsPerBeat, rulerMarkers, zoom, totalWidth } = useTimelineCalculations();
-    const playheadX = currentPosition * pixelsPerBeat * zoom;
+    const { pixelsPerBeat, rulerMarkers, totalWidth } = useTimelineCalculations();
 
-    // ========================================================================
-    // AUTO-SCROLL: Keep playhead visible during playback
-    // ========================================================================
-    useEffect(() => {
-        if (!scrollContainerRef?.current) return;
-
-        const container = scrollContainerRef.current;
-        const containerWidth = container.clientWidth;
-        const scrollLeft = container.scrollLeft;
-
-        // Calculate playhead position relative to scroll
-        const playheadRelativeX = playheadX - scrollLeft;
-
-        // Auto-scroll if playhead is near the right edge (within 20% of container width)
-        const scrollThreshold = containerWidth * 0.8;
-
-        if (playheadRelativeX > scrollThreshold) {
-            // Scroll to keep playhead at 50% of container width
-            const targetScrollLeft = playheadX - containerWidth * 0.5;
-            container.scrollTo({
-                left: Math.max(0, targetScrollLeft),
-                behavior: 'smooth',
-            });
-        }
-        // Also scroll if playhead is off-screen to the left
-        else if (playheadRelativeX < 0) {
-            container.scrollTo({
-                left: Math.max(0, playheadX - containerWidth * 0.2),
-                behavior: 'smooth',
-            });
-        }
-    }, [playheadX, scrollContainerRef]);
+    // Auto-scroll is handled inside SequencerTimelinePlayhead's RAF loop
+    // so it runs at 60fps in sync with the interpolated playhead position.
 
     return (
         <>
@@ -109,6 +76,7 @@ export function SequencerTimeline({
                     <SequencerTimelinePlayhead
                         pixelsPerBeat={pixelsPerBeat}
                         onSeek={seek}
+                        scrollContainerRef={scrollContainerRef}
                     />
                 </div>
             )}

@@ -30,10 +30,10 @@ class IntentRouter:
     """
 
     def __init__(self, api_key: Optional[str] = None):
-        self.client = anthropic.Anthropic(api_key=api_key) if api_key else None
+        self.client = anthropic.AsyncAnthropic(api_key=api_key) if api_key else None
         self.model = "claude-haiku-4-5-20251001"  # Fast, cheap, accurate
 
-    def route(self, user_message: str, daw_state_summary: Optional[str] = None) -> Intent:
+    async def route(self, user_message: str, daw_state_summary: Optional[str] = None) -> Intent:
         """
         Route user message to intent category using LLM.
 
@@ -66,7 +66,7 @@ User request: "{user_message}"{context}
 Respond with ONLY the category name (e.g., "CREATE_CONTENT"). No explanation."""
 
         try:
-            response = self.client.messages.create(
+            response = await self.client.messages.create(
                 model=self.model,
                 max_tokens=50,
                 messages=[{
