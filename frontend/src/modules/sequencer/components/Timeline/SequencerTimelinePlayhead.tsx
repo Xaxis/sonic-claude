@@ -28,7 +28,9 @@ export function SequencerTimelinePlayhead({
     const currentPosition = transport?.position_beats ?? 0;
     const isPlaying = transport?.is_playing ?? false;
     const isPaused = transport?.is_paused ?? false;
-    const tempo = activeComposition?.tempo ?? 120;
+    // Prefer real-time transport tempo (updated immediately via WebSocket) over
+    // activeComposition.tempo which only refreshes after loadComposition resolves.
+    const tempo = transport?.tempo ?? activeComposition?.tempo ?? 120;
     const zoom = useDAWStore(state => state.zoom);
     const snapEnabled = useDAWStore(state => state.snapEnabled);
     const gridSize = useDAWStore(state => state.gridSize);
@@ -189,22 +191,25 @@ export function SequencerTimelinePlayhead({
     return (
         <div
             ref={playheadRef}
-            className="absolute top-0 bottom-0 w-1 bg-red-500 z-10 cursor-ew-resize pointer-events-auto"
+            className="absolute top-0 bottom-0 w-px bg-red-500 z-[25] cursor-ew-resize pointer-events-auto"
             style={{
                 transform: `translateX(${playheadX}px)`,
-                boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)',
+                boxShadow: '0 0 4px rgba(239, 68, 68, 0.6)',
                 willChange: 'transform',
             }}
             onMouseDown={handlePlayheadMouseDown}
             title="Drag to scrub"
         >
-            {/* Playhead triangle at top - Higher z-index so it appears above ruler */}
+            {/* Downward-pointing cap — sits above the ruler (z-[25] > ruler z-20) and is
+                centred over the 1px line via translateX(-50%). The ruler cell overflow is
+                set to "visible" so this cap is not clipped. */}
             <div
-                className="absolute -top-2 -left-2 w-0 h-0 pointer-events-none z-30"
+                className="absolute top-0 left-0 w-0 h-0 pointer-events-none"
                 style={{
-                    borderLeft: '10px solid transparent',
-                    borderRight: '10px solid transparent',
-                    borderTop: '12px solid #ef4444',
+                    transform: 'translateX(-50%)',
+                    borderLeft: '5px solid transparent',
+                    borderRight: '5px solid transparent',
+                    borderTop: '6px solid #ef4444',
                 }}
             />
         </div>

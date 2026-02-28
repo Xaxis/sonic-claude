@@ -129,7 +129,7 @@ export function SequencerGridLayout({
                         width: `${contentWidth}px`,
                         height: `${headerHeight}px`,
                         zIndex: 20, // Below corner header, above timeline
-                        overflow: 'hidden', // Prevent ruler content from bleeding out
+                        overflow: 'visible', // Allow playhead cap to bleed into ruler row
                     }}
                 >
                     {ruler}

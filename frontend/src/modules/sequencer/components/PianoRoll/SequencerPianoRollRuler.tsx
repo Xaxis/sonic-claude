@@ -194,22 +194,23 @@ export function SequencerPianoRollRuler({}: SequencerPianoRollRulerProps) {
             {/* Playhead indicator */}
             <div
                 ref={playheadRef}
-                className="absolute top-0 bottom-0 w-1 bg-red-500 z-50 cursor-ew-resize pointer-events-auto"
+                className="absolute top-0 bottom-0 w-px bg-red-500 z-50 cursor-ew-resize pointer-events-auto"
                 style={{
                     transform: `translateX(${playheadX}px)`,
-                    boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)',
+                    boxShadow: '0 0 4px rgba(239, 68, 68, 0.6)',
                     willChange: 'transform',
                 }}
                 onMouseDown={handlePlayheadMouseDown}
                 title="Drag to scrub"
             >
-                {/* Playhead triangle at top */}
+                {/* Downward-pointing cap — centred over the 1px line via translateX(-50%) */}
                 <div
-                    className="absolute -top-3 -left-2.5 w-0 h-0 pointer-events-none"
+                    className="absolute top-0 left-0 w-0 h-0 pointer-events-none"
                     style={{
-                        borderLeft: '10px solid transparent',
-                        borderRight: '10px solid transparent',
-                        borderTop: '12px solid #ef4444',
+                        transform: 'translateX(-50%)',
+                        borderLeft: '5px solid transparent',
+                        borderRight: '5px solid transparent',
+                        borderTop: '6px solid #ef4444',
                     }}
                 />
             </div>

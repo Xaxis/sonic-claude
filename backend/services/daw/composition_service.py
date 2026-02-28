@@ -520,8 +520,8 @@ class CompositionService:
                 for track_id, sample_path in composition.sample_assignments.items():
                     # Find track in composition
                     track = next((t for t in composition.tracks if t.id == track_id), None)
-                    if track and hasattr(track, 'sample_path'):
-                        track.sample_path = sample_path
+                    if track and hasattr(track, 'sample_file_path'):
+                        track.sample_file_path = sample_path
 
                 # CRITICAL FIX: Recreate mixer channels for all tracks
                 # This ensures that mixer channel synths exist in SuperCollider

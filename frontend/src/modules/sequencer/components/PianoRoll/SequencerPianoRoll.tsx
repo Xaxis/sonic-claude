@@ -63,7 +63,7 @@ export function SequencerPianoRoll({
     // ========================================================================
     // SHARED TIMELINE CALCULATIONS
     // ========================================================================
-    const { totalWidth } = useTimelineCalculations();
+    const { totalWidth, pixelsPerBeat, zoom } = useTimelineCalculations();
 
     // ========================================================================
     // LOCAL UI STATE
@@ -180,6 +180,59 @@ export function SequencerPianoRoll({
 
                         {/* Loop Region - Overlaid on grid */}
                         <SequencerTimelineLoopRegion />
+
+                        {/* Clip boundary overlay - shown when Clip tab is active */}
+                        {activeTab === "clip" && (
+                            <div className="absolute inset-0 pointer-events-none z-10">
+                                {/* Dim area before clip start */}
+                                {clip.start_time > 0 && (
+                                    <div
+                                        className="absolute top-0 bottom-0"
+                                        style={{
+                                            left: 0,
+                                            width: `${clip.start_time * pixelsPerBeat * zoom}px`,
+                                            background: 'rgba(0, 0, 0, 0.4)',
+                                        }}
+                                    />
+                                )}
+                                {/* Dim area after clip end */}
+                                <div
+                                    className="absolute top-0 bottom-0"
+                                    style={{
+                                        left: `${(clip.start_time + clip.duration) * pixelsPerBeat * zoom}px`,
+                                        right: 0,
+                                        background: 'rgba(0, 0, 0, 0.4)',
+                                    }}
+                                />
+                                {/* Clip start boundary line */}
+                                <div
+                                    className="absolute top-0 bottom-0 w-px"
+                                    style={{
+                                        left: `${clip.start_time * pixelsPerBeat * zoom}px`,
+                                        background: 'hsl(var(--primary) / 0.9)',
+                                        boxShadow: '0 0 6px hsl(var(--primary) / 0.5)',
+                                    }}
+                                />
+                                {/* Clip end boundary line */}
+                                <div
+                                    className="absolute top-0 bottom-0 w-px"
+                                    style={{
+                                        left: `${(clip.start_time + clip.duration) * pixelsPerBeat * zoom}px`,
+                                        background: 'hsl(var(--primary) / 0.9)',
+                                        boxShadow: '0 0 6px hsl(var(--primary) / 0.5)',
+                                    }}
+                                />
+                                {/* Clip region label */}
+                                <div
+                                    className="absolute top-1 text-xs font-medium text-primary/70 select-none"
+                                    style={{
+                                        left: `${(clip.start_time + 0.25) * pixelsPerBeat * zoom}px`,
+                                    }}
+                                >
+                                    {clip.name}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 }
                 sidebarWidth={256}

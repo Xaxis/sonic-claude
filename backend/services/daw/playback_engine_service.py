@@ -180,9 +180,90 @@ class PlaybackEngineService:
         composition.is_playing = True
         composition.current_position = position
 
+        # Pre-load all audio buffers before starting the loop so there is no
+        # b_allocRead / s_new race condition on first play.
+        if self.buffer_manager and self.engine_manager:
+            await self._preload_audio_buffers(composition)
+
         # Start playback loop task
         self.playback_task = asyncio.create_task(self._playback_loop(composition_id))
         logger.info("✅ Playback started successfully")
+
+    async def _preload_audio_buffers(self, composition: 'Composition') -> None:
+        """
+        Pre-load all audio sample buffers into SuperCollider before playback begins.
+
+        Sends /b_allocRead for every unique audio sample referenced by the composition
+        and then waits briefly so SC has time to finish loading them all before the
+        first /s_new arrives.  Without this, the first trigger of a sample that has
+        never been loaded in the current session would race against an unready buffer.
+        """
+        from pathlib import Path
+
+        samples_dir = Path(__file__).parent.parent.parent.parent / "data" / "samples"
+        loaded: set = set()
+
+        for clip in composition.clips:
+            if clip.type != "audio" or clip.is_muted:
+                continue
+
+            track = next((t for t in composition.tracks if t.id == clip.track_id), None)
+            if not track or track.is_muted:
+                continue
+
+            # Determine sample_id and file path (mirrors _trigger_clip logic)
+            if track.type == "audio" and track.sample_id:
+                sample_id = track.sample_id
+                if sample_id in loaded:
+                    continue
+                sample_path = None
+                if track.sample_file_path:
+                    p = Path(track.sample_file_path)
+                    if p.exists():
+                        sample_path = p
+                if not sample_path:
+                    for ext in ['.wav', '.webm', '.mp3', '.ogg', '.flac']:
+                        p = samples_dir / f"{sample_id}{ext}"
+                        if p.exists():
+                            sample_path = p
+                            break
+                if sample_path:
+                    try:
+                        await self.buffer_manager.load_sample(sample_id, str(sample_path))
+                        loaded.add(sample_id)
+                        logger.info(f"📦 Pre-loaded buffer for track sample: {sample_id}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not pre-load track sample {sample_id}: {e}")
+
+            elif clip.type == "audio" and clip.audio_file_path and not track.sample_id:
+                audio_file_path = clip.audio_file_path
+                cache_key = clip.id
+                if cache_key in loaded:
+                    continue
+                audio_path = None
+                if not audio_file_path.endswith(('.wav', '.mp3', '.webm', '.ogg', '.flac')):
+                    for ext in ['.wav', '.webm', '.mp3', '.ogg', '.flac']:
+                        p = samples_dir / f"{audio_file_path}{ext}"
+                        if p.exists():
+                            audio_path = p
+                            break
+                else:
+                    audio_path = Path(audio_file_path)
+                    if not audio_path.is_absolute():
+                        audio_path = Path(__file__).parent.parent.parent.parent / audio_path
+                if audio_path and audio_path.exists():
+                    try:
+                        await self.buffer_manager.load_sample(cache_key, str(audio_path))
+                        loaded.add(cache_key)
+                        logger.info(f"📦 Pre-loaded buffer for clip: {clip.name}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not pre-load clip buffer {cache_key}: {e}")
+
+        if loaded:
+            # Give SC a moment to finish reading all files from disk before the
+            # playback loop sends the first /s_new messages.
+            await asyncio.sleep(0.15)
+            logger.info(f"✅ Pre-loaded {len(loaded)} audio buffer(s)")
 
     async def _playback_loop(self, composition_id: str) -> None:
         """Background task that advances playhead and triggers clips"""
@@ -220,6 +301,54 @@ class PlaybackEngineService:
                 # Advance playhead
                 delta_beats = (delta_time / beat_duration)
                 self.playhead_position += delta_beats
+
+                # End-of-composition detection (only when loop is disabled)
+                if not composition.loop_enabled and composition.clips:
+                    end_beat = max(c.start_time + c.duration for c in composition.clips)
+                    if self.playhead_position >= end_beat:
+                        logger.info(f"⏹ Reached end of composition at {end_beat:.2f} beats — stopping")
+                        self.is_playing = False
+                        self.is_paused = False
+                        self.playhead_position = 0.0
+                        composition.is_playing = False
+                        composition.current_position = 0.0
+
+                        # Free all active synths
+                        if self.engine_manager:
+                            for node_id in self.timeline_active_synths.values():
+                                self.engine_manager.send_message("/n_free", node_id)
+                        self.timeline_active_synths.clear()
+                        for task in list(self.timeline_midi_note_tasks):
+                            task.cancel()
+                        if self.timeline_midi_note_tasks:
+                            await asyncio.gather(*self.timeline_midi_note_tasks, return_exceptions=True)
+                        self.timeline_midi_note_tasks.clear()
+                        if self.engine_manager:
+                            for node_id in self.timeline_active_midi_notes.keys():
+                                self.engine_manager.send_message("/n_free", node_id)
+                        self.timeline_active_midi_notes.clear()
+
+                        # Broadcast stopped state so the frontend updates immediately
+                        if self.websocket_manager:
+                            time_sig_parts = composition.time_signature.split("/")
+                            await self.websocket_manager.broadcast_transport({
+                                "type": "transport",
+                                "is_playing": False,
+                                "is_paused": False,
+                                "position_beats": 0.0,
+                                "position_seconds": 0.0,
+                                "tempo": self.tempo,
+                                "time_signature_num": int(time_sig_parts[0]) if time_sig_parts else 4,
+                                "time_signature_den": int(time_sig_parts[1]) if len(time_sig_parts) > 1 else 4,
+                                "loop_enabled": composition.loop_enabled,
+                                "loop_start": composition.loop_start,
+                                "loop_end": composition.loop_end,
+                                "metronome_enabled": self.metronome_enabled,
+                                "active_notes": [],
+                                "playing_clips": [],
+                                "triggered_clips": [],
+                            })
+                        break
 
                 # Handle loop region: if loop is enabled and we've passed loop_end, jump back to loop_start
                 if composition.loop_enabled and self.playhead_position >= composition.loop_end:
@@ -418,8 +547,8 @@ class PlaybackEngineService:
 
                 # If not found, search in data/samples/ directory
                 if not sample_path:
-                    # Go from backend/services/daw/playback_engine_service.py -> backend/services/daw -> backend/services -> backend -> project_root
-                    samples_dir = Path(__file__).parent.parent.parent / "data" / "samples"
+                    # Go from backend/services/daw/ -> backend/services -> backend -> project_root -> project_root/data/samples
+                    samples_dir = Path(__file__).parent.parent.parent.parent / "data" / "samples"
                     logger.info(f"   Searching in: {samples_dir}")
 
                     # Try to find the file with any extension
@@ -505,7 +634,7 @@ class PlaybackEngineService:
                 # If it's just a sample ID (UUID), construct path to data/samples/
                 if not audio_file_path.endswith(('.wav', '.mp3', '.webm', '.ogg', '.flac')):
                     # Assume it's a sample ID, construct full path
-                    samples_dir = Path(__file__).parent.parent.parent / "data" / "samples"
+                    samples_dir = Path(__file__).parent.parent.parent.parent / "data" / "samples"
 
                     # Try to find the file with any extension
                     for ext in ['.webm', '.wav', '.mp3', '.ogg', '.flac']:
@@ -932,6 +1061,37 @@ class PlaybackEngineService:
         self.tempo = tempo  # Update global tempo for playback
         composition.updated_at = datetime.now()
         logger.info(f"🎵 Set tempo to {tempo} BPM for composition {composition_id}")
+
+        # If playing, reschedule MIDI notes at the new tempo.
+        # Already-sleeping asyncio tasks were calculated at the old tempo and won't
+        # adjust automatically — cancel them so the next playback loop iteration
+        # re-triggers all active MIDI clips at the correct timing for the new tempo.
+        if self.is_playing:
+            # Cancel all pending MIDI note tasks
+            for task in list(self.timeline_midi_note_tasks):
+                task.cancel()
+            if self.timeline_midi_note_tasks:
+                await asyncio.gather(*self.timeline_midi_note_tasks, return_exceptions=True)
+            self.timeline_midi_note_tasks.clear()
+
+            # Free all currently-sounding MIDI notes
+            if self.engine_manager:
+                for node_id in list(self.timeline_active_midi_notes.keys()):
+                    self.engine_manager.send_message("/n_free", node_id)
+            self.timeline_active_midi_notes.clear()
+
+            # Remove MIDI clips from active-synth tracking so _check_and_trigger_clips
+            # re-triggers them on the very next playback loop tick with the new tempo
+            midi_track_ids = {t.id for t in composition.tracks if t.type == "midi"}
+            clips_retriggered = [
+                clip_id for clip_id, _ in list(self.timeline_active_synths.items())
+                if any(c.id == clip_id and c.track_id in midi_track_ids for c in composition.clips)
+            ]
+            for clip_id in clips_retriggered:
+                del self.timeline_active_synths[clip_id]
+
+            if clips_retriggered:
+                logger.info(f"🔄 Rescheduling {len(clips_retriggered)} MIDI clip(s) at new tempo {tempo} BPM")
 
     async def set_loop(
         self,

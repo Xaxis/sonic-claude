@@ -158,8 +158,8 @@ async def seek(
             raise ServiceError("No composition loaded")
 
         await playback_engine_service.seek(
-            composition_state_service.current_composition_id,
-            request.position
+            request.position,
+            request.trigger_audio
         )
 
         return {
