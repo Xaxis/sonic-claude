@@ -34,6 +34,7 @@ class PlayRequest(BaseModel):
 class SeekRequest(BaseModel):
     """Request to seek to a position"""
     position: float = Field(description="Position in beats")
+    trigger_audio: bool = Field(default=False, description="Restart audio playback from new position")
 
 
 class SetTempoRequest(BaseModel):

@@ -207,6 +207,7 @@ interface DAWStore {
     zoom: number;
     snapEnabled: boolean;
     gridSize: number;
+    pianoRollFollowPlayback: boolean;
     isLooping: boolean;
     loopStart: number;
     loopEnd: number;
@@ -411,6 +412,7 @@ interface DAWStore {
     setZoom: (zoom: number) => void;
     setSnapEnabled: (enabled: boolean) => void;
     setGridSize: (size: number) => void;
+    togglePianoRollFollow: () => void;
     setIsLooping: (looping: boolean) => void;
     setLoopStart: (start: number) => void;
     setLoopEnd: (end: number) => void;
@@ -552,6 +554,7 @@ export const useDAWStore = create<DAWStore>()(
                 zoom: 0.5,
                 snapEnabled: true,
                 gridSize: 16,
+                pianoRollFollowPlayback: true,
                 isLooping: true,
                 loopStart: 0,
                 loopEnd: 16,
@@ -2165,6 +2168,9 @@ export const useDAWStore = create<DAWStore>()(
         setGridSize: (size) => {
             set({ gridSize: size });
             // Auto-persisted by Zustand persist middleware
+        },
+        togglePianoRollFollow: () => {
+            set(state => ({ pianoRollFollowPlayback: !state.pianoRollFollowPlayback }));
         },
         setIsLooping: async (looping) => {
             set({ isLooping: looping });

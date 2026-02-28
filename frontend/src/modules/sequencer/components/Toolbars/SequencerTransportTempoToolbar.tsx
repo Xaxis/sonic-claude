@@ -13,18 +13,17 @@ export function SequencerTransportTempoToolbar() {
     const setTempo = useDAWStore((state) => state.setTempo);
 
     return (
-        <div className="min-w-[180px]">
-            <ControlRow
-                label="BPM"
-                value={tempo}
-                min={20}
-                max={300}
-                step={1}
-                formatValue={v => Math.round(v).toString()}
-                onChange={setTempo}
-                labelWidth="w-9"
-                valueWidth="w-8"
-            />
-        </div>
+        <ControlRow
+            label="BPM"
+            value={tempo}
+            min={20}
+            max={300}
+            step={1}
+            formatValue={v => Math.round(v).toString()}
+            onChange={setTempo}
+            labelWidth="w-9"
+            valueWidth="w-8"
+            className="py-0 w-full"
+        />
     );
 }

@@ -25,3 +25,11 @@
 ...
 
 - User should be able to adaptively set specific LLM model versions (in settings)
+
+...
+
+- Critically research, I have Ableton Live installed on this computer (macbook)... It has a range of "collections" (sounds, drums, audio...). They appear to be .adg and .adv files... Would it make sense and would it be practical to implement those files/sounds as part of our own refactored "instruments" system which would then become a similar "collections" system and work with supercollider and everything else, in addition to our custom instruments. Does that make sense. What do you think?
+
+...
+
+DAWs are highly detail oriented apps in terms of UI/UX, which usually means smaller fonts, icons, ui/ux.. Research critically and add a setting in which user can dynamically scale the size of the UI/UX, including font sizes, etc (downwards) specifically. We really want to rebuild our interface structures so they are visually more compact but why were at it we might as well enable dynamic adjustment so the user can (and us) can determine what works.

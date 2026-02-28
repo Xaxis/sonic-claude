@@ -1,28 +1,29 @@
 /**
- * SequencerTransportTimer – Professional DAW-style playback position display
+ * SequencerTransportTimer – Playback position display
  *
- * Shows current playback position in two synchronized formats:
- *   Musical:  BAR : BEAT . TICK  (e.g.  004 : 3 . 092)
- *   Clock:    M:SS.mmm           (e.g.    0:04.250)
+ * Renders inside the unified transport strip — no own border/background.
+ * Parent container provides the visual boundary.
  *
- * Architecture:
- * - Uses requestAnimationFrame + dead-reckoning (identical to SequencerTimelinePlayhead)
- * - Writes directly to DOM refs – zero React re-renders during playback
- * - Syncs target position from WebSocket (position_beats), extrapolates between updates
+ * Two rows:
+ *   • BAR : BEAT . TICK  (musical time, primary)
+ *   • M:SS.mmm · sig     (wall-clock + time signature, secondary)
+ *
+ * RAF dead-reckoning — direct DOM writes, zero React re-renders during playback.
  */
 
 import { useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
 import { useDAWStore } from "@/stores/dawStore";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Pure conversion helpers
+// Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 function formatMusical(beats: number, beatsPerBar: number): string {
-    const safeBeats = Math.max(0, beats);
-    const bar  = Math.floor(safeBeats / beatsPerBar) + 1;       // 1-indexed
-    const beat = Math.floor(safeBeats % beatsPerBar) + 1;       // 1-indexed
-    const tick = Math.floor((safeBeats % 1) * 96);              // 96 PPQN
+    const b = Math.max(0, beats);
+    const bar  = Math.floor(b / beatsPerBar) + 1;
+    const beat = Math.floor(b % beatsPerBar) + 1;
+    const tick = Math.floor((b % 1) * 96);
     return (
         bar.toString().padStart(3, "0") +
         " : " +
@@ -33,17 +34,11 @@ function formatMusical(beats: number, beatsPerBar: number): string {
 }
 
 function formatClock(beats: number, tempo: number): string {
-    const totalSec = (Math.max(0, beats) * 60) / tempo;
-    const minutes  = Math.floor(totalSec / 60);
-    const seconds  = Math.floor(totalSec % 60);
-    const millis   = Math.floor((totalSec % 1) * 1000);
-    return (
-        minutes.toString() +
-        ":" +
-        seconds.toString().padStart(2, "0") +
-        "." +
-        millis.toString().padStart(3, "0")
-    );
+    const s   = (Math.max(0, beats) * 60) / tempo;
+    const min = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    const ms  = Math.floor((s % 1) * 1000);
+    return min + ":" + sec.toString().padStart(2, "0") + "." + ms.toString().padStart(3, "0");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -51,7 +46,6 @@ function formatClock(beats: number, tempo: number): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function SequencerTransportTimer() {
-    // ── Store ─────────────────────────────────────────────────────────────────
     const transport        = useDAWStore((s) => s.transport);
     const compositionTempo = useDAWStore((s) => s.activeComposition?.tempo ?? 120);
 
@@ -62,30 +56,25 @@ export function SequencerTransportTimer() {
     const beatsPerBar = transport?.time_signature_num ?? 4;
     const timeSigDen  = transport?.time_signature_den ?? 4;
 
-    // ── DOM refs (written directly by RAF – no state) ─────────────────────────
     const musicalRef = useRef<HTMLSpanElement>(null);
     const clockRef   = useRef<HTMLSpanElement>(null);
 
-    // ── Dead-reckoning refs ───────────────────────────────────────────────────
     const animRef           = useRef<number | null>(null);
     const targetPosRef      = useRef(currentPos);
     const lastUpdateTimeRef = useRef(Date.now());
     const tempoRef          = useRef(tempo);
     const beatsPerBarRef    = useRef(beatsPerBar);
 
-    // Keep mutable refs in sync with store values without restarting RAF
     useEffect(() => {
-        tempoRef.current      = tempo;
+        tempoRef.current       = tempo;
         beatsPerBarRef.current = beatsPerBar;
     }, [tempo, beatsPerBar]);
 
-    // Sync target position on each WebSocket update
     useEffect(() => {
         targetPosRef.current      = currentPos;
         lastUpdateTimeRef.current = Date.now();
     }, [currentPos]);
 
-    // ── RAF animation loop ────────────────────────────────────────────────────
     useEffect(() => {
         const write = (pos: number) => {
             if (musicalRef.current)
@@ -94,69 +83,58 @@ export function SequencerTransportTimer() {
                 clockRef.current.textContent = formatClock(pos, tempoRef.current);
         };
 
-        // Not playing: show exact position, no loop needed
         if (!isPlaying || isPaused) {
             write(currentPos);
             return;
         }
 
-        // Playing: extrapolate forward each frame using dead reckoning
         const loop = () => {
             const delta = (Date.now() - lastUpdateTimeRef.current) / 1000;
-            const pos   = targetPosRef.current + delta * (tempoRef.current / 60);
-            write(pos);
+            write(targetPosRef.current + delta * (tempoRef.current / 60));
             animRef.current = requestAnimationFrame(loop);
         };
-
         animRef.current = requestAnimationFrame(loop);
-        return () => {
-            if (animRef.current !== null) cancelAnimationFrame(animRef.current);
-        };
-    // Restart loop only when play state changes, not on every position tick
+        return () => { if (animRef.current !== null) cancelAnimationFrame(animRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isPlaying, isPaused]);
 
-    // ── Initial render strings (React hydration pass) ────────────────────────
     const musicalInit = formatMusical(currentPos, beatsPerBar);
     const clockInit   = formatClock(currentPos, tempo);
 
     return (
-        <div
-            className="relative flex flex-col items-center justify-center px-4 py-1.5 rounded-md border border-border/40 bg-black/70 min-w-[148px] select-none"
-            title="Playback position"
-        >
-            {/* Status dot – pulses when playing */}
-            <span
-                className={[
-                    "absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full",
-                    isPlaying && !isPaused
-                        ? "bg-red-500 animate-pulse"
-                        : isPaused
-                        ? "bg-yellow-500"
-                        : "bg-muted-foreground/30",
-                ].join(" ")}
-            />
+        <div className="flex flex-col justify-center pl-3 pr-4 h-full select-none min-w-[132px]">
+            {/* Row 1: status dot + musical position */}
+            <div className="flex items-center gap-1.5">
+                <span
+                    className={cn(
+                        "w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors duration-200",
+                        isPlaying && !isPaused
+                            ? "bg-red-500 animate-pulse"
+                            : isPaused
+                            ? "bg-yellow-400"
+                            : "bg-muted-foreground/25"
+                    )}
+                />
+                <span
+                    ref={musicalRef}
+                    className="font-mono text-xs font-bold tabular-nums tracking-wider text-primary leading-none"
+                >
+                    {musicalInit}
+                </span>
+            </div>
 
-            {/* Musical time: BAR : BEAT . TICK */}
-            <span
-                ref={musicalRef}
-                className="font-mono text-sm font-bold tabular-nums leading-snug tracking-widest text-cyan-400"
-            >
-                {musicalInit}
-            </span>
-
-            {/* Wall-clock time: M:SS.mmm */}
-            <span
-                ref={clockRef}
-                className="font-mono text-[10px] tabular-nums leading-snug tracking-wider text-muted-foreground"
-            >
-                {clockInit}
-            </span>
-
-            {/* Time signature – static label */}
-            <span className="absolute bottom-1 right-2 font-mono text-[9px] text-muted-foreground/40 tabular-nums leading-none">
-                {beatsPerBar}/{timeSigDen}
-            </span>
+            {/* Row 2: clock time + time signature */}
+            <div className="flex items-center gap-1.5 mt-[3px] pl-3">
+                <span
+                    ref={clockRef}
+                    className="font-mono text-[9px] tabular-nums text-muted-foreground/55 leading-none tracking-wide"
+                >
+                    {clockInit}
+                </span>
+                <span className="font-mono text-[8px] text-muted-foreground/30 leading-none">
+                    {beatsPerBar}/{timeSigDen}
+                </span>
+            </div>
         </div>
     );
 }

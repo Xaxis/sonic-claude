@@ -21,9 +21,11 @@ export function SequencerPianoRollRuler({}: SequencerPianoRollRulerProps) {
     // ========================================================================
     // STATE: Read from Zustand store
     // ========================================================================
-    const snapEnabled = useDAWStore(state => state.snapEnabled);
-    const gridSize = useDAWStore(state => state.gridSize);
-    const transport = useDAWStore(state => state.transport);
+    const snapEnabled          = useDAWStore(state => state.snapEnabled);
+    const gridSize             = useDAWStore(state => state.gridSize);
+    const transport            = useDAWStore(state => state.transport);
+    const followPlayback       = useDAWStore(state => state.pianoRollFollowPlayback);
+    const pianoRollScrollRef   = useDAWStore(state => state.pianoRollScrollRef);
 
     // ========================================================================
     // ACTIONS: Get from Zustand store
@@ -54,15 +56,19 @@ export function SequencerPianoRollRuler({}: SequencerPianoRollRulerProps) {
     const playheadX = displayPosition * pixelsPerBeat * zoom;
 
     // Store latest values in refs to avoid animation loop restarts
-    const currentPositionRef = useRef(currentPosition);
-    const pixelsPerBeatRef = useRef(pixelsPerBeat);
-    const zoomRef = useRef(zoom);
+    const currentPositionRef   = useRef(currentPosition);
+    const pixelsPerBeatRef     = useRef(pixelsPerBeat);
+    const zoomRef              = useRef(zoom);
+    const followPlaybackRef    = useRef(followPlayback);
+    const pianoRollScrollRefRef = useRef(pianoRollScrollRef);
 
     useEffect(() => {
-        currentPositionRef.current = currentPosition;
-        pixelsPerBeatRef.current = pixelsPerBeat;
-        zoomRef.current = zoom;
-    }, [currentPosition, pixelsPerBeat, zoom]);
+        currentPositionRef.current    = currentPosition;
+        pixelsPerBeatRef.current      = pixelsPerBeat;
+        zoomRef.current               = zoom;
+        followPlaybackRef.current     = followPlayback;
+        pianoRollScrollRefRef.current = pianoRollScrollRef;
+    }, [currentPosition, pixelsPerBeat, zoom, followPlayback, pianoRollScrollRef]);
 
     // Refs for drag state — let getX read fresh values without restarting the RAF
     const isDraggingPlayheadRef       = useRef(isDraggingPlayhead);
@@ -84,10 +90,27 @@ export function SequencerPianoRollRuler({}: SequencerPianoRollRulerProps) {
         const el = playheadRef.current;
         if (!el) return;
 
-        const apply = () => { el.style.transform = `translateX(${getPlayheadX()}px)`; };
+        const applyScroll = (x: number) => {
+            if (!followPlaybackRef.current) return;
+            const container = pianoRollScrollRefRef.current?.current;
+            if (!container) return;
+            const cw = container.clientWidth;
+            const rel = x - container.scrollLeft;
+            if (rel > cw * 0.8) {
+                container.scrollLeft = Math.max(0, x - cw * 0.5);
+            } else if (rel < 0) {
+                container.scrollLeft = Math.max(0, x - cw * 0.2);
+            }
+        };
+
+        const apply = () => {
+            const x = getPlayheadX();
+            el.style.transform = `translateX(${x}px)`;
+            applyScroll(x);
+        };
 
         if (!isPlaying || isPaused || isDraggingPlayhead) {
-            apply();
+            el.style.transform = `translateX(${getPlayheadX()}px)`;
             return;
         }
 

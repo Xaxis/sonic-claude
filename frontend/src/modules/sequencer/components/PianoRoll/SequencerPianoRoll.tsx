@@ -7,8 +7,9 @@
  */
 
 import { useEffect, useState } from "react";
-import { X, Music, SlidersHorizontal } from "lucide-react";
+import { X, Music, SlidersHorizontal, Navigation } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
+import { cn } from "@/lib/utils.ts";
 import { EditorTabBar } from "@/components/ui/editor-tab-bar.tsx";
 import { SequencerPianoRollKeyboard } from "./SequencerPianoRollKeyboard.tsx";
 import { SequencerPianoRollGrid } from "./SequencerPianoRollGrid.tsx";
@@ -43,9 +44,11 @@ export function SequencerPianoRoll({
     // ========================================================================
     // ACTIONS: Get from Zustand store
     // ========================================================================
-    const closePianoRoll = useDAWStore(state => state.closePianoRoll);
-    const setPianoRollScrollLeft = useDAWStore(state => state.setPianoRollScrollLeft);
-    const setPianoRollScrollRef = useDAWStore(state => state.setPianoRollScrollRef);
+    const closePianoRoll          = useDAWStore(state => state.closePianoRoll);
+    const setPianoRollScrollLeft  = useDAWStore(state => state.setPianoRollScrollLeft);
+    const setPianoRollScrollRef   = useDAWStore(state => state.setPianoRollScrollRef);
+    const followPlayback          = useDAWStore(state => state.pianoRollFollowPlayback);
+    const togglePianoRollFollow   = useDAWStore(state => state.togglePianoRollFollow);
 
     // ========================================================================
     // EFFECTS: Set scroll ref when component mounts
@@ -144,7 +147,16 @@ export function SequencerPianoRoll({
                             • Bar {Math.floor(clip.start_time / 4) + 1} • {clip.duration} beats
                         </span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                        {/* Follow Playback toggle */}
+                        <IconButton
+                            icon={Navigation}
+                            tooltip={followPlayback ? "Follow playback: ON" : "Follow playback: OFF"}
+                            onClick={togglePianoRollFollow}
+                            variant="ghost"
+                            size="icon-sm"
+                            className={cn(followPlayback && "bg-primary/20 text-primary")}
+                        />
                         {/* Close */}
                         <IconButton
                             icon={X}

@@ -292,6 +292,48 @@ export function SampleEditorWaveform({
         return secs >= 0 && secs <= durationRef.current;
     }, []);
 
+    // ========================================================================
+    // SCAN GLOW: Two GPU-accelerated layers that track the playhead
+    //   • playedRegionRef — subtle white tint over the "scanned" area (left of playhead)
+    //   • scanGlowRef     — red bell-curve gradient centered on the playhead
+    // Both are driven here via RAF so they stay in sync with the Playhead line.
+    // ========================================================================
+    const scanGlowRef     = useRef<HTMLDivElement>(null);
+    const playedRegionRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const scanEl   = scanGlowRef.current;
+        const regionEl = playedRegionRef.current;
+        if (!scanEl || !regionEl) return;
+
+        // Scan glow half-width must match the w-20 (80px) class on the element
+        const GLOW_HALF = 40;
+
+        const apply = () => {
+            const x       = getPlayheadX();
+            const visible = isPlayheadVisible();
+            const op      = visible ? '1' : '0';
+
+            // Right edge of the played-region div tracks the playhead
+            regionEl.style.transform = `translateX(${x - contentWidthRef.current}px)`;
+            regionEl.style.opacity   = op;
+
+            // Glow column centered on the playhead
+            scanEl.style.transform = `translateX(${x - GLOW_HALF}px)`;
+            scanEl.style.opacity   = op;
+        };
+
+        if (!isPlaying || isPaused) {
+            apply();
+            return;
+        }
+
+        let animId: number;
+        const loop = () => { apply(); animId = requestAnimationFrame(loop); };
+        animId = requestAnimationFrame(loop);
+        return () => cancelAnimationFrame(animId);
+    }, [isPlaying, isPaused, getPlayheadX, isPlayheadVisible]);
+
     // Resolved display values
     const localTrimEnd = localAudioEnd ?? dur;
     const localLEnd    = localLoopEnd  ?? dur;
@@ -550,6 +592,33 @@ export function SampleEditorWaveform({
                             />
                         </>
                     )}
+
+                    {/* Layer 6.5: Played-region tint — right edge tracks playhead */}
+                    <div
+                        ref={playedRegionRef}
+                        className="absolute top-0 bottom-0 pointer-events-none"
+                        style={{
+                            left: 0,
+                            width: contentWidth,
+                            opacity: 0,
+                            willChange: 'transform, opacity',
+                            background: 'rgba(255, 255, 255, 0.04)',
+                            zIndex: 8,
+                        }}
+                    />
+
+                    {/* Layer 6.6: Scan glow — bell-curve gradient centered on playhead */}
+                    <div
+                        ref={scanGlowRef}
+                        className="absolute top-0 bottom-0 w-20 pointer-events-none"
+                        style={{
+                            left: 0,
+                            opacity: 0,
+                            willChange: 'transform, opacity',
+                            background: 'linear-gradient(to right, transparent 0%, rgba(239,68,68,0.05) 25%, rgba(239,68,68,0.20) 50%, rgba(239,68,68,0.05) 75%, transparent 100%)',
+                            zIndex: 9,
+                        }}
+                    />
 
                     {/* Layer 7: Playhead (shared component — same formula as SampleEditorRuler) */}
                     <Playhead

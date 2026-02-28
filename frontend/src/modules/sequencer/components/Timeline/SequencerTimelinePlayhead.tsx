@@ -50,18 +50,32 @@ export function SequencerTimelinePlayhead({
     const targetPositionRef = useRef<number>(currentPosition);
     const interpolatedPositionRef = useRef<number>(currentPosition);
     const lastReceivedPositionRef = useRef<number>(currentPosition);
+    // Holds the seeked-to position between "mouse up" and "WebSocket confirms"
+    // so the playhead doesn't snap back while waiting for the round-trip.
+    const pendingSeekPositionRef = useRef<number | null>(null);
 
     // Update target position when currentPosition changes from WebSocket
     useEffect(() => {
         const now = Date.now();
-        const positionJumped = Math.abs(currentPosition - lastReceivedPositionRef.current) > 1;
 
+        // If we have a pending seek, check whether WebSocket has caught up yet.
+        // Clear the pending ref once the reported position is close to our target.
+        if (pendingSeekPositionRef.current !== null) {
+            if (Math.abs(currentPosition - pendingSeekPositionRef.current) < 0.5) {
+                pendingSeekPositionRef.current = null;
+            } else {
+                // WebSocket not yet confirmed — keep the interpolation at the sought position.
+                lastReceivedPositionRef.current = currentPosition;
+                lastUpdateTimeRef.current = now;
+                return;
+            }
+        }
+
+        const positionJumped = Math.abs(currentPosition - lastReceivedPositionRef.current) > 1;
         if (positionJumped) {
-            // Loop reset or seek - snap instantly
             interpolatedPositionRef.current = currentPosition;
             targetPositionRef.current = currentPosition;
         } else {
-            // Normal update - set as target for interpolation
             targetPositionRef.current = currentPosition;
         }
 
@@ -87,10 +101,12 @@ export function SequencerTimelinePlayhead({
     // Smooth animation loop using requestAnimationFrame
     useEffect(() => {
         if (!isPlaying || isPaused || isDraggingPlayhead) {
-            // Not playing, paused, or dragging - just use exact position
-            interpolatedPositionRef.current = draggedPlayheadPosition ?? currentPosition;
+            // Use dragged position → pending seek position → last known WebSocket position
+            const displayPos =
+                draggedPlayheadPosition ?? pendingSeekPositionRef.current ?? currentPosition;
+            interpolatedPositionRef.current = displayPos;
             if (playheadRef.current) {
-                const x = interpolatedPositionRef.current * pixelsPerBeatRef.current * zoomRef.current;
+                const x = displayPos * pixelsPerBeatRef.current * zoomRef.current;
                 playheadRef.current.style.transform = `translateX(${x}px)`;
             }
             return;
@@ -183,7 +199,14 @@ export function SequencerTimelinePlayhead({
             }
 
             newValue = Math.max(0, newValue);
-            
+
+            // Lock the target into refs BEFORE clearing drag state so the static
+            // render branch never falls back to the stale WebSocket position.
+            pendingSeekPositionRef.current = newValue;
+            targetPositionRef.current = newValue;
+            interpolatedPositionRef.current = newValue;
+            lastUpdateTimeRef.current = Date.now();
+
             // Call seek API once on mouse up
             if (onSeek) {
                 onSeek(newValue, true);
