@@ -27,11 +27,6 @@ export function SequencerPanel() {
     const activeComposition = useDAWStore(state => state.activeComposition);
 
     // ========================================================================
-    // LOCAL UI STATE
-    // ========================================================================
-    // @TODO - Consider implementing master settings dialog
-
-    // ========================================================================
     // SCROLL REFS: For auto-scroll functionality
     // ========================================================================
     const timelineScrollRef = useRef<HTMLDivElement>(null);

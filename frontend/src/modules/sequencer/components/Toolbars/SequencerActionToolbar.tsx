@@ -2,16 +2,21 @@
  * SequencerActionToolbar - Toolbar for sequencer operations
  *
  * Unified pill strip — mirrors the transport toolbar visual language.
- * Four logical sections separated by hairline dividers:
+ * Five logical sections separated by hairline dividers:
  *   [+ Track] | [Undo · Redo] | [Zoom −·%·+] | [Snap] | [Grid ──]
  *
- * Active state convention: bg-primary/20 + text-primary
+ * Active state: use `active` prop on IconButton — no manual className conditionals.
  */
 
 import { useState, useCallback } from "react";
 import { Plus, ZoomIn, ZoomOut, Grid3x3, Undo2, Redo2 } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
-import { cn } from "@/lib/utils.ts";
+import {
+    ToolbarPill,
+    ToolbarDivider,
+    ToolbarGroup,
+    ToolbarSection,
+} from "@/components/ui/toolbar-primitive.tsx";
 import {
     Select,
     SelectContent,
@@ -19,13 +24,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select.tsx";
-import { useDAWStore } from '@/stores/dawStore';
+import { useDAWStore } from "@/stores/dawStore";
 import { SequencerTrackTypeDialog } from "../Dialogs/SequencerTrackTypeDialog.tsx";
-
-/** Thin full-height hairline divider between strip sections */
-function StripDivider() {
-    return <div className="w-px self-stretch bg-border/30 flex-shrink-0" />;
-}
 
 export function SequencerActionToolbar() {
     const activeComposition = useDAWStore(state => state.activeComposition);
@@ -66,34 +66,28 @@ export function SequencerActionToolbar() {
 
     return (
         <>
-            {/* ── Single unified pill ──────────────────────────────────────────── */}
-            <div className="flex items-center h-10 rounded-lg border border-border/30 bg-background/80 overflow-hidden">
+            <ToolbarPill>
 
-                {/* 1. Add Track ──────────────────────────────────────────────────── */}
-                <div className="flex items-center px-2.5 h-full">
+                {/* 1. Add Track */}
+                <ToolbarSection px="px-2.5">
                     <button
                         onClick={handleAddTrack}
                         disabled={!hasComposition}
-                        className={cn(
-                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-medium",
-                            "bg-primary/15 text-primary hover:bg-primary/25 transition-colors",
-                            "disabled:opacity-40 disabled:pointer-events-none"
-                        )}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors disabled:opacity-40 disabled:pointer-events-none"
                     >
                         <Plus size={12} />
                         Track
                     </button>
-                </div>
+                </ToolbarSection>
 
-                <StripDivider />
+                <ToolbarDivider />
 
-                {/* 2. Undo · Redo ────────────────────────────────────────────────── */}
-                <div className="flex items-center px-1.5 gap-0.5">
+                {/* 2. Undo · Redo */}
+                <ToolbarGroup>
                     <IconButton
                         icon={Undo2}
                         tooltip="Undo (Cmd/Ctrl+Z)"
                         onClick={handleUndo}
-                        variant="ghost"
                         size="icon-sm"
                         disabled={!canUndo}
                         className="rounded-sm"
@@ -102,22 +96,20 @@ export function SequencerActionToolbar() {
                         icon={Redo2}
                         tooltip="Redo (Cmd/Ctrl+Shift+Z)"
                         onClick={handleRedo}
-                        variant="ghost"
                         size="icon-sm"
                         disabled={!canRedo}
                         className="rounded-sm"
                     />
-                </div>
+                </ToolbarGroup>
 
-                <StripDivider />
+                <ToolbarDivider />
 
-                {/* 3. Zoom − · % · + ─────────────────────────────────────────────── */}
-                <div className="flex items-center px-1.5 gap-0.5">
+                {/* 3. Zoom − · % · + */}
+                <ToolbarGroup>
                     <IconButton
                         icon={ZoomOut}
                         tooltip="Zoom out timeline"
                         onClick={() => setZoom(Math.max(0.25, zoom - 0.25))}
-                        variant="ghost"
                         size="icon-sm"
                         disabled={!hasComposition || zoom <= 0.25}
                         className="rounded-sm"
@@ -129,32 +121,31 @@ export function SequencerActionToolbar() {
                         icon={ZoomIn}
                         tooltip="Zoom in timeline"
                         onClick={() => setZoom(Math.min(4, zoom + 0.25))}
-                        variant="ghost"
                         size="icon-sm"
                         disabled={!hasComposition || zoom >= 4}
                         className="rounded-sm"
                     />
-                </div>
+                </ToolbarGroup>
 
-                <StripDivider />
+                <ToolbarDivider />
 
-                {/* 4. Snap toggle ─────────────────────────────────────────────────── */}
-                <div className="flex items-center px-1.5">
+                {/* 4. Snap toggle */}
+                <ToolbarGroup px="px-1.5" gap="gap-0">
                     <IconButton
                         icon={Grid3x3}
                         tooltip={snapEnabled ? "Snap to grid: ON" : "Snap to grid: OFF"}
                         onClick={() => setSnapEnabled(!snapEnabled)}
-                        variant="ghost"
+                        active={snapEnabled}
                         size="icon-sm"
                         disabled={!hasComposition}
-                        className={cn("rounded-sm", snapEnabled && "bg-primary/20 text-primary")}
+                        className="rounded-sm"
                     />
-                </div>
+                </ToolbarGroup>
 
-                <StripDivider />
+                <ToolbarDivider />
 
-                {/* 5. Grid size select ────────────────────────────────────────────── */}
-                <div className="flex items-center px-2 gap-1.5 h-full">
+                {/* 5. Grid size select */}
+                <ToolbarSection px="px-2">
                     <span className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider select-none">
                         Grid
                     </span>
@@ -175,8 +166,8 @@ export function SequencerActionToolbar() {
                             <SelectItem value="32">1/32</SelectItem>
                         </SelectContent>
                     </Select>
-                </div>
-            </div>
+                </ToolbarSection>
+            </ToolbarPill>
 
             {/* Dialogs owned by toolbar */}
             <SequencerTrackTypeDialog

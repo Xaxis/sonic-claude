@@ -15,6 +15,8 @@
 import { useState } from "react";
 import { Settings, ChevronUp, ChevronDown, PanelRightClose, PanelLeft, PanelRight, Pin } from "lucide-react";
 import { Panel } from "@/components/ui/panel";
+import { IconButton } from "@/components/ui/icon-button";
+import { Separator } from "@/components/ui/separator";
 import { SettingsModal } from "@/components/settings";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { cn } from "@/lib/utils";
@@ -22,12 +24,6 @@ import type { PanelConfig } from "./PanelGridItem";
 
 interface RightColumnProps {
     panels: PanelConfig[];
-}
-
-// ─── Divider (mirrors NavSidebar's NavDivider) ────────────────────────────────
-
-function Divider() {
-    return <div className="mx-2 h-px bg-border/40 flex-shrink-0" />;
 }
 
 // ─── Minimized chip strip (expanded view only) ────────────────────────────────
@@ -87,20 +83,20 @@ function PinnedPanelCard({
                 className="h-full"
                 headerActions={
                     <>
-                        <button
+                        <IconButton
+                            icon={ChevronUp}
+                            tooltip="Minimize to tab"
                             onClick={onMinimize}
-                            title="Minimize to tab"
-                            className="hover:bg-primary/20 cursor-pointer touch-manipulation rounded p-2 transition-colors"
-                        >
-                            <ChevronUp className="h-4 w-4" />
-                        </button>
-                        <button
+                            variant="ghost"
+                            size="icon-xs"
+                        />
+                        <IconButton
+                            icon={PanelRightClose}
+                            tooltip="Restore to grid"
                             onClick={onUnpin}
-                            title="Restore to grid"
-                            className="hover:bg-primary/20 cursor-pointer touch-manipulation rounded p-2 transition-colors"
-                        >
-                            <PanelRightClose className="h-4 w-4" />
-                        </button>
+                            variant="ghost"
+                            size="icon-xs"
+                        />
                     </>
                 }
             >
@@ -151,13 +147,13 @@ export function RightColumn({ panels }: RightColumnProps) {
                         <span className="text-xs font-bold tracking-widest uppercase text-muted-foreground">
                             Pinned
                         </span>
-                        <button
+                        <IconButton
+                            icon={Settings}
+                            tooltip="Settings (⌘,)"
                             onClick={() => setSettingsOpen(true)}
-                            title="Settings (⌘,)"
-                            className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded hover:bg-muted/30"
-                        >
-                            <Settings className="h-4 w-4" />
-                        </button>
+                            variant="ghost"
+                            size="icon-xs"
+                        />
                     </>
                 )}
             </div>
@@ -227,7 +223,7 @@ export function RightColumn({ panels }: RightColumnProps) {
             )}
 
             {/* ── Collapse / Expand toggle (mirrors NavSidebar) ─────────────── */}
-            <Divider />
+            <Separator className="mx-2 flex-shrink-0" />
             <button
                 className={cn(
                     "w-full flex items-center transition-colors duration-150",

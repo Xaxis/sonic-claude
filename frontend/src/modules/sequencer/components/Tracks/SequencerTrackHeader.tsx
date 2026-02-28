@@ -10,10 +10,11 @@
  */
 
 import { useState } from "react";
-import {  Trash2, Edit2, Check, X, MoreVertical, Copy, Settings, ChevronDown } from "lucide-react";
-import { IconButton } from "@/components/ui/icon-button.tsx";
-import { ControlRow } from "@/components/ui/control-row.tsx";
-import { Badge }       from "@/components/ui/badge.tsx";
+import {  Trash2, Edit2, MoreVertical, Copy, Settings, ChevronDown } from "lucide-react";
+import { IconButton }    from "@/components/ui/icon-button.tsx";
+import { ControlRow }    from "@/components/ui/control-row.tsx";
+import { Badge }         from "@/components/ui/badge.tsx";
+import { EditableText }  from "@/components/ui/editable-text.tsx";
 import { cn } from "@/lib/utils.ts";
 import { SequencerInstrumentSelector } from "../Instruments/SequencerInstrumentSelector.tsx";
 import { TrackButton } from "@/components/ui/track-button.tsx";
@@ -182,26 +183,18 @@ export function SequencerTrackHeader({
                     {/* Track Name - Always visible, click to expand, right-click/long-press for AI */}
                     <div
                         className={cn("flex-1 min-w-0 cursor-pointer transition-all", highlightClass)}
-                        onClick={() => onToggleExpand?.(track.id)}
+                        onClick={() => !isEditing && onToggleExpand?.(track.id)}
                         title="Click to expand • Right-click or long-press for AI"
                         {...aiHandlers}
                     >
-                        {isEditing ? (
-                            <input
-                                type="text"
-                                value={editName}
-                                onChange={(e) => setEditName(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") handleSaveEdit();
-                                    if (e.key === "Escape") handleCancelEdit();
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                autoFocus
-                                className="w-full px-1.5 py-0.5 text-xs font-medium bg-background border border-primary rounded"
-                            />
-                        ) : (
-                            <div className="text-sm font-medium truncate">{track.name}</div>
-                        )}
+                        <EditableText
+                            value={editName}
+                            isEditing={isEditing}
+                            onChange={setEditName}
+                            onSave={handleSaveEdit}
+                            onCancel={handleCancelEdit}
+                            inputSize="text-xs"
+                        />
                     </div>
 
                     {/* Mute/Solo - Always visible */}
@@ -240,27 +233,14 @@ export function SequencerTrackHeader({
                         </Badge>
 
                         <div className="flex-1 min-w-0">
-                            {isEditing ? (
-                                <div className="flex items-center gap-1">
-                                    <input
-                                        type="text"
-                                        value={editName}
-                                        onChange={(e) => setEditName(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === "Enter") handleSaveEdit();
-                                            if (e.key === "Escape") handleCancelEdit();
-                                        }}
-                                        autoFocus
-                                        className="flex-1 px-1.5 py-0.5 text-sm font-medium bg-background border border-primary rounded"
-                                    />
-                                    <IconButton icon={Check} onClick={handleSaveEdit} size="icon-xs" variant="ghost" tooltip="Save" />
-                                    <IconButton icon={X} onClick={handleCancelEdit} size="icon-xs" variant="ghost" tooltip="Cancel" />
-                                </div>
-                            ) : (
-                                <div className="text-sm font-medium truncate">
-                                    {track.name}
-                                </div>
-                            )}
+                            <EditableText
+                                value={editName}
+                                isEditing={isEditing}
+                                onChange={setEditName}
+                                onSave={handleSaveEdit}
+                                onCancel={handleCancelEdit}
+                                showButtons
+                            />
                         </div>
                     </div>
 

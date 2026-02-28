@@ -36,6 +36,12 @@ export interface IconButtonProps
     tooltipSide?: "top" | "bottom" | "left" | "right";
     /** Whether tooltip is disabled */
     disableTooltip?: boolean;
+    /**
+     * Toggle active state — applies bg-primary/20 + text-primary styling.
+     * Use for icon buttons that represent a toggleable mode (loop, snap, etc.)
+     * instead of applying the class manually every call-site.
+     */
+    active?: boolean;
 }
 
 export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
@@ -46,6 +52,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
             iconSize = "h-4 w-4",
             tooltipSide = "top",
             disableTooltip = false,
+            active = false,
             className,
             variant = "ghost",
             size = "icon",
@@ -58,8 +65,9 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
                 ref={ref}
                 variant={variant}
                 size={size}
-                className={cn(className)}
+                className={cn(active && "bg-primary/20 text-primary", className)}
                 aria-label={tooltip}
+                aria-pressed={active}
                 {...props}
             >
                 <Icon className={iconSize} />

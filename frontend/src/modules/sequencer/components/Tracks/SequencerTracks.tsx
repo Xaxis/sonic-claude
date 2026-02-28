@@ -11,6 +11,7 @@
  */
 
 import { Volume2 } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state.tsx";
 import { useState } from "react";
 import { SequencerTrackHeader } from "././SequencerTrackHeader.tsx";
 import { useDAWStore } from '@/stores/dawStore';
@@ -90,15 +91,11 @@ export function SequencerTracks({
     return (
         <div className="flex flex-col h-full">
             {tracks.length === 0 ? (
-                <div className="relative flex flex-col items-center justify-center p-8 text-center h-full">
-                    <div className="text-muted-foreground h-full">
-                        <Volume2 size={48} className="mx-auto mb-4 opacity-20" />
-                        <div className="text-base font-medium mb-1">No tracks yet</div>
-                        <div className="text-xs text-muted-foreground/70">
-                            Add a track to start sequencing
-                        </div>
-                    </div>
-                </div>
+                <EmptyState
+                    icon={<Volume2 size={48} className="opacity-20" />}
+                    title="No tracks yet"
+                    description="Add a track to start sequencing"
+                />
             ) : (
                 tracks.map((track) => (
                     <SequencerTrackHeader

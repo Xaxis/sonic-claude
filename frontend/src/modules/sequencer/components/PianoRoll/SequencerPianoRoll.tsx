@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { X, Music, SlidersHorizontal, Navigation } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
-import { cn } from "@/lib/utils.ts";
+import { EmptyState } from "@/components/ui/empty-state.tsx";
 import { EditorTabBar } from "@/components/ui/editor-tab-bar.tsx";
 import { SequencerPianoRollKeyboard } from "./SequencerPianoRollKeyboard.tsx";
 import { SequencerPianoRollGrid } from "./SequencerPianoRollGrid.tsx";
@@ -94,30 +94,22 @@ export function SequencerPianoRoll({
     // No clip selected
     if (!clip) {
         return (
-            <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center overflow-hidden min-h-0 min-w-0">
-                <div className="text-muted-foreground">
-                    <Music size={48} className="mx-auto mb-4 opacity-20" />
-                    <div className="text-base font-medium mb-1">No MIDI Clip Selected</div>
-                    <div className="text-xs text-muted-foreground/70">
-                        Double-click a MIDI clip in the timeline above to open it in the piano roll editor.
-                    </div>
-                </div>
-            </div>
+            <EmptyState
+                icon={<Music size={48} className="opacity-20" />}
+                title="No MIDI Clip Selected"
+                description="Double-click a MIDI clip in the timeline above to open it in the piano roll editor."
+            />
         );
     }
 
     // Invalid clip type (audio clip)
     if (clip.type !== "midi") {
         return (
-            <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center overflow-hidden min-h-0 min-w-0">
-                <div className="text-muted-foreground">
-                    <Music size={48} className="mx-auto mb-4 opacity-20" />
-                    <div className="text-base font-medium mb-1">Audio Clip Selected</div>
-                    <div className="text-xs text-muted-foreground/70">
-                        Piano roll only works with MIDI clips. The selected clip is an audio clip.
-                    </div>
-                </div>
-            </div>
+            <EmptyState
+                icon={<Music size={48} className="opacity-20" />}
+                title="Audio Clip Selected"
+                description="Piano roll only works with MIDI clips. The selected clip is an audio clip."
+            />
         );
     }
 
@@ -155,7 +147,7 @@ export function SequencerPianoRoll({
                             onClick={togglePianoRollFollow}
                             variant="ghost"
                             size="icon-sm"
-                            className={cn(followPlayback && "bg-primary/20 text-primary")}
+                            active={followPlayback}
                         />
                         {/* Close */}
                         <IconButton

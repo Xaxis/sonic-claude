@@ -12,8 +12,8 @@
  */
 
 import { useEffect, useRef } from "react";
-import { cn } from "@/lib/utils";
 import { useDAWStore } from "@/stores/dawStore";
+import { StatusDot } from "@/components/ui/status-dot";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -105,15 +105,8 @@ export function SequencerTransportTimer() {
         <div className="flex flex-col justify-center pl-3 pr-4 h-full select-none min-w-[132px]">
             {/* Row 1: status dot + musical position */}
             <div className="flex items-center gap-1.5">
-                <span
-                    className={cn(
-                        "w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors duration-200",
-                        isPlaying && !isPaused
-                            ? "bg-red-500 animate-pulse"
-                            : isPaused
-                            ? "bg-yellow-400"
-                            : "bg-muted-foreground/25"
-                    )}
+                <StatusDot
+                    status={isPlaying && !isPaused ? "playing" : isPaused ? "paused" : "idle"}
                 />
                 <span
                     ref={musicalRef}

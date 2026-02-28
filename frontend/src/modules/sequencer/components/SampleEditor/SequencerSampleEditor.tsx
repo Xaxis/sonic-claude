@@ -25,28 +25,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Music, X } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
+import { EmptyState } from "@/components/ui/empty-state.tsx";
 import { useDAWStore } from "@/stores/dawStore";
 import { useWaveformData } from "../../hooks/useWaveformData.ts";
 import { SampleEditorControls, SAMPLE_EDITOR_SIDEBAR_WIDTH } from "./SampleEditorControls.tsx";
 import { SampleEditorRuler } from "./SampleEditorRuler.tsx";
 import { SampleEditorWaveform } from "./SampleEditorWaveform.tsx";
 import { SAMPLE_EDITOR_PIXELS_PER_SECOND } from "@/config/daw.constants";
-
-// ============================================================================
-// EMPTY STATE (shared across all guard branches)
-// ============================================================================
-
-function EmptyState({ icon, title, children }: { icon: React.ReactNode; title: string; children?: React.ReactNode }) {
-    return (
-        <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center overflow-hidden">
-            <div className="text-muted-foreground/30 mb-4">{icon}</div>
-            <div className="text-sm font-medium text-muted-foreground mb-1">{title}</div>
-            {children && (
-                <div className="text-xs text-muted-foreground/60 max-w-xs">{children}</div>
-            )}
-        </div>
-    );
-}
 
 // ============================================================================
 // MAIN COMPONENT
@@ -116,23 +101,29 @@ export function SequencerSampleEditor({}: SequencerSampleEditorProps) {
     // ========================================================================
     if (!clip) {
         return (
-            <EmptyState icon={<Music size={48} />} title="No Audio Clip Selected">
-                Click an audio clip in the timeline to open it here.
-            </EmptyState>
+            <EmptyState
+                icon={<Music size={48} />}
+                title="No Audio Clip Selected"
+                description="Click an audio clip in the timeline to open it here."
+            />
         );
     }
     if (clip.type !== "audio") {
         return (
-            <EmptyState icon={<Music size={48} />} title="MIDI Clip">
-                Open the Piano Roll to edit MIDI clips.
-            </EmptyState>
+            <EmptyState
+                icon={<Music size={48} />}
+                title="MIDI Clip"
+                description="Open the Piano Roll to edit MIDI clips."
+            />
         );
     }
     if (!clip.audio_file_path) {
         return (
-            <EmptyState icon={<Music size={48} />} title="No Audio File">
-                This clip has no associated audio file.
-            </EmptyState>
+            <EmptyState
+                icon={<Music size={48} />}
+                title="No Audio File"
+                description="This clip has no associated audio file."
+            />
         );
     }
 

@@ -16,8 +16,9 @@ import { useState } from "react";
 import { useDAWStore }        from "@/stores/dawStore";
 import { ChannelStrip }       from "@/components/ui/channel-strip.tsx";
 import { ChannelStripHeader } from "@/components/ui/channel-strip-header.tsx";
-import { EffectSlot }    from "./EffectSlot";
-import { EffectSelector } from "./EffectSelector";
+import { EmptyState }         from "@/components/ui/empty-state.tsx";
+import { EffectSlot }         from "./EffectSlot";
+import { EffectSelector }     from "./EffectSelector";
 
 interface EffectsChannelStripProps {
     trackId: string; // ✅ Identifier - acceptable
@@ -73,15 +74,11 @@ export function EffectsChannelStrip({ trackId }: EffectsChannelStripProps) {
             {/* Effects Chain - Scrollable with Drag and Drop */}
             <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
                 {sortedEffects.length === 0 ? (
-                    // Empty state
-                    <div className="flex flex-1 items-center justify-center">
-                        <div className="text-center space-y-2">
-                            <div className="text-2xl opacity-20">⚡</div>
-                            <p className="text-[9px] text-muted-foreground">
-                                No Effects
-                            </p>
-                        </div>
-                    </div>
+                    <EmptyState
+                        icon={<span className="text-2xl">⚡</span>}
+                        title="No Effects"
+                        description="Add an effect below to get started"
+                    />
                 ) : (
                     // Effect slots with native drag and drop
                     sortedEffects.map((effect) => {

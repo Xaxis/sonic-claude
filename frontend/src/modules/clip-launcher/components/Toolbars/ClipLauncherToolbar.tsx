@@ -17,7 +17,9 @@ import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Play, Pause, SkipBack, Square, Plus, Minus, Circle, Grid3x3, Gamepad2, ListTree } from 'lucide-react';
+import { ToggleButtonGroup } from '@/components/ui/toggle-button-group';
+import { LabelValue } from '@/components/ui/label-value';
+import { Play, Square, Plus, Minus, Circle, Grid3x3, Gamepad2, ListTree } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -200,19 +202,14 @@ export function ClipLauncherToolbar() {
 
                 {/* Position & Tempo */}
                 <div className="flex items-center gap-3 px-3 py-1 rounded-md bg-muted/30 border border-border/30">
-                    <div className="flex flex-col">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-                            Position
-                        </span>
-                        <span className="text-xs font-mono font-bold text-foreground">
-                            {formatTime(currentTime)}
-                        </span>
-                    </div>
+                    <LabelValue
+                        label="Position"
+                        value={formatTime(currentTime)}
+                        orientation="vertical"
+                    />
                     <Separator orientation="vertical" className="h-6" />
                     <div className="flex flex-col gap-0.5">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-                            Tempo
-                        </span>
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">Tempo</span>
                         <div className="flex items-center gap-1">
                             <Input
                                 type="number"
@@ -232,30 +229,14 @@ export function ClipLauncherToolbar() {
             {/* Right: Clip Launcher Controls */}
             <div className="flex items-center gap-2">
                 {/* MODE TOGGLE: PAD VIEW ↔ ASSIGNMENT VIEW */}
-                <div className="flex items-center gap-0.5 p-0.5 rounded-md bg-muted/30 border border-border/30">
-                    <Button
-                        variant={clipLauncherMode === "pad" ? "default" : "ghost"}
-                        size="sm"
-                        className="h-7 gap-1.5 px-2"
-                        onClick={() => setClipLauncherMode("pad")}
-                    >
-                        <Gamepad2 size={14} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">
-                            Pad View
-                        </span>
-                    </Button>
-                    <Button
-                        variant={clipLauncherMode === "assignment" ? "default" : "ghost"}
-                        size="sm"
-                        className="h-7 gap-1.5 px-2"
-                        onClick={() => setClipLauncherMode("assignment")}
-                    >
-                        <ListTree size={14} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">
-                            Assignment
-                        </span>
-                    </Button>
-                </div>
+                <ToggleButtonGroup
+                    value={clipLauncherMode}
+                    onChange={setClipLauncherMode}
+                    options={[
+                        { value: "pad",        label: "Pad View",   icon: Gamepad2 },
+                        { value: "assignment", label: "Assignment",  icon: ListTree },
+                    ]}
+                />
 
                 {/* Launch Quantization */}
                 <DropdownMenu>
