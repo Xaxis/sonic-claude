@@ -25,6 +25,7 @@ import {
     Zap,
     Radio,
     Layout,
+    LibraryBig,
     Plus,
     Scan,
     ChevronLeft,
@@ -50,6 +51,7 @@ type IconComp = React.ComponentType<LucideProps>;
 const TAB_ICON_REGISTRY: Record<string, IconComp> = {
     compose:  LayoutDashboard,   // Sequencer + Mixer + Effects grid
     interact: Zap,               // Input + Visualizer + AI assistant
+    browse:   LibraryBig,        // Sound & instrument browser
     perform:  Radio,             // Clip Launcher performance mode
 };
 

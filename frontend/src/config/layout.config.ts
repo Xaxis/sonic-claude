@@ -53,7 +53,8 @@ import { MixerPanel } from "@/modules/mixer";
 import { EffectsPanel } from "@/modules/effects";
 import { AssistantPanel } from "@/modules/assistant";
 import { ClipLauncherPanel } from "@/modules/clip-launcher";
-import { FolderOpen, Activity, AlignJustify, SlidersHorizontal, Wand2, Bot, LayoutGrid } from "lucide-react";
+import { SoundBrowserPanel } from "@/modules/browser";
+import { FolderOpen, Activity, AlignJustify, SlidersHorizontal, Wand2, Bot, LayoutGrid, LibraryBig } from "lucide-react";
 
 /**
  * Grid Layout Settings
@@ -148,6 +149,20 @@ export const DEFAULT_PANELS: PanelConfig[] = [
         defaultLayout: { x: 0, y: 38, w: 12, h: 16 },
     },
 
+    // ===== BROWSE TAB =====
+    // Sound & instrument library
+
+    {
+        id: "sound-browser",
+        title: "BROWSER",
+        icon: LibraryBig,
+        component: createElement(SoundBrowserPanel),
+        closeable: false,
+        pinnable: true,
+        getSubtitle: () => "Sounds · Drums · Instruments · Samples",
+        defaultLayout: { x: 0, y: 0, w: 5, h: 12 },
+    },
+
     // ===== PERFORM TAB =====
     // Live performance mode
 
@@ -185,6 +200,13 @@ export const DEFAULT_TABS = [
             "input",
             "visualizer",
             "ai"
+        ],
+    },
+    {
+        id: "browse",
+        name: "BROWSE",
+        panelIds: [
+            "sound-browser",
         ],
     },
     {
