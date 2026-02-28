@@ -120,7 +120,7 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
                     <>
                         <div
                             className={cn(
-                                "from-primary/5 to-secondary/5 border-primary/10 flex items-center justify-between border-b bg-gradient-to-r px-4 py-3",
+                                "from-primary/5 to-secondary/5 border-primary/10 flex items-center justify-between border-b bg-gradient-to-r px-3 py-2",
                                 draggable && "drag-handle cursor-move"
                             )}
                         >
@@ -140,7 +140,7 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
                                                     e.stopPropagation();
                                                     onMaximize();
                                                 }}
-                                                className="hover:bg-primary/20 cursor-pointer touch-manipulation rounded p-2 transition-colors"
+                                                className="hover:bg-primary/20 cursor-pointer touch-manipulation rounded p-1.5 transition-colors"
                                                 aria-label={isMaximized ? "Minimize panel" : "Maximize panel"}
                                                 title={isMaximized ? "Minimize panel" : "Maximize panel"}
                                             >
@@ -157,7 +157,7 @@ export const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
                                                     e.stopPropagation();
                                                     onClose?.();
                                                 }}
-                                                className="hover:bg-destructive/20 cursor-pointer touch-manipulation rounded p-2 transition-colors"
+                                                className="hover:bg-destructive/20 cursor-pointer touch-manipulation rounded p-1.5 transition-colors"
                                                 aria-label="Close panel"
                                             >
                                                 <X className="h-4 w-4" />

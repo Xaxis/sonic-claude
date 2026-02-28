@@ -120,7 +120,7 @@ export function SlotCard({
 
                 {/* Drag handle */}
                 <GripVertical
-                    size={10}
+                    size={12}
                     className="flex-shrink-0 text-muted-foreground/25 hover:text-muted-foreground/70 cursor-grab active:cursor-grabbing"
                 />
 
@@ -133,7 +133,7 @@ export function SlotCard({
                     style={active ? { color: accentColor ?? THEME_PRIMARY_HSL } : undefined}
                 >
                     <Power
-                        size={10}
+                        size={12}
                         className={cn(!active && "text-muted-foreground/35")}
                     />
                 </button>

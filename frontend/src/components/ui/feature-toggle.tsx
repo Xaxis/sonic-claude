@@ -71,7 +71,7 @@ export function FeatureToggle({
     label,
     active,
     color     = "primary",
-    iconSize  = 11,
+    iconSize  = 12,
     className,
     type      = "button",
     ...props

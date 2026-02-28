@@ -157,7 +157,7 @@ function Handle({ pct, variant, side, onMouseDown }: HandleProps) {
             {/* Label (start/end indicator on hover) */}
             <div
                 className={cn(
-                    "absolute top-5 text-[8px] font-mono uppercase tracking-wider opacity-0 group-hover/handle:opacity-100 transition-opacity whitespace-nowrap pointer-events-none",
+                    "absolute top-5 text-[9px] font-mono uppercase tracking-wider opacity-0 group-hover/handle:opacity-100 transition-opacity whitespace-nowrap pointer-events-none",
                     isLoop ? "text-accent" : "text-white/70",
                     side === "start" ? "left-2" : "right-2 translate-x-full",
                 )}

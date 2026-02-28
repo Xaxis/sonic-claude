@@ -18,6 +18,7 @@
 import { useState, useEffect } from "react";
 import {
     LayoutGrid,
+    Monitor,
     Music2,
     Music,
     SlidersHorizontal,
@@ -35,12 +36,14 @@ import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useDAWStore } from "@/stores/dawStore";
+import { DENSITY_PRESETS } from "@/config/ui-density.constants";
 
 // ============================================================================
 // SECTION REGISTRY
 // ============================================================================
 
 type SectionId =
+    | "appearance"
     | "sequencer"
     | "playback"
     | "notes"
@@ -56,6 +59,7 @@ interface SectionDef {
 }
 
 const SECTIONS: SectionDef[] = [
+    { id: "appearance", label: "Appearance",   icon: Monitor },
     { id: "sequencer",  label: "Sequencer",    icon: LayoutGrid },
     { id: "playback",   label: "Playback",      icon: Music2 },
     { id: "notes",      label: "MIDI Notes",    icon: Music },
@@ -208,6 +212,80 @@ function SettingSegment<T extends string>({
 // ============================================================================
 // SECTION CONTENT COMPONENTS
 // ============================================================================
+
+function AppearanceSection() {
+    const uiDensity    = useSettingsStore(s => s.uiDensity);
+    const setUIDensity = useSettingsStore(s => s.setUIDensity);
+
+    const [localDensity, setLocalDensity] = useState(uiDensity);
+    useEffect(() => { setLocalDensity(uiDensity); }, [uiDensity]);
+
+    return (
+        <div>
+            <SettingGroup title="UI Density" />
+            <div className="py-2 text-xs text-muted-foreground/60 leading-relaxed mb-3">
+                Controls the html base font-size. All rem-based sizes (spacing, text, component
+                heights) scale proportionally. Pixel values — borders, shadows, canvas output —
+                stay crisp and unchanged.
+            </div>
+
+            {/* Density presets */}
+            <SettingRow label="Preset" description="Choose a named density level.">
+                <div className="flex rounded border border-border/60 overflow-hidden">
+                    {DENSITY_PRESETS.map((preset, i) => (
+                        <button
+                            key={preset.value}
+                            onClick={() => { setUIDensity(preset.value); setLocalDensity(preset.value); }}
+                            className={cn(
+                                "px-3 py-1.5 text-xs font-medium transition-colors",
+                                i > 0 && "border-l border-border/60",
+                                uiDensity === preset.value
+                                    ? "bg-primary/15 text-primary"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/30",
+                            )}
+                            title={preset.description}
+                        >
+                            {preset.label}
+                        </button>
+                    ))}
+                </div>
+            </SettingRow>
+
+            {/* Fine-grained slider */}
+            <SettingRow label="Fine Adjustment" description="Exact density multiplier (0.70 – 1.0).">
+                <div className="flex items-center gap-3 w-48">
+                    <Slider
+                        value={[localDensity * 100]}
+                        onValueChange={([v]) => setLocalDensity(v / 100)}
+                        onValueCommit={([v]) => setUIDensity(v / 100)}
+                        min={70}
+                        max={100}
+                        step={5}
+                        className="flex-1"
+                    />
+                    <span className="text-xs tabular-nums text-muted-foreground w-10 text-right font-mono">
+                        {Math.round(localDensity * 100)}%
+                    </span>
+                </div>
+            </SettingRow>
+
+            {/* Reference info */}
+            <div className="mt-4 p-3 rounded bg-muted/20 border border-border/30 space-y-1.5">
+                {DENSITY_PRESETS.map((p) => (
+                    <div key={p.value} className="flex items-center gap-2">
+                        <span className={cn(
+                            "text-xs font-medium w-16 flex-shrink-0",
+                            uiDensity === p.value ? "text-primary" : "text-muted-foreground",
+                        )}>
+                            {p.label}
+                        </span>
+                        <span className="text-xs text-muted-foreground/60">{p.description}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 function SequencerSection() {
     const snapEnabled   = useDAWStore(s => s.snapEnabled);
@@ -757,6 +835,7 @@ function ShortcutsSection() {
 
 // Map section ID to its content component
 const SECTION_CONTENT: Record<SectionId, React.ComponentType> = {
+    appearance: AppearanceSection,
     sequencer: SequencerSection,
     playback:  PlaybackSection,
     notes:     NotesSection,

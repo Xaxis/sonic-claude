@@ -4,6 +4,28 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * UI Density
+ *
+ * --ui-density controls the html base font-size, which scales all rem-based
+ * Tailwind utilities (spacing, text sizes, component heights) proportionally.
+ * This is different from browser zoom: pixel values (borders, shadows, fixed px
+ * widths, canvas output) remain crisp and unchanged.
+ *
+ * 1.0  → 16px base (standard web)
+ * 0.875 → 14px base (compact DAW — recommended default)
+ * 0.75 → 12px base (dense)
+ *
+ * Changed at runtime via: document.documentElement.style.setProperty('--ui-density', '0.875')
+ */
+:root {
+  --ui-density: 0.875;
+}
+
+html {
+  font-size: calc(16px * var(--ui-density));
+}
+
 @theme {
   --color-background: hsl(220 15% 6%);
   --color-foreground: hsl(220 10% 92%);

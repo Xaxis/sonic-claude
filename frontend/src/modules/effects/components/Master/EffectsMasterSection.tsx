@@ -24,7 +24,7 @@ export function EffectsMasterSection() {
                 <div className="text-center space-y-2">
                     <div className="text-2xl opacity-20">⚡</div>
                     <p className="text-[9px] text-muted-foreground">Master Effects</p>
-                    <p className="text-[8px] text-muted-foreground/50">Coming Soon</p>
+                    <p className="text-[9px] text-muted-foreground/50">Coming Soon</p>
                 </div>
             </div>
         </ChannelStrip>

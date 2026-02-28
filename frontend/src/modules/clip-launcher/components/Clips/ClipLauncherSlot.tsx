@@ -201,7 +201,7 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                     <div className="relative h-full flex flex-col justify-between gap-1">
                         {/* Top: Clip name + Playing indicator */}
                         <div className="flex items-start justify-between gap-1">
-                            <div className="text-[8px] font-bold text-white/90 truncate leading-tight drop-shadow flex-1">
+                            <div className="text-[9px] font-bold text-white/90 truncate leading-tight drop-shadow flex-1">
                                 {clip.name}
                             </div>
                             {isPlaying && (
@@ -224,7 +224,7 @@ export function ClipLauncherSlot({ trackIndex, slotIndex }: ClipLauncherSlotProp
                         )}
 
                         {/* Bottom: Type + Duration */}
-                        <div className="flex items-center justify-between text-[7px] text-white/70">
+                        <div className="flex items-center justify-between text-[9px] text-white/70">
                             <span className="uppercase font-bold">{clip.type}</span>
                             {clip.duration && (
                                 <span className="font-mono">{clip.duration.toFixed(1)}s</span>

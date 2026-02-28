@@ -32,6 +32,7 @@ import { ActivityContainer } from "@/components/activity";
 import { CompositionLoader } from "@/components/composition/CompositionLoader";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { useDAWStore } from "@/stores/dawStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { useAutosave } from "@/hooks/useAutosave";
 import { DEFAULT_PANELS } from "@/config/layout.config";
 
@@ -47,6 +48,12 @@ export default function App() {
         initialize();
         loadSynthDefs();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ── UI Density — sync persisted setting to CSS custom property ────────────
+    const uiDensity = useSettingsStore(s => s.uiDensity);
+    useEffect(() => {
+        document.documentElement.style.setProperty('--ui-density', String(uiDensity));
+    }, [uiDensity]);
 
     // ── Autosave ──────────────────────────────────────────────────────────────
     useAutosave();

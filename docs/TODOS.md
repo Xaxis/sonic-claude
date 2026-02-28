@@ -33,3 +33,11 @@
 ...
 
 DAWs are highly detail oriented apps in terms of UI/UX, which usually means smaller fonts, icons, ui/ux.. Research critically and add a setting in which user can dynamically scale the size of the UI/UX, including font sizes, etc (downwards) specifically. We really want to rebuild our interface structures so they are visually more compact but why were at it we might as well enable dynamic adjustment so the user can (and us) can determine what works.
+
+...
+
+Maybe "mimic" feature should be implemented by attaching a file or clip to the chat interface? DO research, both in terms of how this should work, etc... Is it even possible to feed in sound and have our LLM system to appropriately mimic whatever the clip may be to a reasonable degree of accuracy and fidelity?
+
+...
+
+Rebuild our meager "instruments" dropdown into a complete "collections" library system, because we need to actually build out every possible sound (Sounds, Drums, Instruments, etc.) that a user would ever need. I am thinking possibly this needs to be its own panel for starters, what do you think? Which features to you envision?

@@ -201,7 +201,7 @@ export function ClipLauncherToolbar() {
                 {/* Position & Tempo */}
                 <div className="flex items-center gap-3 px-3 py-1 rounded-md bg-muted/30 border border-border/30">
                     <div className="flex flex-col">
-                        <span className="text-[8px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                             Position
                         </span>
                         <span className="text-xs font-mono font-bold text-foreground">
@@ -210,7 +210,7 @@ export function ClipLauncherToolbar() {
                     </div>
                     <Separator orientation="vertical" className="h-6" />
                     <div className="flex flex-col gap-0.5">
-                        <span className="text-[8px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                             Tempo
                         </span>
                         <div className="flex items-center gap-1">

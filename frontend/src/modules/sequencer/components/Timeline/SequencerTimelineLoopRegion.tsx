@@ -139,7 +139,7 @@ export function SequencerTimelineLoopRegion({}: SequencerTimelineLoopRegionProps
                     className="absolute -top-2 -left-2 w-4 h-4 bg-primary rounded-sm flex items-center justify-center hover:bg-primary/80 transition-colors cursor-ew-resize"
                     title="Drag to adjust loop start"
                 >
-                    <span className="text-[8px] text-primary-foreground font-bold">L</span>
+                    <span className="text-[9px] text-primary-foreground font-bold">L</span>
                 </div>
             </div>
             {/* Loop end marker */}
@@ -152,7 +152,7 @@ export function SequencerTimelineLoopRegion({}: SequencerTimelineLoopRegionProps
                     className="absolute -top-2 -left-2 w-4 h-4 bg-primary rounded-sm flex items-center justify-center hover:bg-primary/80 transition-colors cursor-ew-resize"
                     title="Drag to adjust loop end"
                 >
-                    <span className="text-[8px] text-primary-foreground font-bold">R</span>
+                    <span className="text-[9px] text-primary-foreground font-bold">R</span>
                 </div>
             </div>
         </>

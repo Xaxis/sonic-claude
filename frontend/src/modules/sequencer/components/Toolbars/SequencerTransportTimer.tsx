@@ -131,7 +131,7 @@ export function SequencerTransportTimer() {
                 >
                     {clockInit}
                 </span>
-                <span className="font-mono text-[8px] text-muted-foreground/30 leading-none">
+                <span className="font-mono text-[9px] text-muted-foreground/30 leading-none">
                     {beatsPerBar}/{timeSigDen}
                 </span>
             </div>

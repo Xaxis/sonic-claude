@@ -56,7 +56,7 @@ export function EditorTabBar<T extends string = string>({
                         )}
                         title={tab.label}
                     >
-                        <Icon size={11} />
+                        <Icon size={12} />
                         {tab.label}
                     </button>
                 );

@@ -148,15 +148,15 @@ export function SequencerTrackHeader({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-36 mr-2">
                         <DropdownMenuItem onClick={handleStartEdit} className="text-xs py-1">
-                            <Edit2 size={10} className="mr-1.5" />
+                            <Edit2 size={12} className="mr-1.5" />
                             Rename
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-xs py-1">
-                            <Copy size={10} className="mr-1.5" />
+                            <Copy size={12} className="mr-1.5" />
                             Duplicate
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-xs py-1">
-                            <Settings size={10} className="mr-1.5" />
+                            <Settings size={12} className="mr-1.5" />
                             Settings
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
@@ -164,7 +164,7 @@ export function SequencerTrackHeader({
                             onClick={() => onDeleteClick?.(track.id)}
                             className="text-xs py-1 text-red-500 focus:text-red-500"
                         >
-                            <Trash2 size={10} className="mr-1.5" />
+                            <Trash2 size={12} className="mr-1.5" />
                             Delete
                         </DropdownMenuItem>
                     </DropdownMenuContent>

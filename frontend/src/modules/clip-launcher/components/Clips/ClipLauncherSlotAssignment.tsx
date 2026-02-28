@@ -138,7 +138,7 @@ export function ClipLauncherSlotAssignment({ trackIndex, slotIndex }: ClipLaunch
                         className="absolute top-1 right-1 w-4 h-4 rounded-full bg-black/50 hover:bg-destructive/80 flex items-center justify-center transition-colors"
                         title="Clear"
                     >
-                        <X size={8} className="text-white" />
+                        <X size={10} className="text-white" />
                     </button>
                 </>
             ) : (

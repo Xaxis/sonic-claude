@@ -105,6 +105,15 @@ interface SettingsState {
     /** Custom one-click prompt buttons shown at the top of the chat panel. */
     aiQuickCommands: AIQuickCommand[];
 
+    // ── Appearance ────────────────────────────────────────────────────────
+    /**
+     * UI density: multiplier applied to the html base font-size (16px).
+     * 1.0 = standard (16px), 0.875 = compact DAW feel (14px), 0.75 = dense (12px).
+     * All rem-based Tailwind utilities scale with this; pixel values stay fixed.
+     */
+    uiDensity: number;
+    setUIDensity: (v: number) => void;
+
     // ========================================================================
     // ACTIONS
     // ========================================================================
@@ -170,6 +179,9 @@ export const useSettingsStore = create<SettingsState>()(
             aiShowRoutingIntent:    false,
             aiShowMusicalContext:   false,
 
+            // Appearance
+            uiDensity: 0.875,
+
             // AI: Quick Commands
             aiQuickCommands: [
                 { label: "Make Ambient",    prompt: "Recompose this sequence to be more ambient and atmospheric" },
@@ -225,6 +237,7 @@ export const useSettingsStore = create<SettingsState>()(
             setAIShowRoutingIntent: (enabled) => set({ aiShowRoutingIntent: enabled }),
             setAIShowMusicalContext: (enabled) => set({ aiShowMusicalContext: enabled }),
             setAIQuickCommands: (commands) => set({ aiQuickCommands: commands }),
+            setUIDensity: (v) => set({ uiDensity: Math.max(0.70, Math.min(1.0, v)) }),
         }),
         {
             name: "sonic-claude-settings",
