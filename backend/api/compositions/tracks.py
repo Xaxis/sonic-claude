@@ -27,8 +27,9 @@ from backend.services.daw.composition_state_service import CompositionStateServi
 from backend.services.daw.composition_service import CompositionService
 from backend.services.daw.mixer_service import MixerService
 from backend.services.daw.track_effects_service import TrackEffectsService
-from backend.models.sequence import Track
+from backend.models.sequence import Track, KitPad
 from backend.models.instrument_types import ValidInstrument
+from backend.services.daw.registry import get_kit_by_id
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ class CreateTrackRequest(BaseModel):
         None,
         description="Instrument/synth name for MIDI tracks. Must be a valid SynthDef from SYNTHDEF_REGISTRY."
     )
+    kit_id: Optional[str] = None  # Drum kit ID from kit_registry
 
 
 class UpdateTrackRequest(BaseModel):
@@ -69,6 +71,7 @@ class UpdateTrackRequest(BaseModel):
         None,
         description="Instrument/synth name for MIDI tracks. Must be a valid SynthDef from SYNTHDEF_REGISTRY."
     )
+    kit_id: Optional[str] = Field(None, description="Drum kit ID — loads pads and clears instrument")
 
 
 class UpdateTrackMuteRequest(BaseModel):
@@ -116,6 +119,17 @@ async def create_track(
 
         if not track:
             raise ResourceNotFoundError(f"Composition {composition_id} not found")
+
+        # Populate drum kit pad map when kit_id is provided
+        if request.kit_id:
+            kit_def = get_kit_by_id(request.kit_id)
+            if kit_def:
+                track.kit = {
+                    note: KitPad(synthdef=pad["synthdef"], params=pad.get("params", {}))
+                    for note, pad in kit_def["pads"].items()
+                }
+                track.kit_id = request.kit_id
+                logger.info(f"🥁 Loaded drum kit '{kit_def['name']}' ({len(track.kit)} pads) onto track {track.id}")
 
         # AUTO-PERSIST: Keep current.json in sync with memory
         composition_service.auto_persist_composition(
@@ -171,6 +185,25 @@ async def update_track(
 
         if not track:
             raise ResourceNotFoundError(f"Track {track_id} not found in composition {composition_id}")
+
+        # Handle kit swap: load new kit pads and clear instrument,
+        # or clear kit when a plain instrument is being assigned.
+        if request.kit_id is not None:
+            kit_def = get_kit_by_id(request.kit_id)
+            if kit_def:
+                track.kit = {
+                    note: KitPad(synthdef=pad["synthdef"], params=pad.get("params", {}))
+                    for note, pad in kit_def["pads"].items()
+                }
+                track.kit_id = request.kit_id
+                track.instrument = None  # Kit overrides instrument
+                logger.info(f"🥁 Swapped kit to '{kit_def['name']}' on track {track_id}")
+            else:
+                logger.warning(f"Kit '{request.kit_id}' not found — ignoring kit swap")
+        elif request.instrument is not None:
+            # Switching to a plain synth instrument — clear any loaded kit
+            track.kit = None
+            track.kit_id = None
 
         # AUTO-PERSIST: Keep current.json in sync with memory
         composition_service.auto_persist_composition(

@@ -1,66 +1,87 @@
 /**
  * SequencerInstrumentSelector Component
  *
- * REFACTORED: Uses Zustand best practices
- * - Reads track from Zustand directly (no prop drilling)
- * - Only receives trackId (identifier) and disabled (local UI state)
+ * Searchable dropdown for choosing a MIDI track's sound source.
+ * Shows ALL available options in one list:
+ *   - Drum kits (grouped by kit category: Classic, Electronic, Acoustic)
+ *   - Synth instruments (grouped by synthdef category)
  *
- * Searchable dropdown selector for choosing MIDI track instruments (SynthDefs).
- * Displays instrument name with category grouping and search filtering.
+ * Selection behaviour:
+ *   - Picking a kit   → updateTrack({ kit_id })  — backend loads pads, clears instrument
+ *   - Picking a synth → updateTrack({ instrument }) — backend clears kit, sets instrument
  *
- * Architecture:
- * - Reads available SynthDefs from Zustand store
- * - Reads track from Zustand store to get current instrument
- * - Groups instruments by category
- * - Updates track instrument via Zustand action
- * - Shows current instrument or placeholder
+ * Current value display:
+ *   - Kit track  → shows kit name from collectionsStore (via track.kit_id)
+ *   - Synth track → shows synthdef display_name (via track.instrument)
  */
 
-import { Music } from "lucide-react";
+import { Drumstick, Music } from "lucide-react";
+import { useMemo } from "react";
 import { SearchableDropdown, type SearchableDropdownItem } from "@/components/ui/searchable-dropdown";
 import { useDAWStore } from "@/stores/dawStore";
+import { useCollectionsStore } from "@/stores/collectionsStore";
+
+// Internal value encoding: prefix distinguishes kits from synthdefs
+const KIT_PREFIX = "kit:";
+const SYNTH_PREFIX = "synth:";
 
 interface SequencerInstrumentSelectorProps {
-    trackId: string;    // Identifier - acceptable to pass
-    disabled?: boolean; // Local UI state - acceptable to pass
+    trackId: string;
+    disabled?: boolean;
 }
 
 export function SequencerInstrumentSelector({
     trackId,
     disabled = false,
 }: SequencerInstrumentSelectorProps) {
-    // ========================================================================
-    // STATE: Read from Zustand store
-    // ========================================================================
-    const synthDefs = useDAWStore(state => state.synthDefs);
-    const tracks = useDAWStore(state => state.tracks);
+    const synthDefs  = useCollectionsStore((s) => s.synthdefs);
+    const drumKits   = useCollectionsStore((s) => s.drumkits);
+    const tracks     = useDAWStore((s) => s.tracks);
+    const updateTrack = useDAWStore((s) => s.updateTrack);
 
-    // ========================================================================
-    // ACTIONS: Get from Zustand store
-    // ========================================================================
-    const updateTrack = useDAWStore(state => state.updateTrack);
+    const track = tracks.find((t) => t.id === trackId);
 
-    // ========================================================================
-    // DERIVED STATE: Find track and get current instrument
-    // ========================================================================
-    const track = tracks.find(t => t.id === trackId);
-    const currentInstrument = track?.instrument;
+    // ── Build dropdown items ──────────────────────────────────────────────────
 
-    // Map SynthDefs to SearchableDropdownItem format
-    const items: SearchableDropdownItem[] = synthDefs.map(synthDef => ({
-        value: synthDef.name,
-        label: synthDef.display_name,
-        category: synthDef.category,
-        description: synthDef.description,
-    }));
+    const items: SearchableDropdownItem[] = useMemo(() => {
+        const kitItems: SearchableDropdownItem[] = drumKits.map((kit) => ({
+            value: `${KIT_PREFIX}${kit.id}`,
+            label: kit.name,
+            category: `Kits — ${kit.category}`,
+            description: kit.description,
+        }));
 
-    // Handle selection - call Zustand action directly
+        const synthItems: SearchableDropdownItem[] = synthDefs.map((sd) => ({
+            value: `${SYNTH_PREFIX}${sd.name}`,
+            label: sd.display_name,
+            category: sd.category,
+            description: sd.description,
+        }));
+
+        return [...kitItems, ...synthItems];
+    }, [drumKits, synthDefs]);
+
+    // ── Determine currently selected value ───────────────────────────────────
+
+    const currentValue = useMemo(() => {
+        if (track?.kit_id) return `${KIT_PREFIX}${track.kit_id}`;
+        if (track?.instrument) return `${SYNTH_PREFIX}${track.instrument}`;
+        return undefined;
+    }, [track?.kit_id, track?.instrument]);
+
+    // ── Handle selection ─────────────────────────────────────────────────────
+
     const handleValueChange = (value: string) => {
-        updateTrack(trackId, { instrument: value });
+        if (value.startsWith(KIT_PREFIX)) {
+            updateTrack(trackId, { kit_id: value.slice(KIT_PREFIX.length) });
+        } else if (value.startsWith(SYNTH_PREFIX)) {
+            updateTrack(trackId, { instrument: value.slice(SYNTH_PREFIX.length) });
+        }
     };
 
-    // Show placeholder if no synthDefs loaded yet
-    if (synthDefs.length === 0) {
+    // ── Empty state ───────────────────────────────────────────────────────────
+
+    if (synthDefs.length === 0 && drumKits.length === 0) {
         return (
             <div className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground">
                 <Music size={12} />
@@ -69,17 +90,20 @@ export function SequencerInstrumentSelector({
         );
     }
 
+    // Use Drumstick icon when a kit is loaded, Music otherwise
+    const icon = track?.kit_id ? Drumstick : Music;
+
     return (
         <SearchableDropdown
             items={items}
-            value={currentInstrument}
+            value={currentValue}
             onValueChange={handleValueChange}
-            placeholder="Instrument"
-            icon={Music}
+            placeholder="Select sound…"
+            icon={icon}
             disabled={disabled}
-            triggerClassName="w-32"
-            searchPlaceholder="Search instruments..."
-            emptyMessage="No instruments found"
+            triggerClassName="w-36"
+            searchPlaceholder="Search kits & instruments…"
+            emptyMessage="No results"
         />
     );
 }

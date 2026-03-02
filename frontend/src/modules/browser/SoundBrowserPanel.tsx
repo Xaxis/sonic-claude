@@ -13,7 +13,7 @@
  *   Audio Effects · MIDI Effects · Grooves · Templates
  */
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { Search, X } from "lucide-react";
 import { Panel } from "@/components/ui/panel";
 import { useDAWStore } from "@/stores/dawStore";
@@ -53,6 +53,9 @@ export function SoundBrowserPanel() {
         onEnded: () => setPreviewingItemId(null),
     });
 
+    // Pending indicator timer for kit groove preview — cleared on stopAll
+    const kitPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     // ── Category counts (M2: memoized) ────────────────────────────────────────
 
     const counts = useMemo(
@@ -65,8 +68,12 @@ export function SoundBrowserPanel() {
 
     // ── Preview helpers ───────────────────────────────────────────────────────
 
-    // stopAll depends only on stable stopSample (H6 fix)
+    // stopAll: cancel the pending indicator timer + stop sample playback
     const stopAll = useCallback(() => {
+        if (kitPreviewTimerRef.current) {
+            clearTimeout(kitPreviewTimerRef.current);
+            kitPreviewTimerRef.current = null;
+        }
         stopSample();
         setPreviewingItemId(null);
     }, [stopSample]);
@@ -75,7 +82,17 @@ export function SoundBrowserPanel() {
         stopAll();
         setPreviewingItemId(item.id);
 
-        if (item.type === "instrument") {
+        if (item.type === "kit") {
+            try {
+                await api.playback.previewKit({ kit_id: item.kitId! });
+            } catch { /* audio engine may not be running */ }
+
+            // Clear preview indicator after the pattern finishes (~2.5s max)
+            kitPreviewTimerRef.current = setTimeout(
+                () => setPreviewingItemId((prev) => (prev === item.id ? null : prev)),
+                2500,
+            );
+        } else if (item.type === "instrument") {
             try {
                 // C1: use api.playback.previewNote (not api.audio)
                 await api.playback.previewNote({
@@ -132,7 +149,9 @@ export function SoundBrowserPanel() {
         if (!selectedItem || !activeComposition) return;
         setIsCreating(true);
         try {
-            if (selectedItem.type === "instrument") {
+            if (selectedItem.type === "kit") {
+                await createTrack(selectedItem.displayName, "midi", undefined, selectedItem.kitId);
+            } else if (selectedItem.type === "instrument") {
                 await createTrack(selectedItem.displayName, "midi", selectedItem.name);
             } else {
                 await createTrack(selectedItem.displayName, "audio");

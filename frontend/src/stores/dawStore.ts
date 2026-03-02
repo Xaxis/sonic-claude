@@ -43,11 +43,11 @@ import type { WaveformData } from '@/hooks/useWaveformWebsocket';
 import type { AnalyticsData } from '@/hooks/useAnalyticsWebsocket';
 
 // Application Types
-import type { SequencerTrack, SequencerClip, SynthDefInfo } from '@/modules/sequencer/types';
+import type { SequencerTrack, SequencerClip } from '@/modules/sequencer/types';
 import type { MixerChannel, MasterChannel } from '@/modules/mixer/types';
 import type { EffectDefinition, TrackEffectChain } from '@/services/api/providers';
-import type { SampleMetadata } from '@/services/api/providers/samples.provider';
 import type { CompositionMetadata } from '@/services/api/providers/compositions.provider';
+import { useCollectionsStore } from '@/stores/collectionsStore';
 
 // Scene definition for clip launcher
 export interface Scene {
@@ -182,7 +182,6 @@ interface DAWStore {
     // These are derived from activeComposition (for convenience/performance)
     tracks: SequencerTrack[];
     clips: SequencerClip[];
-    synthDefs: SynthDefInfo[];
 
     // Mixer (INTERNAL - part of active composition)
     channels: MixerChannel[];
@@ -193,7 +192,6 @@ interface DAWStore {
     effectChains: Record<string, TrackEffectChain>; // trackId -> chain
 
     // Samples (INTERNAL - part of active composition)
-    samples: SampleMetadata[];
     sampleAssignments: Record<string, string>; // trackId -> sampleId
 
     // Synthesis (INTERNAL - runtime state)
@@ -232,6 +230,8 @@ interface DAWStore {
     pianoRollClipId: string | null;
     showSampleEditor: boolean;
     sampleEditorClipId: string | null;
+    showDrumEditor: boolean;
+    drumEditorClipId: string | null;
 
     // Mixer UI
     showMeters: boolean;
@@ -316,10 +316,10 @@ interface DAWStore {
     seek: (position: number, triggerAudio?: boolean) => Promise<void>;
 
     // Tracks (operate on active composition)
-    createTrack: (name: string, type: "midi" | "audio", instrument?: string) => Promise<void>;
+    createTrack: (name: string, type: "midi" | "audio", instrument?: string, kitId?: string) => Promise<void>;
     deleteTrack: (trackId: string) => Promise<void>;
     renameTrack: (trackId: string, name: string) => Promise<void>;
-    updateTrack: (trackId: string, updates: { volume?: number; pan?: number; instrument?: string }) => Promise<void>;
+    updateTrack: (trackId: string, updates: { volume?: number; pan?: number; instrument?: string; kit_id?: string }) => Promise<void>;
     updateTrackVolume: (trackId: string, volume: number) => Promise<void>;
     updateTrackPan: (trackId: string, pan: number) => Promise<void>;
     muteTrack: (trackId: string, muted: boolean) => Promise<void>;
@@ -331,8 +331,6 @@ interface DAWStore {
     deleteClip: (clipId: string) => Promise<void>;
     duplicateClip: (sequenceId: string, clipId: string) => Promise<void>;
 
-    // SynthDefs
-    loadSynthDefs: () => Promise<void>;
 
     // ========================================================================
     // CLIP LAUNCHER ACTIONS (Performance Mode)
@@ -388,7 +386,6 @@ interface DAWStore {
     // ========================================================================
     // SAMPLES ACTIONS
     // ========================================================================
-    loadSamples: () => Promise<void>;
     uploadSample: (file: File, name: string, category?: string) => Promise<void>;
     deleteSample: (sampleId: string) => Promise<void>;
     updateSample: (sampleId: string, name?: string, category?: string) => Promise<void>;
@@ -437,6 +434,8 @@ interface DAWStore {
     closePianoRoll: () => void;
     openSampleEditor: (clipId: string) => void;
     closeSampleEditor: () => void;
+    openDrumEditor: (clipId: string) => void;
+    closeDrumEditor: () => void;
     setShowMeters: (show: boolean) => void;
     setMeterMode: (mode: "peak" | "rms" | "both") => void;
     setSelectedChannelId: (id: string | null) => void;
@@ -541,12 +540,10 @@ export const useDAWStore = create<DAWStore>()(
                 // Derived from active composition (loaded from backend)
                 tracks: [],
                 clips: [],
-                synthDefs: [],
                 channels: [],
                 master: null,
                 effectDefinitions: [],
                 effectChains: {},
-                samples: [],
                 sampleAssignments: {},
                 activeSynths: {},
 
@@ -579,6 +576,8 @@ export const useDAWStore = create<DAWStore>()(
                 pianoRollClipId: null,
                 showSampleEditor: false,
                 sampleEditorClipId: null,
+                showDrumEditor: false,
+                drumEditorClipId: null,
                 showMeters: true,
                 meterMode: "both",
                 selectedChannelId: null,
@@ -754,7 +753,7 @@ export const useDAWStore = create<DAWStore>()(
         // TRACK ACTIONS (operate on active composition)
         // ====================================================================
 
-        createTrack: async (name, type, instrument) => {
+        createTrack: async (name, type, instrument, kitId) => {
             const { activeComposition } = get();
             if (!activeComposition) {
                 toast.error("No active composition");
@@ -767,6 +766,7 @@ export const useDAWStore = create<DAWStore>()(
                     name,
                     type,
                     instrument,
+                    kit_id: kitId,
                 });
                 // Full reload needed to get real ID and proper track object from backend
                 await get().loadComposition(activeComposition.id);
@@ -845,12 +845,34 @@ export const useDAWStore = create<DAWStore>()(
                 return;
             }
 
+            // Build optimistic track patch — handle kit_id and instrument cross-clearing
+            let optimisticPatch: Partial<typeof track>;
+            if (updates.kit_id !== undefined) {
+                // Switching to a drum kit: populate pads from collectionsStore, clear instrument
+                const drumkits = useCollectionsStore.getState().drumkits;
+                const kitInfo = drumkits.find(k => k.id === updates.kit_id);
+                optimisticPatch = {
+                    kit_id: updates.kit_id,
+                    kit: kitInfo?.pads as any,
+                    instrument: undefined,
+                };
+            } else if (updates.instrument !== undefined) {
+                // Switching to a plain synth: clear kit
+                optimisticPatch = { ...updates, kit: undefined, kit_id: undefined };
+            } else {
+                optimisticPatch = { ...updates };
+            }
+
             // Optimistic update
             const prevTracks = tracks;
-            set({ tracks: tracks.map(t => t.id === trackId ? { ...t, ...updates } : t) });
+            set({ tracks: tracks.map(t => t.id === trackId ? { ...t, ...optimisticPatch } : t) });
 
             try {
                 await api.compositions.updateTrack(activeComposition.id, trackId, updates);
+                // Kit swap: reload so the full pad map from backend is in the store
+                if (updates.kit_id !== undefined || updates.instrument !== undefined) {
+                    await get().loadComposition(activeComposition.id);
+                }
                 await get().refreshUndoRedoStatus();
             } catch (error) {
                 set({ tracks: prevTracks });
@@ -1127,15 +1149,6 @@ export const useDAWStore = create<DAWStore>()(
         // SYNTHDEF ACTIONS
         // ====================================================================
 
-        loadSynthDefs: async () => {
-            try {
-                const synthDefs = await api.audio.getSynthDefs();
-                set({ synthDefs });
-            } catch (error) {
-                console.error("Failed to load synth defs:", error);
-                toast.error("Failed to load synth defs");
-            }
-        },
 
         // ====================================================================
         // CLIP LAUNCHER ACTIONS (Performance Mode)
@@ -1733,21 +1746,10 @@ export const useDAWStore = create<DAWStore>()(
         // SAMPLES ACTIONS
         // ====================================================================
 
-        loadSamples: async () => {
-            try {
-                const response = await api.samples.getAll();
-                set({ samples: response.samples });
-                windowManager.broadcastState('samples', response.samples);
-            } catch (error) {
-                console.error("Failed to load samples:", error);
-                toast.error("Failed to load samples");
-            }
-        },
-
         uploadSample: async (file, name, category = "Uncategorized") => {
             try {
                 await api.samples.upload(file, name, category);
-                await get().loadSamples();
+                await useCollectionsStore.getState().reload('samples');
                 toast.success(`Uploaded sample: ${name}`);
             } catch (error) {
                 console.error("Failed to upload sample:", error);
@@ -1758,7 +1760,7 @@ export const useDAWStore = create<DAWStore>()(
         deleteSample: async (sampleId) => {
             try {
                 await api.samples.deleteSample(sampleId);
-                await get().loadSamples();
+                await useCollectionsStore.getState().reload('samples');
                 toast.success("Sample deleted");
 
                 // Refresh undo/redo status
@@ -1772,7 +1774,7 @@ export const useDAWStore = create<DAWStore>()(
         updateSample: async (sampleId, name, category) => {
             try {
                 await api.samples.update(sampleId, { name, category });
-                await get().loadSamples();
+                await useCollectionsStore.getState().reload('samples');
                 toast.success("Sample updated");
 
                 // Refresh undo/redo status
@@ -2368,6 +2370,20 @@ export const useDAWStore = create<DAWStore>()(
         closeSampleEditor: () => set({
             showSampleEditor: false,
             sampleEditorClipId: null
+        }),
+
+        openDrumEditor: (clipId) => set({
+            showDrumEditor: true,
+            drumEditorClipId: clipId,
+            showPianoRoll: false,
+            pianoRollClipId: null,
+            showSampleEditor: false,
+            sampleEditorClipId: null,
+        }),
+
+        closeDrumEditor: () => set({
+            showDrumEditor: false,
+            drumEditorClipId: null,
         }),
 
         setShowMeters: (show) => set({ showMeters: show }),

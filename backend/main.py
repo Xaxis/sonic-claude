@@ -32,6 +32,7 @@ from backend.api.playback import router as playback_router
 from backend.api.assistant import router as assistant_router
 from backend.api.samples import router as samples_router
 from backend.api.compositions import router as compositions_router
+from backend.api.collections import router as collections_router
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +201,12 @@ async def sonic_claude_exception_handler(request: Request, exc: SonicClaudeExcep
 # ============================================================================
 # Entity Resources (REST CRUD):
 #   - /api/compositions/* - Composition management (includes tracks, clips, mixers, effects)
-#   - /api/samples/* - Sample management
+#   - /api/samples/* - Sample management (upload, download, delete)
+#
+# Catalog / Discovery (read-only collections):
+#   - /api/collections/synthdefs  - Available synthesizers
+#   - /api/collections/drumkits   - Drum kit definitions
+#   - /api/collections/samples    - Sample library listing
 #
 # Service Operations (RPC-style):
 #   - /api/playback/* - Transport control (play, stop, seek, preview)
@@ -212,6 +218,7 @@ async def sonic_claude_exception_handler(request: Request, exc: SonicClaudeExcep
 # Entity resources
 app.include_router(compositions_router, prefix="/api/compositions")
 app.include_router(samples_router, prefix="/api/samples")
+app.include_router(collections_router, prefix="/api/collections")
 
 # Service operations
 app.include_router(playback_router, prefix="/api/playback")

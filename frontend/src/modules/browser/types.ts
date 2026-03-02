@@ -4,10 +4,10 @@
 
 export type BrowserCategory = "all" | "sounds" | "drums" | "instruments" | "samples";
 
-export type BrowserItemType = "instrument" | "sample";
+export type BrowserItemType = "instrument" | "sample" | "kit";
 
 export interface BrowserItem {
-    /** Unique key — synthdef name or sample id */
+    /** Unique key — synthdef name or sample id or kit:${kitId} */
     id: string;
     /** Raw name used by the engine (synthdef name or sample id) */
     name: string;
@@ -22,7 +22,10 @@ export interface BrowserItem {
     /** Audio duration in seconds — samples only */
     duration?: number;
     tags: string[];
+    /** Kit ID — only for type === "kit" */
+    kitId?: string;
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Category metadata used by the rail

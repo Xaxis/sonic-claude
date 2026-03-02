@@ -42,9 +42,11 @@ export function SequencerClip({
     const selectedClipId = useDAWStore(state => state.selectedClipId);
     const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
     const sampleEditorClipId = useDAWStore(state => state.sampleEditorClipId);
+    const drumEditorClipId = useDAWStore(state => state.drumEditorClipId);
     const isSelected = selectedClipId === clip.id;
     const isEditingInPianoRoll = pianoRollClipId === clip.id;
     const isEditingInSampleEditor = sampleEditorClipId === clip.id;
+    const isEditingInDrumEditor = drumEditorClipId === clip.id;
 
     // ========================================================================
     // ACTIONS: Get from Zustand store
@@ -55,6 +57,7 @@ export function SequencerClip({
     const updateClip = useDAWStore(state => state.updateClip);
     const openPianoRoll = useDAWStore(state => state.openPianoRoll);
     const openSampleEditor = useDAWStore(state => state.openSampleEditor);
+    const openDrumEditor = useDAWStore(state => state.openDrumEditor);
     const setClipDragState = useDAWStore(state => state.setClipDragState);
 
     // ========================================================================
@@ -221,7 +224,12 @@ export function SequencerClip({
         setSelectedClipId(clip.id);
 
         if (clip.type === "midi") {
-            openPianoRoll(clip.id);
+            // Kit tracks → drum step editor; plain MIDI → piano roll
+            if (track?.kit && Object.keys(track.kit).length > 0) {
+                openDrumEditor(clip.id);
+            } else {
+                openPianoRoll(clip.id);
+            }
         } else if (clip.type === "audio") {
             openSampleEditor(clip.id);
         }
@@ -242,7 +250,7 @@ export function SequencerClip({
             <div
                 className={cn(
                     "absolute top-1 bottom-1 rounded border-2 cursor-move overflow-hidden transition-all",
-                    isEditingInPianoRoll || isEditingInSampleEditor
+                    isEditingInPianoRoll || isEditingInSampleEditor || isEditingInDrumEditor
                         ? "border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.6)] ring-2 ring-cyan-400/50"
                         : isSelected
                             ? "border-white shadow-lg"

@@ -77,6 +77,7 @@ export interface SynthDefInfo {
     parameters: string[];
 }
 
+
 // ============================================================================
 // AUDIO PROVIDER (HTTP CLIENT ONLY - NO BUSINESS LOGIC)
 // ============================================================================
@@ -116,8 +117,7 @@ export class AudioProvider extends BaseAPIClient {
     }
 
     async getSynthDefs(): Promise<SynthDefInfo[]> {
-        const response = await this.get("/api/compositions/synthdefs");
-        // Backend returns array of SynthDefInfo objects directly
+        const response = await this.get("/api/collections/synthdefs");
         return Array.isArray(response) ? response : [];
     }
 

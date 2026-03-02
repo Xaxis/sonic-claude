@@ -15,6 +15,7 @@ import { Music } from "lucide-react";
 import { SequencerTimelineSection } from "../Timeline/SequencerTimelineSection.tsx";
 import { SequencerPianoRoll } from "../PianoRoll/SequencerPianoRoll.tsx";
 import { SequencerSampleEditor } from "../SampleEditor/SequencerSampleEditor.tsx";
+import { SequencerDrumEditor } from "../DrumEditor/SequencerDrumEditor.tsx";
 import { useDAWStore } from '@/stores/dawStore.ts';
 
 const SPLIT_RATIO_KEY = 'sonic-claude-sequencer-split-ratio';
@@ -36,6 +37,7 @@ export function SequencerSplitLayout({
     // ========================================================================
     const showPianoRoll = useDAWStore(state => state.showPianoRoll);
     const showSampleEditor = useDAWStore(state => state.showSampleEditor);
+    const showDrumEditor = useDAWStore(state => state.showDrumEditor);
 
     // ========================================================================
     // LOCAL UI STATE: Split ratio and drag states
@@ -123,7 +125,9 @@ export function SequencerSplitLayout({
                 style={{ flexGrow: 100 - timelineHeightPercent, flexShrink: 1, flexBasis: 0 }}
             >
                 <div className="h-full flex flex-col overflow-hidden">
-                    {showPianoRoll ? (
+                    {showDrumEditor ? (
+                        <SequencerDrumEditor />
+                    ) : showPianoRoll ? (
                         <SequencerPianoRoll
                             pianoRollScrollRef={pianoRollScrollRef}
                         />
@@ -137,7 +141,7 @@ export function SequencerSplitLayout({
                                 <Music size={48} className="mx-auto mb-4 opacity-20" />
                                 <div className="text-base font-medium mb-1">No Editor Open</div>
                                 <div className="text-xs text-muted-foreground/70">
-                                    Click a clip to open it — MIDI clips open the piano roll, audio clips open the sample editor.
+                                    Click a clip to open it — MIDI clips open the piano roll, drum clips open the step editor, audio clips open the sample editor.
                                 </div>
                             </div>
                         </div>

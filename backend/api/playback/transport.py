@@ -4,7 +4,7 @@ Transport Routes - Playback control for the current composition
 All playback operations work on the currently active composition.
 """
 import logging
-from typing import Optional
+from typing import Dict, Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -55,6 +55,13 @@ class PreviewNoteRequest(BaseModel):
     velocity: Optional[int] = Field(default=100, ge=1, le=127, description="Note velocity")
     duration: Optional[float] = Field(default=0.5, gt=0, description="Note duration in seconds")
     synthdef: Optional[str] = Field(default="default", description="Synth definition to use")
+    params: Optional[Dict[str, float]] = Field(default_factory=dict, description="Extra synth params (e.g. freq, decay)")
+
+
+class PreviewKitRequest(BaseModel):
+    """Request to preview a drum kit's built-in demo pattern"""
+    kit_id: str = Field(description="Kit ID whose demo pattern to play")
+    bpm_override: Optional[float] = Field(default=None, gt=0, le=300, description="Override the kit's demo BPM")
 
 
 class UpdateMetronomeRequest(BaseModel):
@@ -269,13 +276,38 @@ async def preview_note(
             note=request.note,
             velocity=request.velocity or 100,
             duration=request.duration or 0.5,
-            synthdef=request.synthdef or "default"
+            synthdef=request.synthdef or "default",
+            params=request.params or {},
         )
         return {"status": "ok"}
 
     except Exception as e:
         logger.error(f"❌ Failed to preview note: {e}")
         raise ServiceError(f"Failed to preview note: {str(e)}")
+
+
+# ============================================================================
+# PREVIEW KIT (for sound browser)
+# ============================================================================
+
+@router.post("/preview-kit")
+async def preview_kit(
+    request: PreviewKitRequest,
+    playback_engine_service: PlaybackEngineService = Depends(get_playback_engine_service)
+):
+    """Play a drum kit's built-in demo pattern (fire-and-forget, returns immediately)"""
+    try:
+        await playback_engine_service.preview_kit_demo(
+            kit_id=request.kit_id,
+            bpm=request.bpm_override,
+        )
+        return {"status": "ok"}
+
+    except ValueError as e:
+        raise ServiceError(str(e))
+    except Exception as e:
+        logger.error(f"❌ Failed to preview kit: {e}")
+        raise ServiceError(f"Failed to preview kit: {str(e)}")
 
 
 # ============================================================================

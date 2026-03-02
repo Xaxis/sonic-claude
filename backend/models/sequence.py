@@ -4,7 +4,7 @@ Track and Clip Models - Pydantic models for tracks, clips, and MIDI events
 NOTE: This file will be renamed to track.py in a future refactor.
 For now, keeping the name for backwards compatibility during migration.
 """
-from typing import List, Optional, Literal, Any
+from typing import Dict, List, Optional, Literal, Any
 from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
 
@@ -90,6 +90,16 @@ class Clip(BaseModel):
 
 
 # ============================================================================
+# KIT PAD
+# ============================================================================
+
+class KitPad(BaseModel):
+    """A single pad in a drum kit — maps a MIDI note to a SynthDef with override params"""
+    synthdef: str
+    params: Dict[str, float] = Field(default_factory=dict)
+
+
+# ============================================================================
 # TRACKS
 # ============================================================================
 
@@ -125,6 +135,11 @@ class Track(BaseModel):
     sample_id: Optional[str] = None  # Reference to sample library
     sample_name: Optional[str] = None  # Cached sample name
     sample_file_path: Optional[str] = None  # Cached file path
+
+    # Drum kit — MIDI note → pad config; overrides track.instrument routing
+    # JSON serializes int keys as strings; use {int(k): v ...} on load
+    kit: Optional[Dict[int, KitPad]] = None
+    kit_id: Optional[str] = None  # Which registry kit is loaded (for display/switching)
 
 
 # Backwards compatibility alias - DEPRECATED, use Track instead

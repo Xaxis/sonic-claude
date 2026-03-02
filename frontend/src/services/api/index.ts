@@ -15,6 +15,7 @@ import {
     AudioProvider,
     AssistantProvider,
     SamplesProvider,
+    CollectionsProvider,
 } from "./providers";
 
 /**
@@ -56,9 +57,10 @@ export class APIClient {
     public audio: AudioProvider;
     public assistant: AssistantProvider;
     public samples: SamplesProvider;
+    public collections: CollectionsProvider;
 
     constructor(baseURL?: string) {
-        // Initialize all providers (7/7 backend API modules)
+        // Initialize all providers (8/8 backend API modules)
         this.compositions = new CompositionsProvider(baseURL);
         this.playback = new PlaybackProvider(baseURL);
         this.mixer = new MixerProvider(baseURL);
@@ -66,6 +68,7 @@ export class APIClient {
         this.audio = new AudioProvider(baseURL);
         this.assistant = new AssistantProvider(baseURL);
         this.samples = new SamplesProvider(baseURL);
+        this.collections = new CollectionsProvider(baseURL);
     }
 }
 

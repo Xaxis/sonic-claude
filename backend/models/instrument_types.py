@@ -34,7 +34,7 @@ def _get_synthdef_registry():
     This function delays the import until it's actually needed,
     preventing circular dependency issues.
     """
-    from backend.services.daw.synthdef_registry import SYNTHDEF_REGISTRY
+    from backend.services.daw.registry import SYNTHDEF_REGISTRY
     return SYNTHDEF_REGISTRY
 
 
@@ -139,7 +139,7 @@ def validate_instrument(instrument: str | None) -> None:
     valid_instruments = get_valid_instruments()
     if instrument not in valid_instruments:
         # Lazy import to avoid circular dependency
-        from backend.services.daw.synthdef_registry import get_categories
+        from backend.services.daw.registry import get_categories
 
         categories = get_categories()
         raise ValueError(

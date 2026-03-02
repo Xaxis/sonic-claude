@@ -8,7 +8,7 @@ that can be used for tracks, clips, and previews.
 import logging
 from fastapi import APIRouter
 
-from backend.services.daw.synthdef_registry import get_all_synthdefs, get_synthdefs_by_category, get_categories
+from backend.services.daw.registry import get_all_synthdefs, get_synthdefs_by_category, get_categories
 from backend.core.exceptions import ServiceError
 
 router = APIRouter()

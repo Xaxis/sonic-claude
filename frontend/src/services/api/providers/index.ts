@@ -12,6 +12,7 @@ export { EffectsProvider } from "./effects.provider";
 export { AudioProvider } from "./audio.provider";
 export { AssistantProvider } from "./assistant.provider";
 export { SamplesProvider } from "./samples.provider";
+export { CollectionsProvider } from "./collections.provider";
 
 // Re-export types
 export type {
@@ -96,4 +97,10 @@ export type {
     UpdateSampleRequest,
     UpdateDurationRequest,
 } from "./samples.provider";
+
+export type {
+    DrumKitPad,
+    DrumKitInfo,
+    CollectionKey,
+} from "./collections.provider";
 

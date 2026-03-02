@@ -37,6 +37,10 @@ export interface SequencerTrack {
     sample_id?: string; // Reference to sample library
     sample_name?: string; // Cached sample name
     sample_file_path?: string; // Cached file path
+
+    // Drum kit — midiNote → pad config
+    kit?: Record<number, { synthdef: string; params: Record<string, number> }>;
+    kit_id?: string; // Registry kit ID currently loaded
 }
 
 export interface SequencerClip {

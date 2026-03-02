@@ -114,13 +114,15 @@ export interface CreateTrackRequest {
     sample_id?: string;
     sample_name?: string;
     sample_file_path?: string;
+    kit_id?: string;  // Drum kit ID — populates track.kit pad map
 }
 
 export interface UpdateTrackRequest {
     name?: string;
     volume?: number;  // 0.0-2.0, 1.0 = unity
     pan?: number;     // -1.0 to 1.0
-    instrument?: string;  // For MIDI tracks
+    instrument?: string;  // For MIDI tracks — clears kit
+    kit_id?: string;      // For drum kit tracks — loads pads, clears instrument
 }
 
 export interface MuteTrackRequest {
@@ -556,5 +558,6 @@ export class CompositionsProvider extends BaseAPIClient {
     async stopTrackClips(compositionId: string, trackId: string): Promise<any> {
         return this.post(`/api/compositions/${compositionId}/clip-launcher/tracks/${trackId}/stop-all`, {});
     }
+
 }
 

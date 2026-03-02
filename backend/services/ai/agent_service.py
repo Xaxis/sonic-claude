@@ -775,7 +775,7 @@ Remember: You're planning focused edits to this specific {entity_type}."""
     def _build_instruments_list(self) -> str:
         """Build formatted list of available instruments from SYNTHDEF_REGISTRY"""
         # Lazy import to avoid circular dependency
-        from backend.services.daw.synthdef_registry import SYNTHDEF_REGISTRY
+        from backend.services.daw.registry import SYNTHDEF_REGISTRY
 
         categories = {}
         for synth in SYNTHDEF_REGISTRY:

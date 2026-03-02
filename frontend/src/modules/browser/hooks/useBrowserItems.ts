@@ -1,16 +1,15 @@
 /**
  * useBrowserItems
  *
- * Aggregates SynthDefs (from Zustand) and Samples (from Zustand store) into a
- * unified BrowserItem list and exposes filtering helpers.
+ * Aggregates SynthDefs, Samples, and DrumKits from the unified collectionsStore
+ * into a single BrowserItem list with filtering helpers.
  *
- * All data comes from the DAW store — no independent API fetching.
- * Samples are loaded at app startup via App.tsx and kept fresh by
- * useSampleLibrary mutations calling useDAWStore.getState().loadSamples().
+ * All collection data is loaded at app startup via collectionsStore.loadAll()
+ * and refreshed via collectionsStore.reload(key) after mutations.
  */
 
 import { useMemo, useCallback, useRef, useState, useEffect } from "react";
-import { useDAWStore } from "@/stores/dawStore";
+import { useCollectionsStore } from "@/stores/collectionsStore";
 import { apiConfig } from "@/config/api.config";
 import type { BrowserItem, BrowserCategory } from "../types";
 import {
@@ -45,8 +44,9 @@ export function useBrowserItems(
     activeCategory: BrowserCategory,
     searchQuery: string,
 ): BrowserItemsState {
-    const synthDefs = useDAWStore((s) => s.synthDefs);
-    const samples   = useDAWStore((s) => s.samples);
+    const synthDefs = useCollectionsStore((s) => s.synthdefs);
+    const samples   = useCollectionsStore((s) => s.samples);
+    const drumKits  = useCollectionsStore((s) => s.drumkits);
 
     // ── Map SynthDefs → BrowserItem[] ────────────────────────────────────────
 
@@ -82,9 +82,27 @@ export function useBrowserItems(
         [samples],
     );
 
+    // ── Map DrumKits → BrowserItem[] ─────────────────────────────────────────
+
+    const kitItems = useMemo<BrowserItem[]>(
+        () =>
+            drumKits.map((k) => ({
+                id: `kit:${k.id}`,
+                name: k.id,
+                displayName: k.name,
+                browserCategory: "drums" as const,
+                subcategory: k.category,
+                type: "kit" as const,
+                description: k.description,
+                tags: [k.category.toLowerCase(), "kit"],
+                kitId: k.id,
+            })),
+        [drumKits],
+    );
+
     const allItems = useMemo(
-        () => [...synthItems, ...sampleItems],
-        [synthItems, sampleItems],
+        () => [...synthItems, ...sampleItems, ...kitItems],
+        [synthItems, sampleItems, kitItems],
     );
 
     // ── Filter helpers ────────────────────────────────────────────────────────

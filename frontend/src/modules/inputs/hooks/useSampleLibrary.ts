@@ -10,7 +10,7 @@ import { api } from "@/services/api";
 import { apiConfig } from "@/config/api.config";
 import type { SampleMetadata } from "@/services/api/providers";
 import { toast } from "sonner";
-import { useDAWStore } from "@/stores/dawStore";
+import { useCollectionsStore } from "@/stores/collectionsStore";
 
 interface UseSampleLibraryProps {
     onSampleSelect?: (sample: SampleMetadata) => void;
@@ -25,7 +25,7 @@ export function useSampleLibrary({ onSampleSelect }: UseSampleLibraryProps = {})
     const [editName, setEditName] = useState("");
     const [editCategory, setEditCategory] = useState("");
 
-    const syncToStore = useCallback(() => useDAWStore.getState().loadSamples(), []);
+    const syncToStore = useCallback(() => useCollectionsStore.getState().reload('samples'), []);
     
     // Playback state
     const [playingSampleId, setPlayingSampleId] = useState<string | null>(null);

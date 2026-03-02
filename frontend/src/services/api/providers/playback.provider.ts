@@ -3,13 +3,14 @@
  * Thin HTTP client for playback transport controls
  *
  * Backend routes:
- * - POST /api/playback/play      - Play current composition
- * - POST /api/playback/stop      - Stop playback
- * - POST /api/playback/seek      - Seek to position
- * - PUT  /api/playback/tempo     - Set tempo
- * - PUT  /api/playback/loop      - Set loop points
- * - POST /api/playback/preview   - Preview MIDI note
- * - PUT  /api/playback/metronome - Update metronome settings
+ * - POST /api/playback/play        - Play current composition
+ * - POST /api/playback/stop        - Stop playback
+ * - POST /api/playback/seek        - Seek to position
+ * - PUT  /api/playback/tempo       - Set tempo
+ * - PUT  /api/playback/loop        - Set loop points
+ * - POST /api/playback/preview     - Preview MIDI note
+ * - POST /api/playback/preview-kit - Preview drum kit demo pattern
+ * - PUT  /api/playback/metronome   - Update metronome settings
  */
 
 import { BaseAPIClient } from "../base";
@@ -44,6 +45,12 @@ export interface PreviewNoteRequest {
     velocity?: number;
     duration?: number;
     synthdef?: string;
+    params?: Record<string, number>;
+}
+
+export interface PreviewKitRequest {
+    kit_id: string;
+    bpm_override?: number;
 }
 
 export interface UpdateMetronomeRequest {
@@ -118,6 +125,14 @@ export class PlaybackProvider extends BaseAPIClient {
      */
     async previewNote(request: PreviewNoteRequest): Promise<any> {
         return this.post("/api/playback/preview", request);
+    }
+
+    /**
+     * Preview a drum kit's demo pattern (fire-and-forget)
+     * POST /api/playback/preview-kit
+     */
+    async previewKit(request: PreviewKitRequest): Promise<any> {
+        return this.post("/api/playback/preview-kit", request);
     }
 
     /**

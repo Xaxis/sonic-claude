@@ -79,7 +79,7 @@ export function BrowserPreviewStrip({
                 </span>
             </div>
 
-            {/* Note selector — instruments only */}
+            {/* Note selector — instruments only (not kits) */}
             {item.type === "instrument" && (
                 <div className="flex flex-col gap-0.5 flex-shrink-0 items-center">
                     <span className="text-[8px] uppercase tracking-widest text-muted-foreground/40 leading-none">
@@ -99,16 +99,18 @@ export function BrowserPreviewStrip({
                 </div>
             )}
 
-            {/* Add Track — works for both instruments and samples */}
+            {/* Add Track — works for instruments, samples, and kits */}
             <button
                 onClick={onCreateTrack}
                 disabled={addTrackDisabled}
                 title={
                     !canCreateTrack
                         ? "No active composition — open or create one first"
-                        : item.type === "instrument"
-                            ? "Create a new MIDI track with this instrument"
-                            : "Create a new audio track"
+                        : item.type === "kit"
+                            ? "Create a new drum track with this kit"
+                            : item.type === "instrument"
+                                ? "Create a new MIDI track with this instrument"
+                                : "Create a new audio track"
                 }
                 className={cn(
                     "flex-shrink-0 flex items-center gap-1.5 h-7 px-2.5 rounded border text-[10px] font-bold uppercase tracking-wider transition-colors",
@@ -119,7 +121,7 @@ export function BrowserPreviewStrip({
             >
                 {isCreating
                     ? <><Loader2 size={10} className="animate-spin" /> Creating…</>
-                    : <><Plus size={10} /> Add Track</>
+                    : <><Plus size={10} /> {item.type === "kit" ? "Add Drum Track" : "Add Track"}</>
                 }
             </button>
 

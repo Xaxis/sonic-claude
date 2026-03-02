@@ -32,6 +32,7 @@ import { ActivityContainer } from "@/components/activity";
 import { CompositionLoader } from "@/components/composition/CompositionLoader";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { useDAWStore } from "@/stores/dawStore";
+import { useCollectionsStore } from "@/stores/collectionsStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useAutosave } from "@/hooks/useAutosave";
 import { DEFAULT_PANELS } from "@/config/layout.config";
@@ -42,13 +43,11 @@ export default function App() {
 
     // ── App startup: initialize DAW store exactly once ────────────────────────
     const initialize    = useDAWStore(state => state.initialize);
-    const loadSynthDefs = useDAWStore(state => state.loadSynthDefs);
-    const loadSamples   = useDAWStore(state => state.loadSamples);
+    const loadAll       = useCollectionsStore(state => state.loadAll);
 
     useEffect(() => {
         initialize();
-        loadSynthDefs();
-        loadSamples();
+        loadAll();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── UI Density — sync persisted setting to CSS custom property ────────────

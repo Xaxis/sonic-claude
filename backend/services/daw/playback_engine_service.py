@@ -98,7 +98,8 @@ class PlaybackEngineService:
         note: int,
         velocity: int = 100,
         duration: float = 0.5,
-        synthdef: str = "default"
+        synthdef: str = "default",
+        params: dict = {}
     ) -> None:
         """
         Preview a MIDI note by playing it briefly
@@ -108,6 +109,7 @@ class PlaybackEngineService:
             velocity: Note velocity (1-127)
             duration: Note duration in seconds
             synthdef: SynthDef to use for playback
+            params: Extra synth parameters (e.g. freq override, decay, etc.)
         """
         if not self.engine_manager:
             logger.warning("Cannot preview note: engine_manager not available")
@@ -117,12 +119,12 @@ class PlaybackEngineService:
             # Allocate node ID
             node_id = self.engine_manager.allocate_node_id()
 
-            # Convert MIDI note to frequency
+            # Convert MIDI note to frequency (may be overridden by params)
             freq = 440.0 * (2.0 ** ((note - 69) / 12.0))
             amp = velocity / 127.0
 
-            # Create synth
-            self.engine_manager.send_message(
+            # Build OSC args: base params first, then kit-specific overrides
+            osc_args = [
                 "/s_new",
                 synthdef,
                 node_id,
@@ -130,8 +132,13 @@ class PlaybackEngineService:
                 1,  # Target group: synths
                 "freq", freq,
                 "amp", amp,
-                "gate", 1
-            )
+                "gate", 1,
+            ]
+            for k, v in params.items():
+                osc_args += [k, v]
+
+            # Create synth
+            self.engine_manager.send_message(*osc_args)
 
             logger.debug(f"🎹 Preview note {note} (freq={freq:.1f}Hz, vel={velocity})")
 
@@ -151,6 +158,75 @@ class PlaybackEngineService:
         except Exception as e:
             logger.error(f"❌ Failed to preview note: {e}")
             raise
+
+    # ========================================================================
+    # PREVIEW KIT DEMO (for sound browser)
+    # ========================================================================
+
+    async def preview_kit_demo(self, kit_id: str, bpm: Optional[float] = None) -> None:
+        """
+        Play a drum kit's built-in demo pattern.
+
+        Schedules one asyncio task per note event and returns immediately.
+        Each task sleeps until its scheduled beat position, then fires preview_note().
+
+        Args:
+            kit_id: Kit ID from the registry
+            bpm:    Override BPM (uses kit's demo_bpm if not provided)
+        """
+        from backend.services.daw.registry import get_kit_by_id
+
+        kit = get_kit_by_id(kit_id)
+        if not kit:
+            raise ValueError(f"Kit '{kit_id}' not found")
+
+        demo: list = kit.get("demo", [])
+        demo_bpm: float = bpm or kit.get("demo_bpm", 120)
+        pads: dict = kit.get("pads", {})
+
+        if not demo:
+            logger.warning(f"Kit '{kit_id}' has no demo pattern")
+            return
+
+        seconds_per_beat = 60.0 / demo_bpm
+
+        async def _fire_note(
+            delay_s: float,
+            note: int,
+            velocity: int,
+            duration_s: float,
+            synthdef: str,
+            params: dict,
+        ) -> None:
+            if delay_s > 0:
+                await asyncio.sleep(delay_s)
+            await self.preview_note(
+                note=note,
+                velocity=velocity,
+                duration=duration_s,
+                synthdef=synthdef,
+                params=params,
+            )
+
+        scheduled = 0
+        for event in demo:
+            beat, note, velocity, duration_beats = event
+            pad = pads.get(note) or pads.get(int(note))
+            if not pad:
+                continue  # Kit doesn't have this pad
+            asyncio.create_task(
+                _fire_note(
+                    beat * seconds_per_beat,
+                    int(note),
+                    int(velocity),
+                    duration_beats * seconds_per_beat,
+                    pad["synthdef"],
+                    pad.get("params", {}),
+                )
+            )
+            scheduled += 1
+
+        logger.info(f"🥁 Kit demo: {kit_id} @ {demo_bpm:.0f} BPM — {scheduled} events scheduled")
 
     # ========================================================================
     # PLAYBACK CONTROL
@@ -720,8 +796,9 @@ class PlaybackEngineService:
                 logger.info(f"   MIDI events count: {len(clip.midi_events)}")
                 logger.info(f"   Offset: {offset:.2f} beats")
 
-                # Get instrument synthdef from track
+                # Get instrument synthdef from track — kit tracks route per note
                 synthdef = track.instrument or "sine"
+                kit_params_default: dict = {}
                 logger.info(f"   Instrument: {synthdef}")
 
                 # Get or allocate audio bus for this track
@@ -777,6 +854,14 @@ class PlaybackEngineService:
 
                         node_id = self.engine_manager.allocate_node_id()
 
+                        # Resolve kit pad for this specific note (per-note routing)
+                        note_synthdef = synthdef
+                        note_kit_params = kit_params_default
+                        if track.kit and effective_note in track.kit:
+                            pad = track.kit[effective_note]
+                            note_synthdef = pad.synthdef
+                            note_kit_params = dict(pad.params)
+
                         # Convert MIDI note to frequency (uses transposed note)
                         freq = 440.0 * (2.0 ** ((effective_note - 69) / 12.0))
 
@@ -784,11 +869,11 @@ class PlaybackEngineService:
                         amp = effective_velocity / 127.0 * 0.8 * clip.gain
 
                         triggered_count += 1
-                        logger.info(f"      ✅ SCHEDULED! node={node_id}, freq={freq:.2f}Hz, amp={amp:.2f}, delay={delay_seconds:.2f}s, bus={track_bus}")
+                        logger.info(f"      ✅ SCHEDULED! node={node_id}, synth={note_synthdef}, freq={freq:.2f}Hz, amp={amp:.2f}, delay={delay_seconds:.2f}s, bus={track_bus}")
 
                         # Schedule note start and release
                         # FIX: Pass note_start_time as parameter to avoid Python closure bug
-                        async def play_note(nid, freq_val, amp_val, synth, delay, dur_beats, note_pitch, note_start_time, clip_id_val, out_bus):
+                        async def play_note(nid, freq_val, amp_val, synth, delay, dur_beats, note_pitch, note_start_time, clip_id_val, out_bus, extra_params):
                             try:
                                 logger.info(f"⏰ MIDI Note Task Started: nid={nid}, delay={delay:.3f}s, synth={synth}, freq={freq_val:.2f}Hz, amp={amp_val:.3f}, bus={out_bus}")
                                 await asyncio.sleep(delay)
@@ -796,18 +881,19 @@ class PlaybackEngineService:
                                 if self.engine_manager and self.is_playing:
                                     logger.info(f"🎵 TRIGGERING MIDI NOTE: nid={nid}, synth={synth}, freq={freq_val:.2f}Hz, amp={amp_val:.3f}, gate=1, out={out_bus}")
 
-                                    # Start the note
-                                    self.engine_manager.send_message(
-                                        "/s_new",
-                                        synth,
-                                        nid,
-                                        0,  # addAction
-                                        1,  # target
+                                    # Build OSC args; append kit pad overrides after base params
+                                    osc_args = [
+                                        "/s_new", synth, nid, 0, 1,
                                         "freq", freq_val,
                                         "amp", amp_val,
                                         "gate", 1,
-                                        "out", out_bus  # Route to track bus
-                                    )
+                                        "out", out_bus,
+                                    ]
+                                    for k, v in extra_params.items():
+                                        osc_args += [k, v]
+
+                                    # Start the note
+                                    self.engine_manager.send_message(*osc_args)
 
                                     # Track active note for visual feedback (TIMELINE PLAYBACK)
                                     self.timeline_active_midi_notes[nid] = {
@@ -846,7 +932,7 @@ class PlaybackEngineService:
                             except Exception as e:
                                 logger.error(f"❌ MIDI note {nid} task FAILED: {e}", exc_info=True)
 
-                        task = asyncio.create_task(play_note(node_id, freq, amp, synthdef, delay_seconds, effective_duration, effective_note, effective_start, clip.id, track_bus))
+                        task = asyncio.create_task(play_note(node_id, freq, amp, note_synthdef, delay_seconds, effective_duration, effective_note, effective_start, clip.id, track_bus, note_kit_params))
                         self.timeline_midi_note_tasks.add(task)
                         # Remove task from set when it completes
                         task.add_done_callback(self.timeline_midi_note_tasks.discard)

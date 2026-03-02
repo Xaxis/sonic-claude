@@ -40,10 +40,12 @@ function TypeBadge({ type }: { type: BrowserItem["type"] }) {
                 "text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded",
                 type === "instrument"
                     ? "bg-primary/10 text-primary/70"
-                    : "bg-amber-500/10 text-amber-400/70",
+                    : type === "kit"
+                        ? "bg-cyan-500/10 text-cyan-400/70"
+                        : "bg-amber-500/10 text-amber-400/70",
             )}
         >
-            {type === "instrument" ? "INST" : "SMPL"}
+            {type === "instrument" ? "INST" : type === "kit" ? "KIT" : "SMPL"}
         </span>
     );
 }
