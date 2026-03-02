@@ -232,6 +232,7 @@ interface DAWStore {
     sampleEditorClipId: string | null;
     showDrumEditor: boolean;
     drumEditorClipId: string | null;
+    midiEditorView: "piano-roll" | "step-sequencer";
 
     // Mixer UI
     showMeters: boolean;
@@ -436,6 +437,7 @@ interface DAWStore {
     closeSampleEditor: () => void;
     openDrumEditor: (clipId: string) => void;
     closeDrumEditor: () => void;
+    switchMidiEditorView: (view: "piano-roll" | "step-sequencer") => void;
     setShowMeters: (show: boolean) => void;
     setMeterMode: (mode: "peak" | "rms" | "both") => void;
     setSelectedChannelId: (id: string | null) => void;
@@ -578,6 +580,7 @@ export const useDAWStore = create<DAWStore>()(
                 sampleEditorClipId: null,
                 showDrumEditor: false,
                 drumEditorClipId: null,
+                midiEditorView: "piano-roll",
                 showMeters: true,
                 meterMode: "both",
                 selectedChannelId: null,
@@ -2345,6 +2348,9 @@ export const useDAWStore = create<DAWStore>()(
             set({
                 showPianoRoll: true,
                 pianoRollClipId: clipId,
+                showDrumEditor: false,
+                drumEditorClipId: clipId,
+                midiEditorView: "piano-roll",
                 showSampleEditor: false,
                 sampleEditorClipId: null,
             });
@@ -2357,7 +2363,9 @@ export const useDAWStore = create<DAWStore>()(
 
         closePianoRoll: () => set({
             showPianoRoll: false,
-            pianoRollClipId: null
+            pianoRollClipId: null,
+            showDrumEditor: false,
+            drumEditorClipId: null,
         }),
 
         openSampleEditor: (clipId) => set({
@@ -2376,7 +2384,8 @@ export const useDAWStore = create<DAWStore>()(
             showDrumEditor: true,
             drumEditorClipId: clipId,
             showPianoRoll: false,
-            pianoRollClipId: null,
+            pianoRollClipId: clipId,
+            midiEditorView: "step-sequencer",
             showSampleEditor: false,
             sampleEditorClipId: null,
         }),
@@ -2384,6 +2393,18 @@ export const useDAWStore = create<DAWStore>()(
         closeDrumEditor: () => set({
             showDrumEditor: false,
             drumEditorClipId: null,
+            showPianoRoll: false,
+            pianoRollClipId: null,
+        }),
+
+        switchMidiEditorView: (view) => set((state) => {
+            const clipId = state.pianoRollClipId ?? state.drumEditorClipId;
+            if (!clipId) return {};
+            return {
+                midiEditorView: view,
+                showPianoRoll: view === "piano-roll",
+                showDrumEditor: view === "step-sequencer",
+            };
         }),
 
         setShowMeters: (show) => set({ showMeters: show }),

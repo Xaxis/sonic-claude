@@ -605,4 +605,391 @@ KITS = [
         ],
     },
 
+    {
+        "id": "drill-kit",
+        "name": "Drill Kit",
+        "category": "Electronic",
+        "description": "UK/NYC drill — dark rolling 808 hi-hats, booming sub kick, short snare",
+        "pads": {
+            36: {"synthdef": "kick808",       "params": {"freq": 42.0,  "decay": 1.10}},
+            38: {"synthdef": "snare808",      "params": {"decay": 0.14, "tone": 0.15, "noise": 0.95}},
+            37: {"synthdef": "rimshot808",    "params": {"decay": 0.07}},
+            39: {"synthdef": "clap909",       "params": {"decay": 0.15, "spread": 0.65}},
+            42: {"synthdef": "hihatClosed808","params": {"decay": 0.03}},
+            44: {"synthdef": "hihatClosed808","params": {"decay": 0.02}},
+            46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.18}},
+            49: {"synthdef": "cymbalCrash",   "params": {"decay": 1.6}},
+        },
+        "demo_bpm": 144,
+        "demo": [
+            # UK Drill — rolling triplet 808 hats, snare on 3, booming kick
+            [0.0,    36, 110, 0.8],
+            [0.0,    42,  82, 0.12],
+            [0.167,  42,  65, 0.1],
+            [0.333,  42,  75, 0.12],
+            [0.5,    42,  82, 0.12],
+            [0.667,  42,  65, 0.1],
+            [0.833,  42,  72, 0.12],
+            [1.0,    42,  82, 0.12],
+            [1.167,  42,  65, 0.1],
+            [1.333,  42,  72, 0.12],
+            [1.5,    42,  80, 0.12],
+            [1.667,  42,  65, 0.1],
+            [1.833,  42,  70, 0.12],
+            [2.0,    36, 100, 0.7],
+            [2.0,    38,  92, 0.2],  # snare on 3
+            [2.0,    42,  82, 0.12],
+            [2.167,  42,  65, 0.1],
+            [2.333,  42,  75, 0.12],
+            [2.5,    42,  80, 0.12],
+            [2.667,  42,  65, 0.1],
+            [2.833,  42,  70, 0.12],
+            [3.0,    42,  82, 0.12],
+            [3.167,  42,  65, 0.1],
+            [3.333,  42,  72, 0.12],
+            [3.5,    42,  80, 0.12],
+            [3.667,  42,  65, 0.1],
+            [3.833,  42,  70, 0.12],
+        ],
+    },
+
+    {
+        "id": "phonk-kit",
+        "name": "Phonk Kit",
+        "category": "Electronic",
+        "description": "Memphis phonk/dark trap — booming 808, cowbell, 73 BPM lurk",
+        "pads": {
+            36: {"synthdef": "kick808",       "params": {"freq": 38.0,  "decay": 1.50}},
+            38: {"synthdef": "snare808",      "params": {"decay": 0.22, "tone": 0.18, "noise": 0.90}},
+            37: {"synthdef": "rimshot808",    "params": {"decay": 0.08}},
+            39: {"synthdef": "clap909",       "params": {"decay": 0.20, "spread": 0.55}},
+            42: {"synthdef": "hihatClosed808","params": {"decay": 0.04}},
+            44: {"synthdef": "hihatClosed808","params": {"decay": 0.025}},
+            46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.22}},
+            56: {"synthdef": "cowbell808",    "params": {"freq": 620.0, "decay": 0.28}},
+            49: {"synthdef": "cymbalCrash",   "params": {"decay": 1.4}},
+        },
+        "demo_bpm": 73,
+        "demo": [
+            # Memphis phonk — lurking tempo, cowbell on off-beats, long 808 sub
+            [0.0,  36, 115, 1.0],   # massive sub kick
+            [0.0,  42,  72, 0.2],
+            [0.5,  42,  55, 0.18],
+            [0.75, 56,  80, 0.22],  # cowbell — phonk signature
+            [1.0,  38,  88, 0.3],
+            [1.0,  39,  78, 0.24],  # clap stack
+            [1.0,  42,  72, 0.2],
+            [1.25, 56,  72, 0.2],   # cowbell
+            [1.5,  42,  55, 0.18],
+            [2.0,  36, 110, 0.9],
+            [2.0,  42,  72, 0.2],
+            [2.25, 56,  80, 0.22],  # cowbell
+            [2.5,  42,  58, 0.18],
+            [2.75, 36,  80, 0.4],   # ghost kick before 4
+            [3.0,  38,  88, 0.3],
+            [3.0,  39,  78, 0.24],  # clap
+            [3.0,  42,  72, 0.2],
+            [3.25, 56,  72, 0.2],   # cowbell
+            [3.5,  42,  55, 0.18],
+            [3.75, 56,  68, 0.18],  # cowbell anticipation
+        ],
+    },
+
+    {
+        "id": "amapiano-kit",
+        "name": "Amapiano Kit",
+        "category": "Electronic",
+        "description": "South African amapiano — log drum pulse, cabasa, slow groove at 112 BPM",
+        "pads": {
+            36: {"synthdef": "kick808",       "params": {"freq": 55.0,  "decay": 0.60}},
+            38: {"synthdef": "snare808",      "params": {"decay": 0.28, "tone": 0.55, "noise": 0.55}},
+            37: {"synthdef": "rimshot808",    "params": {"decay": 0.12}},
+            39: {"synthdef": "clap909",       "params": {"decay": 0.22, "spread": 0.40}},
+            42: {"synthdef": "hihatClosed808","params": {"decay": 0.06}},
+            44: {"synthdef": "hihatClosed808","params": {"decay": 0.04}},
+            46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.35}},
+            69: {"synthdef": "cabasa",        "params": {"decay": 0.14}},
+            64: {"synthdef": "tomMid808",     "params": {"freq": 78.0,  "decay": 0.35}},  # log drum sim
+            49: {"synthdef": "cymbalCrash",   "params": {"decay": 1.4}},
+        },
+        "demo_bpm": 112,
+        "demo": [
+            # Amapiano — cabasa 8th groove, log drum fills, light kick/snare backbone
+            [0.0,  36,  90, 0.5],
+            [0.0,  69,  72, 0.2],   # cabasa downstroke
+            [0.0,  64,  85, 0.3],   # log drum hit
+            [0.25, 69,  58, 0.15],  # cabasa
+            [0.5,  42,  65, 0.2],
+            [0.5,  69,  68, 0.18],  # cabasa
+            [0.5,  64,  78, 0.25],  # log drum
+            [0.75, 69,  55, 0.15],
+            [1.0,  38,  85, 0.3],
+            [1.0,  39,  76, 0.24],  # clap
+            [1.0,  69,  72, 0.2],   # cabasa on 2
+            [1.25, 64,  70, 0.2],   # log drum
+            [1.5,  42,  65, 0.2],
+            [1.5,  69,  65, 0.18],
+            [1.75, 69,  55, 0.15],
+            [2.0,  36,  90, 0.5],
+            [2.0,  69,  72, 0.2],
+            [2.0,  64,  88, 0.3],   # log drum accent
+            [2.25, 36,  68, 0.3],   # log drum-style kick ghost
+            [2.5,  42,  65, 0.2],
+            [2.5,  69,  68, 0.18],
+            [2.75, 64,  75, 0.22],  # log drum
+            [3.0,  38,  85, 0.3],
+            [3.0,  39,  76, 0.24],  # clap
+            [3.0,  69,  72, 0.2],
+            [3.25, 64,  70, 0.2],   # log drum
+            [3.5,  46,  72, 0.4],   # open hat accent
+            [3.5,  69,  65, 0.18],
+            [3.75, 64,  80, 0.22],  # log drum anticipation
+        ],
+    },
+
+    {
+        "id": "hyperpop-kit",
+        "name": "Hyperpop Kit",
+        "category": "Electronic",
+        "description": "Hyper-processed, clipping, sugar-rush chaos — 160 BPM",
+        "pads": {
+            36: {"synthdef": "kick808",       "params": {"freq": 60.0,  "decay": 0.28}},
+            38: {"synthdef": "snare808",      "params": {"decay": 0.12, "tone": 0.10, "noise": 1.0}},
+            37: {"synthdef": "rimshot808",    "params": {"decay": 0.05}},
+            39: {"synthdef": "clap909",       "params": {"decay": 0.10, "spread": 0.80}},
+            42: {"synthdef": "hihatClosed808","params": {"decay": 0.025}},
+            44: {"synthdef": "hihatClosed808","params": {"decay": 0.015}},
+            46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.14}},
+            49: {"synthdef": "cymbalCrash",   "params": {"decay": 0.7}},
+            55: {"synthdef": "cymbalSplash",  "params": {"decay": 0.3}},
+            56: {"synthdef": "cowbell808",    "params": {"freq": 1100.0,"decay": 0.12}},
+        },
+        "demo_bpm": 160,
+        "demo": [
+            # Hyperpop — frantic, every-16th-note, velocity-accent grid, crash hits
+            [0.0,   36, 127, 0.25],
+            [0.0,   38, 115, 0.12],  # clipped snare
+            [0.0,   49,  90, 0.2],   # crash opening
+            [0.0,   42,  90, 0.08],
+            [0.125, 42,  70, 0.07],
+            [0.25,  42,  80, 0.08],
+            [0.375, 42,  60, 0.07],
+            [0.5,   36, 110, 0.22],
+            [0.5,   42,  88, 0.08],
+            [0.625, 42,  65, 0.07],
+            [0.75,  38, 105, 0.12],  # clipped snare
+            [0.75,  42,  78, 0.08],
+            [0.875, 42,  58, 0.07],
+            [1.0,   36, 127, 0.25],
+            [1.0,   42,  90, 0.08],
+            [1.0,   56, 100, 0.1],   # hi cowbell stab
+            [1.125, 42,  70, 0.07],
+            [1.25,  42,  80, 0.08],
+            [1.375, 36,  88, 0.18],
+            [1.375, 42,  62, 0.07],
+            [1.5,   38, 115, 0.12],
+            [1.5,   39,  98, 0.1],   # clap stack
+            [1.5,   42,  85, 0.08],
+            [1.625, 42,  65, 0.07],
+            [1.75,  42,  78, 0.08],
+            [1.875, 42,  58, 0.07],
+            [2.0,   36, 127, 0.25],
+            [2.0,   42,  90, 0.08],
+            [2.125, 42,  70, 0.07],
+            [2.25,  38, 105, 0.12],
+            [2.25,  42,  80, 0.08],
+            [2.375, 42,  62, 0.07],
+            [2.5,   36, 110, 0.22],
+            [2.5,   42,  88, 0.08],
+            [2.625, 42,  65, 0.07],
+            [2.75,  42,  78, 0.08],
+            [2.875, 36,  85, 0.18],
+            [3.0,   38, 115, 0.12],
+            [3.0,   39,  98, 0.1],   # clap stack
+            [3.0,   42,  90, 0.08],
+            [3.0,   55,  88, 0.2],   # splash cymbal
+            [3.125, 42,  70, 0.07],
+            [3.25,  42,  80, 0.08],
+            [3.375, 42,  62, 0.07],
+            [3.5,   36, 120, 0.25],
+            [3.5,   42,  85, 0.08],
+            [3.625, 42,  65, 0.07],
+            [3.75,  38, 105, 0.12],
+            [3.75,  42,  78, 0.08],
+            [3.875, 42,  58, 0.07],
+        ],
+    },
+
+    {
+        "id": "chicago-house-classic",
+        "name": "Chicago House (Classic)",
+        "category": "Electronic",
+        "description": "Original Warehouse-era house — hand clap, tight 909 hats, pumping kick",
+        "pads": {
+            36: {"synthdef": "kick808",       "params": {"freq": 56.0,  "decay": 0.52}},
+            38: {"synthdef": "snare808",      "params": {"decay": 0.20, "tone": 0.30, "noise": 0.82}},
+            39: {"synthdef": "handclap",      "params": {"decay": 0.18}},
+            42: {"synthdef": "hihatClosed808","params": {"decay": 0.04}},
+            44: {"synthdef": "hihatClosed808","params": {"decay": 0.025}},
+            46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.32}},
+            51: {"synthdef": "cymbalRide",    "params": {"decay": 1.2}},
+            49: {"synthdef": "cymbalCrash",   "params": {"decay": 1.4}},
+        },
+        "demo_bpm": 127,
+        "demo": [
+            # Chicago house — 4-on-the-floor, hand clap on 2 & 4, crispy hats
+            [0.0,  36, 100, 0.45],
+            [0.0,  42,  68, 0.18],
+            [0.25, 42,  52, 0.14],
+            [0.5,  42,  62, 0.18],
+            [0.75, 42,  48, 0.14],
+            [1.0,  36,  92, 0.4],
+            [1.0,  39,  90, 0.22],  # hand clap on 2
+            [1.0,  42,  68, 0.18],
+            [1.25, 42,  52, 0.14],
+            [1.5,  42,  62, 0.18],
+            [1.75, 46,  74, 0.35],  # open hat before 3
+            [2.0,  36, 100, 0.45],
+            [2.0,  42,  68, 0.18],
+            [2.25, 42,  52, 0.14],
+            [2.5,  42,  62, 0.18],
+            [2.75, 42,  48, 0.14],
+            [3.0,  36,  92, 0.4],
+            [3.0,  39,  90, 0.22],  # hand clap on 4
+            [3.0,  42,  68, 0.18],
+            [3.25, 42,  52, 0.14],
+            [3.5,  42,  62, 0.18],
+            [3.75, 46,  74, 0.35],
+        ],
+    },
+
+    {
+        "id": "detroit-techno-kit",
+        "name": "Detroit Techno Kit",
+        "category": "Electronic",
+        "description": "Underground Resistance era — minimal, hypnotic, driving 130 BPM",
+        "pads": {
+            36: {"synthdef": "kick808",       "params": {"freq": 48.0,  "decay": 0.70}},
+            38: {"synthdef": "snare808",      "params": {"decay": 0.16, "tone": 0.12, "noise": 0.98}},
+            37: {"synthdef": "rimshot808",    "params": {"decay": 0.06}},
+            42: {"synthdef": "hihatClosed808","params": {"decay": 0.04}},
+            44: {"synthdef": "hihatClosed808","params": {"decay": 0.025}},
+            46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.20}},
+            49: {"synthdef": "cymbalCrash",   "params": {"decay": 0.9}},
+            56: {"synthdef": "cowbell808",    "params": {"freq": 850.0, "decay": 0.16}},
+        },
+        "demo_bpm": 130,
+        "demo": [
+            # Detroit techno — hypnotic 4-on-the-floor, acid-influenced rimshot accents
+            [0.0,  36, 100, 0.55],
+            [0.0,  42,  72, 0.18],
+            [0.5,  42,  58, 0.16],
+            [1.0,  36,  92, 0.5],
+            [1.0,  38,  82, 0.18],
+            [1.0,  42,  72, 0.18],
+            [1.25, 37,  68, 0.1],   # rimshot accent
+            [1.5,  42,  58, 0.16],
+            [1.75, 56,  70, 0.16],  # cowbell pulse
+            [2.0,  36, 100, 0.55],
+            [2.0,  42,  72, 0.18],
+            [2.25, 37,  62, 0.1],   # rimshot
+            [2.5,  42,  58, 0.16],
+            [2.75, 36,  75, 0.3],   # kick ghost
+            [3.0,  36,  92, 0.5],
+            [3.0,  38,  82, 0.18],
+            [3.0,  42,  72, 0.18],
+            [3.25, 37,  68, 0.1],   # rimshot accent
+            [3.5,  42,  58, 0.16],
+            [3.75, 56,  70, 0.16],  # cowbell
+        ],
+    },
+
+    {
+        "id": "baltimore-club-kit",
+        "name": "Baltimore Club",
+        "category": "Electronic",
+        "description": "Call-response kicks, snare on 1.5 & 3.5, frenetic 130 BPM",
+        "pads": {
+            36: {"synthdef": "kick808",       "params": {"freq": 54.0,  "decay": 0.32}},
+            38: {"synthdef": "snare808",      "params": {"decay": 0.16, "tone": 0.25, "noise": 0.86}},
+            39: {"synthdef": "clap909",       "params": {"decay": 0.14, "spread": 0.65}},
+            42: {"synthdef": "hihatClosed808","params": {"decay": 0.035}},
+            44: {"synthdef": "hihatClosed808","params": {"decay": 0.022}},
+            46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.18}},
+            49: {"synthdef": "cymbalCrash",   "params": {"decay": 0.9}},
+        },
+        "demo_bpm": 130,
+        "demo": [
+            # Baltimore club — snare on "and-of-1" and "and-of-3", galloping kicks
+            [0.0,  36, 110, 0.28],
+            [0.0,  42,  78, 0.12],
+            [0.25, 36,  88, 0.24],  # gallop kick
+            [0.25, 42,  58, 0.1],
+            [0.5,  38,  92, 0.18],  # snare on "and-of-1"
+            [0.5,  42,  72, 0.12],
+            [0.75, 42,  55, 0.1],
+            [1.0,  36, 105, 0.28],
+            [1.0,  42,  78, 0.12],
+            [1.25, 42,  58, 0.1],
+            [1.5,  36,  90, 0.26],
+            [1.5,  42,  72, 0.12],
+            [1.75, 36,  80, 0.22],  # gallop kick
+            [1.75, 42,  55, 0.1],
+            [2.0,  36, 110, 0.28],
+            [2.0,  42,  78, 0.12],
+            [2.25, 36,  88, 0.24],  # gallop kick
+            [2.25, 42,  58, 0.1],
+            [2.5,  38,  92, 0.18],  # snare on "and-of-3"
+            [2.5,  39,  82, 0.14],  # clap stack
+            [2.5,  42,  72, 0.12],
+            [2.75, 42,  55, 0.1],
+            [3.0,  36, 105, 0.28],
+            [3.0,  42,  78, 0.12],
+            [3.25, 42,  58, 0.1],
+            [3.5,  36,  90, 0.26],
+            [3.5,  42,  72, 0.12],
+            [3.75, 36,  82, 0.22],  # gallop kick into bar 2
+            [3.75, 42,  55, 0.1],
+        ],
+    },
+
+    {
+        "id": "hardstyle-kit",
+        "name": "Hardstyle Kit",
+        "category": "Electronic",
+        "description": "Distorted reverse-kick, hard snare/clap, driving 150 BPM",
+        "pads": {
+            36: {"synthdef": "kick808",       "params": {"freq": 44.0,  "decay": 0.85}},
+            38: {"synthdef": "snare808",      "params": {"decay": 0.18, "tone": 0.08, "noise": 1.0}},
+            39: {"synthdef": "clap909",       "params": {"decay": 0.16, "spread": 0.72}},
+            42: {"synthdef": "hihatClosed808","params": {"decay": 0.04}},
+            44: {"synthdef": "hihatClosed808","params": {"decay": 0.025}},
+            46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.22}},
+            49: {"synthdef": "cymbalCrash",   "params": {"decay": 1.2}},
+        },
+        "demo_bpm": 150,
+        "demo": [
+            # Hardstyle — reverse-style distorted kick, snare/clap only on beat 3
+            # Hard pumping kick on every beat with ghost, minimal hat
+            [0.0,  36, 127, 0.7],   # main kick
+            [0.0,  42,  70, 0.18],
+            [0.5,  42,  55, 0.15],
+            [0.75, 36,  80, 0.35],  # anticipation kick
+            [1.0,  36, 120, 0.65],
+            [1.0,  42,  70, 0.18],
+            [1.5,  42,  55, 0.15],
+            [1.75, 36,  75, 0.3],   # ghost kick
+            [2.0,  36, 127, 0.7],
+            [2.0,  38, 110, 0.22],  # SNARE/CLAP on beat 3 — defining hardstyle hit
+            [2.0,  39, 100, 0.18],
+            [2.0,  42,  70, 0.18],
+            [2.5,  42,  55, 0.15],
+            [2.75, 36,  80, 0.35],  # anticipation
+            [3.0,  36, 120, 0.65],
+            [3.0,  42,  70, 0.18],
+            [3.5,  42,  55, 0.15],
+            [3.75, 36,  75, 0.3],   # ghost kick into bar 2
+        ],
+    },
+
 ]

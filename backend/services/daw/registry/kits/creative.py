@@ -377,4 +377,140 @@ KITS = [
         ],
     },
 
+    {
+        "id": "cinematic-kit",
+        "name": "Cinematic Kit",
+        "category": "Creative",
+        "description": "Orchestral impacts, taiko hits, long crash — trailer/score texture at 80 BPM",
+        "pads": {
+            36: {"synthdef": "taiko",         "params": {"freq": 50.0, "decay": 1.20}},  # impact
+            38: {"synthdef": "taiko",         "params": {"freq": 80.0, "decay": 0.80}},  # tension hit
+            37: {"synthdef": "taiko",         "params": {"freq": 65.0, "decay": 1.0}},   # mid impact
+            60: {"synthdef": "taiko",         "params": {"freq": 100.0,"decay": 0.45}},  # staccato hit
+            39: {"synthdef": "snare808",      "params": {"decay": 0.60, "tone": 0.30, "noise": 0.85}},
+            42: {"synthdef": "hihatClosed808","params": {"decay": 0.08}},
+            46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.90}},
+            49: {"synthdef": "cymbalCrash",   "params": {"decay": 4.0}},   # long swell crash
+            51: {"synthdef": "cymbalRide",    "params": {"decay": 3.0}},   # long shimmer
+            41: {"synthdef": "tomLow808",     "params": {"freq": 45.0, "decay": 0.80}},
+        },
+        "demo_bpm": 80,
+        "demo": [
+            # Cinematic — big taiko impacts, snare tension rolls, long crash swell
+            [0.0,  36, 110, 1.0],   # massive impact beat 1
+            [0.0,  49,  75, 3.0],   # long crash swell
+            [0.0,  42,  55, 0.3],
+            [0.5,  60,  80, 0.4],   # staccato hit
+            [1.0,  38,  92, 0.75],  # tension hit
+            [1.0,  42,  65, 0.3],
+            [1.5,  39,  85, 0.4],   # snare tension
+            [1.5,  42,  55, 0.25],
+            [2.0,  36, 105, 0.9],   # second impact
+            [2.0,  51,  65, 2.5],   # shimmer ride
+            [2.25, 60,  78, 0.35],  # staccato
+            [2.5,  38,  88, 0.65],
+            [2.75, 41,  70, 0.5],   # floor tom rumble
+            [3.0,  37, 100, 0.85],  # mid impact — crescendo
+            [3.0,  42,  72, 0.3],
+            [3.25, 60,  85, 0.4],   # staccato drive
+            [3.5,  38,  95, 0.5],   # snare crack
+            [3.5,  39,  88, 0.42],
+            [3.75, 41,  80, 0.5],   # floor tom into climax
+        ],
+    },
+
+    {
+        "id": "polyrhythm-kit",
+        "name": "Polyrhythm Kit",
+        "category": "Creative",
+        "description": "3-against-4 cross-rhythms — kick in triplet feel over 4/4 hat grid",
+        "pads": {
+            36: {"synthdef": "kick808",       "params": {"freq": 52.0,  "decay": 0.55}},
+            38: {"synthdef": "snare808",      "params": {"decay": 0.24, "tone": 0.35, "noise": 0.72}},
+            37: {"synthdef": "rimshot808",    "params": {"decay": 0.09}},
+            39: {"synthdef": "clap808",       "params": {"decay": 0.18, "spread": 0.50}},
+            42: {"synthdef": "hihatClosed808","params": {"decay": 0.045}},
+            44: {"synthdef": "hihatClosed808","params": {"decay": 0.03}},
+            46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.38}},
+            60: {"synthdef": "tomHigh808",    "params": {"freq": 105.0, "decay": 0.22}},
+            64: {"synthdef": "tomMid808",     "params": {"freq": 75.0,  "decay": 0.28}},
+            41: {"synthdef": "tomLow808",     "params": {"freq": 52.0,  "decay": 0.36}},
+            49: {"synthdef": "cymbalCrash",   "params": {"decay": 1.4}},
+        },
+        "demo_bpm": 108,
+        "demo": [
+            # 3-against-4: kicks land on triplet positions (0, 4/3, 8/3 beats) over 4/4 hats
+            # Triplet kick positions: 0.0, 1.333, 2.667 (every 4/3 beats = 3 in 4)
+            [0.0,    36, 100, 0.5],   # kick (triplet 1)
+            [0.0,    42,  68, 0.18],
+            [0.25,   42,  52, 0.14],
+            [0.5,    42,  62, 0.18],
+            [0.5,    60,  75, 0.2],   # tom accent
+            [0.75,   42,  50, 0.14],
+            [1.0,    38,  88, 0.28],  # snare (4/4 beat 2)
+            [1.0,    42,  68, 0.18],
+            [1.25,   42,  52, 0.14],
+            [1.333,  36,  90, 0.45],  # kick (triplet 2)
+            [1.5,    42,  62, 0.18],
+            [1.5,    64,  72, 0.22],  # mid conga
+            [1.75,   42,  50, 0.14],
+            [2.0,    42,  68, 0.18],
+            [2.25,   42,  52, 0.14],
+            [2.5,    38,  88, 0.28],  # snare (4/4 beat 4)
+            [2.5,    42,  62, 0.18],
+            [2.667,  36, 100, 0.5],   # kick (triplet 3)
+            [2.75,   42,  50, 0.14],
+            [3.0,    42,  68, 0.18],
+            [3.0,    41,  78, 0.32],  # floor tom accent
+            [3.25,   42,  52, 0.14],
+            [3.5,    42,  62, 0.18],
+            [3.75,   42,  50, 0.14],
+        ],
+    },
+
+    {
+        "id": "vaporwave-kit",
+        "name": "Vaporwave Kit",
+        "category": "Creative",
+        "description": "Slowed, pitch-shifted, nostalgic — 75 BPM dreamy",
+        "pads": {
+            36: {"synthdef": "kick808",       "params": {"freq": 46.0,  "decay": 1.0}},
+            38: {"synthdef": "snare808",      "params": {"decay": 0.50, "tone": 0.72, "noise": 0.42}},
+            37: {"synthdef": "rimshot808",    "params": {"decay": 0.20}},
+            39: {"synthdef": "clap808",       "params": {"decay": 0.40, "spread": 0.28}},
+            42: {"synthdef": "hihatClosed808","params": {"decay": 0.12}},
+            44: {"synthdef": "hihatClosed808","params": {"decay": 0.08}},
+            46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.80}},
+            56: {"synthdef": "cowbell808",    "params": {"freq": 440.0, "decay": 0.60}},  # pitched low cowbell
+            41: {"synthdef": "tomLow808",     "params": {"freq": 46.0,  "decay": 0.65}},
+            49: {"synthdef": "cymbalCrash",   "params": {"decay": 3.5}},
+            51: {"synthdef": "cymbalRide",    "params": {"decay": 2.5}},
+        },
+        "demo_bpm": 75,
+        "demo": [
+            # Vaporwave — slowed boom bap, smooth, dreamy textures, reverby cowbell
+            [0.0,  36, 88,  0.8],
+            [0.0,  42, 60,  0.3],
+            [0.0,  51, 50,  0.4],   # soft ride shimmer
+            [0.5,  42, 48,  0.28],
+            [0.75, 56, 65,  0.5],   # cowbell dreamy accent
+            [1.0,  38, 78,  0.45],
+            [1.0,  39, 68,  0.38],  # warm clap
+            [1.0,  42, 60,  0.3],
+            [1.5,  46, 62,  0.7],   # long open hat swell
+            [1.75, 56, 58,  0.45],  # cowbell echo feel
+            [2.0,  36, 90,  0.8],
+            [2.0,  42, 60,  0.3],
+            [2.25, 36, 60,  0.4],   # ghost kick
+            [2.5,  42, 50,  0.28],
+            [2.5,  41, 55,  0.5],   # floor tom texture
+            [3.0,  38, 80,  0.45],
+            [3.0,  39, 70,  0.38],  # warm clap
+            [3.0,  42, 60,  0.3],
+            [3.25, 56, 65,  0.5],   # cowbell
+            [3.5,  46, 65,  0.6],   # open hat swell
+            [3.75, 51, 52,  0.3],   # soft ride
+        ],
+    },
+
 ]

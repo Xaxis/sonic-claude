@@ -65,7 +65,7 @@ KITS = [
             36: {"synthdef": "kick808",       "params": {"freq": 60.0,  "decay": 0.55}},
             38: {"synthdef": "snare808",      "params": {"decay": 0.28, "tone": 0.35, "noise": 0.75}},
             37: {"synthdef": "rimshot808",    "params": {"decay": 0.08}},
-            39: {"synthdef": "clap808",       "params": {"decay": 0.18, "spread": 0.55}},
+            39: {"synthdef": "clap909",       "params": {"decay": 0.18, "spread": 0.55}},
             42: {"synthdef": "hihatClosed808","params": {"decay": 0.04}},
             44: {"synthdef": "hihatClosed808","params": {"decay": 0.03}},
             46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.35}},
@@ -104,15 +104,15 @@ KITS = [
         "category": "Classic",
         "description": "Roland TR-606 — light electronic, thin kick, buzzy hats",
         "pads": {
-            36: {"synthdef": "kick808",       "params": {"freq": 72.0,  "decay": 0.30}},
-            38: {"synthdef": "snare808",      "params": {"decay": 0.20, "tone": 0.25, "noise": 0.85}},
-            42: {"synthdef": "hihatClosed808","params": {"decay": 0.05}},
-            44: {"synthdef": "hihatClosed808","params": {"decay": 0.03}},
-            46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.30}},
-            41: {"synthdef": "tomLow808",     "params": {"freq": 64.0,  "decay": 0.22}},
-            43: {"synthdef": "tomMid808",     "params": {"freq": 82.0,  "decay": 0.18}},
-            48: {"synthdef": "tomHigh808",    "params": {"freq": 110.0, "decay": 0.14}},
-            49: {"synthdef": "cymbalCrash",   "params": {"decay": 0.9}},
+            36: {"synthdef": "kick606",        "params": {"freq": 72.0,  "decay": 0.30}},
+            38: {"synthdef": "snare606",       "params": {"decay": 0.20, "tone": 0.25, "noise": 0.85}},
+            42: {"synthdef": "hihatClosed606", "params": {"decay": 0.05}},
+            44: {"synthdef": "hihatClosed606", "params": {"decay": 0.03}},
+            46: {"synthdef": "hihatOpen606",   "params": {"decay": 0.30}},
+            41: {"synthdef": "tomLow808",      "params": {"freq": 64.0,  "decay": 0.22}},
+            43: {"synthdef": "tomMid808",      "params": {"freq": 82.0,  "decay": 0.18}},
+            48: {"synthdef": "tomHigh808",     "params": {"freq": 110.0, "decay": 0.14}},
+            49: {"synthdef": "cymbalCrash",    "params": {"decay": 0.9}},
         },
         "demo_bpm": 120,
         "demo": [
@@ -138,10 +138,10 @@ KITS = [
         "category": "Classic",
         "description": "Roland TR-707 — PCM-style, mid-forward, bright overall",
         "pads": {
-            36: {"synthdef": "kick808",       "params": {"freq": 65.0,  "decay": 0.40}},
-            38: {"synthdef": "snare808",      "params": {"decay": 0.24, "tone": 0.45, "noise": 0.65}},
+            36: {"synthdef": "kick707",       "params": {"freq": 65.0,  "decay": 0.40}},
+            38: {"synthdef": "snare707",      "params": {"decay": 0.24, "tone": 0.45, "noise": 0.65}},
             37: {"synthdef": "rimshot808",    "params": {"decay": 0.10}},
-            39: {"synthdef": "clap808",       "params": {"decay": 0.15, "spread": 0.6}},
+            39: {"synthdef": "clap909",       "params": {"decay": 0.15, "spread": 0.6}},
             42: {"synthdef": "hihatClosed808","params": {"decay": 0.055}},
             44: {"synthdef": "hihatClosed808","params": {"decay": 0.035}},
             46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.32}},
@@ -510,6 +510,91 @@ KITS = [
             [3.25, 42,  52, 0.15],
             [3.5,  36,  78, 0.35],
             [3.75, 42,  50, 0.15],
+        ],
+    },
+
+    {
+        "id": "mpc60-kit",
+        "name": "Akai MPC60",
+        "category": "Classic",
+        "description": "12-bit warm sampler, 1988 — NAS, Wu-Tang, early East Coast hip-hop",
+        "pads": {
+            36: {"synthdef": "kick808",       "params": {"freq": 52.0,  "decay": 0.65}},
+            38: {"synthdef": "snare808",      "params": {"decay": 0.28, "tone": 0.45, "noise": 0.68}},
+            37: {"synthdef": "rimshot808",    "params": {"decay": 0.10}},
+            39: {"synthdef": "handclap",      "params": {"decay": 0.22}},
+            42: {"synthdef": "hihatClosed808","params": {"decay": 0.06}},
+            44: {"synthdef": "hihatClosed808","params": {"decay": 0.04}},
+            46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.40}},
+            41: {"synthdef": "tomLow808",     "params": {"freq": 52.0,  "decay": 0.34}},
+            43: {"synthdef": "tomMid808",     "params": {"freq": 68.0,  "decay": 0.26}},
+            48: {"synthdef": "tomHigh808",    "params": {"freq": 86.0,  "decay": 0.20}},
+            49: {"synthdef": "cymbalCrash",   "params": {"decay": 1.6}},
+            51: {"synthdef": "cymbalRide",    "params": {"decay": 1.3}},
+        },
+        "demo_bpm": 93,
+        "demo": [
+            # MPC60 — laid-back boom bap, warm low-end, natural hand clap on 2 & 4
+            [0.0,  36, 100, 0.6],
+            [0.0,  42,  68, 0.22],
+            [0.5,  42,  55, 0.2],
+            [0.75, 36,  68, 0.3],   # late ghost kick
+            [1.0,  38,  90, 0.3],
+            [1.0,  39,  82, 0.25],  # hand clap on 2
+            [1.0,  42,  68, 0.22],
+            [1.5,  42,  55, 0.2],
+            [2.0,  36, 100, 0.6],
+            [2.0,  42,  68, 0.22],
+            [2.25, 36,  62, 0.3],   # syncopated kick
+            [2.5,  42,  55, 0.2],
+            [3.0,  38,  90, 0.3],
+            [3.0,  39,  82, 0.25],  # hand clap on 4
+            [3.0,  42,  68, 0.22],
+            [3.5,  42,  55, 0.2],
+            [3.75, 36,  72, 0.3],   # late kick anticipating bar 2
+        ],
+    },
+
+    {
+        "id": "mpc3000-kit",
+        "name": "Akai MPC3000",
+        "category": "Classic",
+        "description": "16-bit pristine, ultra-punchy, 1994 — J Dilla, Pete Rock, Madlib",
+        "pads": {
+            36: {"synthdef": "kick808",       "params": {"freq": 50.0,  "decay": 0.75}},
+            38: {"synthdef": "snare808",      "params": {"decay": 0.26, "tone": 0.42, "noise": 0.72}},
+            37: {"synthdef": "rimshot808",    "params": {"decay": 0.09}},
+            39: {"synthdef": "handclap",      "params": {"decay": 0.20}},
+            42: {"synthdef": "hihatClosed808","params": {"decay": 0.05}},
+            44: {"synthdef": "hihatClosed808","params": {"decay": 0.03}},
+            46: {"synthdef": "hihatOpen808",  "params": {"decay": 0.38}},
+            41: {"synthdef": "tomLow808",     "params": {"freq": 50.0,  "decay": 0.38}},
+            43: {"synthdef": "tomMid808",     "params": {"freq": 65.0,  "decay": 0.30}},
+            48: {"synthdef": "tomHigh808",    "params": {"freq": 82.0,  "decay": 0.22}},
+            49: {"synthdef": "cymbalCrash",   "params": {"decay": 1.5}},
+            51: {"synthdef": "cymbalRide",    "params": {"decay": 1.2}},
+        },
+        "demo_bpm": 87,
+        "demo": [
+            # MPC3000 — J Dilla drunken swing feel, off-beat hats, deliberate sloppiness
+            [0.0,   36, 100, 0.6],
+            [0.0,   42,  70, 0.2],
+            [0.45,  42,  52, 0.18],  # slightly late "and-of-1" — Dilla lag
+            [0.75,  36,  65, 0.3],   # ghost kick
+            [1.0,   38,  92, 0.3],
+            [1.0,   39,  84, 0.25],  # hand clap
+            [1.0,   42,  70, 0.2],
+            [1.45,  42,  52, 0.18],  # late hat
+            [2.0,   36, 100, 0.6],
+            [2.0,   42,  70, 0.2],
+            [2.3,   36,  60, 0.25],  # syncopated ghost kick
+            [2.45,  42,  52, 0.18],  # late hat
+            [2.75,  46,  72, 0.4],   # open hat before 4
+            [3.0,   38,  92, 0.3],
+            [3.0,   39,  84, 0.25],  # hand clap
+            [3.0,   42,  70, 0.2],
+            [3.5,   42,  52, 0.18],
+            [3.78,  36,  78, 0.3],   # very late kick — Dilla signature
         ],
     },
 

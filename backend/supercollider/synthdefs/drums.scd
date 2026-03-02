@@ -432,18 +432,267 @@ SynthDef(\agogoLow, { |out=0, amp=0.5, freq=2000, decay=0.5|
     Out.ar(out, [sig, sig]);
 }).add;
 
+// ============================================================================
+// EXTENDED DRUM MACHINES — 606 / 707 / 909 CLAP / COWBELL 909
+// ============================================================================
+
+// TR-606 Kick — thin, electronic, higher pitch
+SynthDef(\kick606, { |out=0, amp=0.7, freq=80, decay=0.18, pitchRatio=2.2|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -6), doneAction: 2);
+    var pitchEnv = EnvGen.kr(Env.perc(0.001, 0.05, pitchRatio, -12));
+    var click = HPF.ar(WhiteNoise.ar(0.12), 2500) * EnvGen.kr(Env.perc(0.001, 0.018));
+    var sig = SinOsc.ar(freq * pitchEnv) + click;
+    sig = sig * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// TR-707 Kick — PCM-like, punchy mid-range
+SynthDef(\kick707, { |out=0, amp=0.8, freq=50, decay=0.28, pitchRatio=2.8|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -4), doneAction: 2);
+    var pitchEnv = EnvGen.kr(Env.perc(0.001, 0.07, pitchRatio, -9));
+    var noise = HPF.ar(WhiteNoise.ar(0.18), 900) * EnvGen.kr(Env.perc(0.0001, 0.015));
+    var sig = SinOsc.ar(freq * pitchEnv) + noise;
+    sig = sig * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// TR-606 Snare — thin, buzzy, lo-fi
+SynthDef(\snare606, { |out=0, amp=0.5, freq=220, decay=0.09, noiseDecay=0.11|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -7), doneAction: 2);
+    var noiseEnv = EnvGen.kr(Env.perc(0.001, noiseDecay, 1, -5));
+    var tonal = SinOsc.ar(freq) * 0.4 * env;
+    var noise = BPF.ar(WhiteNoise.ar(1), 3200, 1.6) * noiseEnv;
+    var sig = (tonal + noise) * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// TR-707 Snare — crisp, sharp attack
+SynthDef(\snare707, { |out=0, amp=0.6, freq=190, decay=0.1, noiseDecay=0.14, snap=0.45|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -6), doneAction: 2);
+    var noiseEnv = EnvGen.kr(Env.perc(0.001, noiseDecay, 1, -4));
+    var snapEnv = EnvGen.kr(Env.perc(0.0001, 0.014));
+    var tonal = SinOsc.ar(freq) * 0.3 * env;
+    var noise = HPF.ar(WhiteNoise.ar(1), 2000) * noiseEnv;
+    var snapSig = HPF.ar(WhiteNoise.ar(snap), 6500) * snapEnv;
+    var sig = (tonal + noise + snapSig) * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// TR-909 Clap — metallic layered clap
+SynthDef(\clap909, { |out=0, amp=0.6, decay=0.12|
+    var env = EnvGen.kr(Env.perc(0.0001, decay, 1, -4), doneAction: 2);
+    var noise = BPF.ar(HPF.ar(WhiteNoise.ar(1), 2000), 3600, 0.35);
+    var sig = (noise
+        + DelayN.ar(noise, 0.008, 0.008) * 0.75
+        + DelayN.ar(noise, 0.016, 0.016) * 0.55
+        + DelayN.ar(noise, 0.022, 0.022) * 0.35) * 0.35;
+    sig = sig * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// TR-606 Closed Hi-Hat — thin, short, buzzy
+SynthDef(\hihatClosed606, { |out=0, amp=0.4, decay=0.035, tone=7200|
+    var env = EnvGen.kr(Env.perc(0.0001, decay, 1, -12), doneAction: 2);
+    var sig = HPF.ar(WhiteNoise.ar(1), tone);
+    sig = BPF.ar(sig, tone * 1.85, 0.22);
+    sig = sig * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// TR-606 Open Hi-Hat — thin, longer
+SynthDef(\hihatOpen606, { |out=0, amp=0.4, decay=0.22, tone=7200|
+    var env = EnvGen.kr(Env.perc(0.0001, decay, 1, -3), doneAction: 2);
+    var sig = HPF.ar(WhiteNoise.ar(1), tone);
+    sig = BPF.ar(sig, tone * 1.85, 0.22);
+    sig = sig * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// TR-909 Cowbell — brighter, sharper than 808
+SynthDef(\cowbell909, { |out=0, amp=0.5, freq=540, decay=0.28|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -5), doneAction: 2);
+    var sig = Mix([
+        Pulse.ar(freq, 0.5),
+        Pulse.ar(freq * 1.47, 0.5) * 0.65
+    ]) * 0.4;
+    sig = BPF.ar(sig, freq * 2.5, 0.45);
+    sig = sig * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// ============================================================================
+// HAND PERCUSSION — CLAPS / SNAPS
+// ============================================================================
+
+// Hand Clap — natural human clap with smack transient
+SynthDef(\handclap, { |out=0, amp=0.5, decay=0.13|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -4), doneAction: 2);
+    var smack = HPF.ar(WhiteNoise.ar(1), 3500) * EnvGen.kr(Env.perc(0.0001, 0.018));
+    var body = BPF.ar(HPF.ar(WhiteNoise.ar(1), 1200), 2400, 0.8);
+    var sig = (body + smack * 0.5) * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// Finger Snap — dry, bright click
+SynthDef(\fingersnap, { |out=0, amp=0.4, decay=0.045|
+    var env = EnvGen.kr(Env.perc(0.0001, decay, 1, -8), doneAction: 2);
+    var sig = BPF.ar(WhiteNoise.ar(1), 2200, 0.28);
+    sig = sig * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// Maracas — dry rattling seeds
+SynthDef(\maracas, { |out=0, amp=0.35, decay=0.07|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -5), doneAction: 2);
+    var sig = HPF.ar(WhiteNoise.ar(1), 5800);
+    sig = BPF.ar(sig, 9200, 0.75);
+    sig = sig * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// Cabasa / Afuche — longer metallic rattling
+SynthDef(\cabasa, { |out=0, amp=0.35, decay=0.14|
+    var env = EnvGen.kr(Env.perc(0.006, decay, 1, -4), doneAction: 2);
+    var sig = HPF.ar(WhiteNoise.ar(1), 3000);
+    sig = BPF.ar(sig, 5200, 1.1);
+    sig = sig * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// ============================================================================
+// GLOBAL PERCUSSION — DJEMBE / TABLA / SURDO / PANDEIRO / CUICA
+// ============================================================================
+
+// Djembe — West African bass tone
+SynthDef(\djembe, { |out=0, amp=0.7, freq=92, decay=0.5, tone=0.4|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -3), doneAction: 2);
+    var pitchEnv = EnvGen.kr(Env.perc(0.001, 0.09, 1.6, -7));
+    var body = SinOsc.ar(freq * pitchEnv);
+    var skin = BPF.ar(WhiteNoise.ar(tone), freq * 3.2, 1.4) * EnvGen.kr(Env.perc(0.001, 0.065));
+    var sig = (body + skin) * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// Djembe Slap — high-pitched sharp slap tone
+SynthDef(\djembeSlap, { |out=0, amp=0.6, freq=360, decay=0.16|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -5), doneAction: 2);
+    var pitchEnv = EnvGen.kr(Env.perc(0.001, 0.04, 1.9, -10));
+    var body = SinOsc.ar(freq * pitchEnv);
+    var snap = HPF.ar(WhiteNoise.ar(0.45), 2800) * EnvGen.kr(Env.perc(0.0001, 0.028));
+    var sig = (body + snap) * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// Tabla — Indian tabla, right-hand open tone (na)
+SynthDef(\tabla, { |out=0, amp=0.6, freq=310, decay=0.35|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -4), doneAction: 2);
+    var pitchEnv = EnvGen.kr(Env.perc(0.001, 0.065, 1.55, -8));
+    var body = Mix([
+        SinOsc.ar(freq * pitchEnv),
+        SinOsc.ar(freq * pitchEnv * 2.01) * 0.28,
+        SinOsc.ar(freq * pitchEnv * 3.03) * 0.12
+    ]) * 0.7;
+    var skin = BPF.ar(WhiteNoise.ar(0.18), freq * 4, 2.0) * EnvGen.kr(Env.perc(0.001, 0.04));
+    var sig = (body + skin) * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// Tabla Low — left-hand baya (bass drone/stroke)
+SynthDef(\tablaLow, { |out=0, amp=0.7, freq=78, decay=0.6|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -3), doneAction: 2);
+    var pitchEnv = EnvGen.kr(Env.perc(0.001, 0.18, 1.85, -5));
+    var body = Mix([
+        SinOsc.ar(freq * pitchEnv),
+        SinOsc.ar(freq * pitchEnv * 2.02) * 0.18
+    ]) * 0.55;
+    var sig = body * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// Surdo — Brazilian surdo bass drum (deep, resonant)
+SynthDef(\surdo, { |out=0, amp=0.85, freq=55, decay=0.7|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -3), doneAction: 2);
+    var pitchEnv = EnvGen.kr(Env.perc(0.001, 0.22, 1.75, -5));
+    var body = SinOsc.ar(freq * pitchEnv);
+    var beater = HPF.ar(WhiteNoise.ar(0.14), 1600) * EnvGen.kr(Env.perc(0.001, 0.025));
+    var sig = (body + beater) * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// Pandeiro — Brazilian frame drum (body + jingles)
+SynthDef(\pandeiro, { |out=0, amp=0.5, freq=410, decay=0.22|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -4), doneAction: 2);
+    var pitchEnv = EnvGen.kr(Env.perc(0.001, 0.05, 1.45, -8));
+    var body = SinOsc.ar(freq * pitchEnv) * 0.55;
+    var jingles = Mix([
+        BPF.ar(WhiteNoise.ar(1), 4200, 0.1),
+        BPF.ar(WhiteNoise.ar(1), 6400, 0.1),
+        BPF.ar(WhiteNoise.ar(1), 8500, 0.1)
+    ]) / 3 * EnvGen.kr(Env.perc(0.001, decay * 1.3));
+    var sig = (body + jingles * 0.45) * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// Cuica — Brazilian friction drum (wobbly pitch)
+SynthDef(\cuica, { |out=0, amp=0.5, freq=260, decay=0.32, squeak=0.5|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -3), doneAction: 2);
+    var pitchWobble = SinOsc.kr(14, 0, squeak * 0.06);
+    var sig = SinOsc.ar(freq * (1 + pitchWobble));
+    sig = LPF.ar(sig, 1600);
+    sig = sig * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// Taiko — Japanese ceremonial drum (deep, resonant)
+SynthDef(\taiko, { |out=0, amp=0.9, freq=42, decay=0.8|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -2), doneAction: 2);
+    var pitchEnv = EnvGen.kr(Env.perc(0.001, 0.12, 1.6, -6));
+    var body = Mix([
+        SinOsc.ar(freq * pitchEnv),
+        SinOsc.ar(freq * pitchEnv * 1.52) * 0.22,
+        SinOsc.ar(freq * pitchEnv * 2.05) * 0.1
+    ]) * 0.65;
+    var stick = HPF.ar(WhiteNoise.ar(0.25), 2000) * EnvGen.kr(Env.perc(0.001, 0.04));
+    var sig = (body + stick) * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// Cajon — Peruvian box drum (bass thump)
+SynthDef(\cajon, { |out=0, amp=0.75, freq=70, decay=0.35|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -3), doneAction: 2);
+    var pitchEnv = EnvGen.kr(Env.perc(0.001, 0.08, 1.5, -7));
+    var body = SinOsc.ar(freq * pitchEnv);
+    var wood = BPF.ar(HPF.ar(WhiteNoise.ar(0.3), 1500), 3000, 0.9) * EnvGen.kr(Env.perc(0.001, 0.05));
+    var sig = (body + wood) * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
+// Cajon Slap — sharp slap tone on cajon
+SynthDef(\cajonSlap, { |out=0, amp=0.6, freq=280, decay=0.18|
+    var env = EnvGen.kr(Env.perc(0.001, decay, 1, -5), doneAction: 2);
+    var pitchEnv = EnvGen.kr(Env.perc(0.001, 0.04, 1.7, -9));
+    var body = SinOsc.ar(freq * pitchEnv) * 0.5;
+    var crack = HPF.ar(WhiteNoise.ar(0.6), 2200) * EnvGen.kr(Env.perc(0.0001, 0.035));
+    var sig = (body + crack) * env * amp;
+    Out.ar(out, [sig, sig]);
+}).add;
+
 "✅ Comprehensive Drum & Percussion SynthDefs loaded".postln;
 "".postln;
-"   KICKS: kick808, kick909, kickAcoustic".postln;
-"   SNARES: snare808, snare909, snareAcoustic".postln;
-"   HI-HATS: hihatClosed808, hihatOpen808, hihatClosed909, hihatOpen909".postln;
+"   KICKS: kick808, kick909, kickAcoustic, kick606, kick707".postln;
+"   SNARES: snare808, snare909, snareAcoustic, snare606, snare707".postln;
+"   CLAPS: clap808, clap909, handclap".postln;
+"   HI-HATS: hihatClosed808/909/606, hihatOpen808/909/606".postln;
 "   TOMS: tomLow808, tomMid808, tomHigh808".postln;
 "   CYMBALS: cymbalCrash, cymbalRide, cymbalSplash".postln;
-"   PERCUSSION: clap808, cowbell808, rimshot808".postln;
-"   LATIN: congaHigh, congaLow, bongoHigh, bongoLow, timbaleHigh, timbaleLow".postln;
-"   WORLD: tambourine, shaker, claves, woodblock, triangle, agogoHigh, agogoLow".postln;
+"   COWBELLS: cowbell808, cowbell909".postln;
+"   SNAPS: fingersnap, rimshot808".postln;
+"   SHAKERS: maracas, cabasa, shaker, tambourine".postln;
+"   LATIN: congaHigh, congaLow, bongoHigh, bongoLow, timbaleHigh, timbaleLow, claves, woodblock".postln;
+"   GLOBAL: djembe, djembeSlap, tabla, tablaLow, surdo, pandeiro, cuica, taiko, cajon, cajonSlap".postln;
+"   MISC: triangle, agogoHigh, agogoLow".postln;
 "".postln;
-"   Total: 30+ drum & percussion instruments".postln;
+"   Total: 50+ drum & percussion instruments".postln;
 )
 
 

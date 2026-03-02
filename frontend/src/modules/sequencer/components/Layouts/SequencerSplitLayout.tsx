@@ -38,6 +38,8 @@ export function SequencerSplitLayout({
     const showPianoRoll = useDAWStore(state => state.showPianoRoll);
     const showSampleEditor = useDAWStore(state => state.showSampleEditor);
     const showDrumEditor = useDAWStore(state => state.showDrumEditor);
+    const midiEditorView = useDAWStore(state => state.midiEditorView);
+    const showMidiEditor = showPianoRoll || showDrumEditor;
 
     // ========================================================================
     // LOCAL UI STATE: Split ratio and drag states
@@ -125,12 +127,14 @@ export function SequencerSplitLayout({
                 style={{ flexGrow: 100 - timelineHeightPercent, flexShrink: 1, flexBasis: 0 }}
             >
                 <div className="h-full flex flex-col overflow-hidden">
-                    {showDrumEditor ? (
-                        <SequencerDrumEditor />
-                    ) : showPianoRoll ? (
-                        <SequencerPianoRoll
-                            pianoRollScrollRef={pianoRollScrollRef}
-                        />
+                    {showMidiEditor ? (
+                        midiEditorView === "step-sequencer" ? (
+                            <SequencerDrumEditor />
+                        ) : (
+                            <SequencerPianoRoll
+                                pianoRollScrollRef={pianoRollScrollRef}
+                            />
+                        )
                     ) : showSampleEditor ? (
                         <SequencerSampleEditor
                             sampleEditorScrollRef={sampleEditorScrollRef}

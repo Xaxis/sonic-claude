@@ -262,10 +262,10 @@ export function SequencerClip({
                 style={{
                     left: `${left}px`,
                     width: `${width}px`,
-                    backgroundColor: (isEditingInPianoRoll || isEditingInSampleEditor)
+                    backgroundColor: (isEditingInPianoRoll || isEditingInSampleEditor || isEditingInDrumEditor)
                         ? `${trackColor}60` // Brighter when editing
                         : `${trackColor}40`, // Track color with 25% opacity
-                    borderColor: (isEditingInPianoRoll || isEditingInSampleEditor) ? "#22d3ee" : trackColor,
+                    borderColor: (isEditingInPianoRoll || isEditingInSampleEditor || isEditingInDrumEditor) ? "#22d3ee" : trackColor,
                 }}
             onClick={handleClick}
             onMouseDown={(e) => {

@@ -460,4 +460,187 @@ KITS = [
         ],
     },
 
+    {
+        "id": "djembe-kit",
+        "name": "Djembe Ensemble",
+        "category": "Acoustic",
+        "description": "West African djembe — bass, tone, slap polyrhythm at 120 BPM",
+        "pads": {
+            36: {"synthdef": "djembe",     "params": {"freq": 80.0,  "decay": 0.55}},  # dundun bass
+            38: {"synthdef": "djembe",     "params": {"freq": 110.0, "decay": 0.38}},  # djembe tone
+            37: {"synthdef": "djembe",     "params": {"freq": 95.0,  "decay": 0.45}},  # djembe mid tone
+            39: {"synthdef": "djembeSlap", "params": {"decay": 0.18}},                  # slap
+            42: {"synthdef": "djembeSlap", "params": {"decay": 0.12}},                  # light slap
+            60: {"synthdef": "djembe",     "params": {"freq": 140.0, "decay": 0.28}},  # sangban hi
+            61: {"synthdef": "djembe",     "params": {"freq": 160.0, "decay": 0.22}},  # kenkeni hi
+            64: {"synthdef": "djembeSlap", "params": {"decay": 0.15}},
+        },
+        "demo_bpm": 120,
+        "demo": [
+            # Kuku rhythm — classic West African 6/8 feel rendered in 4/4 bars
+            [0.0,  36, 100, 0.5],   # dundun bass 1
+            [0.0,  39,  88, 0.18],  # slap accent
+            [0.0,  60,  75, 0.2],
+            [0.25, 42,  65, 0.12],  # light slap texture
+            [0.5,  38,  90, 0.35],  # djembe tone
+            [0.5,  60,  70, 0.18],
+            [0.75, 42,  60, 0.12],
+            [0.75, 61,  72, 0.18],  # kenkeni pulse
+            [1.0,  39,  85, 0.18],  # slap
+            [1.0,  36,  88, 0.4],
+            [1.25, 42,  62, 0.12],
+            [1.25, 60,  75, 0.2],
+            [1.5,  38,  82, 0.3],
+            [1.5,  61,  70, 0.18],
+            [1.75, 42,  58, 0.12],
+            [2.0,  36, 100, 0.5],   # dundun bass 2
+            [2.0,  39,  90, 0.18],  # slap
+            [2.0,  60,  75, 0.2],
+            [2.25, 42,  65, 0.12],
+            [2.5,  38,  88, 0.35],
+            [2.5,  60,  70, 0.18],
+            [2.75, 42,  60, 0.12],
+            [2.75, 61,  72, 0.18],
+            [3.0,  39,  85, 0.18],  # slap
+            [3.0,  38,  85, 0.3],
+            [3.25, 60,  75, 0.2],
+            [3.5,  36,  88, 0.4],
+            [3.5,  61,  70, 0.18],
+            [3.75, 42,  60, 0.12],
+        ],
+    },
+
+    {
+        "id": "cajon-kit",
+        "name": "Cajon Kit",
+        "category": "Acoustic",
+        "description": "Peruvian box drum — bass thump + slap, fingernap accents at 98 BPM",
+        "pads": {
+            36: {"synthdef": "cajon",      "params": {"freq": 65.0, "decay": 0.55}},   # bass thump
+            38: {"synthdef": "cajonSlap",  "params": {"decay": 0.20}},                  # slap (snare zone)
+            37: {"synthdef": "cajonSlap",  "params": {"decay": 0.14}},                  # ghost slap
+            39: {"synthdef": "fingersnap", "params": {"decay": 0.10}},                  # snap accent
+            42: {"synthdef": "cajonSlap",  "params": {"decay": 0.08}},                  # finger brush (hat)
+            60: {"synthdef": "cajon",      "params": {"freq": 90.0, "decay": 0.30}},   # mid tone
+            61: {"synthdef": "cajon",      "params": {"freq": 110.0,"decay": 0.22}},   # hi tone
+        },
+        "demo_bpm": 98,
+        "demo": [
+            # Flamenco-influenced cajon groove — bass on 1, slap on 2 & 4, snap accents
+            [0.0,  36, 100, 0.5],   # bass thump
+            [0.0,  42,  60, 0.12],  # finger brush
+            [0.25, 37,  55, 0.12],  # ghost slap
+            [0.5,  42,  65, 0.14],
+            [0.5,  60,  70, 0.2],   # mid tone
+            [0.75, 42,  55, 0.12],
+            [1.0,  38,  90, 0.28],  # slap on 2
+            [1.0,  39,  80, 0.16],  # snap accent
+            [1.0,  42,  65, 0.14],
+            [1.25, 42,  55, 0.12],
+            [1.5,  36,  82, 0.4],   # bass thump
+            [1.5,  60,  65, 0.2],
+            [1.75, 37,  55, 0.12],  # ghost slap
+            [2.0,  36, 100, 0.5],   # bass thump
+            [2.0,  42,  60, 0.12],
+            [2.25, 37,  58, 0.12],
+            [2.5,  42,  65, 0.14],
+            [2.5,  61,  68, 0.18],  # hi tone
+            [2.75, 42,  52, 0.12],
+            [3.0,  38,  90, 0.28],  # slap on 4
+            [3.0,  39,  80, 0.16],  # snap
+            [3.0,  42,  65, 0.14],
+            [3.25, 37,  55, 0.12],
+            [3.5,  36,  85, 0.4],
+            [3.5,  60,  68, 0.2],
+            [3.75, 42,  52, 0.12],
+        ],
+    },
+
+    {
+        "id": "tabla-kit",
+        "name": "Tabla Duo",
+        "category": "Acoustic",
+        "description": "Indian tabla — Teentaal (16 beat) groove, dayan na/ta, bayan ge",
+        "pads": {
+            36: {"synthdef": "tablaLow",  "params": {"freq": 55.0,  "decay": 0.60}},  # baya ge
+            38: {"synthdef": "tabla",     "params": {"freq": 200.0, "decay": 0.35}},  # dayan na open
+            37: {"synthdef": "tabla",     "params": {"freq": 240.0, "decay": 0.28}},  # dayan tin
+            39: {"synthdef": "tabla",     "params": {"freq": 280.0, "decay": 0.20}},  # dayan high
+            42: {"synthdef": "tablaLow",  "params": {"freq": 45.0,  "decay": 0.45}},  # baya closed
+            60: {"synthdef": "tabla",     "params": {"freq": 180.0, "decay": 0.42}},  # dayan ta (muted)
+        },
+        "demo_bpm": 100,
+        "demo": [
+            # Teentaal groove — 16 beats in groups of 4+4+4+4, sam on beat 1
+            [0.0,  36,  95, 0.55],  # sam — baya ge (beat 1, stressed)
+            [0.0,  38,  88, 0.32],  # dayan na (sam)
+            [0.25, 38,  75, 0.28],  # na
+            [0.25, 42,  70, 0.2],   # baya pulse
+            [0.5,  60,  80, 0.35],  # ta (muted)
+            [0.75, 37,  82, 0.25],  # tin
+            [1.0,  38,  85, 0.3],   # na
+            [1.0,  42,  68, 0.2],   # baya
+            [1.25, 38,  72, 0.26],  # na
+            [1.5,  39,  78, 0.22],  # high dayan accent
+            [1.75, 36,  88, 0.42],  # baya ge accent (khali beat 9)
+            [2.0,  38,  82, 0.3],   # na
+            [2.0,  42,  65, 0.2],
+            [2.25, 37,  75, 0.25],  # tin
+            [2.5,  60,  78, 0.32],  # ta
+            [2.5,  36,  85, 0.4],   # baya
+            [2.75, 38,  70, 0.26],  # na
+            [3.0,  38,  88, 0.32],  # na (beat 13, closing)
+            [3.0,  39,  82, 0.22],  # high accent
+            [3.25, 42,  70, 0.2],
+            [3.25, 38,  72, 0.26],  # na
+            [3.5,  36,  92, 0.5],   # baya ge (approaching sam)
+            [3.5,  37,  80, 0.28],  # tin
+            [3.75, 38,  85, 0.3],   # na anticipating sam
+        ],
+    },
+
+    {
+        "id": "taiko-kit",
+        "name": "Taiko Ensemble",
+        "category": "Acoustic",
+        "description": "Japanese ceremonial taiko — o-daiko punch, chappa shimmer, 100 BPM",
+        "pads": {
+            36: {"synthdef": "taiko",         "params": {"freq": 60.0, "decay": 0.90}},   # o-daiko (large)
+            38: {"synthdef": "taiko",         "params": {"freq": 90.0, "decay": 0.55}},   # chu-daiko (mid)
+            37: {"synthdef": "taiko",         "params": {"freq": 75.0, "decay": 0.70}},   # chu-daiko accent
+            60: {"synthdef": "taiko",         "params": {"freq": 120.0,"decay": 0.35}},   # ko-daiko (small)
+            61: {"synthdef": "taiko",         "params": {"freq": 150.0,"decay": 0.28}},   # shime-daiko
+            42: {"synthdef": "hihatClosed808","params": {"decay": 0.08}},                  # chappa (cymbals)
+            49: {"synthdef": "cymbalCrash",   "params": {"decay": 1.2}},                   # large chappa
+        },
+        "demo_bpm": 100,
+        "demo": [
+            # Taiko pattern — o-daiko grounds the pulse, chu-daiko calls, ko-daiko responds
+            [0.0,  36, 110, 0.8],   # o-daiko DON (beat 1)
+            [0.0,  42,  72, 0.2],   # chappa shimmer
+            [0.25, 60,  85, 0.3],   # ko-daiko tsu
+            [0.5,  38,  95, 0.5],   # chu-daiko DON
+            [0.5,  42,  65, 0.2],
+            [0.75, 61,  80, 0.28],  # shime-daiko
+            [1.0,  60,  88, 0.32],  # ko-daiko
+            [1.0,  42,  70, 0.2],
+            [1.25, 38,  82, 0.42],  # chu-daiko
+            [1.5,  36, 100, 0.7],   # o-daiko DON
+            [1.5,  42,  65, 0.2],
+            [1.75, 61,  78, 0.26],  # shime-daiko
+            [2.0,  38,  90, 0.5],   # chu-daiko
+            [2.0,  42,  72, 0.2],
+            [2.25, 60,  85, 0.3],   # ko-daiko
+            [2.5,  37, 100, 0.6],   # chu-daiko ACCENT — forte
+            [2.5,  49,  80, 0.8],   # large chappa clash
+            [2.75, 61,  80, 0.26],
+            [3.0,  36, 110, 0.8],   # o-daiko DON
+            [3.0,  42,  72, 0.2],
+            [3.25, 60,  85, 0.3],
+            [3.5,  38,  92, 0.5],   # chu-daiko
+            [3.5,  42,  65, 0.2],
+            [3.75, 61,  82, 0.28],  # shime-daiko drive into next bar
+        ],
+    },
+
 ]

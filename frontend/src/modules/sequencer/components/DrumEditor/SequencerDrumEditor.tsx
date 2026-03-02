@@ -13,9 +13,10 @@
  */
 
 import { useState, useEffect, useMemo } from "react";
-import { Drumstick, X } from "lucide-react";
+import { Drumstick, X, Piano, Grid3x3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDAWStore } from "@/stores/dawStore";
+import { IconButton } from "@/components/ui/icon-button.tsx";
 import type { MIDIEvent } from "../../types";
 
 // ─── GM drum name map ────────────────────────────────────────────────────────
@@ -119,11 +120,13 @@ function DrumPadRow({ padNote, label, stepCount, activeSteps, onToggle }: DrumPa
 // ─── SequencerDrumEditor ──────────────────────────────────────────────────────
 
 export function SequencerDrumEditor() {
-    const clipId     = useDAWStore((s) => s.drumEditorClipId);
-    const tracks     = useDAWStore((s) => s.tracks);
-    const clips      = useDAWStore((s) => s.clips);
-    const updateClip = useDAWStore((s) => s.updateClip);
-    const closeDrumEditor = useDAWStore((s) => s.closeDrumEditor);
+    const clipId              = useDAWStore((s) => s.drumEditorClipId);
+    const tracks              = useDAWStore((s) => s.tracks);
+    const clips               = useDAWStore((s) => s.clips);
+    const updateClip          = useDAWStore((s) => s.updateClip);
+    const closeDrumEditor     = useDAWStore((s) => s.closeDrumEditor);
+    const midiEditorView      = useDAWStore((s) => s.midiEditorView);
+    const switchMidiEditorView = useDAWStore((s) => s.switchMidiEditorView);
 
     // Clips are stored flat in the store (not nested inside tracks)
     const clip = useMemo(
@@ -148,17 +151,24 @@ export function SequencerDrumEditor() {
         else setStepCount(16);
     }, [clip?.id]);
 
-    // Build sorted pad list from kit
+    // Build sorted pad list from kit, or derive from clip notes for instrument tracks
     const pads = useMemo(() => {
-        if (!kit) return [];
-        return Object.keys(kit)
-            .map(Number)
-            .sort((a, b) => a - b)
-            .map((note) => ({
-                note,
-                label: GM_DRUM_NAMES[note] ?? `Note ${note}`,
-            }));
-    }, [kit]);
+        if (kit && Object.keys(kit).length > 0) {
+            return Object.keys(kit)
+                .map(Number)
+                .sort((a, b) => a - b)
+                .map((note) => ({
+                    note,
+                    label: GM_DRUM_NAMES[note] ?? `Note ${note}`,
+                }));
+        }
+        // Instrument mode: pads = unique pitches in clip, sorted descending
+        const uniqueNotes = [...new Set(localNotes.map((n) => n.note))].sort((a, b) => b - a);
+        return uniqueNotes.map((note) => ({
+            note,
+            label: midiNoteToName(note),
+        }));
+    }, [kit, localNotes]);
 
     // Per-pad active step sets (precomputed for O(1) lookup in render)
     const activeStepsByPad = useMemo(() => {
@@ -206,33 +216,53 @@ export function SequencerDrumEditor() {
         updateClip(clipId, { midi_events: [] });
     };
 
-    if (!clip || !kit || pads.length === 0) {
+    if (!clip) {
         return (
             <div className="h-full flex flex-col items-center justify-center text-center p-8 bg-muted/20">
                 <Drumstick size={40} className="text-muted-foreground/20 mb-3" />
-                <div className="text-sm font-medium text-muted-foreground/60">No drum kit loaded</div>
+                <div className="text-sm font-medium text-muted-foreground/60">No clip selected</div>
                 <div className="text-xs text-muted-foreground/40 mt-1">
-                    Select a kit track clip to edit its pattern.
+                    Select a MIDI clip to edit its pattern.
                 </div>
             </div>
         );
     }
 
-    const kitName = track?.name ?? "Drum Track";
+    const trackName = track?.name ?? "MIDI Track";
     const noteCount = localNotes.length;
 
     return (
         <div className="h-full flex flex-col overflow-hidden bg-background">
 
             {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border/40 flex-shrink-0 bg-muted/10">
+            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/40 flex-shrink-0 bg-muted/10">
                 <Drumstick size={13} className="text-muted-foreground/50 flex-shrink-0" />
                 <span className="text-xs font-medium text-foreground/80 flex-1 truncate">
-                    {kitName}
+                    {trackName}
                 </span>
                 <span className="text-[10px] text-muted-foreground/40">
                     {noteCount} note{noteCount !== 1 ? "s" : ""}
                 </span>
+
+                {/* View toggle: Keys ↔ Grid */}
+                <IconButton
+                    icon={Piano}
+                    tooltip="Piano Roll (Keys)"
+                    onClick={() => switchMidiEditorView("piano-roll")}
+                    variant="ghost"
+                    size="icon-sm"
+                    active={midiEditorView === "piano-roll"}
+                />
+                <IconButton
+                    icon={Grid3x3}
+                    tooltip="Step Sequencer (Grid)"
+                    onClick={() => switchMidiEditorView("step-sequencer")}
+                    variant="ghost"
+                    size="icon-sm"
+                    active={midiEditorView === "step-sequencer"}
+                />
+
+                <div className="w-px h-4 bg-border mx-1" />
 
                 {/* Step count toggle */}
                 <div className="flex items-center gap-0.5 bg-muted/20 rounded p-0.5">
@@ -262,13 +292,13 @@ export function SequencerDrumEditor() {
                 </button>
 
                 {/* Close */}
-                <button
+                <IconButton
+                    icon={X}
+                    tooltip="Close drum editor"
                     onClick={closeDrumEditor}
-                    className="text-muted-foreground/40 hover:text-foreground transition-colors"
-                    title="Close drum editor"
-                >
-                    <X size={13} />
-                </button>
+                    variant="ghost"
+                    size="icon-sm"
+                />
             </div>
 
             {/* ── Beat ruler ─────────────────────────────────────────────── */}
@@ -290,16 +320,22 @@ export function SequencerDrumEditor() {
 
             {/* ── Pad rows ───────────────────────────────────────────────── */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden">
-                {pads.map(({ note, label }) => (
-                    <DrumPadRow
-                        key={note}
-                        padNote={note}
-                        label={label}
-                        stepCount={stepCount}
-                        activeSteps={activeStepsByPad.get(note) ?? new Set()}
-                        onToggle={(stepIndex) => handleToggle(note, stepIndex)}
-                    />
-                ))}
+                {pads.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground/50 italic p-8">
+                        No notes in clip — switch to Piano Roll to add notes
+                    </div>
+                ) : (
+                    pads.map(({ note, label }) => (
+                        <DrumPadRow
+                            key={note}
+                            padNote={note}
+                            label={label}
+                            stepCount={stepCount}
+                            activeSteps={activeStepsByPad.get(note) ?? new Set()}
+                            onToggle={(stepIndex) => handleToggle(note, stepIndex)}
+                        />
+                    ))
+                )}
             </div>
 
         </div>

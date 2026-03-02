@@ -40,4 +40,22 @@ SYNTHDEFS = [
     {"name": "clap808",       "display_name": "808 Clap",          "category": "Drums", "description": "808 hand clap",            "parameters": ["amp", "decay", "spread"]},
     {"name": "cowbell808",    "display_name": "808 Cowbell",       "category": "Drums", "description": "808 cowbell",              "parameters": ["amp", "decay", "freq"]},
     {"name": "rimshot808",    "display_name": "808 Rimshot",       "category": "Drums", "description": "808 rimshot",              "parameters": _DRUM_PARAMS},
+
+    # TR-606 voices
+    {"name": "kick606",       "display_name": "606 Kick",          "category": "Drums", "description": "Thin TR-606 kick drum",              "parameters": ["amp", "decay", "freq"]},
+    {"name": "snare606",      "display_name": "606 Snare",         "category": "Drums", "description": "Thin buzzy TR-606 snare",            "parameters": ["amp", "decay", "tone", "noise"]},
+    {"name": "hihatClosed606","display_name": "606 Closed Hi-Hat", "category": "Drums", "description": "Thin buzzy 606 closed hi-hat",       "parameters": _DRUM_PARAMS},
+    {"name": "hihatOpen606",  "display_name": "606 Open Hi-Hat",   "category": "Drums", "description": "Thin 606 open hi-hat",               "parameters": _DRUM_PARAMS},
+
+    # TR-707/909 extended voices
+    {"name": "kick707",       "display_name": "707 Kick",          "category": "Drums", "description": "PCM-like TR-707 kick drum",          "parameters": ["amp", "decay", "freq"]},
+    {"name": "snare707",      "display_name": "707 Snare",         "category": "Drums", "description": "Crisp TR-707 snare with snap",       "parameters": ["amp", "decay", "tone", "noise"]},
+    {"name": "clap909",       "display_name": "909 Clap",          "category": "Drums", "description": "4-layer metallic TR-909 clap",       "parameters": ["amp", "decay", "spread"]},
+    {"name": "cowbell909",    "display_name": "909 Cowbell",       "category": "Drums", "description": "Brighter TR-909 style cowbell",      "parameters": ["amp", "decay", "freq"]},
+
+    # Hand percussion
+    {"name": "handclap",      "display_name": "Hand Clap",         "category": "Drums", "description": "Natural human hand clap",            "parameters": _DRUM_PARAMS},
+    {"name": "fingersnap",    "display_name": "Finger Snap",       "category": "Drums", "description": "Dry bright finger snap",             "parameters": _DRUM_PARAMS},
+    {"name": "maracas",       "display_name": "Maracas",           "category": "Drums", "description": "Dry seed maraca rattle",             "parameters": _DRUM_PARAMS},
+    {"name": "cabasa",        "display_name": "Cabasa",            "category": "Drums", "description": "Metallic cabasa rattle",             "parameters": _DRUM_PARAMS},
 ]
