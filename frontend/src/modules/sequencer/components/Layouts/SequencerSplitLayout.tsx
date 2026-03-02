@@ -12,13 +12,15 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { Music } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state.tsx";
 import { SequencerTimelineSection } from "../Timeline/SequencerTimelineSection.tsx";
 import { SequencerPianoRoll } from "../PianoRoll/SequencerPianoRoll.tsx";
 import { SequencerSampleEditor } from "../SampleEditor/SequencerSampleEditor.tsx";
-import { SequencerDrumEditor } from "../DrumEditor/SequencerDrumEditor.tsx";
+import { SequencerStepEditor } from "../StepEditor/SequencerStepEditor.tsx";
 import { useDAWStore } from '@/stores/dawStore.ts';
+import { SEQUENCER_SPLIT_RATIO_STORAGE_KEY } from "@/config/daw.constants";
 
-const SPLIT_RATIO_KEY = 'sonic-claude-sequencer-split-ratio';
+const SPLIT_RATIO_KEY = SEQUENCER_SPLIT_RATIO_STORAGE_KEY;
 
 interface SequencerSplitLayoutProps {
     // Scroll refs for auto-scroll functionality
@@ -35,11 +37,9 @@ export function SequencerSplitLayout({
     // ========================================================================
     // STATE: Read directly from Zustand store
     // ========================================================================
-    const showPianoRoll = useDAWStore(state => state.showPianoRoll);
+    const midiEditorMode = useDAWStore(state => state.midiEditorMode);
     const showSampleEditor = useDAWStore(state => state.showSampleEditor);
-    const showDrumEditor = useDAWStore(state => state.showDrumEditor);
-    const midiEditorView = useDAWStore(state => state.midiEditorView);
-    const showMidiEditor = showPianoRoll || showDrumEditor;
+    const showMidiEditor = midiEditorMode !== "closed";
 
     // ========================================================================
     // LOCAL UI STATE: Split ratio and drag states
@@ -128,8 +128,8 @@ export function SequencerSplitLayout({
             >
                 <div className="h-full flex flex-col overflow-hidden">
                     {showMidiEditor ? (
-                        midiEditorView === "step-sequencer" ? (
-                            <SequencerDrumEditor />
+                        midiEditorMode === "step-sequencer" ? (
+                            <SequencerStepEditor />
                         ) : (
                             <SequencerPianoRoll
                                 pianoRollScrollRef={pianoRollScrollRef}
@@ -140,15 +140,11 @@ export function SequencerSplitLayout({
                             sampleEditorScrollRef={sampleEditorScrollRef}
                         />
                     ) : (
-                        <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center bg-muted/20">
-                            <div className="text-muted-foreground">
-                                <Music size={48} className="mx-auto mb-4 opacity-20" />
-                                <div className="text-base font-medium mb-1">No Editor Open</div>
-                                <div className="text-xs text-muted-foreground/70">
-                                    Click a clip to open it — MIDI clips open the piano roll, drum clips open the step editor, audio clips open the sample editor.
-                                </div>
-                            </div>
-                        </div>
+                        <EmptyState
+                            icon={<Music size={48} className="opacity-20" />}
+                            title="No Editor Open"
+                            description="Click a clip to open it — MIDI clips open the piano roll, drum clips open the step editor, audio clips open the sample editor."
+                        />
                     )}
                 </div>
             </div>

@@ -19,8 +19,7 @@ import {
     PIANO_ROLL_MAX_PITCH,
     PIANO_ROLL_NOTE_HEIGHT,
 } from "@/config/daw.constants";
-
-const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+import { NOTE_NAMES } from "@/config/midi.constants";
 
 // Interaction modes
 type InteractionMode =
@@ -35,7 +34,7 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     // ========================================================================
     // ZUSTAND STATE
     // ========================================================================
-    const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
+    const midiEditorClipId = useDAWStore(state => state.midiEditorClipId);
     const clips = useDAWStore(state => state.clips);
     const tracks = useDAWStore(state => state.tracks);
     const snapEnabled = useDAWStore(state => state.snapEnabled);
@@ -67,7 +66,7 @@ export function SequencerPianoRollGrid({}: SequencerPianoRollGridProps) {
     // ========================================================================
     // CLIP DATA
     // ========================================================================
-    const clip = pianoRollClipId ? clips.find(c => c.id === pianoRollClipId) : undefined;
+    const clip = midiEditorClipId ? clips.find(c => c.id === midiEditorClipId) : undefined;
     if (!clip || clip.type !== 'midi') {
         return <div className="flex items-center justify-center h-full text-muted-foreground">Invalid clip</div>;
     }

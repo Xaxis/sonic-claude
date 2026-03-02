@@ -40,13 +40,11 @@ export function SequencerClip({
     const snapEnabled = useDAWStore(state => state.snapEnabled);
     const gridSize = useDAWStore(state => state.gridSize);
     const selectedClipId = useDAWStore(state => state.selectedClipId);
-    const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
+    const midiEditorClipId = useDAWStore(state => state.midiEditorClipId);
     const sampleEditorClipId = useDAWStore(state => state.sampleEditorClipId);
-    const drumEditorClipId = useDAWStore(state => state.drumEditorClipId);
     const isSelected = selectedClipId === clip.id;
-    const isEditingInPianoRoll = pianoRollClipId === clip.id;
+    const isEditingInMidiEditor = midiEditorClipId === clip.id;
     const isEditingInSampleEditor = sampleEditorClipId === clip.id;
-    const isEditingInDrumEditor = drumEditorClipId === clip.id;
 
     // ========================================================================
     // ACTIONS: Get from Zustand store
@@ -55,9 +53,8 @@ export function SequencerClip({
     const duplicateClip = useDAWStore(state => state.duplicateClip);
     const deleteClip = useDAWStore(state => state.deleteClip);
     const updateClip = useDAWStore(state => state.updateClip);
-    const openPianoRoll = useDAWStore(state => state.openPianoRoll);
+    const openMidiEditor = useDAWStore(state => state.openMidiEditor);
     const openSampleEditor = useDAWStore(state => state.openSampleEditor);
-    const openDrumEditor = useDAWStore(state => state.openDrumEditor);
     const setClipDragState = useDAWStore(state => state.setClipDragState);
 
     // ========================================================================
@@ -224,12 +221,11 @@ export function SequencerClip({
         setSelectedClipId(clip.id);
 
         if (clip.type === "midi") {
-            // Kit tracks → drum step editor; plain MIDI → piano roll
-            if (track?.kit && Object.keys(track.kit).length > 0) {
-                openDrumEditor(clip.id);
-            } else {
-                openPianoRoll(clip.id);
-            }
+            // Kit tracks → step editor; plain MIDI → piano roll
+            const mode = (track?.kit && Object.keys(track.kit).length > 0)
+                ? "step-sequencer" as const
+                : "piano-roll" as const;
+            openMidiEditor(clip.id, mode);
         } else if (clip.type === "audio") {
             openSampleEditor(clip.id);
         }
@@ -250,7 +246,7 @@ export function SequencerClip({
             <div
                 className={cn(
                     "absolute top-1 bottom-1 rounded border-2 cursor-move overflow-hidden transition-all",
-                    isEditingInPianoRoll || isEditingInSampleEditor || isEditingInDrumEditor
+                    isEditingInMidiEditor || isEditingInSampleEditor
                         ? "border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.6)] ring-2 ring-cyan-400/50"
                         : isSelected
                             ? "border-white shadow-lg"
@@ -262,10 +258,10 @@ export function SequencerClip({
                 style={{
                     left: `${left}px`,
                     width: `${width}px`,
-                    backgroundColor: (isEditingInPianoRoll || isEditingInSampleEditor || isEditingInDrumEditor)
+                    backgroundColor: (isEditingInMidiEditor || isEditingInSampleEditor)
                         ? `${trackColor}60` // Brighter when editing
                         : `${trackColor}40`, // Track color with 25% opacity
-                    borderColor: (isEditingInPianoRoll || isEditingInSampleEditor || isEditingInDrumEditor) ? "#22d3ee" : trackColor,
+                    borderColor: (isEditingInMidiEditor || isEditingInSampleEditor) ? "#22d3ee" : trackColor,
                 }}
             onClick={handleClick}
             onMouseDown={(e) => {

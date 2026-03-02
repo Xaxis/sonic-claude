@@ -48,6 +48,38 @@ export const TIMELINE_MIN_BEATS = 64;
 export const TIMELINE_PADDING_BEATS = 128;
 
 // ============================================================================
+// STEP EDITOR (DRUM / STEP SEQUENCER)
+// ============================================================================
+
+/** Width (px) of the fixed left label column in the step editor */
+export const STEP_EDITOR_LABEL_WIDTH = 128;
+
+/** Duration of each step in beats (1/16 note) */
+export const STEP_EDITOR_STEP_SIZE = 0.25;
+
+/** Width (px) of each step cell at default zoom */
+export const STEP_EDITOR_CELL_WIDTH = 28;
+
+/** Height (px) of each pad row in the step editor */
+export const STEP_EDITOR_ROW_HEIGHT = 28;
+
+// ============================================================================
+// SEQUENCER PANEL
+// ============================================================================
+
+/** localStorage key for the sequencer split-panel ratio */
+export const SEQUENCER_SPLIT_RATIO_STORAGE_KEY = "sonic-claude-sequencer-split-ratio";
+
+/** Minimum zoom level for the sequencer/piano roll */
+export const SEQUENCER_ZOOM_MIN = 0.25;
+
+/** Maximum zoom level for the sequencer/piano roll */
+export const SEQUENCER_ZOOM_MAX = 8;
+
+/** Zoom step increment/decrement amount */
+export const SEQUENCER_ZOOM_STEP = 0.25;
+
+// ============================================================================
 // SAMPLE EDITOR
 // ============================================================================
 

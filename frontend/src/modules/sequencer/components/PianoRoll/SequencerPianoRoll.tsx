@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { X, Music, SlidersHorizontal, Navigation, Piano, Grid3x3 } from "lucide-react";
+import { X, Music, SlidersHorizontal, Navigation } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button.tsx";
 import { EmptyState } from "@/components/ui/empty-state.tsx";
 import { EditorTabBar } from "@/components/ui/editor-tab-bar.tsx";
@@ -17,6 +17,7 @@ import { SequencerPianoRollRuler } from "./SequencerPianoRollRuler.tsx";
 import { MidiClipControls } from "./MidiClipControls.tsx";
 import { SequencerTimelineLoopRegion } from "../Timeline/SequencerTimelineLoopRegion.tsx";
 import { SequencerGridLayout } from "../Layouts/SequencerGridLayout.tsx";
+import { MidiEditorViewToggle } from "../Shared/MidiEditorViewToggle.tsx";
 import { useDAWStore } from '@/stores/dawStore';
 import { useTimelineCalculations } from "../../hooks/useTimelineCalculations.ts";
 
@@ -38,19 +39,17 @@ export function SequencerPianoRoll({
     // ========================================================================
     // STATE: Read from Zustand store
     // ========================================================================
-    const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
+    const midiEditorClipId = useDAWStore(state => state.midiEditorClipId);
     const clips = useDAWStore(state => state.clips);
 
     // ========================================================================
     // ACTIONS: Get from Zustand store
     // ========================================================================
-    const closePianoRoll          = useDAWStore(state => state.closePianoRoll);
+    const closeMidiEditor         = useDAWStore(state => state.closeMidiEditor);
     const setPianoRollScrollLeft  = useDAWStore(state => state.setPianoRollScrollLeft);
     const setPianoRollScrollRef   = useDAWStore(state => state.setPianoRollScrollRef);
     const followPlayback          = useDAWStore(state => state.pianoRollFollowPlayback);
     const togglePianoRollFollow   = useDAWStore(state => state.togglePianoRollFollow);
-    const midiEditorView          = useDAWStore(state => state.midiEditorView);
-    const switchMidiEditorView    = useDAWStore(state => state.switchMidiEditorView);
 
     // ========================================================================
     // EFFECTS: Set scroll ref when component mounts
@@ -78,7 +77,7 @@ export function SequencerPianoRoll({
     // ========================================================================
     // DERIVED STATE: Get clip data
     // ========================================================================
-    const clip = pianoRollClipId ? clips.find(c => c.id === pianoRollClipId) : undefined;
+    const clip = midiEditorClipId ? clips.find(c => c.id === midiEditorClipId) : undefined;
     const midiEvents = clip?.type === 'midi' ? (clip.midi_events || []) : [];
 
     // ========================================================================
@@ -143,22 +142,7 @@ export function SequencerPianoRoll({
                     </div>
                     <div className="flex items-center gap-1">
                         {/* View toggle: Keys ↔ Grid */}
-                        <IconButton
-                            icon={Piano}
-                            tooltip="Piano Roll (Keys)"
-                            onClick={() => switchMidiEditorView("piano-roll")}
-                            variant="ghost"
-                            size="icon-sm"
-                            active={midiEditorView === "piano-roll"}
-                        />
-                        <IconButton
-                            icon={Grid3x3}
-                            tooltip="Step Sequencer (Grid)"
-                            onClick={() => switchMidiEditorView("step-sequencer")}
-                            variant="ghost"
-                            size="icon-sm"
-                            active={midiEditorView === "step-sequencer"}
-                        />
+                        <MidiEditorViewToggle />
                         <div className="w-px h-4 bg-border mx-1" />
                         {/* Follow Playback toggle */}
                         <IconButton
@@ -173,7 +157,7 @@ export function SequencerPianoRoll({
                         <IconButton
                             icon={X}
                             tooltip="Close Piano Roll"
-                            onClick={closePianoRoll}
+                            onClick={closeMidiEditor}
                             variant="ghost"
                             size="icon-sm"
                         />

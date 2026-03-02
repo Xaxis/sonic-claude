@@ -226,13 +226,12 @@ interface DAWStore {
     showSampleBrowser: boolean;
     showSequenceManager: boolean;
     showSequenceSettings: boolean;
-    showPianoRoll: boolean;
-    pianoRollClipId: string | null;
+    /** Which MIDI editor is currently open, or "closed" if none */
+    midiEditorMode: "closed" | "piano-roll" | "step-sequencer";
+    /** ID of the MIDI clip open in the editor (null when midiEditorMode is "closed") */
+    midiEditorClipId: string | null;
     showSampleEditor: boolean;
     sampleEditorClipId: string | null;
-    showDrumEditor: boolean;
-    drumEditorClipId: string | null;
-    midiEditorView: "piano-roll" | "step-sequencer";
 
     // Mixer UI
     showMeters: boolean;
@@ -431,13 +430,11 @@ interface DAWStore {
     setShowSampleBrowser: (show: boolean) => void;
     setShowSequenceManager: (show: boolean) => void;
     setShowSequenceSettings: (show: boolean) => void;
-    openPianoRoll: (clipId: string) => void;
-    closePianoRoll: () => void;
+    openMidiEditor: (clipId: string, mode: "piano-roll" | "step-sequencer") => void;
+    closeMidiEditor: () => void;
+    switchMidiEditorMode: (mode: "piano-roll" | "step-sequencer") => void;
     openSampleEditor: (clipId: string) => void;
     closeSampleEditor: () => void;
-    openDrumEditor: (clipId: string) => void;
-    closeDrumEditor: () => void;
-    switchMidiEditorView: (view: "piano-roll" | "step-sequencer") => void;
     setShowMeters: (show: boolean) => void;
     setMeterMode: (mode: "peak" | "rms" | "both") => void;
     setSelectedChannelId: (id: string | null) => void;
@@ -574,13 +571,10 @@ export const useDAWStore = create<DAWStore>()(
                 showSampleBrowser: false,
                 showSequenceManager: false,
                 showSequenceSettings: false,
-                showPianoRoll: false,
-                pianoRollClipId: null,
+                midiEditorMode: "closed",
+                midiEditorClipId: null,
                 showSampleEditor: false,
                 sampleEditorClipId: null,
-                showDrumEditor: false,
-                drumEditorClipId: null,
-                midiEditorView: "piano-roll",
                 showMeters: true,
                 meterMode: "both",
                 selectedChannelId: null,
@@ -2344,67 +2338,42 @@ export const useDAWStore = create<DAWStore>()(
         setShowSequenceManager: (show) => set({ showSequenceManager: show }),
         setShowSequenceSettings: (show) => set({ showSequenceSettings: show }),
 
-        openPianoRoll: (clipId) => {
+        openMidiEditor: (clipId, mode) => {
             set({
-                showPianoRoll: true,
-                pianoRollClipId: clipId,
-                showDrumEditor: false,
-                drumEditorClipId: clipId,
-                midiEditorView: "piano-roll",
+                midiEditorMode: mode,
+                midiEditorClipId: clipId,
                 showSampleEditor: false,
                 sampleEditorClipId: null,
             });
 
-            // Auto-scroll to notes after a brief delay to ensure DOM is ready
-            setTimeout(() => {
-                get().scrollPianoRollToNotes(clipId);
-            }, 100);
+            // Auto-scroll piano roll to notes after DOM is ready
+            if (mode === "piano-roll") {
+                setTimeout(() => {
+                    get().scrollPianoRollToNotes(clipId);
+                }, 100);
+            }
         },
 
-        closePianoRoll: () => set({
-            showPianoRoll: false,
-            pianoRollClipId: null,
-            showDrumEditor: false,
-            drumEditorClipId: null,
+        closeMidiEditor: () => set({
+            midiEditorMode: "closed",
+            midiEditorClipId: null,
+        }),
+
+        switchMidiEditorMode: (mode) => set((state) => {
+            if (!state.midiEditorClipId) return {};
+            return { midiEditorMode: mode };
         }),
 
         openSampleEditor: (clipId) => set({
             showSampleEditor: true,
             sampleEditorClipId: clipId,
-            showPianoRoll: false,
-            pianoRollClipId: null,
+            midiEditorMode: "closed",
+            midiEditorClipId: null,
         }),
 
         closeSampleEditor: () => set({
             showSampleEditor: false,
             sampleEditorClipId: null
-        }),
-
-        openDrumEditor: (clipId) => set({
-            showDrumEditor: true,
-            drumEditorClipId: clipId,
-            showPianoRoll: false,
-            pianoRollClipId: clipId,
-            midiEditorView: "step-sequencer",
-            showSampleEditor: false,
-            sampleEditorClipId: null,
-        }),
-
-        closeDrumEditor: () => set({
-            showDrumEditor: false,
-            drumEditorClipId: null,
-            showPianoRoll: false,
-            pianoRollClipId: null,
-        }),
-
-        switchMidiEditorView: (view) => set((state) => {
-            const clipId = state.pianoRollClipId ?? state.drumEditorClipId;
-            if (!clipId) return {};
-            return {
-                midiEditorView: view,
-                showPianoRoll: view === "piano-roll",
-                showDrumEditor: view === "step-sequencer",
-            };
         }),
 
         setShowMeters: (show) => set({ showMeters: show }),

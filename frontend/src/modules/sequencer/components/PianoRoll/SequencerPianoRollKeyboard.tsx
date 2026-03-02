@@ -51,11 +51,11 @@ const isBlackKey = (pitch: number): boolean =>
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function SequencerPianoRollKeyboard() {
-    const pianoRollClipId = useDAWStore(state => state.pianoRollClipId);
-    const clips           = useDAWStore(state => state.clips);
-    const tracks          = useDAWStore(state => state.tracks);
+    const midiEditorClipId = useDAWStore(state => state.midiEditorClipId);
+    const clips            = useDAWStore(state => state.clips);
+    const tracks           = useDAWStore(state => state.tracks);
 
-    const clip       = pianoRollClipId ? clips.find(c => c.id === pianoRollClipId) : undefined;
+    const clip       = midiEditorClipId ? clips.find(c => c.id === midiEditorClipId) : undefined;
     const track      = clip ? tracks.find(t => t.id === clip.track_id) : undefined;
     const instrument = track?.instrument || "sine";
 

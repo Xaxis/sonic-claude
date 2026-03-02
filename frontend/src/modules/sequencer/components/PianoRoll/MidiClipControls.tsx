@@ -43,11 +43,11 @@ const CORNER_HEADER_H = 32;
 
 export function MidiClipControls() {
     // ── Store ──────────────────────────────────────────────────────────────
-    const pianoRollClipId = useDAWStore(s => s.pianoRollClipId);
-    const clips           = useDAWStore(s => s.clips);
-    const updateClip      = useDAWStore(s => s.updateClip);
+    const midiEditorClipId = useDAWStore(s => s.midiEditorClipId);
+    const clips            = useDAWStore(s => s.clips);
+    const updateClip       = useDAWStore(s => s.updateClip);
 
-    const clip = pianoRollClipId ? clips.find(c => c.id === pianoRollClipId) : undefined;
+    const clip = midiEditorClipId ? clips.find(c => c.id === midiEditorClipId) : undefined;
 
     const {
         midiTranspose,
