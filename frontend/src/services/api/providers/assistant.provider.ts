@@ -43,6 +43,10 @@ export interface ContextualChatRequest {
     entity_id: string;
     composition_id: string;
     additional_context?: Record<string, any>;
+    // Per-request AI preferences (all optional; backend uses defaults when absent)
+    execution_model?: "haiku" | "sonnet" | "opus";
+    temperature?: number;
+    response_style?: "concise" | "balanced" | "detailed";
 }
 
 export interface ContextualChatResponse {
@@ -50,6 +54,7 @@ export interface ContextualChatResponse {
     actions_executed?: any[];
     affected_entities?: Array<{ type: string; id: string }>;
     musical_context?: string | null;
+    routing_intent?: string | null;
 }
 
 export interface GetStateRequest {

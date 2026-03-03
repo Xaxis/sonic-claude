@@ -2634,12 +2634,18 @@ export const useDAWStore = create<DAWStore>()(
                     aiRequestHistory: [historyEntry, ...state.aiRequestHistory].slice(0, 100)
                 }));
 
+                // Read AI preferences from settingsStore (non-hook, safe to call in store action)
+                const aiPrefs = useSettingsStore.getState();
+
                 // Send contextual message to backend
                 const response = await api.assistant.contextualChat({
                     message,
                     entity_type,
                     entity_id,
                     composition_id,
+                    execution_model: aiPrefs.aiExecutionModel,
+                    temperature:     aiPrefs.aiCreativity,
+                    response_style:  aiPrefs.aiResponseStyle,
                 });
 
                 // Update history entry with success

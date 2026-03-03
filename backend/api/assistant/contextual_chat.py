@@ -35,7 +35,7 @@ router = APIRouter()
 class ContextualChatRequest(BaseModel):
     """Contextual chat message request with entity scope"""
     message: str = Field(..., description="User's natural language request")
-    
+
     # Entity context
     entity_type: Literal["track", "clip", "effect", "mixer_channel", "composition"] = Field(
         ...,
@@ -43,11 +43,22 @@ class ContextualChatRequest(BaseModel):
     )
     entity_id: str = Field(..., description="ID of the specific entity")
     composition_id: str = Field(..., description="ID of the composition")
-    
+
     # Optional additional context
     additional_context: Optional[Dict[str, Any]] = Field(
         None,
         description="Additional context (e.g., current parameter values, related entities)"
+    )
+
+    # Per-request AI preferences (all optional; backend uses defaults when absent)
+    execution_model: Optional[Literal["haiku", "sonnet", "opus"]] = Field(
+        None, description="Model shorthand override"
+    )
+    temperature: Optional[float] = Field(
+        None, ge=0.0, le=1.0, description="Creativity / temperature (0.0–1.0)"
+    )
+    response_style: Literal["concise", "balanced", "detailed"] = Field(
+        "balanced", description="Response verbosity style"
     )
 
 
@@ -62,6 +73,7 @@ class ContextualChatResponse(BaseModel):
         description="List of all entities affected by the actions (for highlighting)"
     )
     musical_context: Optional[str] = Field(None, description="Full musical analysis")
+    routing_intent: Optional[str] = Field(None, description="Detected intent category")
 
 
 # ============================================================================
@@ -106,7 +118,10 @@ async def contextual_chat(
             entity_type=request.entity_type,
             entity_id=request.entity_id,
             composition_id=request.composition_id,
-            additional_context=request.additional_context
+            additional_context=request.additional_context,
+            execution_model=request.execution_model,
+            temperature=request.temperature,
+            response_style=request.response_style,
         )
 
         return ContextualChatResponse(
@@ -115,7 +130,8 @@ async def contextual_chat(
             entity_type=request.entity_type,
             entity_id=request.entity_id,
             affected_entities=response_dict.get("affected_entities", []),
-            musical_context=response_dict.get("musical_context")
+            musical_context=response_dict.get("musical_context"),
+            routing_intent=response_dict.get("routing_intent"),
         )
 
     except HTTPException:

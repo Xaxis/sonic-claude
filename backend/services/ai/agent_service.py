@@ -22,13 +22,14 @@ import anthropic
 
 from backend.models.daw_state import DAWStateSnapshot
 from backend.models.ai_actions import DAWAction, ActionResult
+from backend.models.composition import ChatMessage
 from backend.services.ai.state_collector_service import DAWStateService
 from backend.services.ai.action_executor_service import DAWActionService
 from backend.services.perception.sample_analysis import SampleAnalyzer
 from backend.services.perception.musical_perception import MusicalPerceptionAnalyzer
 from backend.services.perception.composition_perception import CompositionPerceptionAnalyzer
-from backend.models.instrument_types import get_valid_instruments_list, get_instruments_by_category
-from backend.services.ai.tools.composite_tools import CompositeToolExecutor
+from backend.models.instrument_types import get_valid_instruments_list
+from backend.services.ai.tools.compose_tool import ComposeTool, COMPOSE_MUSIC_TOOL_SCHEMA, EDIT_CLIP_TOOL_SCHEMA
 from backend.services.ai.routing import IntentRouter, Intent
 from typing import TYPE_CHECKING
 
@@ -69,8 +70,8 @@ class AIAgentService:
         self.model = model
         self.ws_manager = ws_manager  # For real-time pipeline events
 
-        # Composite tool executor (poka-yoke design)
-        self.composite_tools = CompositeToolExecutor(action_service)
+        # Primary composition tool
+        self.compose_tool = ComposeTool(action_service)
 
         # Intent router (LLM-based classification)
         self.router = IntentRouter(api_key=api_key)
@@ -86,7 +87,7 @@ class AIAgentService:
         self.last_state_hash: Optional[str] = None
 
         # Chat history tracking (per composition)
-        self.chat_histories: Dict[str, List[Dict[str, Any]]] = {}
+        self.chat_histories: Dict[str, List[ChatMessage]] = {}
 
     async def _emit_pipeline(
         self,
@@ -196,8 +197,10 @@ class AIAgentService:
         # ====================================================================
         # STEP 1: ROUTE REQUEST TO INTENT (LLM-based, or bypass)
         # ====================================================================
-        instruments_list = self._build_instruments_list()
+        instruments_catalog = self._build_instruments_catalog()
         effects_list = self._build_effects_list()
+        kit_catalog = self._build_kit_catalog()
+        genre_summary = self._build_genre_profiles_summary()
         all_tools = self._get_tool_definitions()
         intent = None
 
@@ -211,7 +214,9 @@ class AIAgentService:
             # STEP 2: GET FOCUSED TOOLS AND PROMPT FOR INTENT
             # ================================================================
             relevant_tool_names = self.router.get_tools_for_intent(intent)
-            system_prompt = self.router.get_system_prompt_for_intent(intent, instruments_list, effects_list)
+            system_prompt = self.router.get_system_prompt_for_intent(
+                intent, instruments_catalog, effects_list, kit_catalog, genre_summary
+            )
 
             if relevant_tool_names:
                 tools = [t for t in all_tools if t["name"] in relevant_tool_names]
@@ -228,7 +233,9 @@ class AIAgentService:
         else:
             # No routing — load all tools, use the general-purpose prompt
             tools = all_tools
-            system_prompt = self.router.get_system_prompt_for_intent(Intent.GENERAL_CHAT, instruments_list, effects_list)
+            system_prompt = self.router.get_system_prompt_for_intent(
+                Intent.GENERAL_CHAT, instruments_catalog, effects_list, kit_catalog, genre_summary
+            )
             logger.info(f"🛠️  Routing bypassed — using all {len(tools)} tools")
             await self._emit_pipeline(request_id, "routing", "skipped", {"tools_loaded": len(tools)})
 
@@ -286,24 +293,8 @@ class AIAgentService:
             elif block.type == "tool_use":
                 logger.info(f"🎯 AI calling tool: {block.name} with params: {block.input}")
 
-                # Handle composite tools
-                if block.name == "create_track_with_content":
-                    result = await self.composite_tools.create_track_with_content(
-                        name=block.input["name"],
-                        instrument=block.input["instrument"],
-                        notes=block.input.get("notes", []),
-                        effects=block.input.get("effects"),
-                        start_time=block.input.get("start_time", 0.0),
-                        duration=block.input.get("duration", 4.0),
-                        clip_name=block.input.get("clip_name")
-                    )
-                else:
-                    # Regular tools
-                    action = DAWAction(
-                        action=block.name,
-                        parameters=block.input
-                    )
-                    result = await self.action_service.execute_action(action)
+                # Dispatch tool calls
+                result = await self._dispatch_tool(block.name, block.input)
 
                 actions_executed.append(result)
                 _tool_action_results.append({"name": block.name, "success": result.success})
@@ -410,34 +401,52 @@ class AIAgentService:
         entity_type: str,
         entity_id: str,
         composition_id: str,
-        additional_context: Optional[Dict[str, Any]] = None
+        additional_context: Optional[Dict[str, Any]] = None,
+        *,
+        execution_model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        response_style: str = "balanced",
     ) -> Dict[str, Any]:
         """
-        Send contextual message scoped to a specific entity
+        Send contextual message scoped to a specific entity.
 
-        This is used for inline AI editing where the user right-clicks on an entity
-        and asks the AI to modify it with natural language.
+        Used for inline AI editing (right-click on track/clip/effect → natural language request).
+        Uses the same routing system as send_message() for consistency and token efficiency.
+
+        Entity context is appended to the user message; the system prompt comes from
+        the intent router so Claude gets appropriate musical guidance for the request type.
 
         Args:
-            message: User's natural language request
-            entity_type: Type of entity (track, clip, effect, mixer_channel, composition)
-            entity_id: ID of the specific entity
-            composition_id: ID of the composition
-            additional_context: Optional additional context
+            message:           User's natural language request
+            entity_type:       "track" | "clip" | "effect" | "mixer_channel" | "composition"
+            entity_id:         ID of the specific entity being edited
+            composition_id:    ID of the active composition
+            additional_context: Reserved for future use
+            execution_model:   "haiku" | "sonnet" | "opus" shorthand, or None for default
+            temperature:       Creativity 0.0–1.0 (None = Anthropic default)
+            response_style:    "concise" | "balanced" | "detailed"
 
         Returns:
-            Dict with 'response', 'actions_executed', and 'affected_entities'
+            Dict with 'response', 'actions_executed', 'affected_entities',
+            'routing_intent', 'musical_context'
         """
         from backend.services.ai.context_builder_service import ContextBuilderService
 
-        # Build focused context for the entity
+        if not self.client:
+            return {"response": "AI not configured", "actions_executed": [], "affected_entities": []}
+
+        effective_model = (
+            self._EXECUTION_MODEL_MAP.get(execution_model, self.model)
+            if execution_model else self.model
+        )
+
+        # ── Build entity-specific context ─────────────────────────────────────
         context_builder = ContextBuilderService(
             composition_state_service=self.action_service.composition_state,
             mixer_service=self.action_service.mixer,
             effects_service=self.action_service.track_effects
         )
 
-        # Get entity-specific context
         if entity_type == "track":
             entity_context = context_builder.build_track_context(composition_id, entity_id)
         elif entity_type == "clip":
@@ -451,80 +460,112 @@ class AIAgentService:
         else:
             raise ValueError(f"Unknown entity type: {entity_type}")
 
-        # Build contextual prompt
-        contextual_prompt = self._build_contextual_prompt(
-            message=message,
-            entity_type=entity_type,
-            entity_context=entity_context,
-            additional_context=additional_context
+        # ── Route intent ───────────────────────────────────────────────────────
+        state = await self.state_service.get_current_state()
+        daw_summary = self._build_brief_state_summary(state) if state else None
+        intent = await self.router.route(message, daw_summary)
+
+        # ── Resolve focused tool set ───────────────────────────────────────────
+        tool_names = self.router.get_tools_for_intent(intent)
+        all_tools = self._get_tool_definitions()
+        tools = [t for t in all_tools if t.get("name") in tool_names] if tool_names else all_tools
+
+        # ── Intent-specific system prompt ──────────────────────────────────────
+        system_prompt = self.router.get_system_prompt_for_intent(
+            intent=intent,
+            instruments_catalog=self._build_instruments_catalog(),
+            effects_list=self._build_effects_list(),
+            kit_catalog=self._build_kit_catalog(),
+            genre_profiles_summary=self._build_genre_profiles_summary(),
         )
+        if response_style in self._RESPONSE_STYLE_APPENDIX:
+            system_prompt += self._RESPONSE_STYLE_APPENDIX[response_style]
 
-        # Execute with AI (single LLM call, no planning stage)
-        logger.info(f"🎯 Contextual AI request for {entity_type} {entity_id}: '{message}'")
+        # ── User message with entity context ──────────────────────────────────
+        entity_context_str = self._format_entity_context(entity_type, entity_id, entity_context)
+        user_content = f"{message}\n\n{entity_context_str}"
 
+        logger.info(f"🎯 Contextual AI [{intent.value}] for {entity_type} {entity_id}: '{message}'")
+
+        # ── Single LLM call ────────────────────────────────────────────────────
+        create_kwargs: Dict[str, Any] = {
+            "model": effective_model,
+            "max_tokens": 4096,
+            "system": system_prompt,
+            "messages": [{"role": "user", "content": user_content}],
+            "tools": tools,
+        }
+        if temperature is not None:
+            create_kwargs["temperature"] = temperature
+
+        response = await self.client.messages.create(**create_kwargs)
+
+        # ── Process response ───────────────────────────────────────────────────
         actions_executed = []
         affected_entities = []
         assistant_message = ""
+        tool_results = []
 
-        messages = [{
-            "role": "user",
-            "content": message
-        }]
-
-        # Single LLM call with tools
-        response = await self.client.messages.create(
-            model=self.model,
-            max_tokens=4096,
-            system=contextual_prompt,
-            messages=messages,
-            tools=self._get_tool_definitions()
-        )
-
-        # Process response blocks
         for block in response.content:
             if block.type == "text":
                 assistant_message += block.text
             elif block.type == "tool_use":
-                logger.info(f"🎯 AI calling tool: {block.name} with params: {block.input}")
-
-                # Handle composite tools
-                if block.name == "create_track_with_content":
-                    result = await self.composite_tools.create_track_with_content(
-                        name=block.input["name"],
-                        instrument=block.input["instrument"],
-                        notes=block.input.get("notes", []),
-                        effects=block.input.get("effects"),
-                        start_time=block.input.get("start_time", 0.0),
-                        duration=block.input.get("duration", 4.0),
-                        clip_name=block.input.get("clip_name")
-                    )
-                else:
-                    # Regular tools
-                    action = DAWAction(
-                        action=block.name,
-                        parameters=block.input
-                    )
-                    result = await self.action_service.execute_action(action)
-
+                logger.info(f"   🔧 Tool call: {block.name}")
+                result = await self._dispatch_tool(block.name, block.input)
                 actions_executed.append(result)
-
-                # Track affected entities
                 if result.success and result.data:
                     if "track_id" in result.data:
                         affected_entities.append({"type": "track", "id": result.data["track_id"]})
                     if "clip_id" in result.data:
                         affected_entities.append({"type": "clip", "id": result.data["clip_id"]})
+                result_content = f"Success: {result.message}" if result.success else f"Error: {result.error}"
+                if result.data:
+                    result_content += f"\nData: {result.data}"
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result_content
+                })
 
-        logger.info(f"✅ Contextual execution complete: {len(actions_executed)} actions")
+        # Send tool results back to LLM so it can acknowledge outcomes
+        if tool_results:
+            assistant_content = []
+            for block in response.content:
+                if block.type == "text":
+                    assistant_content.append({"type": "text", "text": block.text})
+                elif block.type == "tool_use":
+                    assistant_content.append({
+                        "type": "tool_use",
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.input
+                    })
 
-        # Build response message
-        full_response = assistant_message if assistant_message else f"✅ Modified {entity_type} '{entity_id}'"
+            follow_up_messages = [
+                {"role": "user", "content": user_content},
+                {"role": "assistant", "content": assistant_content},
+                {"role": "user", "content": tool_results}
+            ]
+
+            logger.info(f"🔄 Sending {len(tool_results)} tool result(s) back to LLM...")
+            follow_up = await self.client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=512,
+                system=system_prompt,
+                messages=follow_up_messages
+            )
+            for block in follow_up.content:
+                if block.type == "text":
+                    assistant_message += block.text
+
+        logger.info(f"✅ Contextual complete: {len(actions_executed)} action(s), intent={intent.value}")
 
         return {
-            "response": full_response,
+            "response": assistant_message or f"✅ Modified {entity_type}",
             "actions_executed": actions_executed,
             "affected_entities": affected_entities,
-            "musical_context": str(entity_context)
+            "routing_intent": intent.value,
+            "musical_context": str(entity_context),
         }
 
     def _extract_affected_entity(self, action: DAWAction, result: ActionResult) -> Optional[Dict[str, str]]:
@@ -570,28 +611,28 @@ class AIAgentService:
                 self.chat_histories[composition_id] = []
 
             # Add user message to chat history
-            self.chat_histories[composition_id].append({
-                "role": "user",
-                "content": user_message,
-                "timestamp": datetime.now().isoformat(),
-                "actions_executed": None
-            })
+            self.chat_histories[composition_id].append(ChatMessage(
+                role="user",
+                content=user_message,
+                timestamp=datetime.now(),
+                actions_executed=None,
+            ))
 
             # Add assistant response to chat history
-            self.chat_histories[composition_id].append({
-                "role": "assistant",
-                "content": assistant_response,
-                "timestamp": datetime.now().isoformat(),
-                "actions_executed": [
+            self.chat_histories[composition_id].append(ChatMessage(
+                role="assistant",
+                content=assistant_response,
+                timestamp=datetime.now(),
+                actions_executed=[
                     {
                         "action": result.action,
                         "success": result.success,
                         "data": result.data,
-                        "error": result.error
+                        "error": result.error,
                     }
                     for result in actions_executed
-                ]
-            })
+                ],
+            ))
 
             # Capture current composition state from services
             captured_composition = self.composition_service.capture_composition_from_services(
@@ -630,166 +671,225 @@ class AIAgentService:
         except Exception as e:
             logger.error(f"❌ Failed to save AI iteration: {e}", exc_info=True)
 
-    def _build_simple_system_prompt(self) -> str:
-        """
-        Build simplified system prompt (Anthropic best practices)
-
-        10-20 lines, clear and direct. No bloat.
-        """
-        instruments_list = self._build_instruments_list()
-        effects_list = self._build_effects_list()
-
-        return f"""You are a music production assistant. Help users create and modify music.
-
-When the user asks to add tracks/instruments:
-- Use create_track_with_content for each track
-- Provide realistic MIDI notes based on the instrument type
-- Add appropriate effects for the genre
-
-AVAILABLE INSTRUMENTS:
-{instruments_list}
-
-AVAILABLE EFFECTS:
-{effects_list}
-
-Always provide complete musical content - tracks without notes are not useful."""
-
-    def _build_contextual_prompt(
+    def _format_entity_context(
         self,
-        message: str,
         entity_type: str,
+        entity_id: str,
         entity_context: Dict[str, Any],
-        additional_context: Optional[Dict[str, Any]] = None
     ) -> str:
-        """Build contextual prompt for entity-specific AI editing"""
+        """
+        Format entity-specific state for injection into the user message.
+
+        The system prompt comes from the intent router; this just adds the
+        concrete entity data so Claude knows exactly what it's editing.
+        """
         import json
 
-        instruments_list = self._build_instruments_list()
-        effects_list = self._build_effects_list()
+        scope_hint = {
+            "track": (
+                "Scope: modify this track's clips, parameters (volume/pan/mute/solo), "
+                "effects, or instrument. Stay focused on this track unless asked otherwise."
+            ),
+            "clip": (
+                "Scope: modify this clip's MIDI notes (use note names: C4, F#3, Bb2), "
+                "timing, or gain. Never use raw MIDI numbers."
+            ),
+            "effect": (
+                "Scope: adjust this effect's parameters, bypass state, or chain position."
+            ),
+            "mixer_channel": (
+                "Scope: adjust fader level, pan, mute, or solo for this channel."
+            ),
+            "composition": (
+                "Scope: global changes — tempo, arrangement, track structure."
+            ),
+        }.get(entity_type, f"Scope: modify this {entity_type}.")
 
-        entity_context_str = json.dumps(entity_context, indent=2)
+        context_str = json.dumps(entity_context, indent=2)
 
-        entity_guidance = {
-            "track": """
-You are modifying a TRACK. You can:
-- Adjust track parameters (volume, pan, mute, solo)
-- Add/modify/remove clips on this track
-- Add/modify/remove effects on this track
-- Change the track's instrument (for MIDI tracks)
-
-Focus on this specific track while considering the overall composition context.""",
-            "clip": """
-You are modifying a CLIP. You can:
-- Modify MIDI notes (for MIDI clips)
-- Adjust clip timing (start_time, duration)
-- Adjust clip gain/volume
-- Transpose notes, add variation, change rhythm
-
-Focus on this specific clip while considering the track and composition context.""",
-            "effect": """
-You are modifying an EFFECT. You can:
-- Adjust effect parameters
-- Bypass/enable the effect
-- Consider the effect's position in the signal chain
-
-Focus on this specific effect while considering the track context.""",
-            "mixer_channel": """
-You are modifying a MIXER CHANNEL. You can:
-- Adjust fader level (volume)
-- Adjust pan position
-- Toggle mute/solo
-- Adjust input gain
-
-Focus on this specific channel while considering the overall mix.""",
-            "composition": """
-You are modifying the COMPOSITION. You can:
-- Adjust global tempo
-- Add/remove tracks
-- Modify arrangement
-- Adjust overall mix balance
-
-Consider the entire composition holistically."""
-        }
-
-        return f"""You are a music production AI in CONTEXTUAL EDITING mode.
-
-The user has right-clicked on a {entity_type.upper()} and asked you to modify it.
-
-═══════════════════════════════════════════════════════════════════════════════
-ENTITY CONTEXT
-═══════════════════════════════════════════════════════════════════════════════
-{entity_context_str}
-
-═══════════════════════════════════════════════════════════════════════════════
-EDITING SCOPE
-═══════════════════════════════════════════════════════════════════════════════
-{entity_guidance.get(entity_type, "")}
-
-═══════════════════════════════════════════════════════════════════════════════
-AVAILABLE INSTRUMENTS
-═══════════════════════════════════════════════════════════════════════════════
-{instruments_list}
-
-═══════════════════════════════════════════════════════════════════════════════
-AVAILABLE EFFECTS
-═══════════════════════════════════════════════════════════════════════════════
-{effects_list}
-
-═══════════════════════════════════════════════════════════════════════════════
-YOUR TASK
-═══════════════════════════════════════════════════════════════════════════════
-
-1. Understand the user's request in the context of this specific {entity_type}
-2. Analyze the current state of the {entity_type}
-3. Generate a focused plan to modify this {entity_type}
-4. Be specific with parameter values and musical content
-
-Generate a plan in this format:
-
-**ANALYSIS:**
-[Brief analysis of the request and current {entity_type} state]
-
-**PLAN:**
-Step 1: [Action] - [Specific details]
-  - Parameter 1: [value]
-  - Parameter 2: [value]
-
-[Continue for all steps...]
-
-**MUSICAL REASONING:**
-[Explain why this plan achieves the user's goal for this {entity_type}]
-
-═══════════════════════════════════════════════════════════════════════════════
-CRITICAL RULES
-═══════════════════════════════════════════════════════════════════════════════
-
-🚨 **STAY FOCUSED** - Modify only this {entity_type} unless the request explicitly asks for more
-🚨 **BE SPECIFIC** - Use exact parameter values, not vague terms
-🚨 **CONSIDER CONTEXT** - Understand how this {entity_type} fits in the bigger picture
-🚨 **PRESERVE INTENT** - Don't drastically change things unless asked
-
-Remember: You're planning focused edits to this specific {entity_type}."""
+        return (
+            f"[Contextual edit — {entity_type.upper()} {entity_id}]\n"
+            f"{scope_hint}\n\n"
+            f"Current {entity_type} state:\n{context_str}"
+        )
 
 
 
-    def _build_instruments_list(self) -> str:
-        """Build formatted list of available instruments from SYNTHDEF_REGISTRY"""
-        # Lazy import to avoid circular dependency
+    async def _dispatch_tool(self, tool_name: str, tool_input: dict):
+        """
+        Central tool dispatch. Routes tool calls to the correct handler.
+        All new musical tools go through this method.
+        """
+        if tool_name == "compose_music":
+            return await self.compose_tool.execute(tool_input)
+
+        elif tool_name == "edit_clip":
+            return await self._handle_edit_clip(tool_input)
+
+        else:
+            # Standard DAW actions
+            action = DAWAction(action=tool_name, parameters=tool_input)
+            return await self.action_service.execute_action(action)
+
+    async def _handle_edit_clip(self, params: dict):
+        """
+        Handle the edit_clip tool — supports add/replace/remove modes
+        and accepts note names in addition to raw MIDI dicts.
+        """
+        from backend.models.ai_actions import ActionResult
+
+        clip_id = params.get("clip_id")
+        mode = params.get("mode", "replace")
+        raw_notes = params.get("notes", [])
+        transpose = params.get("transpose_semitones", 0)
+        vel_scale = params.get("velocity_scale", 1.0)
+
+        # Convert notes — accept both {pitch, beat, dur, vel} and {n, s, d, v}
+        from backend.services.music.theory import note_name_to_midi
+
+        def normalize_note(note: dict) -> dict:
+            if "pitch" in note:
+                try:
+                    midi = note_name_to_midi(note["pitch"])
+                except ValueError:
+                    return None
+                return {
+                    "n": midi + int(transpose),
+                    "s": float(note.get("beat", note.get("s", 0))),
+                    "d": float(note.get("dur", note.get("d", 0.5))),
+                    "v": min(127, max(0, int(note.get("vel", note.get("v", 100)) * vel_scale))),
+                }
+            else:
+                n = note.get("n")
+                if n is None:
+                    return None
+                return {
+                    "n": int(n) + int(transpose),
+                    "s": float(note.get("s", 0)),
+                    "d": float(note.get("d", 0.5)),
+                    "v": min(127, max(0, int(note.get("v", 100) * vel_scale))),
+                }
+
+        converted = [n for n in (normalize_note(r) for r in raw_notes) if n is not None]
+
+        if mode == "add":
+            # Get existing notes and merge
+            comp_id = self.action_service.composition_state.current_composition_id
+            composition = self.action_service.composition_state.get_composition(comp_id)
+            existing = []
+            if composition:
+                for clip in composition.clips:
+                    if clip.id == clip_id and clip.midi_events:
+                        existing = [
+                            {"n": e.note, "s": e.start_time, "d": e.duration, "v": e.velocity}
+                            for e in clip.midi_events
+                        ]
+                        break
+            merged = existing + converted
+            action = DAWAction(action="modify_clip", parameters={"clip_id": clip_id, "notes": merged})
+        elif mode == "remove":
+            # Remove matching notes by pitch+beat proximity
+            comp_id = self.action_service.composition_state.current_composition_id
+            composition = self.action_service.composition_state.get_composition(comp_id)
+            remaining = []
+            if composition:
+                for clip in composition.clips:
+                    if clip.id == clip_id and clip.midi_events:
+                        remove_set = {(n["n"], round(n["s"], 3)) for n in converted}
+                        remaining = [
+                            {"n": e.note, "s": e.start_time, "d": e.duration, "v": e.velocity}
+                            for e in clip.midi_events
+                            if (e.note, round(e.start_time, 3)) not in remove_set
+                        ]
+                        break
+            action = DAWAction(action="modify_clip", parameters={"clip_id": clip_id, "notes": remaining})
+        else:
+            # replace (default)
+            action = DAWAction(action="modify_clip", parameters={"clip_id": clip_id, "notes": converted})
+
+        return await self.action_service.execute_action(action)
+
+    def _build_instruments_catalog(self) -> str:
+        """
+        Build a role-grouped, compact instrument catalog for AI prompts.
+        Groups by musical role rather than dumping all 195+ instruments.
+        """
         from backend.services.daw.registry import SYNTHDEF_REGISTRY
 
-        categories = {}
-        for synth in SYNTHDEF_REGISTRY:
-            cat = synth["category"]
-            if cat not in categories:
-                categories[cat] = []
-            categories[cat].append(f"  • {synth['name']} - {synth['description']}")
+        # Role groupings — what an AI producer thinks about
+        role_groups = {
+            "SYNTHS & LEADS": [],
+            "BASS SYNTHS": [],
+            "PADS & TEXTURES": [],
+            "KEYS & MALLETS": [],
+            "GM PIANO & KEYS": [],
+            "GM STRINGS & ENSEMBLE": [],
+            "GM BRASS & WINDS": [],
+            "GM GUITAR & PLUCKED": [],
+            "SPECIAL / WAVEFORMS": [],
+        }
 
-        lines = []
-        for cat in sorted(categories.keys()):
-            lines.append(f"\n{cat.upper()}:")
-            lines.extend(sorted(categories[cat]))
+        category_to_role = {
+            "Lead":   "SYNTHS & LEADS",
+            "Synth":  "SYNTHS & LEADS",
+            "Bass":   "BASS SYNTHS",
+            "Pad":    "PADS & TEXTURES",
+            "Keys":   "KEYS & MALLETS",
+            "Piano":  "GM PIANO & KEYS",
+            "Chromatic Percussion": "KEYS & MALLETS",
+            "Organ":  "GM PIANO & KEYS",
+            "Strings": "GM STRINGS & ENSEMBLE",
+            "Ensemble": "GM STRINGS & ENSEMBLE",
+            "Brass":  "GM BRASS & WINDS",
+            "Reed":   "GM BRASS & WINDS",
+            "Pipe":   "GM BRASS & WINDS",
+            "Guitar": "GM GUITAR & PLUCKED",
+            "Plucked": "GM GUITAR & PLUCKED",
+            "Basic":  "SPECIAL / WAVEFORMS",
+            "Ethnic": "GM GUITAR & PLUCKED",
+            "Percussive": "KEYS & MALLETS",
+            "Sound Effects": "SPECIAL / WAVEFORMS",
+        }
+
+        # Drums are handled separately via kit catalog
+        skip_categories = {"Drums", "Percussion"}
+
+        for synth in SYNTHDEF_REGISTRY:
+            cat = synth.get("category", "")
+            if cat in skip_categories:
+                continue
+            role = category_to_role.get(cat, "SPECIAL / WAVEFORMS")
+            role_groups[role].append(f"{synth['name']}")
+
+        lines = ["INSTRUMENTS (use as 'instrument' in tracks):"]
+        for role, names in role_groups.items():
+            if names:
+                lines.append(f"  {role}: {', '.join(names[:12])}" +
+                              (f" (+{len(names)-12} more)" if len(names) > 12 else ""))
 
         return "\n".join(lines)
+
+    def _build_kit_catalog(self) -> str:
+        """Build compact kit catalog for AI prompts."""
+        try:
+            from backend.services.music.genre_profiles import get_genre_kit_catalog_for_ai
+            return get_genre_kit_catalog_for_ai()
+        except Exception:
+            return "DRUM KITS: trap-kit, 808-core, house-kit, boom-bap, jazz-kit, rock-kit"
+
+    def _build_genre_profiles_summary(self) -> str:
+        """Build a compact genre profiles summary for AI prompts."""
+        try:
+            from backend.services.music.genre_profiles import GENRE_PROFILES
+            lines = ["GENRE PROFILES (suggested kit + scale + tempo):"]
+            for name, profile in list(GENRE_PROFILES.items())[:10]:
+                kit = profile.get("kit_id", "?")
+                scales = profile.get("scales", ["minor"])[0]
+                bpm = profile.get("tempo_default", 120)
+                lines.append(f"  {name}: kit={kit}, scale={scales}, bpm={bpm}")
+            return "\n".join(lines)
+        except Exception:
+            return ""
 
     def _build_effects_list(self) -> str:
         """Build formatted list of available effects from EFFECT_DEFINITIONS"""
@@ -825,213 +925,6 @@ Remember: You're planning focused edits to this specific {entity_type}."""
 
         return "\n".join(lines)
 
-    def _build_system_prompt(self) -> str:
-        """Build system prompt for Claude"""
-        instruments_list = self._build_instruments_list()
-        effects_list = self._build_effects_list()
-
-        return f"""You are an AI music producer integrated into a DAW (Digital Audio Workstation).
-
-IMPORTANT: Each request is ONE-SHOT with fresh DAW state. No conversation history.
-
-Your role:
-- Accept VAGUE, CREATIVE commands from users (e.g., "make this more ambient", "add tension", "recompose as jazz")
-- Autonomously recompose and transform entire sequences
-- Create reversible iterations that users can listen to and approve/reject
-- Be creatively intelligent - interpret artistic intent and take over composition
-- Suggest musical improvements and variations
-- Execute actions immediately to transform the music
-
-Guidelines:
-- Each message is INDEPENDENT - you get the current DAW state fresh each time
-- Embrace vague commands - use your creativity to interpret them
-- Think holistically about the entire composition
-- Create complete, musically coherent transformations
-- Explain your creative reasoning briefly
-- Use musical terminology appropriately
-- When creating MIDI, use musically sensible note choices
-- Consider the current key, tempo, and style
-- Don't ask for clarification - be bold and creative with your interpretation
-- EXECUTE ACTIONS to make changes happen
-
-═══════════════════════════════════════════════════════════════════════════════
-CRITICAL WORKFLOW RULES - READ THIS CAREFULLY
-═══════════════════════════════════════════════════════════════════════════════
-
-🚨 **NEVER CREATE EMPTY TRACKS** 🚨
-
-When you create a track, you MUST IMMEDIATELY follow these steps IN THE SAME RESPONSE:
-
-1. **create_track** - Create the track with name, type, and instrument
-2. **create_midi_clip** - Add at least ONE clip with actual musical notes
-3. **add_effect** (optional) - Add effects to enhance the sound
-
-A track without clips is COMPLETELY USELESS. It's like ordering a pizza and leaving the box empty.
-You MUST add musical content (clips with notes) to every track you create.
-
-═══════════════════════════════════════════════════════════════════════════════
-AVAILABLE INSTRUMENTS (use in create_track "instrument" parameter)
-═══════════════════════════════════════════════════════════════════════════════
-{instruments_list}
-
-═══════════════════════════════════════════════════════════════════════════════
-AVAILABLE EFFECTS (use in add_effect "effect_name" parameter)
-═══════════════════════════════════════════════════════════════════════════════
-{effects_list}
-
-═══════════════════════════════════════════════════════════════════════════════
-AVAILABLE TOOLS
-═══════════════════════════════════════════════════════════════════════════════
-
-- create_track: Create a new track (MUST be followed by create_midi_clip)
-- create_midi_clip: Add MIDI clips with notes to a track
-- modify_clip: Change existing clip notes, timing, or properties
-- delete_clip: Remove a clip from the sequence
-- set_track_parameter: Adjust track volume, pan, mute, solo
-- add_effect: Add effects to tracks
-- set_tempo: Change global tempo
-- play_composition/stop_playback: Control playback
-
-═══════════════════════════════════════════════════════════════════════════════
-MIDI NOTE FORMAT (COMPACT)
-═══════════════════════════════════════════════════════════════════════════════
-
-{{n: MIDI_NOTE, s: START_TIME, d: DURATION, v: VELOCITY}}
-
-- n: MIDI note number (0-127, middle C = 60)
-- s: Start time in beats (relative to clip start)
-- d: Duration in beats
-- v: Velocity (0-127, default 100)
-
-Example: {{n: 60, s: 0, d: 1, v: 100}} = Middle C, starts at beat 0, lasts 1 beat
-
-Common MIDI notes:
-- C4 (middle C) = 60
-- D4 = 62
-- E4 = 64
-- F4 = 65
-- G4 = 67
-- A4 = 69
-- B4 = 71
-- C5 = 72
-
-═══════════════════════════════════════════════════════════════════════════════
-COMPLETE WORKFLOW EXAMPLES - STUDY THESE CAREFULLY
-═══════════════════════════════════════════════════════════════════════════════
-
-Example 1: "Add a kick drum"
-──────────────────────────────────────────────────────────────────────────────
-Step 1: create_track(name="Kick Drum", type="midi", instrument="kick")
-  → Returns: {{track_id: "abc123"}}
-
-Step 2: create_midi_clip(
-  track_id="abc123",
-  start_time=0,
-  duration=4,
-  notes=[
-    {{n: 36, s: 0, d: 0.5, v: 110}},    # Kick on beat 1
-    {{n: 36, s: 2, d: 0.5, v: 110}}     # Kick on beat 3
-  ]
-)
-
-Step 3: add_effect(track_id="abc123", effect_name="reverb")
-
-Example 2: "Add a subtle beat that blends into the chorus"
-──────────────────────────────────────────────────────────────────────────────
-Step 1: create_track(name="Percussion", type="midi", instrument="triangle")
-  → Returns: {{track_id: "xyz789"}}
-
-Step 2: create_midi_clip(
-  track_id="xyz789",
-  start_time=0,
-  duration=8,
-  notes=[
-    {{n: 81, s: 0.5, d: 0.25, v: 60}},   # Soft triangle on offbeat
-    {{n: 81, s: 1.5, d: 0.25, v: 65}},
-    {{n: 81, s: 2.5, d: 0.25, v: 70}},
-    {{n: 81, s: 3.5, d: 0.25, v: 75}},
-    {{n: 81, s: 4.5, d: 0.25, v: 80}},   # Building intensity
-    {{n: 81, s: 5.5, d: 0.25, v: 85}},
-    {{n: 81, s: 6.5, d: 0.25, v: 90}},
-    {{n: 81, s: 7.5, d: 0.25, v: 95}}
-  ]
-)
-
-Step 3: add_effect(track_id="xyz789", effect_name="reverb")
-Step 4: set_track_parameter(track_id="xyz789", parameter="volume", value=0.6)
-
-Example 3: "Add a bass line in D major"
-──────────────────────────────────────────────────────────────────────────────
-Step 1: create_track(name="Bass", type="midi", instrument="sine")
-  → Returns: {{track_id: "bass001"}}
-
-Step 2: create_midi_clip(
-  track_id="bass001",
-  start_time=0,
-  duration=8,
-  notes=[
-    {{n: 50, s: 0, d: 1, v: 100}},    # D2
-    {{n: 50, s: 1, d: 1, v: 90}},
-    {{n: 54, s: 2, d: 1, v: 95}},     # F#2
-    {{n: 57, s: 3, d: 1, v: 100}},    # A2
-    {{n: 50, s: 4, d: 1, v: 100}},    # D2
-    {{n: 50, s: 5, d: 1, v: 90}},
-    {{n: 54, s: 6, d: 1, v: 95}},     # F#2
-    {{n: 57, s: 7, d: 1, v: 100}}     # A2
-  ]
-)
-
-Step 3: add_effect(track_id="bass001", effect_name="lpf")
-
-Example 4: "Add a melodic pad"
-──────────────────────────────────────────────────────────────────────────────
-Step 1: create_track(name="Pad", type="midi", instrument="saw")
-  → Returns: {{track_id: "pad001"}}
-
-Step 2: create_midi_clip(
-  track_id="pad001",
-  start_time=0,
-  duration=16,
-  notes=[
-    {{n: 62, s: 0, d: 4, v: 70}},     # D major chord
-    {{n: 66, s: 0, d: 4, v: 70}},
-    {{n: 69, s: 0, d: 4, v: 70}},
-    {{n: 64, s: 4, d: 4, v: 70}},     # E minor chord
-    {{n: 67, s: 4, d: 4, v: 70}},
-    {{n: 71, s: 4, d: 4, v: 70}},
-    {{n: 65, s: 8, d: 4, v: 70}},     # F# minor chord
-    {{n: 69, s: 8, d: 4, v: 70}},
-    {{n: 72, s: 8, d: 4, v: 70}},
-    {{n: 62, s: 12, d: 4, v: 70}},    # D major chord
-    {{n: 66, s: 12, d: 4, v: 70}},
-    {{n: 69, s: 12, d: 4, v: 70}}
-  ]
-)
-
-Step 3: add_effect(track_id="pad001", effect_name="reverb")
-Step 4: set_track_parameter(track_id="pad001", parameter="volume", value=0.7)
-
-═══════════════════════════════════════════════════════════════════════════════
-REMEMBER
-═══════════════════════════════════════════════════════════════════════════════
-
-✅ DO: Create track → Add clip with notes → Add effects (complete workflow)
-❌ DON'T: Create track and stop (empty track is useless)
-
-✅ DO: Think about the complete musical gesture
-❌ DON'T: Create infrastructure without content
-
-✅ DO: Add actual note data with musically sensible patterns
-❌ DON'T: Create clips without notes or with placeholder notes
-
-When modifying sequences:
-- You can see ALL tracks, clips, and notes in the context
-- Use modify_clip to change existing clips (replaces all notes)
-- Use delete_clip + create_midi_clip to restructure
-- Create new tracks for new instruments/parts
-- Think holistically about the entire composition
-- ALWAYS follow through with complete workflows - never leave empty tracks"""
-
     def _build_messages_with_history(
         self,
         user_message: str,
@@ -1054,8 +947,8 @@ When modifying sequences:
 
             for entry in recent:
                 messages.append({
-                    "role": entry["role"],
-                    "content": entry["content"]
+                    "role": entry.role,
+                    "content": entry.content,
                 })
 
             # API requires messages start with "user" role — drop any leading assistant entries
@@ -1450,128 +1343,23 @@ When modifying sequences:
 
         return "\n".join(parts)
 
-    def _build_analysis_prompt(self, state: Optional[DAWStateSnapshot]) -> str:
-        """Build prompt for autonomous analysis"""
-        context = self._build_context_message(state)
-        return f"""{context}
-
-Analyze the current musical state and suggest ONE improvement or addition.
-If the music is playing and sounds good, you can suggest subtle enhancements.
-If nothing is playing, you might suggest starting with a basic rhythm or melody.
-
-Keep suggestions simple and musical. Explain your reasoning briefly."""
-
-    def _build_instrument_description(self) -> str:
-        """
-        Build comprehensive instrument description for AI tool schema
-
-        This dynamically generates the description from SYNTHDEF_REGISTRY,
-        ensuring the AI knows about all available instruments organized by category.
-
-        Returns:
-            Formatted description string with all instruments by category
-        """
-        by_category = get_instruments_by_category()
-
-        # Build description with categories
-        desc_parts = ["Instrument/synth name for MIDI tracks. REQUIRED for MIDI tracks to produce sound.\n\nAvailable instruments by category:"]
-
-        for category in sorted(by_category.keys()):
-            instruments = by_category[category]
-            # Limit to first 10 per category in description to keep it readable
-            if len(instruments) > 10:
-                instrument_list = ", ".join(instruments[:10]) + f", ... ({len(instruments)} total)"
-            else:
-                instrument_list = ", ".join(instruments)
-            desc_parts.append(f"\n- {category}: {instrument_list}")
-
-        desc_parts.append("\n\nExamples: 'acousticGrandPiano', 'kick808', 'synthBass1', 'trumpet', 'electricGuitarClean'")
-
-        return "".join(desc_parts)
-
     def _get_tool_definitions(self) -> List[Dict[str, Any]]:
         """
-        Get Claude function calling tool definitions
+        Get Claude function calling tool definitions.
 
-        CRITICAL: Instrument enum is dynamically generated from SYNTHDEF_REGISTRY
-        to prevent AI hallucination of invalid instrument names.
-
-        COMPOSITE TOOLS FIRST - These prevent mistakes through design.
+        compose_music and edit_clip are the primary tools.
+        modify_clip kept for raw-MIDI fallback (used by _handle_edit_clip internally).
         """
         return [
             # ================================================================
-            # COMPOSITE TOOL (Poka-Yoke Design - Prevents Empty Tracks)
+            # PRIMARY TOOLS — musical abstraction level
             # ================================================================
-            {
-                "name": "create_track_with_content",
-                "description": "Create a complete track with musical content in ONE operation. This is the PRIMARY tool for adding tracks. It creates the track, adds a clip with notes, and optionally adds effects - all atomically. This makes it IMPOSSIBLE to create empty tracks.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "name": {"type": "string", "description": "Track name (e.g., 'Kick Drum', 'Bass', 'Lead Synth')"},
-                        "instrument": {
-                            "type": "string",
-                            "enum": get_valid_instruments_list(),
-                            "description": self._build_instrument_description()
-                        },
-                        "notes": {
-                            "type": "array",
-                            "description": "MIDI notes for the clip (REQUIRED, min 1 note). Format: [{n: MIDI_NOTE, s: START_BEAT, d: DURATION, v: VELOCITY}, ...]. Example: [{n: 60, s: 0, d: 1, v: 100}, {n: 64, s: 1, d: 1, v: 100}]",
-                            "minItems": 1,
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "n": {"type": "integer", "description": "MIDI note number (0-127). Middle C = 60, Kick = 36"},
-                                    "s": {"type": "number", "description": "Start time in beats (relative to clip start)"},
-                                    "d": {"type": "number", "description": "Duration in beats"},
-                                    "v": {"type": "integer", "description": "Velocity (0-127, default 100)"}
-                                },
-                                "required": ["n", "s", "d"]
-                            }
-                        },
-                        "effects": {
-                            "type": "array",
-                            "description": "Effects to add (optional). Example: ['reverb', 'delay', 'lpf']",
-                            "items": {"type": "string"}
-                        },
-                        "start_time": {"type": "number", "description": "Clip start time in beats (default: 0)"},
-                        "duration": {"type": "number", "description": "Clip duration in beats (default: 4)"},
-                        "clip_name": {"type": "string", "description": "Clip name (optional, defaults to '{name} Pattern')"}
-                    },
-                    "required": ["name", "instrument", "notes"]
-                }
-            },
+            COMPOSE_MUSIC_TOOL_SCHEMA,
+            EDIT_CLIP_TOOL_SCHEMA,
+
             # ================================================================
-            # LEGACY TOOLS (For advanced use cases only)
+            # STANDARD DAW OPERATIONS
             # ================================================================
-            {
-                "name": "create_midi_clip",
-                "description": "Create a new MIDI clip with notes on a track. DEPRECATED: Use create_track_with_content instead for new tracks.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "track_id": {"type": "string", "description": "Track ID (UUID) to add clip to. MUST use the track_id returned from create_track, NOT the track name. Example: '17c79f6d-7507-4d40-baec-4fe84c3cf165'"},
-                        "start_time": {"type": "number", "description": "Start time in beats (0 = beginning of sequence)"},
-                        "duration": {"type": "number", "description": "Clip duration in beats (e.g., 4 for 4 bars, 8 for 8 bars)"},
-                        "notes": {
-                            "type": "array",
-                            "description": "Array of MIDI notes in compact format: [{n: MIDI_NOTE, s: START_BEAT, d: DURATION, v: VELOCITY}, ...]. Example: [{n: 60, s: 0, d: 1, v: 100}, {n: 64, s: 1, d: 1, v: 100}] creates two notes. MUST contain at least one note!",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "n": {"type": "integer", "description": "MIDI note number (0-127). Middle C = 60, D = 62, E = 64, F = 65, G = 67, A = 69, B = 71, C5 = 72. Kick drum = 36."},
-                                    "s": {"type": "number", "description": "Start time in beats RELATIVE to clip start (0 = clip start, 1 = one beat in, etc.)"},
-                                    "d": {"type": "number", "description": "Note duration in beats (0.25 = sixteenth note, 0.5 = eighth note, 1 = quarter note, 2 = half note, 4 = whole note)"},
-                                    "v": {"type": "integer", "description": "Velocity/volume (0-127, default 100). Higher = louder."}
-                                },
-                                "required": ["n", "s", "d"]
-                            }
-                        },
-                        "name": {"type": "string", "description": "Clip name (optional, e.g., 'Kick Pattern', 'Bass Line')"}
-                    },
-                    "required": ["track_id", "start_time", "duration", "notes"]
-                }
-            },
             {
                 "name": "modify_clip",
                 "description": "Modify an existing clip (change notes, timing, or properties)",
@@ -1609,23 +1397,6 @@ Keep suggestions simple and musical. Explain your reasoning briefly."""
                         "clip_id": {"type": "string", "description": "Clip ID to delete"}
                     },
                     "required": ["clip_id"]
-                }
-            },
-            {
-                "name": "create_track",
-                "description": "Create a new track. WARNING: You MUST immediately follow this with create_midi_clip to add musical content. A track without clips is useless. Complete workflow: 1) create_track, 2) create_midi_clip with notes, 3) optionally add_effect.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "name": {"type": "string", "description": "Track name (e.g., 'Kick Drum', 'Bass', 'Pad')"},
-                        "type": {"type": "string", "enum": ["midi", "audio"], "description": "Track type - use 'midi' for synthesized instruments"},
-                        "instrument": {
-                            "type": "string",
-                            "enum": get_valid_instruments_list(),
-                            "description": self._build_instrument_description()
-                        }
-                    },
-                    "required": ["name", "type", "instrument"]
                 }
             },
             {
@@ -1828,6 +1599,19 @@ Keep suggestions simple and musical. Explain your reasoning briefly."""
                     "required": ["track_id", "effect_order"]
                 }
             },
+            {
+                "name": "set_effect_parameter",
+                "description": "Adjust a parameter on an existing effect (e.g. reverb room size, delay time, filter cutoff)",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "effect_id": {"type": "string", "description": "Effect ID"},
+                        "parameter": {"type": "string", "description": "Parameter name (e.g. 'room', 'decay', 'cutoff', 'mix')"},
+                        "value": {"type": "number", "description": "New parameter value"}
+                    },
+                    "required": ["effect_id", "parameter", "value"]
+                }
+            },
             # Extended Composition Operations
             {
                 "name": "set_time_signature",
@@ -1873,6 +1657,14 @@ Keep suggestions simple and musical. Explain your reasoning briefly."""
                         "name": {"type": "string", "description": "New composition name"}
                     },
                     "required": ["name"]
+                }
+            },
+            {
+                "name": "clear_composition",
+                "description": "Remove ALL tracks, clips, and effects from the current composition. This is destructive and cannot be undone. Use only when explicitly asked to start fresh or delete everything.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {}
                 }
             }
         ]

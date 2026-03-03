@@ -96,7 +96,7 @@ class AudioEngineManager:
     
     def send_message(self, address: str, *args):
         """Send OSC message to scsynth"""
-        if not self.scsynth_client:
+        if not self.scsynth_client or not self.is_connected:
             raise RuntimeError("Not connected to SuperCollider")
 
         try:

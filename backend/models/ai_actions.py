@@ -95,7 +95,7 @@ class SetEffectParameterAction(BaseModel):
 
 class PlaySequenceAction(BaseModel):
     """Start playback"""
-    action: Literal["play_sequence"] = "play_sequence"
+    action: Literal["play_composition"] = "play_composition"
     sequence_id: Optional[str] = Field(None, description="Sequence to play (current if not specified)")
 
 
@@ -221,6 +221,11 @@ class RenameCompositionAction(BaseModel):
     name: str
 
 
+class ClearCompositionAction(BaseModel):
+    """Remove all tracks and clips from the composition (destructive, non-undoable)"""
+    action: Literal["clear_composition"] = "clear_composition"
+
+
 # ============================================================================
 # ACTION EXECUTION
 # ============================================================================
@@ -246,6 +251,7 @@ class DAWAction(BaseModel):
         "change_track_instrument",
         "reorder_tracks",
         "set_track_parameter",
+        "set_drum_kit",
         # Effect operations
         "add_effect",
         "remove_effect",
@@ -258,8 +264,9 @@ class DAWAction(BaseModel):
         "set_loop_points",
         "seek_to_position",
         "rename_composition",
+        "clear_composition",
         # Playback operations
-        "play_sequence",
+        "play_composition",
         "stop_playback"
     ]
     parameters: Dict[str, Any] = Field(..., description="Action-specific parameters")

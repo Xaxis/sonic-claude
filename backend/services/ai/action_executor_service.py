@@ -43,6 +43,7 @@ from backend.models.ai_actions import (
     SetLoopPointsAction,
     SeekToPositionAction,
     RenameCompositionAction,
+    ClearCompositionAction,
     # Playback actions
     PlaySequenceAction,
     StopPlaybackAction
@@ -121,6 +122,8 @@ class DAWActionService:
                 return await self._reorder_tracks(params)
             elif action_type == "set_track_parameter":
                 return await self._set_track_parameter(params)
+            elif action_type == "set_drum_kit":
+                return await self._set_drum_kit(params)
 
             # === EFFECT OPERATIONS ===
             elif action_type == "add_effect":
@@ -145,6 +148,8 @@ class DAWActionService:
                 return await self._seek_to_position(params)
             elif action_type == "rename_composition":
                 return await self._rename_composition(params)
+            elif action_type == "clear_composition":
+                return await self._clear_composition(params)
 
             # === PLAYBACK OPERATIONS ===
             elif action_type == "play_composition":
@@ -440,6 +445,82 @@ class DAWActionService:
             logger.error(f"Failed to set track parameter: {e}")
             raise
 
+    async def _set_drum_kit(self, params: Dict[str, Any]) -> ActionResult:
+        """Apply a named drum kit to a track (sets pad routing + per-pad parameters)."""
+        try:
+            track_id = params.get("track_id")
+            kit_id = params.get("kit_id")
+
+            if not track_id or not kit_id:
+                return ActionResult(
+                    success=False,
+                    action="set_drum_kit",
+                    message="track_id and kit_id are required",
+                    error="MISSING_PARAMS",
+                )
+
+            if not self.composition_state.current_composition_id:
+                return ActionResult(
+                    success=False,
+                    action="set_drum_kit",
+                    message="No active composition",
+                    error="NO_COMPOSITION",
+                )
+
+            composition_id = self.composition_state.current_composition_id
+            composition = self.composition_state.get_composition(composition_id)
+            if not composition:
+                return ActionResult(
+                    success=False,
+                    action="set_drum_kit",
+                    message=f"Composition {composition_id} not found",
+                    error="COMPOSITION_NOT_FOUND",
+                )
+
+            track = next((t for t in composition.tracks if t.id == track_id), None)
+            if not track:
+                return ActionResult(
+                    success=False,
+                    action="set_drum_kit",
+                    message=f"Track {track_id} not found",
+                    error="TRACK_NOT_FOUND",
+                )
+
+            from backend.services.daw.registry import get_kit_by_id
+            from backend.models.sequence import KitPad
+
+            kit_data = get_kit_by_id(kit_id)
+            if not kit_data:
+                return ActionResult(
+                    success=False,
+                    action="set_drum_kit",
+                    message=f"Kit '{kit_id}' not found in registry",
+                    error="KIT_NOT_FOUND",
+                )
+
+            # Apply kit to track
+            track.kit_id = kit_id
+            track.kit = {
+                midi_note: KitPad(
+                    synthdef=pad_data["synthdef"],
+                    params=pad_data.get("params", {}),
+                )
+                for midi_note, pad_data in kit_data["pads"].items()
+            }
+
+            logger.info(f"✅ Applied kit '{kit_data['name']}' ({len(track.kit)} pads) to track {track_id}")
+
+            return ActionResult(
+                success=True,
+                action="set_drum_kit",
+                message=f"Applied kit '{kit_data['name']}' to track",
+                data={"track_id": track_id, "kit_id": kit_id, "kit_name": kit_data["name"], "pad_count": len(track.kit)},
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to set drum kit: {e}")
+            raise
+
     async def _set_tempo(self, params: Dict[str, Any]) -> ActionResult:
         """Set global tempo"""
         try:
@@ -589,9 +670,26 @@ class DAWActionService:
                 is_muted=clip.is_muted,
                 is_looped=clip.is_looped,
                 gain=clip.gain,
+                # MIDI
                 midi_events=clip.midi_events.copy() if clip.midi_events else None,
+                midi_transpose=clip.midi_transpose,
+                midi_velocity_offset=clip.midi_velocity_offset,
+                midi_gate=clip.midi_gate,
+                midi_timing_offset=clip.midi_timing_offset,
+                midi_quantize_strength=clip.midi_quantize_strength,
+                # Audio
                 audio_file_path=clip.audio_file_path,
-                audio_offset=clip.audio_offset
+                audio_offset=clip.audio_offset,
+                sample_id=clip.sample_id,
+                audio_end=clip.audio_end,
+                pitch_semitones=clip.pitch_semitones,
+                playback_rate=clip.playback_rate,
+                reverse=clip.reverse,
+                fade_in=clip.fade_in,
+                fade_out=clip.fade_out,
+                loop_enabled=clip.loop_enabled,
+                loop_start=clip.loop_start,
+                loop_end=clip.loop_end,
             )
 
             composition.clips.append(new_clip)
@@ -1247,6 +1345,45 @@ class DAWActionService:
 
         except Exception as e:
             logger.error(f"Failed to rename composition: {e}")
+            raise
+
+    async def _clear_composition(self, params: Dict[str, Any]) -> ActionResult:
+        """Remove all tracks, clips, and effects from the current composition."""
+        try:
+            composition_id = self.composition_state.current_composition_id
+            if not composition_id:
+                return ActionResult(
+                    success=False,
+                    action="clear_composition",
+                    message="No active composition",
+                    error="NO_COMPOSITION",
+                )
+
+            composition = self.composition_state.get_composition(composition_id)
+            if not composition:
+                return ActionResult(
+                    success=False,
+                    action="clear_composition",
+                    message=f"Composition {composition_id} not found",
+                    error="COMPOSITION_NOT_FOUND",
+                )
+
+            track_count = len(composition.tracks)
+            clip_count = len(composition.clips)
+
+            composition.tracks = []
+            composition.clips = []
+            composition.track_effects = []
+
+            return ActionResult(
+                success=True,
+                action="clear_composition",
+                message=f"Cleared composition: removed {track_count} track(s) and {clip_count} clip(s)",
+                data={"tracks_removed": track_count, "clips_removed": clip_count},
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to clear composition: {e}")
             raise
 
     @staticmethod
