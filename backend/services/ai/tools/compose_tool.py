@@ -64,12 +64,19 @@ COMPOSE_MUSIC_TOOL_SCHEMA = {
     "description": (
         "Create one or more musical tracks. Use this for ALL music creation tasks.\n\n"
         "CRITICAL: Specify music symbolically — the system converts to MIDI automatically:\n"
-        "  • Drums:   use drum_pattern with voice names (kick/snare/hihat_closed/clap/etc.)\n"
-        "  • Chords:  use chord_pattern with chord symbols (Am, Cmaj7, G7, Dm9, sus4, etc.)\n"
-        "  • Melody:  use note_sequence with note NAMES (C4, F#3, Bb5) — NOT MIDI numbers\n"
-        "  • Bassline: use note_sequence with note names in octaves 1-3\n"
-        "  • Kit:     use kit_pattern with a kit_id to use a kit's built-in pattern\n\n"
-        "Never specify raw MIDI note numbers — always use note names or voice names."
+        "  • Drums:        use drum_pattern (voice names) or kit_pattern (kit ID)\n"
+        "  • Chords:       use chord_pattern — add 'rhythm' field for feel beyond block chords\n"
+        "  • Arpeggio:     use arp_pattern — cycles chord tones rhythmically (best for leads/keys)\n"
+        "  • Bass:         use bass_line — chord-root-aware bass (better than note_sequence for bass)\n"
+        "  • Scale melody: use scale_melody — contour-guided (best for ambient/pad melodies)\n"
+        "  • Custom notes: use note_sequence with note NAMES (C4, F#3, Bb5) — NOT MIDI numbers\n\n"
+        "Never specify raw MIDI note numbers — always use note names or voice names.\n\n"
+        "CHOOSE THE RIGHT CONTENT TYPE:\n"
+        "  Bass track?   → bass_line (root_pulse/walking/syncopated/sub_pulse)\n"
+        "  Arpeggio?     → arp_pattern (up/down/up_down, 16th/8th/swing_8th)\n"
+        "  Chords w/feel?→ chord_pattern with rhythm field (off_beat/staccato/syncopated)\n"
+        "  Melodic shape?→ scale_melody (arch/rising/wave contour, sparse/medium/dense)\n"
+        "  Specific riff?→ note_sequence (explicit note names + beat positions)"
     ),
     "input_schema": {
         "type": "object",
@@ -206,9 +213,168 @@ COMPOSE_MUSIC_TOOL_SCHEMA = {
                                     "type": "integer",
                                     "description": "Note velocity 0–127 (default: 80)",
                                     "default": 80
+                                },
+                                "rhythm": {
+                                    "type": "string",
+                                    "enum": ["block", "off_beat", "staccato", "on_beat", "syncopated"],
+                                    "description": (
+                                        "Rhythmic pattern for chord placement (default: block = full duration). "
+                                        "off_beat = hits on 'and' of beats (0.5/1.5/2.5/3.5). "
+                                        "staccato = short hits on each beat. "
+                                        "on_beat = one hit per beat, medium length. "
+                                        "syncopated = hit on beat 1, then off-beat 16ths."
+                                    ),
+                                    "default": "block"
                                 }
                             },
                             "required": ["chords"]
+                        },
+
+                        "arp_pattern": {
+                            "type": "object",
+                            "description": (
+                                "Arpeggiated chord pattern — cycles through chord tones rhythmically. "
+                                "Best for: lead synths over chords, piano arpeggios, melodic pluck patterns. "
+                                "The system generates all notes from chord symbols."
+                            ),
+                            "properties": {
+                                "chords": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "Chord symbols (Am, F, C, G). Repeats to fill bars."
+                                },
+                                "style": {
+                                    "type": "string",
+                                    "enum": ["up", "down", "up_down", "pinned"],
+                                    "description": (
+                                        "Arp direction: up (ascending cycle), down (descending), "
+                                        "up_down (bounce A-C-E-C-A), pinned (root alternates with each tone)"
+                                    ),
+                                    "default": "up"
+                                },
+                                "rhythm": {
+                                    "type": "string",
+                                    "enum": ["16th", "8th", "dotted_8th", "triplet", "swing_8th"],
+                                    "description": "Note spacing: 16th (0.25), 8th (0.5), dotted_8th (0.75), triplet (1/3), swing_8th",
+                                    "default": "16th"
+                                },
+                                "octave": {
+                                    "type": "integer",
+                                    "description": "Base octave for chord tones (default: 4)",
+                                    "default": 4
+                                },
+                                "octave_range": {
+                                    "type": "integer",
+                                    "description": "1 = single octave, 2 = span two octaves of chord tones",
+                                    "default": 1
+                                },
+                                "beats_per_chord": {
+                                    "type": "number",
+                                    "description": "How many beats each chord lasts before the arp moves to the next chord (default: 4 = one bar). Use 2 for faster chord changes.",
+                                    "default": 4.0
+                                },
+                                "velocity": {
+                                    "type": "integer",
+                                    "description": "Base velocity 0–127 (default: 90)",
+                                    "default": 90
+                                }
+                            },
+                            "required": ["chords"]
+                        },
+
+                        "bass_line": {
+                            "type": "object",
+                            "description": (
+                                "Chord-root-aware bass pattern. Always harmonically correct. "
+                                "Preferred over note_sequence for bass tracks — just pick a style."
+                            ),
+                            "properties": {
+                                "chords": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "Chord progression (same as other content types)"
+                                },
+                                "style": {
+                                    "type": "string",
+                                    "enum": ["root_only", "root_pulse", "walking", "octave_jump", "syncopated", "sub_pulse"],
+                                    "description": (
+                                        "root_only = long root note per chord. "
+                                        "root_pulse = root on every beat (house/techno). "
+                                        "walking = jazz walking bass (root+5th+7th+approach). "
+                                        "octave_jump = root alternates with upper octave. "
+                                        "syncopated = off-beat ghost notes (hip-hop/R&B). "
+                                        "sub_pulse = 8th-note sub-bass pulse (808/EDM)."
+                                    ),
+                                    "default": "root_pulse"
+                                },
+                                "octave": {
+                                    "type": "integer",
+                                    "description": "Bass octave: 1=very deep, 2=standard (default), 3=bass melody",
+                                    "default": 2
+                                },
+                                "beats_per_chord": {
+                                    "type": "number",
+                                    "description": "Beats per chord change (default: 4.0)",
+                                    "default": 4.0
+                                },
+                                "velocity": {
+                                    "type": "integer",
+                                    "description": "Base velocity 0–127 (default: 100)",
+                                    "default": 100
+                                }
+                            },
+                            "required": ["chords"]
+                        },
+
+                        "scale_melody": {
+                            "type": "object",
+                            "description": (
+                                "Contour-guided scale melody. Python generates all notes — "
+                                "you specify the shape and density. Best for ambient textures, "
+                                "melodic fills, or when you want smooth melodic motion without "
+                                "specifying every note."
+                            ),
+                            "properties": {
+                                "root": {
+                                    "type": "string",
+                                    "description": "Root note of the scale (C, A, F#, Bb)"
+                                },
+                                "scale": {
+                                    "type": "string",
+                                    "description": "Scale name: minor, pentatonic_minor, pentatonic_major, major, dorian, mixolydian, blues, etc."
+                                },
+                                "octave": {
+                                    "type": "integer",
+                                    "description": "Starting octave (4 = middle C octave)",
+                                    "default": 4
+                                },
+                                "octave_range": {
+                                    "type": "integer",
+                                    "description": "1 = single octave, 2 = two octaves for wider melodic range",
+                                    "default": 1
+                                },
+                                "contour": {
+                                    "type": "string",
+                                    "enum": ["arch", "rising", "falling", "wave", "valley"],
+                                    "description": (
+                                        "Melodic shape: arch (rise→peak→fall), rising (ascent), "
+                                        "falling (descent), wave (full oscillation), valley (fall→rise)"
+                                    ),
+                                    "default": "arch"
+                                },
+                                "density": {
+                                    "type": "string",
+                                    "enum": ["sparse", "medium", "dense"],
+                                    "description": "Note spacing: sparse=quarter notes, medium=8th notes, dense=16th notes",
+                                    "default": "medium"
+                                },
+                                "velocity": {
+                                    "type": "integer",
+                                    "description": "Base velocity 0–127 (default: 90)",
+                                    "default": 90
+                                }
+                            },
+                            "required": ["root", "scale"]
                         },
 
                         "note_sequence": {
@@ -352,8 +518,8 @@ class ComposeTool:
         """Create a single track + clip from a track specification dict."""
         name = spec.get("name", "Untitled")
         instrument = spec.get("instrument") or ""
-        bars = int(spec.get("bars", 4))
-        start_bar = int(spec.get("start_bar", 0))
+        bars = max(1, min(256, int(spec.get("bars", 4))))
+        start_bar = max(0, int(spec.get("start_bar", 0)))
         clip_name = spec.get("clip_name") or f"{name} Pattern"
         volume = spec.get("volume", 1.0)
         effects = spec.get("effects") or []
@@ -422,12 +588,21 @@ class ComposeTool:
         elif "chord_pattern" in spec:
             notes = self._generate_chord_notes(spec["chord_pattern"], bars)
 
+        elif "arp_pattern" in spec:
+            notes = self._generate_arp_notes(spec["arp_pattern"], bars)
+
+        elif "bass_line" in spec:
+            notes = self._generate_bass_line(spec["bass_line"], bars)
+
+        elif "scale_melody" in spec:
+            notes = self._generate_scale_melody(spec["scale_melody"], bars)
+
         elif "note_sequence" in spec:
             notes = self._parse_note_sequence(spec["note_sequence"])
 
         else:
             # No content type specified — warn but still create the track
-            logger.warning(f"Track '{name}' has no content (no drum_pattern/chord_pattern/note_sequence/kit_pattern)")
+            logger.warning(f"Track '{name}' has no content (no drum_pattern/chord_pattern/arp_pattern/bass_line/scale_melody/note_sequence/kit_pattern)")
 
         # ── Step 3: Apply kit to track (if kit specified) ────────────────────
         if kit_id:
@@ -558,9 +733,23 @@ class ComposeTool:
         octave = int(chord_pattern.get("octave", 4))
         voicing = chord_pattern.get("voicing", "closed")
         velocity = int(chord_pattern.get("velocity", 80))
+        rhythm = chord_pattern.get("rhythm", "block")
         total_beats = bars * 4
 
-        # Repeat chord list to fill bars
+        # Use rhythmic generator for non-block rhythms
+        if rhythm and rhythm != "block":
+            from backend.services.music.generators import generate_chord_rhythm
+            return generate_chord_rhythm(
+                chords=chords,
+                rhythm=rhythm,
+                beats_per_chord=beats_per_chord,
+                octave=octave,
+                voicing=voicing,
+                velocity=velocity,
+                bars=bars,
+            )
+
+        # Default: full-duration block chords
         full_chords = []
         while len(full_chords) * beats_per_chord < total_beats:
             full_chords.extend(chords)
@@ -575,6 +764,62 @@ class ComposeTool:
 
         # Trim to bar length
         return [n for n in notes if n["s"] < total_beats]
+
+    def _generate_arp_notes(self, arp_pattern: Dict, bars: int) -> List[Dict]:
+        """Generate MIDI notes from an arp_pattern spec."""
+        from backend.services.music.generators import generate_arp_notes
+
+        chords = arp_pattern.get("chords", [])
+        if not chords:
+            return []
+
+        return generate_arp_notes(
+            chords=chords,
+            style=arp_pattern.get("style", "up"),
+            rhythm=arp_pattern.get("rhythm", "16th"),
+            octave=int(arp_pattern.get("octave", 4)),
+            octave_range=int(arp_pattern.get("octave_range", 1)),
+            bars=bars,
+            beats_per_chord=float(arp_pattern.get("beats_per_chord", 4.0)),
+            velocity=int(arp_pattern.get("velocity", 90)),
+        )
+
+    def _generate_bass_line(self, bass_line: Dict, bars: int) -> List[Dict]:
+        """Generate MIDI notes from a bass_line spec."""
+        from backend.services.music.generators import generate_bass_line
+
+        chords = bass_line.get("chords", [])
+        if not chords:
+            return []
+
+        return generate_bass_line(
+            chords=chords,
+            style=bass_line.get("style", "root_pulse"),
+            octave=int(bass_line.get("octave", 2)),
+            bars=bars,
+            beats_per_chord=float(bass_line.get("beats_per_chord", 4.0)),
+            velocity=int(bass_line.get("velocity", 100)),
+        )
+
+    def _generate_scale_melody(self, scale_melody: Dict, bars: int) -> List[Dict]:
+        """Generate MIDI notes from a scale_melody spec."""
+        from backend.services.music.generators import generate_scale_melody
+
+        root = scale_melody.get("root", "C")
+        scale = scale_melody.get("scale", "minor")
+        if not root or not scale:
+            return []
+
+        return generate_scale_melody(
+            root=root,
+            scale=scale,
+            octave=int(scale_melody.get("octave", 4)),
+            octave_range=int(scale_melody.get("octave_range", 1)),
+            contour=scale_melody.get("contour", "arch"),
+            bars=bars,
+            density=scale_melody.get("density", "medium"),
+            velocity=int(scale_melody.get("velocity", 90)),
+        )
 
     def _parse_note_sequence(self, note_sequence: List[Dict]) -> List[Dict]:
         """Convert note-name sequence to compact MIDI dicts."""

@@ -220,11 +220,13 @@ class AIAgentService:
         genre_summary       = self._build_genre_profiles_summary()
         all_tools           = self._get_tool_definitions()
 
-        # Route → focused tool set + intent-specific system prompt
+        # Route → focused tool set + intent-specific system prompt + genre (one Haiku call)
+        route_result = None
         intent = None
         if use_intent_routing:
             state_summary = self._build_brief_state_summary(state_response.full_state)
-            intent = await self.router.route(user_message, daw_state_summary=state_summary)
+            route_result = await self.router.route(user_message, daw_state_summary=state_summary)
+            intent = route_result.intent
             logger.info(f"🔀 Intent: {intent.value}")
 
             relevant_tool_names = self.router.get_tools_for_intent(intent)
@@ -248,34 +250,50 @@ class AIAgentService:
         if response_style in self._RESPONSE_STYLE_APPENDIX:
             system_prompt += self._RESPONSE_STYLE_APPENDIX[response_style]
 
-        # Genre detection + prompt injection (best-effort; never fatal)
+        # Genre injection — sourced from LLM routing result (or keyword fallback if routing disabled)
         try:
-            from backend.services.music.genre_profiles import detect_genre, get_genre_profile
-            detected_genre = detect_genre(user_message)
+            from backend.services.music.genre_profiles import get_genre_profile
+            detected_genre = route_result.genre if route_result else self.router._resolve_genre(user_message, None)
             if detected_genre:
                 profile = get_genre_profile(detected_genre)
                 if profile:
-                    logger.info(f"🎵 Detected genre: {detected_genre}")
+                    logger.info(f"🎵 Genre: {detected_genre}")
                     progressions = profile.get("progressions", [])[:2]
                     tempo_range = profile.get("tempo_range", (100, 140))
                     if not isinstance(tempo_range, (tuple, list)) or len(tempo_range) < 2:
                         tempo_range = (100, 140)
-                    system_prompt += (
+                    scale = profile.get("scales", ["minor"])[0]
+                    chord_inst = profile.get("chord_instrument", "pad")
+                    lead_inst = profile.get("lead_instrument", "lead")
+                    bass_inst = profile.get("bass_instrument", "bass")
+                    bass_octave = profile.get("bass_octave", 2)
+                    chord_rhythm = profile.get("chord_rhythm", "block")
+                    arp_style = profile.get("arp_style", "up")
+                    arp_rhythm = profile.get("arp_rhythm", "8th")
+                    melody_contour = profile.get("melody_contour", "arch")
+                    melody_density = profile.get("melody_density", "medium")
+                    bass_gen = profile.get("bass_generator", "root_pulse")
+                    prog_root = progressions[0][0][0] if progressions else "C"
+                    example_chords = progressions[0] if progressions else ["Am", "F", "C", "G"]
+                    genre_injection = (
                         f"\n\nDETECTED GENRE: {detected_genre.upper()}\n"
-                        f"Use these genre-specific settings:\n"
-                        f"  kit={profile.get('kit_id')}, "
-                        f"scale={profile.get('scales', ['minor'])[0]}, "
-                        f"tempo={profile.get('tempo_default', 120)} bpm "
-                        f"(range {tempo_range[0]}–{tempo_range[1]})\n"
-                        f"  bass_style={profile.get('bass_style', 'melodic')}, "
-                        f"bass_octave={profile.get('bass_octave', 2)}, "
-                        f"lead={profile.get('lead_instrument', 'lead')}, "
-                        f"chords={profile.get('chord_instrument', 'pad')}\n"
-                        f"  Progressions: {progressions}\n"
-                        f"  Style: {profile.get('notes', '')}"
+                        f"Core settings: kit={profile.get('kit_id')}, scale={scale}, "
+                        f"tempo={profile.get('tempo_default', 120)} bpm (range {tempo_range[0]}–{tempo_range[1]})\n"
+                        f"Instruments: lead={lead_inst}, chords={chord_inst}, bass={bass_inst}, bass_octave={bass_octave}\n"
+                        f"Chord progressions: {progressions}\n"
+                        f"Style: {profile.get('notes', '')}\n\n"
+                        f"MELODIC GENERATOR RECOMMENDATIONS for {detected_genre}:\n"
+                        f"  Bass:   instrument={bass_inst!r}, bass_line style={bass_gen!r}, octave={bass_octave}\n"
+                        f"  Chords: instrument={chord_inst!r}, chord_pattern rhythm={chord_rhythm!r}\n"
+                        f"  Arp:    instrument={lead_inst!r}, arp_pattern style={arp_style!r}, rhythm={arp_rhythm!r}\n"
+                        f"  Melody: instrument={lead_inst!r}, scale_melody root={prog_root!r}, scale={scale!r}, "
+                        f"contour={melody_contour!r}, density={melody_density!r}\n"
+                        f"Example bass track: name='Bass', instrument={bass_inst!r}, "
+                        f"bass_line chords={example_chords}, style={bass_gen!r}, octave={bass_octave}"
                     )
+                    system_prompt += genre_injection
         except Exception as e:
-            logger.debug(f"Genre detection skipped (non-fatal): {e}")
+            logger.warning(f"⚠️ Genre injection failed (non-fatal): {e}")
 
         # Build messages with conversation history
         _tempo = state_response.full_state.tempo if state_response.full_state else 120.0
@@ -745,7 +763,8 @@ class AIAgentService:
         # ── Route intent ───────────────────────────────────────────────────────
         state = await self.state_service.get_current_state()
         daw_summary = self._build_brief_state_summary(state) if state else None
-        intent = await self.router.route(message, daw_summary)
+        route_result = await self.router.route(message, daw_summary)
+        intent = route_result.intent
 
         # ── Resolve focused tool set ───────────────────────────────────────────
         tool_names = self.router.get_tools_for_intent(intent)
@@ -1165,13 +1184,41 @@ class AIAgentService:
 
     def _compute_instruments_catalog(self) -> str:
         """
-        Build a role-grouped, compact instrument catalog for AI prompts.
-        Groups by musical role rather than dumping all 195+ instruments.
+        Build a role-grouped instrument catalog for AI prompts with sonic descriptions.
+        Annotates the most commonly used synths so Claude can pick musically appropriate ones.
         """
         from backend.services.daw.registry import SYNTHDEF_REGISTRY
 
-        # Role groupings — what an AI producer thinks about
-        role_groups = {
+        # Sonic descriptions for key synths (instrument name → brief timbral description)
+        _SONIC_HINTS: Dict[str, str] = {
+            # Leads
+            "lead":      "bright cutting sawtooth",
+            "supersaw":  "wide stacked detuned (EDM)",
+            "glide":     "portamento monophonic",
+            "fm":        "metallic bell-like (FM)",
+            "stab":      "short punchy chord stab",
+            # Bass
+            "bass":      "deep subtractive",
+            "acidbass":  "TB-303 squelch/resonance",
+            "reese":     "detuned saw (DnB/techno)",
+            "wobble":    "LFO filter sweep",
+            "synthBass1": "clean GM synth bass",
+            # Pads / Textures
+            "pad":       "warm slow-attack atmosphere",
+            "strings":   "lush detuned ensemble",
+            # Keys
+            "pluck":     "fast-decay pizzicato",
+            "bell":      "clear resonant sine",
+            "organ":     "Hammond B3 drawbar",
+            "kalimba":   "thumb piano (bright & short)",
+            "glass":     "ethereal bowl shimmer",
+            "electricPiano1": "Rhodes/Wurlitzer",
+            "clavinet":  "funky clavinet",
+            # Drums note
+            "chiptune":  "8-bit pulse wave",
+        }
+
+        role_groups: Dict[str, List[str]] = {
             "SYNTHS & LEADS": [],
             "BASS SYNTHS": [],
             "PADS & TEXTURES": [],
@@ -1212,13 +1259,16 @@ class AIAgentService:
             cat = synth.get("category", "")
             if cat in skip_categories:
                 continue
+            name = synth["name"]
             role = category_to_role.get(cat, "SPECIAL / WAVEFORMS")
-            role_groups[role].append(f"{synth['name']}")
+            hint = _SONIC_HINTS.get(name)
+            entry = f"{name} ({hint})" if hint else name
+            role_groups[role].append(entry)
 
         lines = ["INSTRUMENTS (use as 'instrument' in tracks):"]
-        for role, names in role_groups.items():
-            if names:
-                lines.append(f"  {role}: {', '.join(names)}")
+        for role, entries in role_groups.items():
+            if entries:
+                lines.append(f"  {role}: {', '.join(entries)}")
 
         return "\n".join(lines)
 

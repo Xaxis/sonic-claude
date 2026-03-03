@@ -3,10 +3,13 @@ Intent Routing System — Maps user requests to appropriate tool sets.
 
 Uses LLM-based classification for accurate intent detection.
 Musical intents (CREATE_BEAT, CREATE_ARRANGEMENT) are first-class citizens.
+Genre is detected in the same Haiku call as intent — zero extra latency/cost.
 """
 import asyncio
+import json
 import logging
 import anthropic
+from dataclasses import dataclass
 from typing import Dict, Any, List, Optional
 from enum import Enum
 
@@ -26,10 +29,17 @@ class Intent(str, Enum):
     GENERAL_CHAT        = "general_chat"        # Everything else
 
 
+@dataclass
+class RouteResult:
+    """Result from a single Haiku routing call — intent + genre in one shot."""
+    intent: Intent
+    genre: Optional[str] = None      # One of the 14 GENRE_PROFILES keys, or None
+
+
 class IntentRouter:
     """
     Routes user requests to appropriate tool sets using LLM classification.
-    Uses Claude Haiku for fast, cheap intent detection.
+    Uses Claude Haiku for fast, cheap intent + genre detection in one call.
     """
 
     _RETRYABLE_STATUS = (529, 429)
@@ -58,46 +68,107 @@ class IntentRouter:
                 return intent
         return Intent.GENERAL_CHAT
 
-    async def route(self, user_message: str, daw_state_summary: Optional[str] = None) -> Intent:
-        """Route user message to intent category using LLM with retry + keyword fallback."""
+    # Valid genre keys — must match GENRE_PROFILES keys exactly
+    _VALID_GENRES = {
+        "trap", "house", "techno", "dnb", "boom_bap", "lofi", "hip_hop",
+        "afrobeats", "uk_garage", "jazz", "funk", "rock", "ambient", "r_and_b",
+    }
+
+    # Artist → genre lookup for well-known producers (Haiku may still know these,
+    # but this prevents any hallucination on canonical mappings)
+    _ARTIST_GENRE_MAP = {
+        "jai cuzco":      "house",       # melodic progressive house
+        "bicep":          "house",       # melodic house/techno
+        "four tet":       "ambient",     # experimental/ambient electronics
+        "burial":         "ambient",     # UK garage / ambient
+        "aphex twin":     "ambient",     # IDM / ambient techno
+        "boards of canada": "ambient",   # downtempo / ambient
+        "j dilla":        "boom_bap",
+        "madlib":         "boom_bap",
+        "pete rock":      "boom_bap",
+        "dj premier":     "boom_bap",
+        "flying lotus":   "hip_hop",     # future beats / LA beat scene
+        "kendrick lamar": "hip_hop",
+        "kanye west":     "hip_hop",
+        "travis scott":   "trap",
+        "metro boomin":   "trap",
+        "future":         "trap",
+        "carl cox":       "techno",
+        "adam beyer":     "techno",
+        "charlotte de witte": "techno",
+        "amelie lens":    "techno",
+        "andy c":         "dnb",
+        "goldie":         "dnb",
+        "netsky":         "dnb",
+        "disclosure":     "house",
+        "kaytranada":     "house",
+        "fred again":     "house",
+        "daft punk":      "house",
+        "deadmau5":       "house",
+        "solomun":        "house",
+        "jamie xx":       "house",
+        "erykah badu":    "r_and_b",
+        "d'angelo":       "r_and_b",
+        "frank ocean":    "r_and_b",
+        "sade":           "r_and_b",
+        "miles davis":    "jazz",
+        "john coltrane":  "jazz",
+        "herbie hancock": "jazz",
+        "james brown":    "funk",
+        "parliament":     "funk",
+        "prince":         "funk",
+    }
+
+    async def route(self, user_message: str, daw_state_summary: Optional[str] = None) -> RouteResult:
+        """
+        Route user message → intent + genre using a single Haiku JSON call.
+        Returns RouteResult(intent, genre). Falls back to keyword detection.
+        Genre is detected with full LLM understanding: artist names, descriptors, context.
+        """
         if not self.client:
             logger.warning("⚠️ No API key, defaulting to GENERAL_CHAT")
-            return Intent.GENERAL_CHAT
+            return RouteResult(intent=Intent.GENERAL_CHAT)
 
         context = f"\n\nCurrent DAW state:\n{daw_state_summary}" if daw_state_summary else ""
 
-        classification_prompt = f"""Classify this music production request into ONE category:
+        classification_prompt = f"""You are a music production assistant classifier. Analyze this request and return JSON.
 
-CREATE_BEAT: User wants a drum beat, percussion pattern, or rhythm track
-  Examples: "make a trap beat", "add drums", "808 pattern", "4-on-the-floor", "drum loop"
+TASK: Return exactly this JSON structure:
+{{"intent": "INTENT_NAME", "genre": "genre_name_or_null"}}
 
-CREATE_ARRANGEMENT: User wants a full multi-track song/section with multiple parts
-  Examples: "full arrangement", "complete song", "verse and chorus", "start a track with everything"
+─── INTENTS ───
+CREATE_BEAT        – drum beat, percussion, rhythm track
+                     e.g. "make a trap beat", "4-on-the-floor kick", "add hi-hats"
+CREATE_ARRANGEMENT – full multi-track song/section with multiple parts
+                     e.g. "full song", "complete arrangement", "build a track", "make something like [artist]"
+CREATE_CONTENT     – single musical element (melody, bassline, chords, one track)
+                     e.g. "add a bass line", "chord progression", "lead synth melody"
+MODIFY_CONTENT     – edit existing notes/clips/tracks
+                     e.g. "change the melody", "edit the bass", "make the snare harder"
+DELETE_CONTENT     – remove tracks, clips, or content
+                     e.g. "delete the drum track", "clear everything"
+ADD_EFFECTS        – FX processing changes
+                     e.g. "add reverb", "distortion on lead", "compress the bass"
+PLAYBACK_CONTROL   – transport or tempo
+                     e.g. "play", "stop", "set tempo to 140"
+QUERY_STATE        – question about current project state
+                     e.g. "what tracks do I have?", "what key am I in?"
+GENERAL_CHAT       – general question, help, or unclear
+                     e.g. "how do I...", "what is..."
 
-CREATE_CONTENT: User wants one specific musical element (melody, bassline, chord pad, single track)
-  Examples: "add a bass line", "create a chord progression", "add a lead synth", "make a piano melody"
+─── GENRES (use null if no genre context) ───
+Valid values: trap, house, techno, dnb, boom_bap, lofi, hip_hop, afrobeats, uk_garage, jazz, funk, rock, ambient, r_and_b
 
-MODIFY_CONTENT: User wants to edit existing content (change notes, add/remove notes, edit a clip)
-  Examples: "change the melody", "add more notes", "edit the bass", "make the snare hit harder"
-
-DELETE_CONTENT: User wants to remove something
-  Examples: "delete the drum track", "remove the reverb", "clear everything"
-
-ADD_EFFECTS: User wants to add/change FX processing
-  Examples: "add reverb", "make it sound warmer", "add distortion", "put a delay on the lead"
-
-PLAYBACK_CONTROL: User wants to control transport/tempo
-  Examples: "play", "stop", "set tempo to 140", "loop this section"
-
-QUERY_STATE: User is asking a question about the current project
-  Examples: "what tracks do I have?", "what key is this in?", "how many bars?"
-
-GENERAL_CHAT: General question, help request, or unclear
-  Examples: "how do I...", "what is...", "can you explain"
+Genre detection rules (in priority order):
+1. Artist name mentioned → use their primary genre (e.g. "Jai Cuzco"→house, "J Dilla"→boom_bap, "Aphex Twin"→ambient, "Carl Cox"→techno)
+2. Explicit genre word → map to nearest valid genre ("progressive house"→house, "drum and bass"→dnb, "drill"→trap)
+3. Musical descriptors → infer genre ("808 bass + hi-hats"→trap, "four-on-floor kick"→house, "walking bass"→jazz, "808s and melodic"→trap)
+4. General "EDM" without specifics → null (not enough info to pick a genre)
+5. No musical context → null
 
 User request: "{user_message}"{context}
 
-Respond with ONLY the category name. No explanation."""
+Respond with ONLY valid JSON. No markdown fences, no explanation."""
 
         intent_map = {
             "CREATE_BEAT":        Intent.CREATE_BEAT,
@@ -112,6 +183,7 @@ Respond with ONLY the category name. No explanation."""
         }
 
         last_exc: Exception = RuntimeError("No attempts made")
+        raw = ""
         for attempt, wait in enumerate([0.0] + self._BACKOFF):
             if wait:
                 logger.warning(f"⏳ Routing retry in {wait:.0f}s (attempt {attempt}/{len(self._BACKOFF)})…")
@@ -119,13 +191,33 @@ Respond with ONLY the category name. No explanation."""
             try:
                 response = await self.client.messages.create(
                     model=self.model,
-                    max_tokens=50,
+                    max_tokens=80,
                     messages=[{"role": "user", "content": classification_prompt}]
                 )
-                intent_str = response.content[0].text.strip().upper()
+                raw = response.content[0].text.strip()
+                parsed = json.loads(raw)
+
+                intent_str = str(parsed.get("intent", "")).strip().upper()
                 intent = intent_map.get(intent_str, Intent.GENERAL_CHAT)
-                logger.info(f"🔀 LLM routed to {intent.value}")
-                return intent
+
+                genre_raw = parsed.get("genre")
+                genre = self._resolve_genre(user_message, genre_raw)
+
+                logger.info(f"🔀 LLM routed to {intent.value}" + (f" | genre: {genre}" if genre else ""))
+                return RouteResult(intent=intent, genre=genre)
+
+            except (json.JSONDecodeError, KeyError, AttributeError) as e:
+                # Malformed JSON — try to salvage intent from raw text
+                logger.warning(f"⚠️ Route JSON parse error: {e} | raw: {raw!r}")
+                # Attempt plain-text intent parse (backwards-compat fallback)
+                intent_str = raw.strip().upper().split()[0] if raw.strip() else ""
+                if intent_str in intent_map:
+                    intent = intent_map[intent_str]
+                    genre = self._resolve_genre(user_message, None)
+                    logger.info(f"🔀 Salvaged plain-text intent: {intent.value}")
+                    return RouteResult(intent=intent, genre=genre)
+                last_exc = e
+
             except anthropic.InternalServerError as exc:
                 if exc.status_code in self._RETRYABLE_STATUS:
                     last_exc = exc
@@ -136,12 +228,59 @@ Respond with ONLY the category name. No explanation."""
             except Exception as e:
                 logger.error(f"❌ Intent routing failed: {e}")
                 last_exc = e
-                break  # Non-retryable error — skip remaining attempts
+                break  # Non-retryable — skip remaining attempts
 
-        # All retries exhausted — use keyword fallback
-        fallback = self._keyword_fallback(user_message)
-        logger.warning(f"⚠️ Routing failed after retries ({last_exc}), keyword fallback → {fallback.value}")
-        return fallback
+        # All retries exhausted — full keyword fallback
+        fallback_intent = self._keyword_fallback(user_message)
+        fallback_genre = self._resolve_genre(user_message, None)
+        logger.warning(
+            f"⚠️ Routing failed after retries ({last_exc}), "
+            f"keyword fallback → intent={fallback_intent.value}, genre={fallback_genre}"
+        )
+        return RouteResult(intent=fallback_intent, genre=fallback_genre)
+
+    def _resolve_genre(self, user_message: str, llm_genre: Optional[str]) -> Optional[str]:
+        """
+        Validate + clean the LLM's genre output.
+        Falls back to artist-map lookup, then keyword scan.
+        Returns a valid GENRE_PROFILES key or None.
+        """
+        # 1. Trust the LLM if it returned a valid genre
+        if llm_genre and str(llm_genre).lower() in self._VALID_GENRES:
+            return str(llm_genre).lower()
+
+        # 2. Artist name lookup (hardcoded canonical mappings)
+        msg_lower = user_message.lower()
+        for artist, genre in self._ARTIST_GENRE_MAP.items():
+            if artist in msg_lower:
+                logger.debug(f"🎨 Artist match: '{artist}' → {genre}")
+                return genre
+
+        # 3. Keyword scan (last resort)
+        _KEYWORD_GENRE_MAP = [
+            # More specific patterns before generic ones
+            ("drum and bass", "dnb"), ("dnb", "dnb"), ("neurofunk", "dnb"), ("jungle", "dnb"),
+            ("liquid dnb", "dnb"),
+            ("techno", "techno"), ("industrial techno", "techno"), ("berlin", "techno"),
+            ("boom bap", "boom_bap"), ("boom-bap", "boom_bap"), ("golden age hip hop", "boom_bap"),
+            ("lo-fi", "lofi"), ("lofi", "lofi"), ("lo fi", "lofi"), ("study beats", "lofi"),
+            ("afrobeats", "afrobeats"), ("amapiano", "afrobeats"), ("afro pop", "afrobeats"),
+            ("uk garage", "uk_garage"), ("2-step", "uk_garage"), ("2step", "uk_garage"),
+            ("r&b", "r_and_b"), ("rnb", "r_and_b"), ("neo soul", "r_and_b"),
+            ("hip hop", "hip_hop"), ("hip-hop", "hip_hop"), ("rap", "hip_hop"),
+            ("trap", "trap"), ("drill", "trap"), ("808", "trap"),
+            ("house", "house"), ("deep house", "house"), ("tech house", "house"),
+            ("progressive house", "house"), ("melodic house", "house"),
+            ("ambient", "ambient"), ("drone", "ambient"), ("atmospheric", "ambient"),
+            ("jazz", "jazz"), ("bebop", "jazz"), ("swing", "jazz"),
+            ("funk", "funk"), ("funky", "funk"), ("groove", "funk"),
+            ("rock", "rock"), ("punk", "rock"), ("guitar rock", "rock"),
+        ]
+        for keyword, genre in _KEYWORD_GENRE_MAP:
+            if keyword in msg_lower:
+                return genre
+
+        return None
 
     def get_tools_for_intent(self, intent: Intent) -> List[str]:
         """Get relevant tool names for an intent — lean and focused."""
@@ -270,22 +409,24 @@ CRITICAL: Make ONE compose_music call that includes ALL tracks AND sets tempo in
 Do NOT call set_tempo separately — put tempo inside compose_music.
 Do NOT make multiple compose_music calls — put all tracks in one call.
 
-compose_music structure:
+CONTENT TYPE GUIDE — choose the best type per track:
+  Drums:  kit_pattern (simplest) or drum_pattern (custom voices)
+  Bass:   bass_line (best!) — styles: root_pulse/walking/syncopated/sub_pulse/octave_jump
+  Chords: chord_pattern + optional rhythm field (block/off_beat/staccato/syncopated)
+  Arp:    arp_pattern — styles: up/down/up_down, rhythms: 16th/8th/swing_8th
+  Melody: scale_melody — contours: arch/rising/falling/wave, densities: sparse/medium/dense
+  Custom: note_sequence — explicit note names (C4, F#3, Bb5) + beat positions
+
+compose_music structure (use bass_line and chord_pattern over note_sequence):
 {{
   "tempo": 128,
   "tracks": [
-    {{ "name": "Drums", "drum_pattern": {{ ... }} }},
-    {{ "name": "Bass", "instrument": "synthBass1", "note_sequence": {{ ... }} }},
-    {{ "name": "Chords", "instrument": "pad", "chord_pattern": {{ ... }} }},
-    {{ "name": "Lead", "instrument": "lead", "note_sequence": {{ ... }} }}
+    {{ "name": "Drums", "drum_pattern": {{ "kit_id": "trap-kit", "voices": [...] }} }},
+    {{ "name": "Bass", "instrument": "bass", "bass_line": {{ "chords": ["Am","F","C","G"], "style": "syncopated", "octave": 2 }} }},
+    {{ "name": "Chords", "instrument": "pad", "chord_pattern": {{ "chords": ["Am","F","C","G"], "rhythm": "off_beat", "octave": 4 }} }},
+    {{ "name": "Melody", "instrument": "lead", "scale_melody": {{ "root": "A", "scale": "pentatonic_minor", "contour": "arch", "density": "medium" }} }}
   ]
 }}
-
-Layers (use all relevant ones):
-1. Drums: kit_pattern or drum_pattern
-2. Bass: note_sequence, octave 2-3 (A2, C2, F2)
-3. Chords: chord_pattern (Am, F, C, G)
-4. Lead/melody: note_sequence, octave 4-5
 
 {kit_catalog}
 {NOTATION_GUIDE}
@@ -294,26 +435,38 @@ Layers (use all relevant ones):
 GENRE PROFILES (suggested settings by genre):
 {genre_profiles_summary}
 
-Always create at least drums + bass + chords. Add a lead melody if appropriate.""",
+Always create at least drums + bass + chords. Add melody/arp if appropriate.
+Prefer bass_line over note_sequence for bass tracks.
+Prefer scale_melody or arp_pattern over note_sequence for melodies.""",
 
             Intent.CREATE_CONTENT: f"""You are a music production AI. Create musical content.
 
 IMPORTANT: Use compose_music in a SINGLE call with tempo set via the `tempo` field. Do NOT call set_tempo first.
 
-Use compose_music to create tracks. Specify content type:
-- note_sequence: melodies, basslines, arpeggios (use note NAMES: C4, F#3, Bb5)
-- chord_pattern: harmonic content (use chord symbols: Am7, Cmaj7, G7)
-- drum_pattern or kit_pattern: rhythmic content
+CONTENT TYPE SELECTION — pick the right generator for each track type:
+  Bass track?    → bass_line (styles: root_pulse/walking/syncopated/sub_pulse/octave_jump)
+                   Example: {{"bass_line": {{"chords": ["Am","F","C","G"], "style": "root_pulse", "octave": 2}}}}
+
+  Arpeggio?      → arp_pattern (styles: up/down/up_down, rhythms: 16th/8th/dotted_8th/swing_8th)
+                   Example: {{"arp_pattern": {{"chords": ["Am","F","C","G"], "style": "up", "rhythm": "16th"}}}}
+
+  Chords w/feel? → chord_pattern + rhythm field (block/off_beat/staccato/on_beat/syncopated)
+                   Example: {{"chord_pattern": {{"chords": ["Am","F","C","G"], "rhythm": "off_beat"}}}}
+
+  Melodic shape? → scale_melody (contours: arch/rising/falling/wave/valley; sparse/medium/dense)
+                   Example: {{"scale_melody": {{"root": "A", "scale": "pentatonic_minor", "contour": "arch", "density": "medium"}}}}
+
+  Specific riff? → note_sequence with explicit note names (C4, F#3, Bb5) + beat positions
 
 {kit_catalog}
 {NOTATION_GUIDE}
 {instruments_catalog}
 
-Bass lines: use octaves 1-3 (A2, C2, F2, G2 etc.)
-Melodies:   use octaves 4-6 (C5, E4, G#4 etc.)
-Chords:     use octave 3-5 with voicing: "closed" / "open" / "spread"
+Bass octaves: 1-3 (A2, C2, F2 for deep bass)
+Melody octaves: 4-6 (C5, E4, G#4 for lead lines)
+Chords: octave 3-5, voicing: "closed" / "open" / "spread"
 
-Think about harmonic context. Ask: what key, what scale, what instrument?""",
+Think: what key, what scale, what generator fits this part best?""",
 
             Intent.MODIFY_CONTENT: f"""You are a music production AI. Edit existing musical content.
 
@@ -377,10 +530,17 @@ Be informative and specific.""",
 
             Intent.GENERAL_CHAT: f"""You are a music production AI with full creative control.
 
-Use compose_music for all creation (tracks, beats, melodies, chords).
-Use edit_clip to modify existing content (notes, length, position):
-  - duration_bars: resize clip (e.g. duration_bars=16)
-  - start_bar: move clip (e.g. start_bar=8)
+Use compose_music for all creation. CHOOSE THE RIGHT CONTENT TYPE:
+  Drums:  kit_pattern or drum_pattern
+  Bass:   bass_line (root_pulse/walking/syncopated/sub_pulse) — better than note_sequence for bass
+  Chords: chord_pattern with optional rhythm (off_beat/staccato/syncopated) for feel
+  Arp:    arp_pattern (up/down/up_down, 16th/8th/swing_8th) — great for lead synths + keys
+  Melody: scale_melody (arch/rising/wave contour, sparse/medium/dense) — smooth melodic shapes
+  Custom: note_sequence for specific riffs with explicit note names
+
+Use edit_clip to modify existing content:
+  - duration_bars: resize clip
+  - start_bar: move clip
   - mode + notes: edit note content
 Use add_effect / remove_effect for effects.
 
