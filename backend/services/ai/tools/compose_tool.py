@@ -22,6 +22,40 @@ from backend.models.ai_actions import DAWAction, ActionResult
 
 logger = logging.getLogger(__name__)
 
+# Mapping from drum voice names (as AI uses in drum_pattern voices) to valid synthdef names.
+# Lets the AI pass voice names as `instrument` on drum tracks without causing a validation error.
+_DRUM_VOICE_TO_SYNTHDEF: Dict[str, str] = {
+    "kick":          "kick808",
+    "kick2":         "kick808",
+    "bass_drum":     "kick808",
+    "bd":            "kick808",
+    "snare":         "snare808",
+    "snare2":        "snare808",
+    "sd":            "snare808",
+    "clap":          "clap808",
+    "rim":           "rimshot808",
+    "rimshot":       "rimshot808",
+    "hihat_closed":  "hihatClosed808",
+    "hihat_open":    "hihatOpen808",
+    "hihat_pedal":   "hihatClosed808",
+    "hh":            "hihatClosed808",
+    "hh_closed":     "hihatClosed808",
+    "hh_open":       "hihatOpen808",
+    "hat":           "hihatClosed808",
+    "hat_closed":    "hihatClosed808",
+    "hat_open":      "hihatOpen808",
+    "open_hat":      "hihatOpen808",
+    "tom_low":       "tomLow808",
+    "tom_mid":       "tomMid808",
+    "tom_high":      "tomHigh808",
+    "tom":           "tomMid808",
+    "crash":         "cymbalCrash",
+    "ride":          "cymbalRide",
+    "cowbell":       "cowbell808",
+    "percussion":    "kick808",
+    "perc":          "kick808",
+}
+
 
 # ── Tool definition schema (Anthropic function-calling format) ────────────────
 
@@ -53,9 +87,11 @@ COMPOSE_MUSIC_TOOL_SCHEMA = {
                         "instrument": {
                             "type": "string",
                             "description": (
-                                "Instrument synthdef name from registry. "
-                                "For drum kits, use any drum voice name (kick808, snare808, etc.) "
-                                "— the kit assignment overrides per-pad routing."
+                                "Synthdef name from SYNTHDEF_REGISTRY (e.g. 'sine', 'bell', 'piano', 'kick808'). "
+                                "REQUIRED for melodic/bass/chord tracks. "
+                                "OPTIONAL for drum tracks — omit it and the kit or drum pattern will set the "
+                                "correct instrument automatically. Do NOT use bare drum voice names like "
+                                "'kick' or 'hihat_closed' here; those are for drum_pattern.voices only."
                             )
                         },
                         "bars": {
@@ -206,7 +242,7 @@ COMPOSE_MUSIC_TOOL_SCHEMA = {
                             }
                         }
                     },
-                    "required": ["name", "instrument"]
+                    "required": ["name"]
                 }
             },
             "tempo": {
@@ -314,7 +350,7 @@ class ComposeTool:
     async def _create_track_from_spec(self, spec: Dict[str, Any]) -> Dict[str, Any]:
         """Create a single track + clip from a track specification dict."""
         name = spec.get("name", "Untitled")
-        instrument = spec.get("instrument", "sine")
+        instrument = spec.get("instrument") or ""
         bars = int(spec.get("bars", 4))
         start_bar = int(spec.get("start_bar", 0))
         clip_name = spec.get("clip_name") or f"{name} Pattern"
@@ -322,6 +358,33 @@ class ComposeTool:
         effects = spec.get("effects") or []
         start_beats = start_bar * 4
         dur_beats = bars * 4
+
+        # ── Pre-resolve instrument before track creation ──────────────────────
+        # Extract kit_id early so we can use it to pick a valid synthdef name.
+        # This must happen before Step 1 because create_track validates instrument.
+        pre_kit_id = None
+        is_drum_track = "drum_pattern" in spec or "kit_pattern" in spec
+        if "kit_pattern" in spec:
+            pre_kit_id = spec["kit_pattern"].get("kit_id")
+        elif "drum_pattern" in spec:
+            pre_kit_id = spec["drum_pattern"].get("kit_id")
+
+        from backend.models.instrument_types import get_valid_instruments
+        valid_synthdefs = get_valid_instruments()
+
+        if instrument not in valid_synthdefs:
+            # Instrument is missing, a drum voice name, or hallucinated — resolve it:
+            resolved = None
+            # 1. Try to get the kick synthdef from the kit
+            if pre_kit_id:
+                resolved = self._get_kit_default_instrument(pre_kit_id)
+            # 2. Try drum voice name → synthdef mapping
+            if not resolved and instrument:
+                resolved = _DRUM_VOICE_TO_SYNTHDEF.get(instrument.lower())
+            # 3. Sensible defaults by track type
+            if not resolved:
+                resolved = "kick808" if is_drum_track else "sine"
+            instrument = resolved
 
         # ── Step 1: Create track ─────────────────────────────────────────────
         track_result = await self.action_service.execute_action(
@@ -346,15 +409,12 @@ class ComposeTool:
 
         # ── Step 2: Generate MIDI notes ──────────────────────────────────────
         notes = []
-        kit_id = None
+        kit_id = pre_kit_id  # already extracted above
 
         if "kit_pattern" in spec:
-            kit_id = spec["kit_pattern"]["kit_id"]
             notes = self._generate_kit_pattern_notes(kit_id, bars)
-            instrument = self._get_kit_default_instrument(kit_id) or instrument
 
         elif "drum_pattern" in spec:
-            kit_id = spec["drum_pattern"].get("kit_id")
             notes = self._generate_drum_pattern_notes(spec["drum_pattern"], bars)
 
         elif "chord_pattern" in spec:

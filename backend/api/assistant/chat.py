@@ -5,6 +5,7 @@ This module handles chat interactions with the assistant agent.
 """
 import logging
 from typing import Optional, Literal
+import anthropic
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -111,6 +112,19 @@ async def chat(
 
     except HTTPException:
         raise
+    except anthropic.RateLimitError:
+        raise HTTPException(
+            status_code=429,
+            detail="AI rate limit reached. Please wait a moment before trying again."
+        )
+    except anthropic.InternalServerError as e:
+        if e.status_code == 529:
+            raise HTTPException(
+                status_code=503,
+                detail="Anthropic AI is temporarily overloaded. Please try again in a few seconds."
+            )
+        logger.error(f"Chat error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         logger.error(f"Chat error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

@@ -12,6 +12,7 @@ Validation:
 - Tool definitions dynamically generated from SYNTHDEF_REGISTRY
 - Ensures AI can only select valid instruments (no hallucination)
 """
+import asyncio
 import logging
 import re
 import time
@@ -88,6 +89,36 @@ class AIAgentService:
 
         # Chat history tracking (per composition)
         self.chat_histories: Dict[str, List[ChatMessage]] = {}
+
+    async def _api_call(self, **kwargs) -> anthropic.types.Message:
+        """
+        Wrapper around client.messages.create with retry logic for transient API errors.
+
+        Retries up to 3 times (with 1s / 2s / 4s backoff) on:
+          - 529 overloaded_error  (Anthropic servers temporarily at capacity)
+          - 429 rate_limit_error  (per-minute token or request limit)
+
+        Any other error is re-raised immediately.
+        """
+        _RETRYABLE = (529, 429)
+        _BACKOFF = [1.0, 2.0, 4.0]
+
+        last_exc: Exception = RuntimeError("No attempts made")
+        for attempt, wait in enumerate([0.0] + _BACKOFF):
+            if wait:
+                logger.warning(f"⏳ Anthropic API transient error — retrying in {wait:.0f}s (attempt {attempt}/{len(_BACKOFF)})…")
+                await asyncio.sleep(wait)
+            try:
+                return await self.client.messages.create(**kwargs)
+            except anthropic.InternalServerError as exc:
+                if exc.status_code in _RETRYABLE:
+                    last_exc = exc
+                else:
+                    raise
+            except anthropic.RateLimitError as exc:
+                last_exc = exc
+
+        raise last_exc
 
     async def _emit_pipeline(
         self,
@@ -272,7 +303,7 @@ class AIAgentService:
         if temperature is not None:
             create_kwargs["temperature"] = temperature
 
-        response = await self.client.messages.create(**create_kwargs)
+        response = await self._api_call(**create_kwargs)
 
         tool_call_count = sum(1 for b in response.content if b.type == "tool_use")
         await self._emit_pipeline(request_id, "execution", "complete", {
@@ -344,7 +375,7 @@ class AIAgentService:
                 "model": "haiku",
                 "tool_results": len(tool_results),
             })
-            follow_up = await self.client.messages.create(
+            follow_up = await self._api_call(
                 model="claude-haiku-4-5-20251001",  # Haiku — fast/cheap for summarizing results
                 max_tokens=512,
                 system=system_prompt,
@@ -498,7 +529,7 @@ class AIAgentService:
         if temperature is not None:
             create_kwargs["temperature"] = temperature
 
-        response = await self.client.messages.create(**create_kwargs)
+        response = await self._api_call(**create_kwargs)
 
         # ── Process response ───────────────────────────────────────────────────
         actions_executed = []
@@ -548,7 +579,7 @@ class AIAgentService:
             ]
 
             logger.info(f"🔄 Sending {len(tool_results)} tool result(s) back to LLM...")
-            follow_up = await self.client.messages.create(
+            follow_up = await self._api_call(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=512,
                 system=system_prompt,

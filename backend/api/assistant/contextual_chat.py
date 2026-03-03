@@ -16,6 +16,7 @@ This enables inline editing like:
 - Right-click mixer channel → "Balance this better with the drums"
 """
 import logging
+import anthropic
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Literal, Optional, Dict, Any
@@ -136,6 +137,19 @@ async def contextual_chat(
 
     except HTTPException:
         raise
+    except anthropic.RateLimitError:
+        raise HTTPException(
+            status_code=429,
+            detail="AI rate limit reached. Please wait a moment before trying again."
+        )
+    except anthropic.InternalServerError as e:
+        if e.status_code == 529:
+            raise HTTPException(
+                status_code=503,
+                detail="Anthropic AI is temporarily overloaded. Please try again in a few seconds."
+            )
+        logger.error(f"Contextual chat error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         logger.error(f"Contextual chat error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

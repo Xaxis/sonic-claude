@@ -12,7 +12,7 @@
 import { SubPanel } from "@/components/ui/sub-panel.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDAWStore } from "@/stores/dawStore";
 import { Activity, Waves, BarChart3, AlertTriangle } from "lucide-react";
 import { WaveformDisplay } from "../../components/ui/waveform-display.tsx";
@@ -62,7 +62,7 @@ export function VisualizerPanel() {
     });
 
     // Calculate audio statistics from spectrum and waveform data
-    useMemo(() => {
+    useEffect(() => {
         if (!spectrum || spectrum.length === 0 || !waveform || waveform.samples_left.length === 0) return;
 
         let maxMagnitude = 0;
