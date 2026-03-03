@@ -58,7 +58,7 @@ class AIAgentService:
         action_service: DAWActionService,
         composition_service: Optional['CompositionService'] = None,
         api_key: Optional[str] = None,
-        model: str = "claude-sonnet-4-5-20250929",
+        model: str = "claude-sonnet-4-6",
         samples_dir: Optional[Path] = None,
         musical_perception_analyzer: Optional[MusicalPerceptionAnalyzer] = None,
         composition_perception_analyzer: Optional[CompositionPerceptionAnalyzer] = None,
@@ -145,7 +145,7 @@ class AIAgentService:
     # Model identifiers for the execution_model shorthand values
     _EXECUTION_MODEL_MAP: Dict[str, str] = {
         "haiku":  "claude-haiku-4-5-20251001",
-        "sonnet": "claude-sonnet-4-5-20250929",
+        "sonnet": "claude-sonnet-4-6",
         "opus":   "claude-opus-4-6",
     }
 
@@ -273,6 +273,32 @@ class AIAgentService:
         # Apply response-style modifier (concise / detailed) to system prompt
         if response_style in self._RESPONSE_STYLE_APPENDIX:
             system_prompt += self._RESPONSE_STYLE_APPENDIX[response_style]
+
+        # Inject detected genre context for smarter, genre-aware music generation
+        try:
+            from backend.services.music.genre_profiles import detect_genre, get_genre_profile
+            detected_genre = detect_genre(user_message)
+            if detected_genre:
+                profile = get_genre_profile(detected_genre)
+                if profile:
+                    logger.info(f"🎵 Detected genre from request: {detected_genre}")
+                    progressions = profile.get("progressions", [])[:2]
+                    system_prompt += (
+                        f"\n\nDETECTED GENRE: {detected_genre.upper()}\n"
+                        f"Use these genre-specific settings:\n"
+                        f"  kit={profile.get('kit_id')}, "
+                        f"scale={profile.get('scales', ['minor'])[0]}, "
+                        f"tempo={profile.get('tempo_default', 120)} bpm "
+                        f"(range {profile.get('tempo_range', (100, 140))[0]}–{profile.get('tempo_range', (100, 140))[1]})\n"
+                        f"  bass_style={profile.get('bass_style', 'melodic')}, "
+                        f"bass_octave={profile.get('bass_octave', 2)}, "
+                        f"lead={profile.get('lead_instrument', 'lead')}, "
+                        f"chords={profile.get('chord_instrument', 'pad')}\n"
+                        f"  Progressions: {progressions}\n"
+                        f"  Style: {profile.get('notes', '')}"
+                    )
+        except Exception:
+            pass  # Genre detection is a best-effort enhancement
 
         # ====================================================================
         # STEP 3: SINGLE LLM CALL WITH FOCUSED CONTEXT
@@ -895,8 +921,7 @@ class AIAgentService:
         lines = ["INSTRUMENTS (use as 'instrument' in tracks):"]
         for role, names in role_groups.items():
             if names:
-                lines.append(f"  {role}: {', '.join(names[:12])}" +
-                              (f" (+{len(names)-12} more)" if len(names) > 12 else ""))
+                lines.append(f"  {role}: {', '.join(names)}")
 
         return "\n".join(lines)
 
@@ -913,7 +938,7 @@ class AIAgentService:
         try:
             from backend.services.music.genre_profiles import GENRE_PROFILES
             lines = ["GENRE PROFILES (suggested kit + scale + tempo):"]
-            for name, profile in list(GENRE_PROFILES.items())[:10]:
+            for name, profile in GENRE_PROFILES.items():
                 kit = profile.get("kit_id", "?")
                 scales = profile.get("scales", ["minor"])[0]
                 bpm = profile.get("tempo_default", 120)

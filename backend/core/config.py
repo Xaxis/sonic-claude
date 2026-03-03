@@ -132,7 +132,7 @@ class CORSConfig(BaseSettings):
 class AIConfig(BaseSettings):
     """AI integration configuration"""
     anthropic_api_key: str = Field(default="", description="Anthropic API key", validation_alias="ANTHROPIC_API_KEY")
-    model: str = Field(default="claude-3-5-sonnet-20241022", description="AI model to use")
+    model: str = Field(default="claude-sonnet-4-6", description="AI model to use")
     min_call_interval: float = Field(default=2.0, ge=0.5, description="Minimum seconds between LLM calls")
 
 
