@@ -102,7 +102,43 @@ export interface ChatMessage {
     actions_executed?: ActionResult[];
     routing_intent?: string | null;
     musical_context?: string | null;
+    /** True while the message is still being streamed from the server */
+    streaming?: boolean;
 }
+
+// ── SSE streaming types ────────────────────────────────────────────────────────
+
+/** Pipeline stage names that the backend emits as SSE stage events. */
+export type SSEStageName =
+    | "context"    // DAW state collected
+    | "routing"    // Intent classified, tools selected
+    | "execution"  // Main LLM call in progress
+    | "tools"      // Tool dispatch in progress
+    | "summary";   // Follow-up Haiku summary call
+
+/** Status values for SSE stage events. */
+export type SSEStageStatus = "start" | "complete" | "skipped";
+
+export interface SSEStageEvent {
+    type: "stage";
+    stage: SSEStageName;
+    status: SSEStageStatus;
+    // Optional context-specific fields
+    intent?: string;
+    tools_loaded?: number;
+    track_count?: number;
+    clip_count?: number;
+    model?: string;
+    total?: number;
+}
+
+/** SSE event union — one of these is yielded per server-sent event. */
+export type SSEEvent =
+    | SSEStageEvent
+    | { type: "token";  content: string }
+    | { type: "action"; name: string; success: boolean; message: string }
+    | { type: "done";   actions_executed: Array<{ action: string; success: boolean; message: string }>; routing_intent: string | null; musical_context: string | null }
+    | { type: "error";  code?: number; detail: string };
 
 export interface ChatRequest {
     message: string;

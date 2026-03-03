@@ -344,6 +344,7 @@ class DAWActionService:
         """Create new track"""
         try:
             if not self.composition_state.current_composition_id:
+                logger.error(f"❌ _create_track: current_composition_id is None! Available compositions: {list(self.composition_state.compositions.keys())}")
                 return ActionResult(
                     success=False,
                     action="create_track",
@@ -351,6 +352,7 @@ class DAWActionService:
                     error="NO_COMPOSITION"
                 )
 
+            logger.info(f"🔍 _create_track: using composition_id={self.composition_state.current_composition_id}, instrument={params.get('instrument')!r}")
             track = self.composition_state.create_track(
                 composition_id=self.composition_state.current_composition_id,
                 name=params.get("name", "AI Track"),

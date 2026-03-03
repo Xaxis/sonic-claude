@@ -11,6 +11,7 @@
  */
 
 import { BaseAPIClient } from "../base";
+import type { SSEEvent } from "@/modules/assistant/types";
 
 // ============================================================================
 // REQUEST/RESPONSE TYPES
@@ -104,6 +105,82 @@ export class AssistantProvider extends BaseAPIClient {
     // === CHAT ===
     async chat(request: ChatRequest): Promise<ChatResponse> {
         return this.post("/api/assistant/chat", request);
+    }
+
+    /**
+     * Stream a chat request via SSE (Server-Sent Events).
+     *
+     * Uses fetch + ReadableStream — NOT EventSource — because SSE requires a POST body.
+     * Yields parsed SSEEvent objects as they arrive.
+     *
+     * @param signal - Optional AbortSignal for cancellation (e.g. on component unmount).
+     *                 The stream also has a built-in 5-minute hard timeout.
+     */
+    async *chatStream(request: ChatRequest, signal?: AbortSignal): AsyncGenerator<SSEEvent> {
+        const url = `${this.baseURL}/api/assistant/chat`;
+
+        // Internal controller — owns the actual fetch abort.
+        // We combine the caller's signal + our own timeout into it.
+        const internalCtrl = new AbortController();
+        const timeoutId = setTimeout(
+            () => internalCtrl.abort(new DOMException("Stream timeout (5 min)", "TimeoutError")),
+            5 * 60 * 1000,
+        );
+
+        // Forward caller cancellation into our internal controller
+        if (signal) {
+            if (signal.aborted) {
+                clearTimeout(timeoutId);
+                return;
+            }
+            signal.addEventListener("abort", () => internalCtrl.abort(signal.reason), { once: true });
+        }
+
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...request, stream: true }),
+                signal: internalCtrl.signal,
+            });
+
+            if (!response.ok || !response.body) {
+                throw new Error(`Stream request failed: ${response.status} ${response.statusText}`);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
+                    // Keep the last (possibly incomplete) chunk in the buffer
+                    buffer = lines.pop() ?? "";
+
+                    for (const line of lines) {
+                        if (line.startsWith("data: ")) {
+                            const data = line.slice(6).trim();
+                            if (data) {
+                                try {
+                                    yield JSON.parse(data) as SSEEvent;
+                                } catch (e) {
+                                    console.warn(`Malformed SSE event ignored: "${data}"`, e);
+                                }
+                            }
+                        }
+                    }
+                }
+            } finally {
+                reader.releaseLock();
+            }
+        } finally {
+            clearTimeout(timeoutId);
+        }
     }
 
     async contextualChat(request: ContextualChatRequest): Promise<ContextualChatResponse> {

@@ -300,6 +300,7 @@ class ComposeTool:
         clear_existing = params.get("clear_existing", False)
 
         if not tracks_spec:
+            logger.error(f"❌ compose_music called with empty/missing tracks. Full params keys: {list(params.keys())}")
             return ActionResult(
                 action="compose_music",
                 success=False,
@@ -395,6 +396,7 @@ class ComposeTool:
             })
         )
         if not track_result.success:
+            logger.error(f"❌ create_track FAILED for '{name}': error={track_result.error!r}, message={track_result.message!r}")
             return {"success": False, "name": name, "error": track_result.error or track_result.message}
 
         track_id = track_result.data["track_id"]
@@ -515,7 +517,10 @@ class ComposeTool:
             "acoustic": "rock",
             "creative": "techno",
         }.get(category, "trap")
+        logger.warning(f"Kit '{kit_id}' has no demo pattern — using '{fallback_genre}' genre fallback")
         pattern = GENRE_PATTERNS.get(fallback_genre, [])
+        if not pattern:
+            logger.error(f"No pattern found for fallback genre '{fallback_genre}' — returning empty notes")
         return generate_drum_notes_from_pattern(pattern, bars=bars)
 
     def _get_kit_default_instrument(self, kit_id: str) -> Optional[str]:
@@ -601,11 +606,13 @@ class ComposeTool:
 EDIT_CLIP_TOOL_SCHEMA = {
     "name": "edit_clip",
     "description": (
-        "Edit an existing clip's notes. Supports three modes:\n"
+        "Edit an existing clip — change its notes, length, or position.\n\n"
+        "Note editing modes (optional — omit if only resizing):\n"
         "  replace: completely replace all notes (default)\n"
         "  add:     add notes without removing existing ones\n"
         "  remove:  remove specific notes by pitch+beat position\n\n"
-        "Use note names (C4, F#3, etc.) or compact {n,s,d,v} dicts."
+        "Use note names (C4, F#3, etc.) or compact {n,s,d,v} dicts.\n\n"
+        "Resizing: use duration_bars to change clip length, start_bar to move it."
     ),
     "input_schema": {
         "type": "object",
@@ -614,10 +621,25 @@ EDIT_CLIP_TOOL_SCHEMA = {
                 "type": "string",
                 "description": "ID of the clip to edit"
             },
+            "duration_bars": {
+                "type": "integer",
+                "description": (
+                    "Resize the clip to this many bars. "
+                    "Use this to extend or shorten a clip. "
+                    "Example: duration_bars=8 makes the clip 8 bars long."
+                )
+            },
+            "start_bar": {
+                "type": "integer",
+                "description": (
+                    "Move the clip to start at this bar (0-indexed). "
+                    "Example: start_bar=4 starts the clip at bar 5."
+                )
+            },
             "mode": {
                 "type": "string",
                 "enum": ["replace", "add", "remove"],
-                "description": "Edit mode (default: replace)",
+                "description": "Note edit mode (default: replace). Omit if only resizing/moving.",
                 "default": "replace"
             },
             "notes": {

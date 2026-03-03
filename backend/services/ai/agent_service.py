@@ -155,6 +155,194 @@ class AIAgentService:
         "detailed": "\n\nIMPORTANT: Provide detailed explanations of every decision. Describe what you changed, why you made each choice, and the musical reasoning behind it.",
     }
 
+    # P3: Shared catalog cache — built once, reused for every request
+    _catalog_cache: Dict[str, str] = {}
+
+    @classmethod
+    def clear_catalog_cache(cls) -> None:
+        """Clear catalog cache — call when registries are updated at runtime."""
+        cls._catalog_cache.clear()
+        logger.info("🗑️ Catalog cache cleared")
+
+    # =========================================================================
+    # SHARED REQUEST CONTEXT BUILDER
+    # Eliminates ~150 lines of duplication between send_message / stream_message
+    # =========================================================================
+
+    async def _build_request_context(
+        self,
+        user_message: str,
+        *,
+        execution_model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        response_style: str = "balanced",
+        history_length: int = 6,
+        use_intent_routing: bool = True,
+        include_harmonic_context: bool = True,
+        include_rhythmic_context: bool = True,
+        include_timbre_context: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Build the full execution context shared by send_message() and stream_message().
+
+        Handles in one place:
+          - Model resolution
+          - DAW state collection + context formatting
+          - Catalog building (all cached after first call)
+          - Intent routing + focused tool/prompt selection
+          - Response-style modifier
+          - Genre detection + prompt injection (best-effort)
+          - Conversation history assembly
+
+        Returns a context dict consumed by both the sync and streaming paths.
+        Keys: effective_model, state_response, context_message, tools,
+              system_prompt, intent, messages, temperature
+        """
+        effective_model = (
+            self._EXECUTION_MODEL_MAP.get(execution_model, self.model)
+            if execution_model else self.model
+        )
+
+        # Force-refresh key/scale analysis so state.musical is never stale
+        self.state_service.analyze_current_sequence()
+        state_response = self.state_service.get_state(previous_hash=self.last_state_hash)
+        context_message = self._build_context_message(
+            state_response.full_state,
+            include_harmonic=include_harmonic_context,
+            include_rhythmic=include_rhythmic_context,
+            include_timbre=include_timbre_context,
+        )
+
+        # Catalogs are cached — no cost after first request
+        instruments_catalog = self._build_instruments_catalog()
+        effects_list        = self._build_effects_list()
+        kit_catalog         = self._build_kit_catalog()
+        genre_summary       = self._build_genre_profiles_summary()
+        all_tools           = self._get_tool_definitions()
+
+        # Route → focused tool set + intent-specific system prompt
+        intent = None
+        if use_intent_routing:
+            state_summary = self._build_brief_state_summary(state_response.full_state)
+            intent = await self.router.route(user_message, daw_state_summary=state_summary)
+            logger.info(f"🔀 Intent: {intent.value}")
+
+            relevant_tool_names = self.router.get_tools_for_intent(intent)
+            system_prompt = self.router.get_system_prompt_for_intent(
+                intent, instruments_catalog, effects_list, kit_catalog, genre_summary
+            )
+            if relevant_tool_names:
+                tools = [t for t in all_tools if t["name"] in relevant_tool_names]
+                logger.info(f"🛠️  Using {len(tools)}/{len(all_tools)} tools for {intent.value}")
+            else:
+                tools = []
+                logger.info(f"🛠️  No tools for {intent.value} (informational response)")
+        else:
+            tools = all_tools
+            system_prompt = self.router.get_system_prompt_for_intent(
+                Intent.GENERAL_CHAT, instruments_catalog, effects_list, kit_catalog, genre_summary
+            )
+            logger.info(f"🛠️  Routing bypassed — using all {len(tools)} tools")
+
+        # Apply response-style modifier (concise / detailed)
+        if response_style in self._RESPONSE_STYLE_APPENDIX:
+            system_prompt += self._RESPONSE_STYLE_APPENDIX[response_style]
+
+        # Genre detection + prompt injection (best-effort; never fatal)
+        try:
+            from backend.services.music.genre_profiles import detect_genre, get_genre_profile
+            detected_genre = detect_genre(user_message)
+            if detected_genre:
+                profile = get_genre_profile(detected_genre)
+                if profile:
+                    logger.info(f"🎵 Detected genre: {detected_genre}")
+                    progressions = profile.get("progressions", [])[:2]
+                    tempo_range = profile.get("tempo_range", (100, 140))
+                    if not isinstance(tempo_range, (tuple, list)) or len(tempo_range) < 2:
+                        tempo_range = (100, 140)
+                    system_prompt += (
+                        f"\n\nDETECTED GENRE: {detected_genre.upper()}\n"
+                        f"Use these genre-specific settings:\n"
+                        f"  kit={profile.get('kit_id')}, "
+                        f"scale={profile.get('scales', ['minor'])[0]}, "
+                        f"tempo={profile.get('tempo_default', 120)} bpm "
+                        f"(range {tempo_range[0]}–{tempo_range[1]})\n"
+                        f"  bass_style={profile.get('bass_style', 'melodic')}, "
+                        f"bass_octave={profile.get('bass_octave', 2)}, "
+                        f"lead={profile.get('lead_instrument', 'lead')}, "
+                        f"chords={profile.get('chord_instrument', 'pad')}\n"
+                        f"  Progressions: {progressions}\n"
+                        f"  Style: {profile.get('notes', '')}"
+                    )
+        except Exception as e:
+            logger.debug(f"Genre detection skipped (non-fatal): {e}")
+
+        # Build messages with conversation history
+        _tempo = state_response.full_state.tempo if state_response.full_state else 120.0
+        messages = self._build_messages_with_history(
+            user_message, context_message, history_length=history_length, tempo=_tempo
+        )
+
+        return {
+            "effective_model": effective_model,
+            "state_response":  state_response,
+            "context_message": context_message,
+            "tools":           tools,
+            "system_prompt":   system_prompt,
+            "intent":          intent,
+            "messages":        messages,
+            "temperature":     temperature,
+        }
+
+    # =========================================================================
+    # HELPER: persist chat + composition after any message
+    # =========================================================================
+
+    def _append_to_chat_history(
+        self,
+        composition_id: Optional[str],
+        user_message: str,
+        full_response: str,
+        actions_executed: List,
+    ) -> None:
+        """Update in-memory chat history for both sync and streaming paths."""
+        if not composition_id:
+            return
+        if composition_id not in self.chat_histories:
+            self.chat_histories[composition_id] = []
+        self.chat_histories[composition_id].append(ChatMessage(
+            role="user",
+            content=user_message,
+            timestamp=datetime.now(),
+            actions_executed=None,
+        ))
+        self.chat_histories[composition_id].append(ChatMessage(
+            role="assistant",
+            content=full_response,
+            timestamp=datetime.now(),
+            actions_executed=[
+                {"action": r.action, "success": r.success, "data": r.data, "error": r.error}
+                for r in actions_executed
+            ] if actions_executed else None,
+        ))
+
+    # =========================================================================
+    # HELPER: build tool-result content string (with error hints)
+    # =========================================================================
+
+    def _format_tool_result(self, tool_name: str, tool_input: dict, result) -> str:
+        """Format a tool result as a string for the follow-up LLM call."""
+        content = f"Success: {result.message}" if result.success else f"Error: {result.error}"
+        if result.data:
+            content += f"\nData: {result.data}"
+        if not result.success:
+            content += self._build_error_hint(tool_name, tool_input, result)
+        return content
+
+    # =========================================================================
+    # PUBLIC: Non-streaming message execution
+    # =========================================================================
+
     async def send_message(
         self,
         user_message: str,
@@ -169,178 +357,83 @@ class AIAgentService:
         include_timbre_context: bool = True,
     ) -> Dict[str, Any]:
         """
-        ROUTED WORKFLOW-BASED EXECUTION (Anthropic Best Practices)
+        Routed, single-call LLM execution (non-streaming).
 
-        1. Route request to intent category (unless use_intent_routing=False)
-        2. Load only relevant tools for that intent
-        3. Use specialized prompt for that intent
-        4. Single LLM call with focused context
+        1. Build full request context via _build_request_context()
+        2. Single LLM call with focused tools + intent-specific prompt
+        3. Dispatch tool calls, enrich error feedback
+        4. Follow-up summary call (Haiku) when tools executed
+        5. Persist chat history + composition snapshot
 
-        This prevents tool bloat and prompt bloat while handling all use cases.
-
-        Args:
-            user_message: User's message/request
-            execution_model: "haiku" | "sonnet" | "opus" shorthand, or None to use default
-            temperature: Creativity 0.0–1.0 (None = Anthropic default)
-            response_style: "concise" | "balanced" | "detailed" — modifies system prompt
-            history_length: How many recent messages to include as context (2–20)
-            use_intent_routing: If False skip routing and load all tools
-            include_harmonic_context: Include chord/key/scale section in context
-            include_rhythmic_context: Include rhythmic analysis section in context
-            include_timbre_context: Include audio energy/brightness section in context
-
-        Returns:
-            Dict with 'response', 'actions_executed', 'musical_context', 'routing_intent'
+        Returns dict with: response, actions_executed, musical_context, routing_intent
         """
-        # Unique ID for correlating pipeline events for this request
         request_id = f"req-{int(time.time() * 1000)}"
-
-        # Resolve which model to use for this request
-        effective_model = (
-            self._EXECUTION_MODEL_MAP.get(execution_model, self.model)
-            if execution_model else self.model
-        )
-
-        # STAGE: context — build DAW state snapshot
         await self._emit_pipeline(request_id, "context", "start")
 
-        # FIX 1: Force-refresh key/scale analysis before building context so state.musical is never stale
-        self.state_service.analyze_current_sequence()
-
-        # Get current state
-        state_response = self.state_service.get_state(previous_hash=self.last_state_hash)
-        context_message = self._build_context_message(
-            state_response.full_state,
-            include_harmonic=include_harmonic_context,
-            include_rhythmic=include_rhythmic_context,
-            include_timbre=include_timbre_context,
+        ctx = await self._build_request_context(
+            user_message,
+            execution_model=execution_model,
+            temperature=temperature,
+            response_style=response_style,
+            history_length=history_length,
+            use_intent_routing=use_intent_routing,
+            include_harmonic_context=include_harmonic_context,
+            include_rhythmic_context=include_rhythmic_context,
+            include_timbre_context=include_timbre_context,
         )
 
-        # Emit context complete with a brief snapshot
+        effective_model = ctx["effective_model"]
+        state_response  = ctx["state_response"]
+        context_message = ctx["context_message"]
+        tools           = ctx["tools"]
+        system_prompt   = ctx["system_prompt"]
+        intent          = ctx["intent"]
+        messages        = ctx["messages"]
+
+        # Emit pipeline stage completions (WebSocket UI)
         _state = state_response.full_state
         await self._emit_pipeline(request_id, "context", "complete", {
             "track_count": len(_state.sequence.tracks) if _state and _state.sequence else 0,
-            "clip_count":  len(_state.sequence.clips) if _state and _state.sequence else 0,
-            "tempo":       _state.sequence.tempo if _state and _state.sequence else None,
+            "clip_count":  len(_state.sequence.clips)  if _state and _state.sequence else 0,
+            "tempo":       _state.sequence.tempo        if _state and _state.sequence else None,
             "key":         f"{_state.musical.key} {_state.musical.scale}" if _state and _state.musical else None,
         })
-
-        # ====================================================================
-        # STEP 1: ROUTE REQUEST TO INTENT (LLM-based, or bypass)
-        # ====================================================================
-        instruments_catalog = self._build_instruments_catalog()
-        effects_list = self._build_effects_list()
-        kit_catalog = self._build_kit_catalog()
-        genre_summary = self._build_genre_profiles_summary()
-        all_tools = self._get_tool_definitions()
-        intent = None
-
-        if use_intent_routing:
-            await self._emit_pipeline(request_id, "routing", "start", {"model": "haiku"})
-            state_summary = self._build_brief_state_summary(state_response.full_state)
-            intent = await self.router.route(user_message, daw_state_summary=state_summary)
-            logger.info(f"🔀 Intent: {intent.value}")
-
-            # ================================================================
-            # STEP 2: GET FOCUSED TOOLS AND PROMPT FOR INTENT
-            # ================================================================
-            relevant_tool_names = self.router.get_tools_for_intent(intent)
-            system_prompt = self.router.get_system_prompt_for_intent(
-                intent, instruments_catalog, effects_list, kit_catalog, genre_summary
-            )
-
-            if relevant_tool_names:
-                tools = [t for t in all_tools if t["name"] in relevant_tool_names]
-                logger.info(f"🛠️  Using {len(tools)}/{len(all_tools)} tools for {intent.value}")
-            else:
-                tools = []
-                logger.info(f"🛠️  No tools needed for {intent.value}")
-
+        if intent:
             await self._emit_pipeline(request_id, "routing", "complete", {
-                "intent": intent.value,
-                "tools_loaded": len(tools),
-                "model": "haiku",
+                "intent": intent.value, "tools_loaded": len(tools), "model": "haiku",
             })
         else:
-            # No routing — load all tools, use the general-purpose prompt
-            tools = all_tools
-            system_prompt = self.router.get_system_prompt_for_intent(
-                Intent.GENERAL_CHAT, instruments_catalog, effects_list, kit_catalog, genre_summary
-            )
-            logger.info(f"🛠️  Routing bypassed — using all {len(tools)} tools")
             await self._emit_pipeline(request_id, "routing", "skipped", {"tools_loaded": len(tools)})
 
-        # Apply response-style modifier (concise / detailed) to system prompt
-        if response_style in self._RESPONSE_STYLE_APPENDIX:
-            system_prompt += self._RESPONSE_STYLE_APPENDIX[response_style]
-
-        # Inject detected genre context for smarter, genre-aware music generation
-        try:
-            from backend.services.music.genre_profiles import detect_genre, get_genre_profile
-            detected_genre = detect_genre(user_message)
-            if detected_genre:
-                profile = get_genre_profile(detected_genre)
-                if profile:
-                    logger.info(f"🎵 Detected genre from request: {detected_genre}")
-                    progressions = profile.get("progressions", [])[:2]
-                    system_prompt += (
-                        f"\n\nDETECTED GENRE: {detected_genre.upper()}\n"
-                        f"Use these genre-specific settings:\n"
-                        f"  kit={profile.get('kit_id')}, "
-                        f"scale={profile.get('scales', ['minor'])[0]}, "
-                        f"tempo={profile.get('tempo_default', 120)} bpm "
-                        f"(range {profile.get('tempo_range', (100, 140))[0]}–{profile.get('tempo_range', (100, 140))[1]})\n"
-                        f"  bass_style={profile.get('bass_style', 'melodic')}, "
-                        f"bass_octave={profile.get('bass_octave', 2)}, "
-                        f"lead={profile.get('lead_instrument', 'lead')}, "
-                        f"chords={profile.get('chord_instrument', 'pad')}\n"
-                        f"  Progressions: {progressions}\n"
-                        f"  Style: {profile.get('notes', '')}"
-                    )
-        except Exception:
-            pass  # Genre detection is a best-effort enhancement
-
-        # ====================================================================
-        # STEP 3: SINGLE LLM CALL WITH FOCUSED CONTEXT
-        # ====================================================================
-        logger.info(f"🎯 Processing request: '{user_message}'")
-
-        actions_executed = []
-        assistant_message = ""
-
-        # FIX 2: Include conversation history so AI has context from prior exchanges
-        _tempo = state_response.full_state.tempo if state_response.full_state else 120.0
-        messages = self._build_messages_with_history(user_message, context_message, history_length=history_length, tempo=_tempo)
-
-        logger.info(f"🤖 Calling {effective_model} with {len(tools)} tools, {len(messages)} messages in context...")
+        logger.info(f"🎯 Processing: '{user_message}'")
+        logger.info(f"🤖 {effective_model} | {len(tools)} tools | {len(messages)} messages")
         await self._emit_pipeline(request_id, "execution", "start", {
-            "model": effective_model,
-            "tool_count": len(tools),
-            "history_messages": len(messages),
+            "model": effective_model, "tool_count": len(tools), "history_messages": len(messages),
         })
 
         create_kwargs: Dict[str, Any] = dict(
-            model=effective_model,
-            max_tokens=4096,
-            system=system_prompt,
-            messages=messages,
+            model=effective_model, max_tokens=8192,
+            system=system_prompt, messages=messages,
             tools=tools if tools else None,
         )
-        if temperature is not None:
-            create_kwargs["temperature"] = temperature
+        if ctx["temperature"] is not None:
+            create_kwargs["temperature"] = ctx["temperature"]
 
         response = await self._api_call(**create_kwargs)
 
         tool_call_count = sum(1 for b in response.content if b.type == "tool_use")
         await self._emit_pipeline(request_id, "execution", "complete", {
-            "model": effective_model,
-            "tool_calls": tool_call_count,
-            "stop_reason": response.stop_reason,
+            "model": effective_model, "tool_calls": tool_call_count, "stop_reason": response.stop_reason,
         })
+        if response.stop_reason == "max_tokens":
+            logger.warning(f"⚠️  Execution hit max_tokens — tool call may be incomplete")
 
-        # Process response blocks, collecting tool calls and results
-        tool_results = []
-        _tool_action_results: list = []
+        # Process response — collect text + dispatch tools
+        assistant_message = ""
+        actions_executed  = []
+        tool_results      = []
+        _tool_summaries: list = []
+
         if tool_call_count > 0:
             await self._emit_pipeline(request_id, "tools", "start", {"total": tool_call_count})
 
@@ -348,109 +441,241 @@ class AIAgentService:
             if block.type == "text":
                 assistant_message += block.text
             elif block.type == "tool_use":
-                logger.info(f"🎯 AI calling tool: {block.name} with params: {block.input}")
-
-                # Dispatch tool calls
+                logger.info(f"🔧 Tool: {block.name}")
                 result = await self._dispatch_tool(block.name, block.input)
-
                 actions_executed.append(result)
-                _tool_action_results.append({"name": block.name, "success": result.success})
-
-                result_content = f"Success: {result.message}" if result.success else f"Error: {result.error}"
-                if result.data:
-                    result_content += f"\nData: {result.data}"
-
+                _tool_summaries.append({"name": block.name, "success": result.success})
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": block.id,
-                    "content": result_content
+                    "content": self._format_tool_result(block.name, block.input, result),
                 })
 
         if tool_call_count > 0:
             await self._emit_pipeline(request_id, "tools", "complete", {
-                "actions": _tool_action_results,
-                "succeeded": sum(1 for a in _tool_action_results if a["success"]),
-                "total": tool_call_count,
+                "actions":   _tool_summaries,
+                "succeeded": sum(1 for a in _tool_summaries if a["success"]),
+                "total":     tool_call_count,
             })
 
-        # FIX 3: Send tool results back to LLM so it can respond to outcomes and recover from errors
+        # Follow-up: send tool results back to LLM for summary (Haiku — fast/cheap)
         if tool_results:
-            # Serialize assistant content blocks (tool_use objects → dicts for API)
-            assistant_content = []
-            for block in response.content:
-                if block.type == "text":
-                    assistant_content.append({"type": "text", "text": block.text})
-                elif block.type == "tool_use":
-                    assistant_content.append({
-                        "type": "tool_use",
-                        "id": block.id,
-                        "name": block.name,
-                        "input": block.input
-                    })
-
-            # Minimal context for follow-up — just the original request + tool exchange.
-            # Do NOT resend full DAW state or history; this is purely a summary call.
-            follow_up_messages = [
-                {"role": "user", "content": user_message},
-                {"role": "assistant", "content": assistant_content},
-                {"role": "user", "content": tool_results}
+            assistant_content = [
+                {"type": "text", "text": b.text} if b.type == "text"
+                else {"type": "tool_use", "id": b.id, "name": b.name, "input": b.input}
+                for b in response.content if b.type in ("text", "tool_use")
             ]
-
-            logger.info(f"🔄 Sending {len(tool_results)} tool result(s) back to LLM...")
+            follow_up_messages = [
+                {"role": "user",      "content": user_message},
+                {"role": "assistant", "content": assistant_content},
+                {"role": "user",      "content": tool_results},
+            ]
+            logger.info(f"🔄 Summarising {len(tool_results)} tool result(s)…")
             await self._emit_pipeline(request_id, "summary", "start", {
-                "model": "haiku",
-                "tool_results": len(tool_results),
+                "model": "haiku", "tool_results": len(tool_results),
             })
             follow_up = await self._api_call(
-                model="claude-haiku-4-5-20251001",  # Haiku — fast/cheap for summarizing results
+                model="claude-haiku-4-5-20251001",
                 max_tokens=512,
                 system=system_prompt,
-                messages=follow_up_messages
+                messages=follow_up_messages,
             )
-
             for block in follow_up.content:
                 if block.type == "text":
                     assistant_message += block.text
-
             await self._emit_pipeline(request_id, "summary", "complete", {"model": "haiku"})
 
-        logger.info(f"✅ Execution complete: {len(actions_executed)} actions")
-
-        # Log execution summary
+        logger.info(f"✅ Complete: {len(actions_executed)} actions")
         if actions_executed:
-            action_summary = {}
-            for action in actions_executed:
-                action_type = action.action
-                action_summary[action_type] = action_summary.get(action_type, 0) + 1
-            logger.info(f"📊 Action summary: {action_summary}")
+            action_counts: Dict[str, int] = {}
+            for a in actions_executed:
+                action_counts[a.action] = action_counts.get(a.action, 0) + 1
+            logger.info(f"📊 {action_counts}")
+            # Log success/failure for each action
+            for a in actions_executed:
+                if not a.success:
+                    logger.warning(f"⚠️  Action {a.action} FAILED: {a.error} — {a.message}")
         else:
-            logger.warning(f"⚠️ No actions were executed!")
+            logger.debug("No tool actions executed (conversational response)")
 
-        # Build response
-        full_response = assistant_message if assistant_message else f"Executed {len(actions_executed)} actions successfully."
+        full_response = assistant_message or f"Executed {len(actions_executed)} actions successfully."
 
-        # Auto-save composition as iteration if actions were executed
-        if actions_executed and len(actions_executed) > 0:
-            await self._save_ai_iteration(user_message, full_response, actions_executed)
+        composition_id = self.action_service.composition_state.current_composition_id
+        # DEBUG: log composition track count before save
+        _comp_debug = self.action_service.composition_state.get_composition(composition_id) if composition_id else None
+        logger.info(f"🔍 Pre-save state: comp_id={composition_id}, tracks={len(_comp_debug.tracks) if _comp_debug else 'N/A (comp not found)'}")
+        self._append_to_chat_history(composition_id, user_message, full_response, actions_executed)
+        if any(a.success for a in actions_executed):
+            await self._save_ai_iteration(composition_id, user_message, full_response, actions_executed)
 
-        # Update state hash
+        # Update diff-detection hash for next request
         if state_response.full_state:
             self.last_state_hash = state_response.full_state.state_hash
-
-        # Store actions count for API response
         self.last_actions_executed = len(actions_executed)
 
         await self._emit_pipeline(request_id, "response", "complete", {
-            "actions": len(actions_executed),
-            "has_tools": tool_call_count > 0,
+            "actions": len(actions_executed), "has_tools": tool_call_count > 0,
         })
 
         return {
-            "response": full_response,
+            "response":        full_response,
             "actions_executed": actions_executed,
             "musical_context": context_message,
-            "routing_intent": intent.value if intent else None,
+            "routing_intent":  intent.value if intent else None,
         }
+
+    # =========================================================================
+    # PUBLIC: Streaming message execution (SSE)
+    # =========================================================================
+
+    async def stream_message(
+        self,
+        user_message: str,
+        *,
+        execution_model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        response_style: str = "balanced",
+        history_length: int = 6,
+        use_intent_routing: bool = True,
+        include_harmonic_context: bool = True,
+        include_rhythmic_context: bool = True,
+        include_timbre_context: bool = True,
+    ):
+        """
+        Streaming version of send_message() — yields SSE event strings.
+
+        Uses the same _build_request_context() helper as send_message() to keep
+        both paths in sync. Streams text tokens via client.messages.stream().
+
+        Yields ``data: {...}\\n\\n`` lines (SSE format).
+        Event types: stage | token | action | done | error
+        """
+        import json
+
+        def sse(event: dict) -> str:
+            return f"data: {json.dumps(event)}\n\n"
+
+        ctx = await self._build_request_context(
+            user_message,
+            execution_model=execution_model,
+            temperature=temperature,
+            response_style=response_style,
+            history_length=history_length,
+            use_intent_routing=use_intent_routing,
+            include_harmonic_context=include_harmonic_context,
+            include_rhythmic_context=include_rhythmic_context,
+            include_timbre_context=include_timbre_context,
+        )
+
+        effective_model = ctx["effective_model"]
+        state_response  = ctx["state_response"]
+        context_message = ctx["context_message"]
+        tools           = ctx["tools"]
+        system_prompt   = ctx["system_prompt"]
+        intent          = ctx["intent"]
+        messages        = ctx["messages"]
+
+        # Emit context + routing stage events
+        _state = state_response.full_state
+        yield sse({
+            "type": "stage", "stage": "context", "status": "complete",
+            "track_count": len(_state.sequence.tracks) if _state and _state.sequence else 0,
+            "clip_count":  len(_state.sequence.clips)  if _state and _state.sequence else 0,
+        })
+        if intent:
+            yield sse({
+                "type": "stage", "stage": "routing", "status": "complete",
+                "intent": intent.value, "tools_loaded": len(tools),
+            })
+        else:
+            yield sse({"type": "stage", "stage": "routing", "status": "skipped", "tools_loaded": len(tools)})
+
+        # === Streaming execution ===
+        yield sse({"type": "stage", "stage": "execution", "status": "start", "model": effective_model})
+
+        assistant_message = ""
+        create_kwargs: Dict[str, Any] = dict(
+            model=effective_model, max_tokens=8192,
+            system=system_prompt, messages=messages,
+            tools=tools if tools else None,
+        )
+        if ctx["temperature"] is not None:
+            create_kwargs["temperature"] = ctx["temperature"]
+
+        final_message = None
+        async with self.client.messages.stream(**create_kwargs) as stream:
+            async for event in stream:
+                if event.type == "content_block_delta":
+                    delta = getattr(event, "delta", None)
+                    if delta and getattr(delta, "type", None) == "text_delta":
+                        text = getattr(delta, "text", "")
+                        if text:
+                            assistant_message += text
+                            yield sse({"type": "token", "content": text})
+            final_message = await stream.get_final_message()
+
+        # === Tool dispatch ===
+        actions_executed = []
+        tool_results     = []
+        tool_calls       = [b for b in final_message.content if b.type == "tool_use"]
+
+        if tool_calls:
+            yield sse({"type": "stage", "stage": "tools", "status": "start", "total": len(tool_calls)})
+            for block in tool_calls:
+                result = await self._dispatch_tool(block.name, block.input)
+                actions_executed.append(result)
+                yield sse({"type": "action", "name": block.name, "success": result.success, "message": result.message or ""})
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": self._format_tool_result(block.name, block.input, result),
+                })
+
+        # === Streaming summary after tools ===
+        if tool_results:
+            assistant_content = [
+                {"type": "text", "text": b.text} if b.type == "text"
+                else {"type": "tool_use", "id": b.id, "name": b.name, "input": b.input}
+                for b in final_message.content if b.type in ("text", "tool_use")
+            ]
+            follow_up_messages = [
+                {"role": "user",      "content": user_message},
+                {"role": "assistant", "content": assistant_content},
+                {"role": "user",      "content": tool_results},
+            ]
+            yield sse({"type": "stage", "stage": "summary", "status": "start"})
+            async with self.client.messages.stream(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=512,
+                system=system_prompt,
+                messages=follow_up_messages,
+            ) as stream:
+                async for event in stream:
+                    if event.type == "content_block_delta":
+                        delta = getattr(event, "delta", None)
+                        if delta and getattr(delta, "type", None) == "text_delta":
+                            text = getattr(delta, "text", "")
+                            if text:
+                                assistant_message += text
+                                yield sse({"type": "token", "content": text})
+
+        full_response = assistant_message or f"Executed {len(actions_executed)} actions successfully."
+
+        composition_id = self.action_service.composition_state.current_composition_id
+        self._append_to_chat_history(composition_id, user_message, full_response, actions_executed)
+        if any(a.success for a in actions_executed):
+            await self._save_ai_iteration(composition_id, user_message, full_response, actions_executed)
+
+        # Update diff-detection hash for next request
+        if state_response.full_state:
+            self.last_state_hash = state_response.full_state.state_hash
+
+        yield sse({
+            "type": "done",
+            "actions_executed": [{"action": a.action, "success": a.success, "message": a.message or ""} for a in actions_executed],
+            "routing_intent":   intent.value if intent else None,
+            "musical_context":  context_message,
+        })
 
     async def send_contextual_message(
         self,
@@ -547,7 +772,7 @@ class AIAgentService:
         # ── Single LLM call ────────────────────────────────────────────────────
         create_kwargs: Dict[str, Any] = {
             "model": effective_model,
-            "max_tokens": 4096,
+            "max_tokens": 8192,
             "system": system_prompt,
             "messages": [{"role": "user", "content": user_content}],
             "tools": tools,
@@ -642,8 +867,12 @@ class AIAgentService:
 
         return None
 
-    async def _save_ai_iteration(self, user_message: str, assistant_response: str, actions_executed: List[ActionResult]) -> None:
-        """Save composition as AI iteration after actions are executed"""
+    async def _save_ai_iteration(self, composition_id: Optional[str], user_message: str, assistant_response: str, actions_executed: List[ActionResult]) -> None:
+        """Save composition as AI iteration after actions are executed.
+
+        Chat history is already updated by the caller (send_message / stream_message).
+        This method only handles the composition snapshot + file save.
+        """
         try:
             # Check if we have all required services
             if not all([self.composition_service, self.action_service.composition_state,
@@ -651,8 +880,6 @@ class AIAgentService:
                 logger.warning("⚠️ Cannot save AI iteration: missing required services")
                 return
 
-            # Get current composition ID
-            composition_id = self.action_service.composition_state.current_composition_id
             if not composition_id:
                 logger.warning("⚠️ Cannot save AI iteration: no active composition")
                 return
@@ -662,34 +889,6 @@ class AIAgentService:
             if not composition:
                 logger.warning(f"⚠️ Cannot save AI iteration: composition {composition_id} not found")
                 return
-
-            # Get or initialize chat history for this composition
-            if composition_id not in self.chat_histories:
-                self.chat_histories[composition_id] = []
-
-            # Add user message to chat history
-            self.chat_histories[composition_id].append(ChatMessage(
-                role="user",
-                content=user_message,
-                timestamp=datetime.now(),
-                actions_executed=None,
-            ))
-
-            # Add assistant response to chat history
-            self.chat_histories[composition_id].append(ChatMessage(
-                role="assistant",
-                content=assistant_response,
-                timestamp=datetime.now(),
-                actions_executed=[
-                    {
-                        "action": result.action,
-                        "success": result.success,
-                        "data": result.data,
-                        "error": result.error,
-                    }
-                    for result in actions_executed
-                ],
-            ))
 
             # Capture current composition state from services
             captured_composition = self.composition_service.capture_composition_from_services(
@@ -703,6 +902,8 @@ class AIAgentService:
                 logger.error("❌ Failed to capture composition for AI iteration")
                 return
 
+            logger.info(f"🔍 Captured composition '{captured_composition.name}': {len(captured_composition.tracks)} tracks, {len(captured_composition.clips)} clips")
+
             # Update metadata
             if not captured_composition.metadata:
                 captured_composition.metadata = {}
@@ -713,8 +914,8 @@ class AIAgentService:
                 "timestamp": datetime.now().isoformat()
             })
 
-            # Update chat history
-            captured_composition.chat_history = self.chat_histories[composition_id]
+            # Persist the in-memory chat history (already updated by caller)
+            captured_composition.chat_history = self.chat_histories.get(composition_id, [])
 
             # Save with history
             self.composition_service.save_composition(
@@ -723,7 +924,7 @@ class AIAgentService:
                 is_autosave=False
             )
 
-            logger.info(f"💾 Saved AI iteration for composition {composition_id} with {len(self.chat_histories[composition_id])} chat messages")
+            logger.info(f"💾 Saved AI iteration for composition {composition_id} with {len(self.chat_histories.get(composition_id, []))} chat messages")
 
         except Exception as e:
             logger.error(f"❌ Failed to save AI iteration: {e}", exc_info=True)
@@ -788,10 +989,89 @@ class AIAgentService:
             action = DAWAction(action=tool_name, parameters=tool_input)
             return await self.action_service.execute_action(action)
 
+    def _build_error_hint(self, tool_name: str, tool_input: dict, result) -> str:
+        """
+        P6: Build actionable hint text appended to tool error messages.
+        Guides Claude toward a correct retry rather than a confused guess.
+        """
+        try:
+            if tool_name == "compose_music":
+                return self._hint_compose_music(tool_input, result)
+            elif tool_name == "edit_clip":
+                return self._hint_edit_clip(tool_input)
+            else:
+                # Generic DAW action hint
+                failed_param = result.data.get("failed_param") if result.data else None
+                if failed_param:
+                    return f"\nHint: Check the '{failed_param}' parameter value and type."
+            return ""
+        except Exception:
+            return ""
+
+    def _hint_compose_music(self, tool_input: dict, result) -> str:
+        """Build hint for a failed compose_music call."""
+        hints = []
+        error_str = (result.error or "").lower()
+
+        # Empty / missing tracks array
+        if "tracks" in error_str and "required" in error_str:
+            hints.append(
+                "You must pass a 'tracks' array with at least one track. "
+                "Example: {\"tempo\": 120, \"tracks\": [{\"name\": \"Drums\", \"drum_pattern\": {\"kit_id\": \"trap-kit\"}}]}. "
+                "Keep each track simple — fewer notes per track if the composition is large."
+            )
+
+        # Instrument error → show valid options by category
+        if "instrument" in error_str or "synthdef" in error_str:
+            try:
+                from backend.services.daw.registry import SYNTHDEF_REGISTRY
+                by_role: Dict[str, List[str]] = {}
+                for s in SYNTHDEF_REGISTRY:
+                    cat = s.get("category", "Other")
+                    by_role.setdefault(cat, []).append(s["name"])
+                sample_lines = []
+                for cat, names in list(by_role.items())[:4]:
+                    sample_lines.append(f"  {cat}: {', '.join(names[:5])}")
+                hints.append("Valid instruments (sample):\n" + "\n".join(sample_lines))
+                hints.append("For drum tracks, omit 'instrument' — the kit/drum_pattern sets it automatically.")
+            except Exception:
+                pass
+
+        # Kit error → show valid kit IDs
+        if "kit" in error_str:
+            try:
+                from backend.services.daw.registry import KIT_REGISTRY
+                kit_ids = [k["id"] for k in KIT_REGISTRY[:8]]
+                hints.append(f"Valid kit_id values: {', '.join(kit_ids)}")
+            except Exception:
+                pass
+
+        # Drum voice error → show valid voice names
+        if "voice" in error_str or "drum" in error_str:
+            from backend.services.ai.tools.compose_tool import _DRUM_VOICE_TO_SYNTHDEF
+            voice_names = list(_DRUM_VOICE_TO_SYNTHDEF.keys())[:12]
+            hints.append(f"Valid drum voice names: {', '.join(voice_names)}")
+
+        return ("\nHint: " + " | ".join(hints)) if hints else ""
+
+    def _hint_edit_clip(self, tool_input: dict) -> str:
+        """Build hint for a failed edit_clip call."""
+        clip_id = tool_input.get("clip_id", "")
+        if not clip_id or "not found" in clip_id.lower():
+            try:
+                comp_id = self.action_service.composition_state.current_composition_id
+                comp = self.action_service.composition_state.get_composition(comp_id)
+                if comp and comp.clips:
+                    ids = [c.id for c in comp.clips[:6]]
+                    return f"\nHint: clip_id '{clip_id}' not found. Available clip IDs: {', '.join(ids)}"
+            except Exception:
+                pass
+        return ""
+
     async def _handle_edit_clip(self, params: dict):
         """
-        Handle the edit_clip tool — supports add/replace/remove modes
-        and accepts note names in addition to raw MIDI dicts.
+        Handle the edit_clip tool — supports add/replace/remove modes,
+        clip resizing (duration_bars), and clip repositioning (start_bar).
         """
         from backend.models.ai_actions import ActionResult
 
@@ -800,6 +1080,8 @@ class AIAgentService:
         raw_notes = params.get("notes", [])
         transpose = params.get("transpose_semitones", 0)
         vel_scale = params.get("velocity_scale", 1.0)
+        duration_bars = params.get("duration_bars")
+        start_bar = params.get("start_bar")
 
         # Convert notes — accept both {pitch, beat, dur, vel} and {n, s, d, v}
         from backend.services.music.theory import note_name_to_midi
@@ -829,6 +1111,15 @@ class AIAgentService:
 
         converted = [n for n in (normalize_note(r) for r in raw_notes) if n is not None]
 
+        # Build base modify_clip params
+        modify_params: dict = {"clip_id": clip_id}
+
+        # Resize / reposition (independent of note edits — can be used alone)
+        if duration_bars is not None:
+            modify_params["duration"] = int(duration_bars) * 4  # bars → beats
+        if start_bar is not None:
+            modify_params["start_time"] = int(start_bar) * 4  # bars → beats
+
         if mode == "add":
             # Get existing notes and merge
             comp_id = self.action_service.composition_state.current_composition_id
@@ -842,8 +1133,7 @@ class AIAgentService:
                             for e in clip.midi_events
                         ]
                         break
-            merged = existing + converted
-            action = DAWAction(action="modify_clip", parameters={"clip_id": clip_id, "notes": merged})
+            modify_params["notes"] = existing + converted
         elif mode == "remove":
             # Remove matching notes by pitch+beat proximity
             comp_id = self.action_service.composition_state.current_composition_id
@@ -859,14 +1149,21 @@ class AIAgentService:
                             if (e.note, round(e.start_time, 3)) not in remove_set
                         ]
                         break
-            action = DAWAction(action="modify_clip", parameters={"clip_id": clip_id, "notes": remaining})
-        else:
-            # replace (default)
-            action = DAWAction(action="modify_clip", parameters={"clip_id": clip_id, "notes": converted})
+            modify_params["notes"] = remaining
+        elif converted:
+            # replace (default) — only include notes if any were provided
+            modify_params["notes"] = converted
 
+        action = DAWAction(action="modify_clip", parameters=modify_params)
         return await self.action_service.execute_action(action)
 
     def _build_instruments_catalog(self) -> str:
+        """Cached instrument catalog for AI prompts (P3)."""
+        if "instruments" not in AIAgentService._catalog_cache:
+            AIAgentService._catalog_cache["instruments"] = self._compute_instruments_catalog()
+        return AIAgentService._catalog_cache["instruments"]
+
+    def _compute_instruments_catalog(self) -> str:
         """
         Build a role-grouped, compact instrument catalog for AI prompts.
         Groups by musical role rather than dumping all 195+ instruments.
@@ -926,6 +1223,12 @@ class AIAgentService:
         return "\n".join(lines)
 
     def _build_kit_catalog(self) -> str:
+        """Cached kit catalog for AI prompts (P3)."""
+        if "kits" not in AIAgentService._catalog_cache:
+            AIAgentService._catalog_cache["kits"] = self._compute_kit_catalog()
+        return AIAgentService._catalog_cache["kits"]
+
+    def _compute_kit_catalog(self) -> str:
         """Build compact kit catalog for AI prompts."""
         try:
             from backend.services.music.genre_profiles import get_genre_kit_catalog_for_ai
@@ -934,6 +1237,12 @@ class AIAgentService:
             return "DRUM KITS: trap-kit, 808-core, house-kit, boom-bap, jazz-kit, rock-kit"
 
     def _build_genre_profiles_summary(self) -> str:
+        """Cached genre profiles summary for AI prompts (P3)."""
+        if "genres" not in AIAgentService._catalog_cache:
+            AIAgentService._catalog_cache["genres"] = self._compute_genre_profiles_summary()
+        return AIAgentService._catalog_cache["genres"]
+
+    def _compute_genre_profiles_summary(self) -> str:
         """Build a compact genre profiles summary for AI prompts."""
         try:
             from backend.services.music.genre_profiles import GENRE_PROFILES
@@ -948,6 +1257,12 @@ class AIAgentService:
             return ""
 
     def _build_effects_list(self) -> str:
+        """Cached effects list for AI prompts (P3)."""
+        if "effects" not in AIAgentService._catalog_cache:
+            AIAgentService._catalog_cache["effects"] = self._compute_effects_list()
+        return AIAgentService._catalog_cache["effects"]
+
+    def _compute_effects_list(self) -> str:
         """Build formatted list of available effects from EFFECT_DEFINITIONS"""
         # Lazy import to avoid circular dependency
         from backend.services.daw.effect_definitions import EFFECT_DEFINITIONS
@@ -997,6 +1312,16 @@ class AIAgentService:
         messages = []
 
         composition_id = self.action_service.composition_state.current_composition_id
+
+        # P4: Load-on-demand — restore history from persisted composition on first access
+        if composition_id and composition_id not in self.chat_histories:
+            comp = self.action_service.composition_state.get_composition(composition_id)
+            if comp and comp.chat_history:
+                self.chat_histories[composition_id] = list(comp.chat_history)
+                logger.info(f"📜 Loaded {len(comp.chat_history)} messages from composition {composition_id}")
+            else:
+                self.chat_histories[composition_id] = []
+
         if composition_id and composition_id in self.chat_histories:
             history = self.chat_histories[composition_id]
             recent = history[-history_length:] if len(history) > history_length else history

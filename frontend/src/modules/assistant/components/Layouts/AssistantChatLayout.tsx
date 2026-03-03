@@ -64,9 +64,9 @@ function MusicalContextPanel({ context }: { context: string }) {
 // ── Main component ────────────────────────────────────────────────────────────
 export function AssistantChatLayout() {
     // Store state
-    const chatHistory       = useDAWStore(state => state.chatHistory);
-    const isSendingMessage  = useDAWStore(state => state.isSendingMessage);
-    const sendMessage       = useDAWStore(state => state.sendMessage);
+    const chatHistory      = useDAWStore(state => state.chatHistory);
+    const isSendingMessage = useDAWStore(state => state.isSendingMessage);
+    const sendMessage      = useDAWStore(state => state.sendMessage);
 
     // AI settings
     const aiQuickCommands      = useSettingsStore(s => s.aiQuickCommands);
@@ -156,7 +156,7 @@ export function AssistantChatLayout() {
                                                 )}
                                             </div>
 
-                                            {/* Message content */}
+                                                            {/* Message content */}
                                             <div className="text-sm whitespace-pre-wrap">{message.content}</div>
 
                                             {/* Action badges */}
@@ -194,7 +194,7 @@ export function AssistantChatLayout() {
                                             <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                                             <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                                         </div>
-                                        <span className="text-xs text-muted-foreground">AI is analyzing your sequence and composing...</span>
+                                        <span className="text-xs text-muted-foreground">Connecting…</span>
                                     </div>
                                 </div>
                             </div>

@@ -4,6 +4,7 @@ Intent Routing System — Maps user requests to appropriate tool sets.
 Uses LLM-based classification for accurate intent detection.
 Musical intents (CREATE_BEAT, CREATE_ARRANGEMENT) are first-class citizens.
 """
+import asyncio
 import logging
 import anthropic
 from typing import Dict, Any, List, Optional
@@ -31,12 +32,34 @@ class IntentRouter:
     Uses Claude Haiku for fast, cheap intent detection.
     """
 
+    _RETRYABLE_STATUS = (529, 429)
+    _BACKOFF = [1.0, 2.0, 4.0]
+
     def __init__(self, api_key: Optional[str] = None):
         self.client = anthropic.AsyncAnthropic(api_key=api_key) if api_key else None
         self.model = "claude-haiku-4-5-20251001"
 
+    @staticmethod
+    def _keyword_fallback(message: str) -> Intent:
+        """Last-resort keyword-based intent detection when LLM routing fails."""
+        msg = message.lower()
+        keywords: Dict[Intent, List[str]] = {
+            Intent.CREATE_BEAT:        ["beat", "drum", "kick", "snare", "808", "hi-hat", "hihat", "percussion", "rhythm"],
+            Intent.CREATE_CONTENT:     ["melody", "bass", "chord", "lead", "pad", "arp", "bassline", "synth"],
+            Intent.CREATE_ARRANGEMENT: ["song", "arrangement", "full track", "verse", "chorus", "complete"],
+            Intent.MODIFY_CONTENT:     ["change", "edit", "modify", "adjust", "fix", "update", "alter"],
+            Intent.DELETE_CONTENT:     ["delete", "remove", "clear", "erase", "wipe"],
+            Intent.ADD_EFFECTS:        ["reverb", "delay", "effect", "eq", "compress", "distort", "chorus", "phaser"],
+            Intent.PLAYBACK_CONTROL:   ["play", "stop", "tempo", "bpm", "loop", "pause"],
+            Intent.QUERY_STATE:        ["what", "how many", "which", "show me", "list", "tell me"],
+        }
+        for intent, words in keywords.items():
+            if any(w in msg for w in words):
+                return intent
+        return Intent.GENERAL_CHAT
+
     async def route(self, user_message: str, daw_state_summary: Optional[str] = None) -> Intent:
-        """Route user message to intent category using LLM."""
+        """Route user message to intent category using LLM with retry + keyword fallback."""
         if not self.client:
             logger.warning("⚠️ No API key, defaulting to GENERAL_CHAT")
             return Intent.GENERAL_CHAT
@@ -76,45 +99,63 @@ User request: "{user_message}"{context}
 
 Respond with ONLY the category name. No explanation."""
 
-        try:
-            response = await self.client.messages.create(
-                model=self.model,
-                max_tokens=50,
-                messages=[{"role": "user", "content": classification_prompt}]
-            )
-            intent_str = response.content[0].text.strip().upper()
-            intent_map = {
-                "CREATE_BEAT":        Intent.CREATE_BEAT,
-                "CREATE_ARRANGEMENT": Intent.CREATE_ARRANGEMENT,
-                "CREATE_CONTENT":     Intent.CREATE_CONTENT,
-                "MODIFY_CONTENT":     Intent.MODIFY_CONTENT,
-                "DELETE_CONTENT":     Intent.DELETE_CONTENT,
-                "ADD_EFFECTS":        Intent.ADD_EFFECTS,
-                "PLAYBACK_CONTROL":   Intent.PLAYBACK_CONTROL,
-                "QUERY_STATE":        Intent.QUERY_STATE,
-                "GENERAL_CHAT":       Intent.GENERAL_CHAT,
-            }
-            intent = intent_map.get(intent_str, Intent.GENERAL_CHAT)
-            logger.info(f"🔀 LLM routed to {intent.value}")
-            return intent
-        except Exception as e:
-            logger.error(f"❌ Intent routing failed: {e}, defaulting to GENERAL_CHAT")
-            return Intent.GENERAL_CHAT
+        intent_map = {
+            "CREATE_BEAT":        Intent.CREATE_BEAT,
+            "CREATE_ARRANGEMENT": Intent.CREATE_ARRANGEMENT,
+            "CREATE_CONTENT":     Intent.CREATE_CONTENT,
+            "MODIFY_CONTENT":     Intent.MODIFY_CONTENT,
+            "DELETE_CONTENT":     Intent.DELETE_CONTENT,
+            "ADD_EFFECTS":        Intent.ADD_EFFECTS,
+            "PLAYBACK_CONTROL":   Intent.PLAYBACK_CONTROL,
+            "QUERY_STATE":        Intent.QUERY_STATE,
+            "GENERAL_CHAT":       Intent.GENERAL_CHAT,
+        }
+
+        last_exc: Exception = RuntimeError("No attempts made")
+        for attempt, wait in enumerate([0.0] + self._BACKOFF):
+            if wait:
+                logger.warning(f"⏳ Routing retry in {wait:.0f}s (attempt {attempt}/{len(self._BACKOFF)})…")
+                await asyncio.sleep(wait)
+            try:
+                response = await self.client.messages.create(
+                    model=self.model,
+                    max_tokens=50,
+                    messages=[{"role": "user", "content": classification_prompt}]
+                )
+                intent_str = response.content[0].text.strip().upper()
+                intent = intent_map.get(intent_str, Intent.GENERAL_CHAT)
+                logger.info(f"🔀 LLM routed to {intent.value}")
+                return intent
+            except anthropic.InternalServerError as exc:
+                if exc.status_code in self._RETRYABLE_STATUS:
+                    last_exc = exc
+                else:
+                    raise
+            except anthropic.RateLimitError as exc:
+                last_exc = exc
+            except Exception as e:
+                logger.error(f"❌ Intent routing failed: {e}")
+                last_exc = e
+                break  # Non-retryable error — skip remaining attempts
+
+        # All retries exhausted — use keyword fallback
+        fallback = self._keyword_fallback(user_message)
+        logger.warning(f"⚠️ Routing failed after retries ({last_exc}), keyword fallback → {fallback.value}")
+        return fallback
 
     def get_tools_for_intent(self, intent: Intent) -> List[str]:
         """Get relevant tool names for an intent — lean and focused."""
         tool_map = {
             Intent.CREATE_BEAT: [
                 "compose_music",
-                "set_tempo",          # tempo often specified alongside beat style
+                # NOTE: set_tempo intentionally omitted — use compose_music's `tempo` field instead
+                # to avoid the model calling set_tempo first and compose_music never running
             ],
             Intent.CREATE_ARRANGEMENT: [
                 "compose_music",
-                "set_tempo",
             ],
             Intent.CREATE_CONTENT: [
                 "compose_music",
-                "set_tempo",
             ],
             Intent.MODIFY_CONTENT: [
                 "edit_clip",
@@ -203,6 +244,8 @@ BEAT POSITIONS (4/4 time, beats 0–3.75 per bar):
 
             Intent.CREATE_BEAT: f"""You are a music production AI. Create drum beats and percussion.
 
+IMPORTANT: Use compose_music in a SINGLE call. Set tempo via compose_music's `tempo` field — do NOT call set_tempo separately first.
+
 Use compose_music with drum_pattern or kit_pattern:
 - kit_pattern: SIMPLEST — use a kit's built-in pattern directly
 - drum_pattern: CUSTOM — specify voices + beat positions manually
@@ -223,11 +266,26 @@ Be decisive. Pick an appropriate kit and create a musical pattern.""",
 
             Intent.CREATE_ARRANGEMENT: f"""You are a music production AI. Create complete multi-track arrangements.
 
-Use compose_music with MULTIPLE tracks in a single call:
+CRITICAL: Make ONE compose_music call that includes ALL tracks AND sets tempo in the `tempo` field.
+Do NOT call set_tempo separately — put tempo inside compose_music.
+Do NOT make multiple compose_music calls — put all tracks in one call.
+
+compose_music structure:
+{{
+  "tempo": 128,
+  "tracks": [
+    {{ "name": "Drums", "drum_pattern": {{ ... }} }},
+    {{ "name": "Bass", "instrument": "synthBass1", "note_sequence": {{ ... }} }},
+    {{ "name": "Chords", "instrument": "pad", "chord_pattern": {{ ... }} }},
+    {{ "name": "Lead", "instrument": "lead", "note_sequence": {{ ... }} }}
+  ]
+}}
+
+Layers (use all relevant ones):
 1. Drums: kit_pattern or drum_pattern
-2. Bass: note_sequence in octave 2-3 (e.g. A2, C2, F2)
-3. Chords: chord_pattern (Am, F, C, G etc.)
-4. Lead/melody: note_sequence in octave 4-5
+2. Bass: note_sequence, octave 2-3 (A2, C2, F2)
+3. Chords: chord_pattern (Am, F, C, G)
+4. Lead/melody: note_sequence, octave 4-5
 
 {kit_catalog}
 {NOTATION_GUIDE}
@@ -236,10 +294,11 @@ Use compose_music with MULTIPLE tracks in a single call:
 GENRE PROFILES (suggested settings by genre):
 {genre_profiles_summary}
 
-Always create at least drums + bass + chords. Add a lead melody if appropriate.
-All tracks in ONE compose_music call for a coherent result.""",
+Always create at least drums + bass + chords. Add a lead melody if appropriate.""",
 
             Intent.CREATE_CONTENT: f"""You are a music production AI. Create musical content.
+
+IMPORTANT: Use compose_music in a SINGLE call with tempo set via the `tempo` field. Do NOT call set_tempo first.
 
 Use compose_music to create tracks. Specify content type:
 - note_sequence: melodies, basslines, arpeggios (use note NAMES: C4, F#3, Bb5)
@@ -258,10 +317,22 @@ Think about harmonic context. Ask: what key, what scale, what instrument?""",
 
             Intent.MODIFY_CONTENT: f"""You are a music production AI. Edit existing musical content.
 
-Use edit_clip to modify clips:
+Use edit_clip for ALL clip changes — notes, length, and position:
+
+NOTE EDITING (use "mode" field):
   mode "add":     add new notes without removing existing ones
-  mode "replace": completely replace notes (careful — destructive)
-  mode "remove":  remove specific notes
+  mode "replace": completely replace all notes
+  mode "remove":  remove specific notes by pitch+beat
+
+RESIZING / REPOSITIONING (no "mode" needed — just set the field):
+  duration_bars: change clip length in bars  (e.g. duration_bars=8 → 8-bar clip)
+  start_bar:     move clip start position    (e.g. start_bar=4 → starts at bar 5)
+  Both can be combined with note edits in the same call.
+
+Examples:
+  Extend clip to 16 bars:    {{"clip_id": "...", "duration_bars": 16}}
+  Move clip to bar 8:        {{"clip_id": "...", "start_bar": 8}}
+  Resize + replace notes:    {{"clip_id": "...", "duration_bars": 8, "mode": "replace", "notes": [...]}}
 
 {NOTATION_GUIDE}
 
@@ -307,7 +378,10 @@ Be informative and specific.""",
             Intent.GENERAL_CHAT: f"""You are a music production AI with full creative control.
 
 Use compose_music for all creation (tracks, beats, melodies, chords).
-Use edit_clip to modify existing content.
+Use edit_clip to modify existing content (notes, length, position):
+  - duration_bars: resize clip (e.g. duration_bars=16)
+  - start_bar: move clip (e.g. start_bar=8)
+  - mode + notes: edit note content
 Use add_effect / remove_effect for effects.
 
 {kit_catalog}

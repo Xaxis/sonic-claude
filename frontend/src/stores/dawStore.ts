@@ -259,6 +259,9 @@ interface DAWStore {
     dawStateSnapshot: DAWStateSnapshot | null;
     aiContext: string | null;
 
+    // Streaming state (P1)
+    streamingMessageId: string | null;
+
     // Assistant UI State
     activeAssistantTab: "chat" | "analysis";
     isSendingMessage: boolean;
@@ -594,6 +597,9 @@ export const useDAWStore = create<DAWStore>()(
                 analysisEvents: [],
                 dawStateSnapshot: null,
                 aiContext: null,
+
+                // Streaming state (P1 — ephemeral)
+                streamingMessageId: null,
 
                 // Assistant UI State (PERSISTED)
                 activeAssistantTab: "chat",
@@ -1994,6 +2000,17 @@ export const useDAWStore = create<DAWStore>()(
                 const scenes = snapshot.scenes || [];
                 const launchQuantization = snapshot.launch_quantization || '1';
 
+                // Load chat history from composition (clears old history on switch)
+                const chatHistory: ChatMessage[] = (snapshot.chat_history || []).map((msg: any) => ({
+                    id: msg.id || crypto.randomUUID(),
+                    role: msg.role,
+                    content: msg.content,
+                    timestamp: msg.timestamp,
+                    actions_executed: msg.actions_executed ?? undefined,
+                    routing_intent: msg.routing_intent ?? null,
+                    musical_context: msg.musical_context ?? null,
+                }));
+
                 set({
                     activeComposition: snapshot,
                     tracks,
@@ -2005,6 +2022,7 @@ export const useDAWStore = create<DAWStore>()(
                     clipSlots,
                     scenes,
                     launchQuantization,
+                    chatHistory,
                     hasUnsavedChanges: false,
                     // Sync loop state from composition to UI state
                     isLooping: snapshot.loop_enabled ?? false,
@@ -2025,6 +2043,7 @@ export const useDAWStore = create<DAWStore>()(
                 windowManager.broadcastState('clipSlots', clipSlots);
                 windowManager.broadcastState('scenes', scenes);
                 windowManager.broadcastState('launchQuantization', launchQuantization);
+                windowManager.broadcastState('chatHistory', chatHistory);
 
                 if (!silent) {
                     toast.success(`Loaded composition: ${snapshot.name}`);
@@ -2471,32 +2490,26 @@ export const useDAWStore = create<DAWStore>()(
             try {
                 set({ isSendingMessage: true });
 
-                // Add to AI request history (pending)
-                const historyEntry: AIRequestHistoryEntry = {
-                    id: requestId,
-                    timestamp: Date.now(),
-                    source: "chat",
-                    entityLabel: "Chat Panel",
-                    userMessage: message,
-                    status: "pending",
-                };
                 set((state) => ({
-                    aiRequestHistory: [historyEntry, ...state.aiRequestHistory].slice(0, 100)
+                    aiRequestHistory: [{
+                        id: requestId,
+                        timestamp: Date.now(),
+                        source: "chat" as const,
+                        entityLabel: "Chat Panel",
+                        userMessage: message,
+                        status: "pending" as const,
+                    }, ...state.aiRequestHistory].slice(0, 100)
                 }));
 
-                // Add user message to chat history
-                const userMessage: ChatMessage = {
+                // Add user message immediately
+                get().addChatMessage({
                     id: `msg-${Date.now()}`,
                     role: "user",
                     content: message,
                     timestamp: new Date().toISOString(),
-                };
-                get().addChatMessage(userMessage);
+                });
 
-                // Read AI preferences from settingsStore (non-hook, safe to call in store action)
                 const aiPrefs = useSettingsStore.getState();
-
-                // Send to backend with current AI preferences
                 const response = await api.assistant.chat({
                     message,
                     execution_model:          aiPrefs.aiExecutionModel,
@@ -2509,24 +2522,18 @@ export const useDAWStore = create<DAWStore>()(
                     include_timbre_context:   aiPrefs.aiIncludeTimbreContext,
                 });
 
-                // Add assistant response to chat history (including metadata for transparency)
-                const assistantMessage: ChatMessage = {
+                get().addChatMessage({
                     id: `msg-${Date.now()}-response`,
                     role: "assistant",
                     content: response.response,
                     timestamp: new Date().toISOString(),
                     actions_executed: response.actions_executed,
-                    routing_intent: response.routing_intent ?? null,
-                    musical_context: response.musical_context ?? null,
-                };
-                get().addChatMessage(assistantMessage);
+                    routing_intent:   response.routing_intent ?? null,
+                    musical_context:  response.musical_context ?? null,
+                });
 
-                // Update AI context if provided
-                if (response.musical_context) {
-                    get().setAIContext(response.musical_context);
-                }
+                if (response.musical_context) get().setAIContext(response.musical_context);
 
-                // Update history entry with success
                 set((state) => ({
                     aiRequestHistory: state.aiRequestHistory.map(entry =>
                         entry.id === requestId
@@ -2535,35 +2542,29 @@ export const useDAWStore = create<DAWStore>()(
                     )
                 }));
 
-                // Add analysis event if actions were executed
                 if (response.actions_executed && response.actions_executed.length > 0) {
-                    const analysisEvent: AnalysisEvent = {
-                        id: `event-${Date.now()}`,
-                        type: "action",
-                        message: `Executed ${response.actions_executed.length} action(s)`,
+                    get().addAnalysisEvent({
+                        id:        `event-${Date.now()}`,
+                        type:      "action",
+                        message:   `Executed ${response.actions_executed.length} action(s)`,
                         timestamp: new Date().toISOString(),
-                        metadata: { actions: response.actions_executed },
-                    };
-                    get().addAnalysisEvent(analysisEvent);
+                        metadata:  { actions: response.actions_executed },
+                    });
 
-                    // CRITICAL: Reload composition after assistant mutations
-                    // Backend is source of truth - must reload to see changes
                     const { activeComposition } = get();
                     if (activeComposition) {
                         await get().loadComposition(activeComposition.id);
                         await get().refreshUndoRedoStatus();
                     }
 
-                    // Auto-play if the user has that preference enabled
                     if (useSettingsStore.getState().aiAutoPlayAfterChanges) {
                         try { await get().play(); } catch { /* non-fatal */ }
                     }
                 }
             } catch (error) {
-                console.error("Failed to send message:", error);
+                console.error("sendMessage failed:", error);
                 toast.error("Failed to send message");
 
-                // Update history entry with error
                 set((state) => ({
                     aiRequestHistory: state.aiRequestHistory.map(entry =>
                         entry.id === requestId
@@ -2572,7 +2573,7 @@ export const useDAWStore = create<DAWStore>()(
                     )
                 }));
             } finally {
-                set({ isSendingMessage: false });
+                set({ isSendingMessage: false, streamingMessageId: null });
             }
         },
 

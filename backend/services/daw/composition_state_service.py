@@ -218,7 +218,7 @@ class CompositionStateService:
         """
         composition = self.compositions.get(composition_id)
         if not composition:
-            logger.error(f"❌ Composition {composition_id} not found")
+            logger.error(f"❌ Composition {composition_id} not found — available IDs: {list(self.compositions.keys())}")
             return None
 
         # VALIDATION LAYER 3: Service-level validation

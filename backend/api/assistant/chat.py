@@ -3,10 +3,12 @@ Assistant Chat Operations - Chat endpoint for assistant-DAW interaction
 
 This module handles chat interactions with the assistant agent.
 """
+import json
 import logging
 from typing import Optional, Literal
 import anthropic
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.core.dependencies import get_ai_agent_service
@@ -15,6 +17,15 @@ from backend.services.ai.agent_service import AIAgentService
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ============================================================================
+# ERROR MESSAGES — shared between streaming and non-streaming paths
+# ============================================================================
+
+_MSG_RATE_LIMIT   = "AI rate limit reached. Please wait a moment before trying again."
+_MSG_OVERLOADED   = "Anthropic AI is temporarily overloaded. Please try again in a few seconds."
+_MSG_UNAVAILABLE  = "AI service not available. Set AI_ANTHROPIC_API_KEY in your .env file at the project root."
 
 
 # ============================================================================
@@ -64,7 +75,7 @@ class ChatResponse(BaseModel):
 # CHAT ENDPOINTS
 # ============================================================================
 
-@router.post("/chat", response_model=ChatResponse)
+@router.post("/chat")
 async def chat(
     request: ChatRequest,
     ai_service: AIAgentService = Depends(get_ai_agent_service)
@@ -83,46 +94,61 @@ async def chat(
     2. Load focused tools for that intent
     3. Analyse current DAW state with the requested context depth
     4. Generate response and execute actions
-    """
-    try:
-        if not ai_service.client:
-            raise HTTPException(
-                status_code=503,
-                detail="AI service not available. Set AI_ANTHROPIC_API_KEY in your .env file at the project root."
-            )
 
-        response_dict = await ai_service.send_message(
-            request.message,
-            execution_model=request.execution_model,
-            temperature=request.temperature,
-            response_style=request.response_style,
-            history_length=request.history_length,
-            use_intent_routing=request.use_intent_routing,
-            include_harmonic_context=request.include_harmonic_context,
-            include_rhythmic_context=request.include_rhythmic_context,
-            include_timbre_context=request.include_timbre_context,
+    Pass ``stream: true`` to receive a ``text/event-stream`` response with
+    incremental SSE events instead of waiting for the full response.
+    """
+    if not ai_service.client:
+        raise HTTPException(status_code=503, detail=_MSG_UNAVAILABLE)
+
+    kwargs = dict(
+        execution_model=request.execution_model,
+        temperature=request.temperature,
+        response_style=request.response_style,
+        history_length=request.history_length,
+        use_intent_routing=request.use_intent_routing,
+        include_harmonic_context=request.include_harmonic_context,
+        include_rhythmic_context=request.include_rhythmic_context,
+        include_timbre_context=request.include_timbre_context,
+    )
+
+    # ── Streaming path ──────────────────────────────────────────────────────
+    if request.stream:
+        async def generate_stream():
+            try:
+                async for event in ai_service.stream_message(request.message, **kwargs):
+                    yield event
+            except anthropic.RateLimitError:
+                yield f"data: {json.dumps({'type': 'error', 'code': 429, 'detail': _MSG_RATE_LIMIT})}\n\n"
+            except anthropic.InternalServerError as e:
+                detail = _MSG_OVERLOADED if e.status_code == 529 else str(e)
+                yield f"data: {json.dumps({'type': 'error', 'code': e.status_code, 'detail': detail})}\n\n"
+            except Exception as e:
+                logger.error(f"Stream error: {e}", exc_info=True)
+                yield f"data: {json.dumps({'type': 'error', 'detail': str(e)})}\n\n"
+
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
+    # ── Non-streaming path ──────────────────────────────────────────────────
+    try:
+        response_dict = await ai_service.send_message(request.message, **kwargs)
         return ChatResponse(
             response=response_dict["response"],
             actions_executed=response_dict.get("actions_executed", []),
             musical_context=response_dict.get("musical_context"),
             routing_intent=response_dict.get("routing_intent"),
         )
-
     except HTTPException:
         raise
     except anthropic.RateLimitError:
-        raise HTTPException(
-            status_code=429,
-            detail="AI rate limit reached. Please wait a moment before trying again."
-        )
+        raise HTTPException(status_code=429, detail=_MSG_RATE_LIMIT)
     except anthropic.InternalServerError as e:
         if e.status_code == 529:
-            raise HTTPException(
-                status_code=503,
-                detail="Anthropic AI is temporarily overloaded. Please try again in a few seconds."
-            )
+            raise HTTPException(status_code=503, detail=_MSG_OVERLOADED)
         logger.error(f"Chat error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
