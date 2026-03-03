@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils.ts";
+import { ResizeHandle } from "@/components/ui/resize-handle";
 import type { SequencerClip } from "../../types.ts";
 import { WaveformDisplay } from "../../../../components/ui/waveform-display.tsx";
 import { useDAWStore } from '@/stores/dawStore';
@@ -279,15 +280,19 @@ export function SequencerClip({
             onTouchCancel={aiHandlers.onTouchCancel}
         >
             {/* Left resize handle */}
-            <div
-                className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/20 z-20"
+            <ResizeHandle
+                orientation="horizontal"
+                side="left"
                 onMouseDown={(e) => handleMouseDown(e, "resize-left")}
+                className="z-20"
             />
 
             {/* Right resize handle */}
-            <div
-                className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/20 z-20"
+            <ResizeHandle
+                orientation="horizontal"
+                side="right"
                 onMouseDown={(e) => handleMouseDown(e, "resize-right")}
+                className="z-20"
             />
 
             {/* Waveform Display */}

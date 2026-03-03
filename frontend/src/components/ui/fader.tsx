@@ -7,6 +7,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { ValueDisplay } from "@/components/ui/value-display";
 
 export interface FaderProps {
     /** Current value in dB (-96 to +6) */
@@ -165,9 +166,9 @@ export function Fader({
 
             {/* Value display */}
             {label && (
-                <div className="min-w-[3rem] text-center font-mono text-xs">
-                    <div className="font-semibold text-cyan-400">{displayValue}</div>
-                    <div className="text-muted-foreground mt-1">{label}</div>
+                <div className="min-w-[3rem] text-center">
+                    <ValueDisplay value={displayValue} emphasis="accent" size="xs" align="center" />
+                    <div className="text-muted-foreground mt-1 text-xs">{label}</div>
                 </div>
             )}
         </div>

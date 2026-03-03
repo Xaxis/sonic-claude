@@ -46,9 +46,9 @@
  */
 
 import * as React from "react";
-import { Slider }       from "@/components/ui/slider.tsx";
-import { ValueDisplay } from "@/components/ui/value-display.tsx";
-import { cn }           from "@/lib/utils";
+import { Slider }          from "@/components/ui/slider.tsx";
+import { NumericScrubber } from "@/components/ui/numeric-scrubber";
+import { cn }              from "@/lib/utils";
 
 export interface ControlRowProps {
     label:       string;
@@ -102,10 +102,16 @@ export function ControlRow({
                 className="flex-1 min-w-0"
             />
 
-            <ValueDisplay
-                value={formatValue(value)}
+            <NumericScrubber
+                value={value}
+                onChange={onChange}
+                onCommit={onCommit}
+                min={min}
+                max={max}
+                step={step}
+                formatValue={formatValue}
+                emphasis="accent"
                 size="xs"
-                emphasis="muted"
                 align="right"
                 className={cn("flex-shrink-0", valueWidth)}
             />

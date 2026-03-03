@@ -7,6 +7,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { ValueDisplay } from "@/components/ui/value-display";
 
 export interface KnobProps {
     /** Current value (-1 to 1 for pan, 0 to 1 for others) */
@@ -186,9 +187,9 @@ export function Knob({
             </div>
 
             {/* Value display */}
-            <div className="min-w-[3rem] text-center font-mono text-xs">
-                <div className="font-semibold text-cyan-400">{formatValue()}</div>
-                {label && <div className="text-muted-foreground mt-1">{label}</div>}
+            <div className="min-w-[3rem] text-center">
+                <ValueDisplay value={formatValue()} emphasis="accent" size="xs" align="center" />
+                {label && <div className="text-muted-foreground mt-1 text-xs">{label}</div>}
             </div>
         </div>
     );

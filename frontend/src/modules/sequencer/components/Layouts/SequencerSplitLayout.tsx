@@ -11,7 +11,9 @@
  */
 
 import React, { useState, useCallback, useEffect } from "react";
+import { cn } from "@/lib/utils";
 import { Music } from "lucide-react";
+import { ResizeHandle } from "@/components/ui/resize-handle";
 import { EmptyState } from "@/components/ui/empty-state.tsx";
 import { SequencerTimelineSection } from "../Timeline/SequencerTimelineSection.tsx";
 import { SequencerPianoRoll } from "../PianoRoll/SequencerPianoRoll.tsx";
@@ -112,14 +114,19 @@ export function SequencerSplitLayout({
             </div>
 
             {/* Resizable Divider */}
-            <div
-                className={`h-1 flex-shrink-0 border-t border-border bg-background hover:bg-accent cursor-row-resize flex items-center justify-center group ${isDragging ? 'bg-accent' : ''}`}
+            <ResizeHandle
+                orientation="vertical"
+                side="top"
                 onMouseDown={handleDividerMouseDown}
                 onDoubleClick={handleDividerDoubleClick}
                 title="Drag to resize, double-click to reset"
+                className={cn(
+                    "h-1 flex-shrink-0 border-t border-border bg-background cursor-row-resize flex items-center justify-center group",
+                    isDragging ? "bg-accent" : "hover:bg-accent",
+                )}
             >
                 <div className="w-12 h-0.5 bg-border group-hover:bg-foreground/50 rounded-full" />
-            </div>
+            </ResizeHandle>
 
             {/* Editor Section - Bottom (resizable) - Piano Roll or Sample Editor */}
             <div

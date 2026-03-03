@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDAWStore } from '@/stores/dawStore';
 import { useTimelineCalculations } from '../../hooks/useTimelineCalculations.ts';
+import { Playhead } from "@/components/ui/playhead";
 
 
 
@@ -45,15 +46,10 @@ export function SequencerPianoRollRuler({}: SequencerPianoRollRulerProps) {
     const isPlaying = transport?.is_playing || false;
     const isPaused = transport?.is_paused ?? false;
 
-    const playheadRef = useRef<HTMLDivElement>(null);
     const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
     const [draggedPlayheadPosition, setDraggedPlayheadPosition] = useState<number | null>(null);
     const dragStartXRef = useRef<number>(0);
     const dragStartValueRef = useRef<number>(0);
-
-    // Calculate playhead position (rulerMarkers come from useTimelineCalculations hook)
-    const displayPosition = draggedPlayheadPosition !== null ? draggedPlayheadPosition : currentPosition;
-    const playheadX = displayPosition * pixelsPerBeat * zoom;
 
     // Store latest values in refs to avoid animation loop restarts
     const currentPositionRef   = useRef(currentPosition);
@@ -84,41 +80,30 @@ export function SequencerPianoRollRuler({}: SequencerPianoRollRulerProps) {
         return pos * pixelsPerBeatRef.current * zoomRef.current;
     }, []);
 
-    // Smooth playhead animation using requestAnimationFrame
-    // FIX: Store animId on every frame so the cleanup always cancels the latest frame
+    // Follow-scroll RAF — runs only during active playback (position is handled by <Playhead>)
     useEffect(() => {
-        const el = playheadRef.current;
-        if (!el) return;
-
-        const applyScroll = (x: number) => {
-            if (!followPlaybackRef.current) return;
-            const container = pianoRollScrollRefRef.current?.current;
-            if (!container) return;
-            const cw = container.clientWidth;
-            const rel = x - container.scrollLeft;
-            if (rel > cw * 0.8) {
-                container.scrollLeft = Math.max(0, x - cw * 0.5);
-            } else if (rel < 0) {
-                container.scrollLeft = Math.max(0, x - cw * 0.2);
-            }
-        };
-
-        const apply = () => {
-            const x = getPlayheadX();
-            el.style.transform = `translateX(${x}px)`;
-            applyScroll(x);
-        };
-
-        if (!isPlaying || isPaused || isDraggingPlayhead) {
-            el.style.transform = `translateX(${getPlayheadX()}px)`;
-            return;
-        }
+        if (!isPlaying || isPaused || isDraggingPlayhead) return;
 
         let animId: number;
-        const loop = () => { apply(); animId = requestAnimationFrame(loop); };
+        const loop = () => {
+            if (followPlaybackRef.current) {
+                const container = pianoRollScrollRefRef.current?.current;
+                if (container) {
+                    const x = getPlayheadX();
+                    const cw = container.clientWidth;
+                    const rel = x - container.scrollLeft;
+                    if (rel > cw * 0.8) {
+                        container.scrollLeft = Math.max(0, x - cw * 0.5);
+                    } else if (rel < 0) {
+                        container.scrollLeft = Math.max(0, x - cw * 0.2);
+                    }
+                }
+            }
+            animId = requestAnimationFrame(loop);
+        };
         animId = requestAnimationFrame(loop);
         return () => cancelAnimationFrame(animId);
-    }, [isPlaying, isPaused, isDraggingPlayhead, draggedPlayheadPosition, getPlayheadX]);
+    }, [isPlaying, isPaused, isDraggingPlayhead, getPlayheadX]);
 
     const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (isDraggingPlayhead) return;
@@ -215,28 +200,15 @@ export function SequencerPianoRollRuler({}: SequencerPianoRollRulerProps) {
             </div>
 
             {/* Playhead indicator */}
-            <div
-                ref={playheadRef}
-                className="absolute top-0 bottom-0 w-px bg-red-500 z-50 cursor-ew-resize pointer-events-auto"
-                style={{
-                    transform: `translateX(${playheadX}px)`,
-                    boxShadow: '0 0 4px rgba(239, 68, 68, 0.6)',
-                    willChange: 'transform',
-                }}
+            <Playhead
+                getX={getPlayheadX}
+                isPlaying={isPlaying}
+                isPaused={isPaused}
+                withCap
+                interactive
                 onMouseDown={handlePlayheadMouseDown}
-                title="Drag to scrub"
-            >
-                {/* Downward-pointing cap — centred over the 1px line via translateX(-50%) */}
-                <div
-                    className="absolute top-0 left-0 w-0 h-0 pointer-events-none"
-                    style={{
-                        transform: 'translateX(-50%)',
-                        borderLeft: '5px solid transparent',
-                        borderRight: '5px solid transparent',
-                        borderTop: '6px solid #ef4444',
-                    }}
-                />
-            </div>
+                className="z-50"
+            />
         </div>
     );
 }
