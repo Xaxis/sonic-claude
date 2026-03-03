@@ -18,6 +18,7 @@ import { ValueDisplay }       from "@/components/ui/value-display.tsx";
 import { TrackButton }        from "@/components/ui/track-button.tsx";
 import { ChannelStrip }       from "@/components/ui/channel-strip.tsx";
 import { ChannelStripHeader } from "@/components/ui/channel-strip-header.tsx";
+import { InstrumentPicker } from "@/components/ui/instrument-picker.tsx";
 import { useDAWStore }  from "@/stores/dawStore";
 import { volumeToDb, dbToVolume, formatDb } from "@/lib/audio-utils";
 import { useInlineAI }        from "@/hooks/useInlineAI";
@@ -80,6 +81,11 @@ export function MixerChannelStrip({ trackId }: MixerChannelStripProps) {
                         ...aiHandlers,
                     }}
                 />
+
+                {/* ── Instrument Picker (MIDI tracks) ─────────────────────── */}
+                {track.type === "midi" && (
+                    <InstrumentPicker trackId={track.id} size="sm" className="w-full max-w-full" />
+                )}
 
                 {/* ── Meter ────────────────────────────────────────────────── */}
                 {showMeters && (

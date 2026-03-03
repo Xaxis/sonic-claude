@@ -16,7 +16,7 @@ import { ControlRow }    from "@/components/ui/control-row.tsx";
 import { Badge }         from "@/components/ui/badge.tsx";
 import { EditableText }  from "@/components/ui/editable-text.tsx";
 import { cn } from "@/lib/utils.ts";
-import { SequencerInstrumentSelector } from "../Instruments/SequencerInstrumentSelector.tsx";
+import { InstrumentPicker } from "@/components/ui/instrument-picker.tsx";
 import { TrackButton } from "@/components/ui/track-button.tsx";
 import {
     DropdownMenu,
@@ -172,44 +172,39 @@ export function SequencerTrackHeader({
                 </DropdownMenu>
             </div>
 
-            {/* MINIMIZED MODE - Single row with essentials */}
+            {/* MINIMIZED MODE - Two stacked rows in 64px */}
             {!isExpanded && (
-                <div className="flex items-center gap-2 h-full">
-                    {/* Type Badge */}
-                    <Badge variant={track.type} rounded="default" className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                        {track.type}
-                    </Badge>
-
-                    {/* Track Name - Always visible, click to expand, right-click/long-press for AI */}
-                    <div
-                        className={cn("flex-1 min-w-0 cursor-pointer transition-all", highlightClass)}
-                        onClick={() => !isEditing && onToggleExpand?.(track.id)}
-                        title="Click to expand • Right-click or long-press for AI"
-                        {...aiHandlers}
-                    >
-                        <EditableText
-                            value={editName}
-                            isEditing={isEditing}
-                            onChange={setEditName}
-                            onSave={handleSaveEdit}
-                            onCancel={handleCancelEdit}
-                            inputSize="text-xs"
-                        />
+                <div className="flex flex-col justify-center gap-0.5 h-full">
+                    {/* Row 1: badge + name + mute/solo */}
+                    <div className="flex items-center gap-1.5">
+                        <Badge variant={track.type} rounded="default" className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider flex-shrink-0">
+                            {track.type}
+                        </Badge>
+                        <div
+                            className={cn("flex-1 min-w-0 cursor-pointer transition-all", highlightClass)}
+                            onClick={() => !isEditing && onToggleExpand?.(track.id)}
+                            title="Click to expand • Right-click or long-press for AI"
+                            {...aiHandlers}
+                        >
+                            <EditableText
+                                value={editName}
+                                isEditing={isEditing}
+                                onChange={setEditName}
+                                onSave={handleSaveEdit}
+                                onCancel={handleCancelEdit}
+                                inputSize="text-xs"
+                            />
+                        </div>
+                        <TrackButton variant="mute"  active={track.is_muted} onClick={handleToggleMute} size="xs" />
+                        <TrackButton variant="solo"  active={track.is_solo}  onClick={handleToggleSolo} size="xs" />
                     </div>
 
-                    {/* Mute/Solo - Always visible */}
-                    <TrackButton
-                        variant="mute"
-                        active={track.is_muted}
-                        onClick={handleToggleMute}
-                        size="xs"
-                    />
-                    <TrackButton
-                        variant="solo"
-                        active={track.is_solo}
-                        onClick={handleToggleSolo}
-                        size="xs"
-                    />
+                    {/* Row 2: instrument picker (MIDI tracks only) */}
+                    {track.type === "midi" && (
+                        <div className="flex items-center pl-0.5">
+                            <InstrumentPicker trackId={track.id} size="xs" />
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -247,11 +242,7 @@ export function SequencerTrackHeader({
                     {/* ROW 2: INSTRUMENT & TRANSPORT - Instrument, Mute, Solo, Arm */}
                     <div className="flex items-center gap-2">
                         {track.type === "midi" && (
-                            <div className="flex items-center gap-2">
-                                <SequencerInstrumentSelector
-                                    trackId={track.id}
-                                />
-                            </div>
+                            <InstrumentPicker trackId={track.id} size="sm" />
                         )}
 
                         {/* TRANSPORT - Mute, Solo, Arm */}
