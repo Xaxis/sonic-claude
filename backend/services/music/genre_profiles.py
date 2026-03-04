@@ -172,7 +172,7 @@ GENRE_PROFILES: Dict[str, Dict] = {
         "bass_octave":      2,
         "bass_style":       "simple",
         "chord_instrument": "electricPiano1",
-        "lead_instrument":  "flute",
+        "lead_instrument":  "glass",        # "flute" doesn't exist in registry; glass = ethereal/delicate
         "chord_voicing":    "closed",
         "structure_bars":   8,
         "chord_rhythm":     "block",

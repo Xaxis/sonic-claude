@@ -1189,33 +1189,75 @@ class AIAgentService:
         """
         from backend.services.daw.registry import SYNTHDEF_REGISTRY
 
-        # Sonic descriptions for key synths (instrument name → brief timbral description)
+        # Sonic descriptions for all synths — drives LLM instrument selection accuracy.
+        # Format: name → brief timbral description (kept to ≤6 words for token efficiency).
         _SONIC_HINTS: Dict[str, str] = {
-            # Leads
-            "lead":      "bright cutting sawtooth",
-            "supersaw":  "wide stacked detuned (EDM)",
-            "glide":     "portamento monophonic",
-            "fm":        "metallic bell-like (FM)",
-            "stab":      "short punchy chord stab",
-            # Bass
-            "bass":      "deep subtractive",
-            "acidbass":  "TB-303 squelch/resonance",
-            "reese":     "detuned saw (DnB/techno)",
-            "wobble":    "LFO filter sweep",
-            "synthBass1": "clean GM synth bass",
-            # Pads / Textures
-            "pad":       "warm slow-attack atmosphere",
-            "strings":   "lush detuned ensemble",
-            # Keys
-            "pluck":     "fast-decay pizzicato",
-            "bell":      "clear resonant sine",
-            "organ":     "Hammond B3 drawbar",
-            "kalimba":   "thumb piano (bright & short)",
-            "glass":     "ethereal bowl shimmer",
+            # ── Synths & Leads ─────────────────────────────────────────────────
+            "lead":        "bright cutting sawtooth lead",
+            "supersaw":    "wide stacked detuned (EDM walls)",
+            "glide":       "portamento monophonic lead",
+            "fm":          "metallic bell-like FM",
+            "stab":        "short punchy chord stab",
+            "duo":         "dual detuned oscillators",
+            "pwm":         "pulse-width-mod LFO sweep",
+            "hoover":      "classic rave hoover w/glide",
+            "polyBrass":   "polysynth brass stabs",
+            "fmBell":      "DX7-style FM bell tones",
+            "fmVibes":     "FM vibraphone w/vibrato",
+            "bowedStr":    "physical model bowed string",
+            "metalKlank":  "metallic resonant partials",
+            "nylonStr":    "Karplus-Strong nylon guitar",
+            "buzzLead":    "rich harmonic Blip oscillator",
+            "analogLead":  "classic detuned mono lead",
+            "squareLead":  "square wave lead synth",
+            "fmLead":      "FM lead w/bright attack",
+            "brass":       "filter-envelope brass stab",
+            "chiptune":    "8-bit pulse wave",
+            # ── Bass Synths ────────────────────────────────────────────────────
+            "bass":        "deep subtractive bass",
+            "acidbass":    "TB-303 squelch/resonance",
+            "reese":       "detuned saw (DnB/techno)",
+            "wobble":      "LFO filter sweep bass",
+            "synthBass1":  "clean GM synth bass",
+            "fmBass":      "FM bass decaying modulator",
+            "moogBass":    "Moog ladder filter warmth",
+            "darkBass":    "sub bass + detuned saws",
+            "punchBass":   "hard attack fast filter sweep",
+            "dubBass":     "reggae/dub sine dominant",
+            "subBass":     "pure sine sub bass",
+            "squareBass":  "square wave low-pass bass",
+            # ── Pads & Textures ────────────────────────────────────────────────
+            "pad":         "warm slow-attack atmosphere",
+            "strings":     "lush detuned string ensemble",
+            "warmPad":     "slow-attack detuned saw pad",
+            "junoPad":     "Juno-106 stereo chorus pad",
+            "choirPad":    "vowel formant choir texture",
+            "spacePad":    "ambient shimmer LFO drift",
+            "dreamPad":    "harmonic series per-voice drift",
+            "atmospherePad": "dark textural pad w/noise",
+            "loPad":       "filtered vintage bit-reduced pad",
+            # ── Keys & Mallets ─────────────────────────────────────────────────
+            "organ":       "Hammond B3 drawbar",
+            "kalimba":     "thumb piano bright & short",
+            "glass":       "ethereal bowl shimmer",
+            "pluck":       "fast-decay pizzicato",
+            "bell":        "clear resonant sine bell",
             "electricPiano1": "Rhodes/Wurlitzer",
-            "clavinet":  "funky clavinet",
-            # Drums note
-            "chiptune":  "8-bit pulse wave",
+            "clavinet":    "funky percussive clavinet",
+            "tubeBell":    "tubular bells accurate partials",
+            "rhodes":      "FM Rhodes electric piano",
+            "wurli":       "Wurlitzer w/transient bark",
+            "claviSynth":  "clavinet-style clicky keys",
+            "fmEpiano":    "DX7-style FM e-piano feedback",
+            # ── GM Bass (used directly in genre profiles) ──────────────────────
+            "acousticBass":       "upright double bass (jazz/acoustic)",
+            "electricBassFinger": "fingered electric bass (warm/smooth)",
+            "electricBassPick":   "picked electric bass (bright/punchy)",
+            "fretlessBass":       "fretless bass smooth glides",
+            "slapBass1":          "slap/pop funk technique",
+            "slapBass2":          "slap bass bright variant",
+            "synthBass2":         "synth bass 2 brighter variant",
+            # GM categories — instrument names are self-describing (standard GM)
         }
 
         role_groups: Dict[str, List[str]] = {
@@ -1293,15 +1335,25 @@ class AIAgentService:
         return AIAgentService._catalog_cache["genres"]
 
     def _compute_genre_profiles_summary(self) -> str:
-        """Build a compact genre profiles summary for AI prompts."""
+        """
+        Build a compact genre profiles summary for AI prompts.
+        Includes instrument recommendations so the model can pick appropriate sounds
+        even on intents where the full genre-injection block doesn't fire.
+        """
         try:
             from backend.services.music.genre_profiles import GENRE_PROFILES
-            lines = ["GENRE PROFILES (suggested kit + scale + tempo):"]
+            lines = ["GENRE PROFILES (kit | scale | bpm | lead, chords, bass):"]
             for name, profile in GENRE_PROFILES.items():
-                kit = profile.get("kit_id", "?")
-                scales = profile.get("scales", ["minor"])[0]
-                bpm = profile.get("tempo_default", 120)
-                lines.append(f"  {name}: kit={kit}, scale={scales}, bpm={bpm}")
+                kit    = profile.get("kit_id", "?")
+                scale  = profile.get("scales", ["minor"])[0]
+                bpm    = profile.get("tempo_default", 120)
+                lead   = profile.get("lead_instrument", "lead")
+                chords = profile.get("chord_instrument", "pad")
+                bass   = profile.get("bass_instrument", "bass")
+                lines.append(
+                    f"  {name}: kit={kit}, scale={scale}, bpm={bpm}"
+                    f" | lead={lead}, chords={chords}, bass={bass}"
+                )
             return "\n".join(lines)
         except Exception:
             return ""
